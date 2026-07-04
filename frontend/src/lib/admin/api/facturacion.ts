@@ -156,7 +156,7 @@ export const facturacionApi = {
   // genérico "no hay nada" cuando en realidad ARCA tiene puntos, pero ninguno sirve.
   consultarPuntosVenta: (id: number) =>
     authedJson<{
-      puntos_venta: { nro: number }[];
+      puntos_venta: { nro: number; emision_tipo?: string | null }[];
       excluidos: {
         nro: number;
         motivo: "bloqueado" | "dado_de_baja" | "no_electronico";

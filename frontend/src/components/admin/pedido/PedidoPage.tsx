@@ -279,6 +279,10 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
     descuentoPct: draft.datos?.descuento_pct ?? null,
     descuentoTipo: draft.datos?.descuento_manual_tipo ?? null,
     descuentoMonto: draft.datos?.descuento_manual_monto ?? null,
+    // Defensa en profundidad: si algún caller reusa `PedidoPage` para más de
+    // un pedido sin desmontarla, el hook no muestra el desglose del pedido
+    // ANTERIOR mientras el nuevo todavía está en vuelo (ver `useCotizacion`).
+    resetKey: pedidoId,
   });
 
   if (pedidoQ.isLoading) {

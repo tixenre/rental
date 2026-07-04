@@ -13,7 +13,7 @@
  *    pase (arma pedidos para terceros). Anónimo / sin cliente → consumidor final.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { authedPostJson } from "@/lib/authedFetch";
 
@@ -185,6 +185,19 @@ export function useCotizacion(args: {
    * 2026-06-06 "Datos del pedido: plata congelada".
    */
   respetarPrecioItem?: boolean;
+  /**
+   * Identidad de la entidad DUEÑA de esta cotización (ej. el id del pedido).
+   * Sin esto, el hook asume una identidad estable (ej. "el carrito"), donde
+   * mostrar el valor anterior mientras se recalcula es lo deseado (sin
+   * parpadeo al editar). Con un `resetKey` que cambia — ej. el admin navega
+   * a OTRO pedido en un panel maestro-detalle que no desmonta el componente
+   * (`/admin/pedidos/$id`) — el hook deja de mostrar el placeholder de la
+   * entidad ANTERIOR: mejor un instante en $0 que el desglose de otro pedido
+   * superpuesto al nombre del nuevo (bug real, confirmado con los valores en
+   * 0 en la base — no era un cálculo mal hecho, era este hook mostrando la
+   * cotización vieja mientras la nueva todavía viajaba por la red).
+   */
+  resetKey?: string | number | null;
   enabled?: boolean;
 }): { data: Cotizacion; isFetching: boolean; isError: boolean } {
   const {
@@ -197,6 +210,7 @@ export function useCotizacion(args: {
     descuentoMonto,
     descuentoManualActivo,
     respetarPrecioItem = false,
+    resetKey = null,
     enabled = true,
   } = args;
 
@@ -230,6 +244,20 @@ export function useCotizacion(args: {
   // es inmediato (`useState(body)`).
   const bodyKey = JSON.stringify(body);
   const [debounced, setDebounced] = useState({ key: bodyKey, body });
+
+  // Generación: se incrementa cada vez que cambia `resetKey`. Ajuste de
+  // estado DURANTE el render (patrón oficial de React para resetear estado
+  // al cambiar de identidad, no en un efecto) — salta el debounce en el
+  // mismo render, antes de pintar, para que el body ya sea el de la entidad
+  // nueva en el primer frame.
+  const prevResetKeyRef = useRef(resetKey);
+  const [generation, setGeneration] = useState(0);
+  if (prevResetKeyRef.current !== resetKey) {
+    prevResetKeyRef.current = resetKey;
+    setGeneration((g) => g + 1);
+    if (bodyKey !== debounced.key) setDebounced({ key: bodyKey, body });
+  }
+
   useEffect(() => {
     if (bodyKey === debounced.key) return;
     const t = setTimeout(() => setDebounced({ key: bodyKey, body }), COTIZAR_DEBOUNCE_MS);
@@ -246,6 +274,17 @@ export function useCotizacion(args: {
     staleTime: 30_000,
   });
 
+  // Mientras el dato que devuelve `q` sea un PLACEHOLDER (de `keepPreviousData`,
+  // de una generación anterior) no lo mostramos como si fuera de la entidad
+  // actual — se corrige solo apenas responde el fetch real de la generación
+  // nueva. Sin `resetKey` (default `null`, nunca cambia) esto es un no-op:
+  // mismo comportamiento de siempre para los demás consumidores del hook.
+  const lastGoodGenerationRef = useRef(-1);
+  if (q.data && !q.isPlaceholderData) {
+    lastGoodGenerationRef.current = generation;
+  }
+  const identityPending = lastGoodGenerationRef.current !== generation;
+
   // `isFetching` cubre TAMBIÉN el intervalo de debounce (hay una edición
   // pendiente de recalcular) → el consumidor puede mostrar "recalculando…" y
   // no presentar el número viejo como definitivo. `isError` surfacea un fallo
@@ -255,8 +294,8 @@ export function useCotizacion(args: {
   // Carrito vacío → cero, sin arrastrar el último valor cacheado por
   // `keepPreviousData` (si no, al vaciar el carrito quedaría el total viejo).
   return {
-    data: hayItems && q.data ? adaptar(q.data) : COTIZACION_VACIA,
-    isFetching: q.isFetching || pendingDebounce,
+    data: hayItems && q.data && !identityPending ? adaptar(q.data) : COTIZACION_VACIA,
+    isFetching: q.isFetching || pendingDebounce || identityPending,
     isError: q.isError,
   };
 }
