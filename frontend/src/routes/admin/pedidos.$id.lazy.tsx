@@ -116,8 +116,20 @@ import {
 } from "@/components/admin/pedido/PedidoPageHelpers";
 
 export const Route = createLazyFileRoute("/admin/pedidos/$id")({
-  component: PedidoEditorPage,
+  component: PedidoEditorRoute,
 });
+
+// `key={id}`: el panel maestro-detalle navega entre pedidos sin desmontar esta
+// ruta (mismo patrón, solo cambia `$id`) — sin el key, el debounce +
+// `keepPreviousData` de `useCotizacion` (lib/cotizacion.ts) no se resetea entre
+// pedidos y el desglose puede mostrar, por una ventana breve, el descuento del
+// pedido ANTERIOR combinado con el nombre del cliente NUEVO (bug real:
+// "aparece un descuento que no existe", confirmado con datos en 0 en la base —
+// era 100% un artefacto de caché del front, no del cálculo).
+function PedidoEditorRoute() {
+  const { id } = useParams({ from: "/admin/pedidos/$id" });
+  return <PedidoEditorPage key={id} />;
+}
 
 // La máquina de estados (FLOW / transiciones / blockReason / nextStep) vive en
 // @/lib/pedido-estados — fuente única compartida con el panel de detalle de la lista.
@@ -177,6 +189,10 @@ function PedidoEditorPage() {
     descuentoTipo: draft.datos?.descuento_manual_tipo ?? null,
     descuentoMonto: draft.datos?.descuento_manual_monto ?? null,
     descuentoManualActivo: draft.datos?.descuento_manual_activo ?? null,
+    // Defensa en profundidad (sumado a `key={id}` en `PedidoEditorRoute`,
+    // arriba): aunque este panel ya se remonta al cambiar de pedido, el hook
+    // en sí queda protegido para cualquier otro consumidor que no lo haga.
+    resetKey: pedidoId,
   });
 
   // Modales

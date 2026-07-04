@@ -104,13 +104,22 @@ def _get_pedido(conn, pedido_id: int) -> dict:
 
 def _chequeos_previos(
     req, perfil_receptor: str, importes: dict, ambiente: str, numero_a_emitir: int, conn=None
-) -> list[dict]:
+) -> tuple[list[dict], Optional[str]]:
     """Chequeos fail-not-fast (todos corren, ninguno frena a los demás — mismo
     patrón que `services/checkout/validar.py`). Lo irreversible es "Confirmar
     y emitir": acá se junta todo lo verificable de antemano para que ese paso
-    no tenga sorpresas."""
+    no tenga sorpresas.
+
+    Devuelve `(chequeos, domicilio_afip)` — `domicilio_afip` es el domicilio que ARCA devolvió
+    en la consulta de solo lectura (`resolver_persona`, ver más abajo) si tuvo éxito, o `None`.
+    Antes se descartaba: el chequeo confirmaba el CUIT contra ARCA pero el domicilio resuelto en
+    esa misma llamada se tiraba, así que el preview mostraba "sin confirmar" aunque ARCA sí lo
+    hubiera devuelto — el domicilio persistido en la ficha del cliente (`cliente_domicilio_fiscal`)
+    solo se actualiza recién al EMITIR de verdad (`verificar_y_actualizar_receptor`), no en el
+    preview de solo lectura."""
     from identity.anchor import cuil_valido
 
+    domicilio_afip: Optional[str] = None
     chequeos = [
         {
             "check": "credenciales_arca",
@@ -146,7 +155,8 @@ def _chequeos_previos(
         # que hay que atender).
         if cuit_ok and conn is not None:
             try:
-                resolver_persona(str(req.receptor.doc_nro), conn)
+                persona = resolver_persona(str(req.receptor.doc_nro), conn)
+                domicilio_afip = persona.domicilio or None
             except RuntimeError as exc:
                 chequeos.append(
                     {
@@ -231,7 +241,7 @@ def _chequeos_previos(
         }
     )
 
-    return chequeos
+    return chequeos, domicilio_afip
 
 
 def previsualizar_factura(pedido_id: int, conn) -> dict:
@@ -330,7 +340,7 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
     ultimo = wsfe.ultimo_autorizado(emisor_obj.punto_venta, int(cbte_tipo))
     numero_a_emitir = ultimo + 1
 
-    chequeos = _chequeos_previos(
+    chequeos, domicilio_afip = _chequeos_previos(
         req, perfil_receptor, importes, cred.ambiente, numero_a_emitir, conn=conn
     )
     listo = all(c["ok"] or not c["bloqueante"] for c in chequeos)
@@ -355,7 +365,7 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
             "razon_social": pedido.get("cliente_razon_social")
             or pedido.get("cliente_nombre")
             or "",
-            "domicilio": pedido.get("cliente_domicilio_fiscal") or "",
+            "domicilio": pedido.get("cliente_domicilio_fiscal") or domicilio_afip or "",
         },
         "comprobante": {
             "letra": letra,

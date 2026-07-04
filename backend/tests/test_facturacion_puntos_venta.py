@@ -43,7 +43,10 @@ def test_filtra_bloqueados_dados_de_baja_y_no_electronicos(monkeypatch):
 
     result = consultar_puntos_venta("pablo", conn=object())
 
-    assert result["habilitados"] == [{"nro": 2}, {"nro": 6}]
+    assert result["habilitados"] == [
+        {"nro": 2, "emision_tipo": "CAE"},
+        {"nro": 6, "emision_tipo": "CAE"},
+    ]
     assert result["excluidos"] == [
         {"nro": 3, "motivo": "bloqueado"},
         {"nro": 4, "motivo": "dado_de_baja"},
@@ -69,7 +72,10 @@ def test_fchbaja_string_null_de_arca_no_cuenta_como_dado_de_baja(monkeypatch):
 
     result = consultar_puntos_venta("pablo", conn=object())
 
-    assert result["habilitados"] == [{"nro": 2}, {"nro": 4}]
+    assert result["habilitados"] == [
+        {"nro": 2, "emision_tipo": "CAE"},
+        {"nro": 4, "emision_tipo": "CAE"},
+    ]
     assert result["excluidos"] == []
 
 
@@ -91,7 +97,10 @@ def test_emisiontipo_con_sufijo_de_regimen_cuenta_como_electronico(monkeypatch):
 
     result = consultar_puntos_venta("pablo", conn=object())
 
-    assert result["habilitados"] == [{"nro": 2}, {"nro": 3}]
+    assert result["habilitados"] == [
+        {"nro": 2, "emision_tipo": "CAE - Monotributo"},
+        {"nro": 3, "emision_tipo": "CAE - Responsable Inscripto"},
+    ]
     assert result["excluidos"] == [
         {"nro": 5, "motivo": "no_electronico", "raw_emision_tipo": "CAEA"},
     ]
