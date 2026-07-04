@@ -430,7 +430,22 @@ function EmisorFormModal({
         {emisor ? "Editar emisor" : "Nuevo emisor"}
       </h2>
       <div className="space-y-3">
-        {/* 1. CUIT — se arranca por acá; AFIP autocompleta el resto solo */}
+        {/* 1. Nombre interno (nuestro, no de AFIP) — primero para identificar el emisor */}
+        <Field
+          label="Nombre interno"
+          hint="Identificador corto para este sistema (no el nombre legal)"
+        >
+          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad; DS Input no soporta estilos custom hairline */}
+          <input
+            type="text"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="pablo, santini, empresa_xyz…"
+            className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm"
+          />
+        </Field>
+
+        {/* 2. CUIT — dispara el autocompletado de AFIP solo */}
         <Field
           label="CUIT"
           hint="Poné el CUIT y AFIP completa razón social, condición IVA y domicilio."
@@ -475,9 +490,15 @@ function EmisorFormModal({
           )}
         </Field>
 
-        {/* 2. Datos de AFIP — de solo-lectura cuando AFIP los devuelve */}
+        {/* 3. Datos de AFIP — de solo-lectura cuando AFIP los devuelve. Mientras
+        la consulta está en vuelo (`padron.buscando`) se muestra un estado
+        "esperando" bien visible en vez del input editable con el valor viejo
+        — si no, un campo que YA tenía el valor correcto (sin cambios visibles
+        al bloquearse) parece que "se quedó editable para siempre". */}
         <Field label="Razón social" hint="Nombre legal que aparece en el PDF de la factura">
-          {afip.razon_social ? (
+          {padron.buscando && !afip.razon_social ? (
+            <PendingAfip />
+          ) : afip.razon_social ? (
             <ReadOnlyAfip
               value={razonSocial}
               onEdit={() => setAfip((a) => ({ ...a, razon_social: false }))}
@@ -496,7 +517,9 @@ function EmisorFormModal({
           )}
         </Field>
         <Field label="Condición IVA del emisor">
-          {afip.condicion_iva ? (
+          {padron.buscando && !afip.condicion_iva ? (
+            <PendingAfip />
+          ) : afip.condicion_iva ? (
             <ReadOnlyAfip
               value={CONDICIONES.find((c) => c.value === condicion)?.label ?? condicion}
               onEdit={() => setAfip((a) => ({ ...a, condicion_iva: false }))}
@@ -519,7 +542,9 @@ function EmisorFormModal({
           )}
         </Field>
         <Field label="Domicilio comercial" hint="Aparece en el PDF de la factura">
-          {afip.domicilio ? (
+          {padron.buscando && !afip.domicilio ? (
+            <PendingAfip />
+          ) : afip.domicilio ? (
             <ReadOnlyAfip
               value={domicilio}
               onEdit={() => setAfip((a) => ({ ...a, domicilio: false }))}
@@ -536,21 +561,6 @@ function EmisorFormModal({
               />
             </>
           )}
-        </Field>
-
-        {/* 3. Nombre interno (nuestro, no de AFIP) */}
-        <Field
-          label="Nombre interno"
-          hint="Identificador corto para este sistema (no el nombre legal)"
-        >
-          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad; DS Input no soporta estilos custom hairline */}
-          <input
-            type="text"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            placeholder="pablo, santini, empresa_xyz…"
-            className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm"
-          />
         </Field>
 
         {/* 4. Punto de venta (AFIP no lo lista confiable — se carga/consulta) */}
@@ -975,6 +985,19 @@ function ReadOnlyAfip({ value, onEdit }: { value: string; onEdit: () => void }) 
       >
         editar
       </button>
+    </div>
+  );
+}
+
+// Estado "consultando AFIP" de un campo que todavía no se resolvió — distinto
+// de un input editable normal, para que no parezca que el campo "se quedó
+// editable para siempre" mientras la consulta a AFIP (que puede tardar unos
+// segundos) sigue en vuelo.
+function PendingAfip() {
+  return (
+    <div className="h-9 rounded-md border hairline bg-muted/20 px-3 text-sm flex items-center gap-1.5 text-muted-foreground">
+      <Search className="h-3.5 w-3.5 animate-pulse" />
+      Esperando a AFIP…
     </div>
   );
 }
