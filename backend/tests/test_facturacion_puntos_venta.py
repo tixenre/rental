@@ -51,6 +51,28 @@ def test_filtra_bloqueados_dados_de_baja_y_no_electronicos(monkeypatch):
     ]
 
 
+def test_fchbaja_string_null_de_arca_no_cuenta_como_dado_de_baja(monkeypatch):
+    """Regresión de bug real: la respuesta REAL de ARCA (no la del WSDL/manual) trae `FchBaja`
+    como la string literal `"NULL"` para un punto de venta que NO está dado de baja — un emisor
+    real reportó los 2 únicos puntos de venta que tenía, ambos activos y uno usado para emitir
+    una factura con éxito, marcados igual como "dado de baja" en el diagnóstico. `"null"` en
+    minúscula y con espacios también se tratan como ausente (mismo quirk, no confiar en el casing
+    exacto de ARCA)."""
+    _patch_auth(monkeypatch)
+    monkeypatch.setattr(
+        "arca_fe.wsfe.WsfeClient.param_puntos_venta",
+        lambda self: [
+            {"Nro": 2, "EmisionTipo": "CAE", "Bloqueado": "N", "FchBaja": "NULL"},
+            {"Nro": 4, "EmisionTipo": "CAE", "Bloqueado": "N", "FchBaja": " null "},
+        ],
+    )
+
+    result = consultar_puntos_venta("pablo", conn=object())
+
+    assert result["habilitados"] == [{"nro": 2}, {"nro": 4}]
+    assert result["excluidos"] == []
+
+
 def test_sin_puntos_habilitados_devuelve_lista_vacia(monkeypatch):
     _patch_auth(monkeypatch)
     monkeypatch.setattr("arca_fe.wsfe.WsfeClient.param_puntos_venta", lambda self: [])
