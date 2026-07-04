@@ -698,6 +698,18 @@ _LAYOUTS = {
     "formal": _factura_formal_html,
 }
 
+LAYOUTS_VALIDOS: tuple[str, ...] = tuple(_LAYOUTS.keys())
+
+
+def normalizar_layout(layout: str) -> str:
+    """Valida un `layout` pedido por el caller contra los soportados (`LAYOUTS_VALIDOS`:
+    `"clasica"`/`"celular"`/`"formal"`) — desconocido o vacío cae a `"celular"`. Es el mismo
+    fallback silencioso que ya aplicaba `renderizar_comprobante_html` puertas adentro; exponerlo
+    deja que el caller lo aplique UNA vez y reuse el resultado ya normalizado en todo lo demás que
+    dependa del mismo `layout` en la misma request (nombre de archivo, tamaño de página del PDF) —
+    sin repetir el chequeo `if layout not in (...)` en cada punto de uso."""
+    return layout if layout in _LAYOUTS else "celular"
+
 
 def renderizar_comprobante_html(
     datos: ComprobanteFiscal,
@@ -720,6 +732,6 @@ def renderizar_comprobante_html(
 
     Devuelve el HTML como string; no convierte a PDF (eso es responsabilidad del caller, junto con
     `arca_fe.seguridad.asegurar_pdf` si hace falta el documento certificado)."""
-    builder = _LAYOUTS.get(layout, _factura_mobile_html)
+    builder = _LAYOUTS[normalizar_layout(layout)]
     ctx = _build_ctx(datos)
     return builder(ctx, fonts_css)

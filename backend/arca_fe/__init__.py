@@ -16,7 +16,7 @@ probada en producción — bajo SemVer, `0.x` señala justamente que puede rompe
 compatibilidad entre versiones menores, la misma libertad que se usó acá.
 """
 
-__version__ = "0.5.0"
+__version__ = "0.7.0"
 
 from .modelos import (
     CondicionIva,
@@ -47,10 +47,16 @@ from .modelos import (
 )
 from .comprobante import tipo_comprobante, calcular_importes, armar_fecae, armar_fecae_lote
 from .qr import armar_qr, qr_svg
-from .pdf import renderizar_comprobante_html, nombre_fiscal_comprobante, tamano_pagina_layout
+from .pdf import (
+    renderizar_comprobante_html,
+    nombre_fiscal_comprobante,
+    tamano_pagina_layout,
+    normalizar_layout,
+    LAYOUTS_VALIDOS,
+)
 from .seguridad import generar_cert_autofirmado, asegurar_pdf
 from .wsaa import construir_tra, firmar_tra, login, login_con_cert, WSFE_WSAA_SERVICIO
-from .wsfe import WsfeClient, clear_cache as wsfe_clear_cache
+from .wsfe import WsfeClient, parse_fecha_arca, clear_cache as wsfe_clear_cache
 from .padron import (
     PadronClient,
     PersonaArca,
@@ -114,6 +120,8 @@ __all__ = [
     "renderizar_comprobante_html",
     "nombre_fiscal_comprobante",
     "tamano_pagina_layout",
+    "normalizar_layout",
+    "LAYOUTS_VALIDOS",
     "generar_cert_autofirmado",
     "asegurar_pdf",
     # auth WSAA
@@ -124,6 +132,7 @@ __all__ = [
     "WSFE_WSAA_SERVICIO",
     # cliente WSFEv1
     "WsfeClient",
+    "parse_fecha_arca",
     "wsfe_clear_cache",
     # cliente de padrón (Constancia de Inscripción, ws_sr_constancia_inscripcion)
     "PadronClient",

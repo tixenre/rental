@@ -563,8 +563,8 @@ async def descargar_pdf_factura(
     A4) · 'formal' (A4, identidad de la celular)."""
     require_admin(request)
 
-    if layout not in ("clasica", "celular", "formal"):
-        layout = "celular"
+    from arca_fe.pdf import normalizar_layout
+    layout = normalizar_layout(layout)
 
     with get_db() as conn:
         factura, html_str = _factura_html_o_404(factura_id, conn, layout=layout)
@@ -630,8 +630,8 @@ async def enviar_mail_factura(factura_id: int, request: Request, layout: str = "
     """Envía el PDF de la factura (renderizado on-demand) al email del cliente del pedido."""
     require_admin(request)
 
-    if layout not in ("clasica", "celular", "formal"):
-        layout = "celular"
+    from arca_fe.pdf import normalizar_layout
+    layout = normalizar_layout(layout)
 
     from services.email import send_raw_email, Attachment
     from services.facturacion.pdf_seguridad import get_or_create_signing_cert

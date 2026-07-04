@@ -203,8 +203,8 @@ async def cliente_pedido_factura(
     `layout`: 'celular' (default de Rambla, compacta 4:5) · 'clasica' (réplica
     oficial AFIP/ARCA, A4) · 'formal'."""
     session = require_cliente(request)
-    if layout not in ("clasica", "celular", "formal"):
-        layout = "celular"
+    from arca_fe.pdf import normalizar_layout
+    layout = normalizar_layout(layout)
     with get_db() as conn:
         row = conn.execute(
             "SELECT id FROM alquileres WHERE id = %s AND cliente_id = %s",

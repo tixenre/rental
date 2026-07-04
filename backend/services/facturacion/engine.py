@@ -533,12 +533,12 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
                 cae_consulta = consultado.get("CodAutorizacion")
                 if cae_consulta:
                     vto_raw = consultado.get("CAEFchVto", "")
-                    from arca_fe.wsfe import _parse_fecha
+                    from arca_fe import parse_fecha_arca
 
                     recuperado = CaeResult(
                         resultado="A",
                         cae=str(cae_consulta),
-                        cae_vto=_parse_fecha(vto_raw),
+                        cae_vto=parse_fecha_arca(vto_raw),
                         numero=numero_a_emitir,
                     )
 
@@ -740,12 +740,12 @@ def emitir_nota_credito(
                 cae_consulta = consultado.get("CodAutorizacion")
                 if cae_consulta:
                     vto_raw = consultado.get("CAEFchVto", "")
-                    from arca_fe.wsfe import _parse_fecha
+                    from arca_fe import parse_fecha_arca
 
                     recuperado = CaeResult(
                         resultado="A",
                         cae=str(cae_consulta),
-                        cae_vto=_parse_fecha(vto_raw),
+                        cae_vto=parse_fecha_arca(vto_raw),
                         numero=numero_a_emitir,
                     )
 

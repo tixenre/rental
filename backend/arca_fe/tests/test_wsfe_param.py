@@ -31,44 +31,44 @@ def _fake_comprobante():
 
 
 # ---------------------------------------------------------------------------
-# Tests de _parse_fecha
+# Tests de parse_fecha_arca
 # ---------------------------------------------------------------------------
 
 
-def test_parse_fecha_8_digitos():
-    from arca_fe.wsfe import _parse_fecha
+def testparse_fecha_arca_8_digitos():
+    from arca_fe.wsfe import parse_fecha_arca
 
-    assert _parse_fecha("20241201") == date(2024, 12, 1)
-
-
-def test_parse_fecha_iso():
-    from arca_fe.wsfe import _parse_fecha
-
-    assert _parse_fecha("2024-12-01") == date(2024, 12, 1)
+    assert parse_fecha_arca("20241201") == date(2024, 12, 1)
 
 
-def test_parse_fecha_none():
-    from arca_fe.wsfe import _parse_fecha
+def testparse_fecha_arca_iso():
+    from arca_fe.wsfe import parse_fecha_arca
 
-    assert _parse_fecha(None) is None
-
-
-def test_parse_fecha_vacio():
-    from arca_fe.wsfe import _parse_fecha
-
-    assert _parse_fecha("") is None
+    assert parse_fecha_arca("2024-12-01") == date(2024, 12, 1)
 
 
-def test_parse_fecha_malformada_loguea_y_devuelve_none(caplog):
+def testparse_fecha_arca_none():
+    from arca_fe.wsfe import parse_fecha_arca
+
+    assert parse_fecha_arca(None) is None
+
+
+def testparse_fecha_arca_vacio():
+    from arca_fe.wsfe import parse_fecha_arca
+
+    assert parse_fecha_arca("") is None
+
+
+def testparse_fecha_arca_malformada_loguea_y_devuelve_none(caplog):
     """Una fecha con formato inesperado (no vacía) → None PERO logueada, no
     tragada en silencio. Cubre también el caso de 8 chars no-dígitos, que
     antes podía explotar con ValueError sin manejar."""
     import logging
-    from arca_fe.wsfe import _parse_fecha
+    from arca_fe.wsfe import parse_fecha_arca
 
     with caplog.at_level(logging.WARNING, logger="arca_fe.wsfe"):
-        assert _parse_fecha("2024-6-1x") is None
-        assert _parse_fecha("aaaabbcc") is None  # 8 chars, no dígitos
+        assert parse_fecha_arca("2024-6-1x") is None
+        assert parse_fecha_arca("aaaabbcc") is None  # 8 chars, no dígitos
     assert sum("formato inesperado" in r.message for r in caplog.records) == 2
 
 
