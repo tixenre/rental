@@ -496,14 +496,6 @@ export function CartDrawerView({
                     </span>
                   </div>
 
-                  {!showNotas && list.length > 0 && (
-                    <button
-                      onClick={onShowNotas}
-                      className="w-full text-xs text-muted-foreground hover:text-ink focus:outline-none focus-visible:underline"
-                    >
-                      Agregar una nota
-                    </button>
-                  )}
                   <Button
                     variant="amber"
                     size="lg"
@@ -621,13 +613,26 @@ export function CartDrawerView({
                     />
                   )}
 
+                  {/* Utilitarias de baja frecuencia, agrupadas en una sola fila —
+                      "Vaciar" (destructiva) lejos del CTA principal para evitar
+                      un click accidental. */}
                   {list.length > 0 && (
-                    <button
-                      onClick={onClear}
-                      className="w-full text-xs text-muted-foreground hover:text-destructive focus:outline-none focus-visible:underline"
-                    >
-                      Vaciar pedido
-                    </button>
+                    <div className="flex items-center gap-3 text-xs">
+                      {!showNotas && (
+                        <button
+                          onClick={onShowNotas}
+                          className="text-muted-foreground transition hover:text-ink focus:outline-none focus-visible:underline"
+                        >
+                          Agregar una nota
+                        </button>
+                      )}
+                      <button
+                        onClick={onClear}
+                        className="ml-auto text-muted-foreground transition hover:text-destructive focus:outline-none focus-visible:underline"
+                      >
+                        Vaciar pedido
+                      </button>
+                    </div>
                   )}
                 </div>
               </>
