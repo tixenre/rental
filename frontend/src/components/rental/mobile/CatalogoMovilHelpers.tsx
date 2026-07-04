@@ -520,7 +520,12 @@ export function CartSheet({
               startTime={horaDesde}
               endTime={horaHasta}
               d={jornadas}
-              itemCount={entries.reduce((acc, { qty }) => acc + qty, 0)}
+              items={entries.map(({ eq, qty }) => ({
+                id: eq.id,
+                nombre: eq.name,
+                marca: eq.brand,
+                cantidad: qty,
+              }))}
               subtotalTotal={subtotal}
               descuentoPct={descuentoPct}
               descuentoOrigen={descuentoOrigen}

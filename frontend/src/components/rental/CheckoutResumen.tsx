@@ -22,6 +22,16 @@ import {
 export const RESUME_STEP_PARAM = "carritoPaso";
 export const RESUME_STEP_VALUE = "resumen";
 
+/** Forma mínima de un ítem para el resumen — compacta (sin steppers ni foto,
+ *  eso vive en el paso "carrito"): solo lo necesario para confirmar QUÉ se
+ *  está pidiendo, no solo cuánto sale. */
+export interface ResumenItem {
+  id: string;
+  nombre: string;
+  marca?: string;
+  cantidad: number;
+}
+
 /**
  * CheckoutResumen — el paso de revisión entre "Revisar pedido" (carrito) y
  * la creación real del pedido. NO hardcodea el orden de las validaciones: le
@@ -46,7 +56,7 @@ export function CheckoutResumen({
   startTime,
   endTime,
   d,
-  itemCount,
+  items,
   subtotalTotal,
   descuentoPct,
   descuentoOrigen,
@@ -63,7 +73,9 @@ export function CheckoutResumen({
   startTime: string;
   endTime: string;
   d: number;
-  itemCount: number;
+  /** Composición del pedido — se muestra compacta arriba del total, para que
+   *  confirmar no sea "a ciegas": vas a saber QUÉ pedís, no solo cuánto sale. */
+  items: ResumenItem[];
   subtotalTotal: number;
   descuentoPct: number;
   descuentoOrigen: DescuentoOrigen;
@@ -77,6 +89,7 @@ export function CheckoutResumen({
    *  tira, este componente lo muestra como error inline sin perder el estado. */
   onCrearPedido: (sessionConfirmed: boolean) => Promise<void>;
 }) {
+  const itemCount = items.reduce((acc, it) => acc + it.cantidad, 0);
   const [cargando, setCargando] = useState(true);
   const [faltan, setFaltan] = useState<FaltanItem[]>([]);
   const [errorValidar, setErrorValidar] = useState<string | null>(null);
@@ -215,6 +228,25 @@ export function CheckoutResumen({
             <div className="text-sm text-muted-foreground">Sin fechas seleccionadas</div>
           )}
         </div>
+
+        {items.length > 0 && (
+          <div className="rounded-lg border hairline bg-surface p-3">
+            <div className="mb-1.5 font-mono text-2xs uppercase tracking-widest text-muted-foreground">
+              Tu pedido
+            </div>
+            <ul className="space-y-1">
+              {items.map((it) => (
+                <li key={it.id} className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="min-w-0 truncate">
+                    <span className="font-mono text-xs text-muted-foreground">{it.cantidad}× </span>
+                    {it.marca && <span className="text-muted-foreground">{it.marca} </span>}
+                    {it.nombre}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="space-y-2 rounded-lg border hairline bg-surface p-3">
           <div className="flex items-center justify-between text-sm">

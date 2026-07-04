@@ -270,7 +270,12 @@ export function CartDrawerView({
                 startTime={startTime}
                 endTime={endTime}
                 d={d}
-                itemCount={list.reduce((acc, { qty }) => acc + qty, 0)}
+                items={list.map(({ it, qty }) => ({
+                  id: it.id,
+                  nombre: it.name,
+                  marca: it.brand,
+                  cantidad: qty,
+                }))}
                 subtotalTotal={subtotalTotal}
                 descuentoPct={descuentoPct}
                 descuentoOrigen={descuentoOrigen}
