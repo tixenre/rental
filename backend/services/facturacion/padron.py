@@ -81,8 +81,14 @@ def resolver_persona(cuit_buscado: str, conn) -> PersonaArca:
         except (ArcaError, ValueError) as exc:
             # Motivo tipado de AFIP (auth/relación/negocio/respuesta) o de
             # config (ValueError de `credenciales`) — se registra por emisor y
-            # se sigue probando el resto.
-            intentos.append(f"'{emisor_autenticador}' (CUIT {cuit_auth}): {exc}")
+            # se sigue probando el resto. Si la excepción trae la respuesta
+            # cruda de AFIP (`ArcaResponseError.raw`), se incluye para poder
+            # diagnosticar exactamente qué contestó AFIP.
+            motivo = str(exc)
+            crudo = getattr(exc, "raw", "")
+            if crudo:
+                motivo += f" [respuesta cruda de AFIP: {crudo}]"
+            intentos.append(f"'{emisor_autenticador}' (CUIT {cuit_auth}): {motivo}")
         except Exception as exc:  # último recurso: se surfacea igual, no se traga
             intentos.append(
                 f"'{emisor_autenticador}' (CUIT {cuit_auth}): "

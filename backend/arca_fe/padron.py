@@ -182,15 +182,23 @@ class PadronClient:
             raise ArcaResponseError(str(exc), raw=str(exc)) from exc
 
         persona = getattr(resp, "personaReturn", None) if resp is not None else None
+        # Algunos clientes SOAP "desenvuelven" el único elemento de retorno del
+        # WSDL: en ese caso `resp` YA ES el contenido de personaReturn
+        # (datosGenerales/datosMonotributo/... directo), no un wrapper con
+        # `.personaReturn`. El schema dice `.personaReturn`, pero contra la
+        # respuesta REAL de AFIP en prod conviene no depender solo de eso — se
+        # contemplan ambas formas.
+        if persona is None and _parece_persona(resp):
+            persona = resp
         if persona is None:
             crudo = _serializar(resp)
             _log.warning(
-                "getPersona sin 'personaReturn' para %s — respuesta cruda: %s",
+                "getPersona sin datos de persona para %s — respuesta cruda: %s",
                 cuit_buscado,
                 crudo,
             )
             raise ArcaResponseError(
-                "AFIP no devolvió 'personaReturn' para este CUIT (respuesta "
+                "AFIP no devolvió datos de persona para este CUIT (respuesta "
                 "vacía o inesperada, sin un motivo reconocible).",
                 raw=crudo,
             )
@@ -232,6 +240,25 @@ def _serializar(obj: Any) -> str:
         return str(zeep.helpers.serialize_object(obj, dict))
     except Exception:
         return repr(obj)
+
+
+def _parece_persona(obj: Any) -> bool:
+    """True si `obj` tiene pinta de ser el contenido de `personaReturn` ya
+    desenvuelto por el cliente SOAP — algún nodo de datos o de error de la
+    constancia colgando directo de `obj` (en vez de bajo `.personaReturn`)."""
+    if obj is None:
+        return False
+    return any(
+        getattr(obj, campo, None) is not None
+        for campo in (
+            "datosGenerales",
+            "datosMonotributo",
+            "datosRegimenGeneral",
+            "errorConstancia",
+            "errorRegimenGeneral",
+            "errorMonotributo",
+        )
+    )
 
 
 def _errores_constancia(persona: Any) -> list[str]:
