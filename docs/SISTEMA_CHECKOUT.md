@@ -151,15 +151,10 @@ Los comentarios `TODO (#NNNN)` marcan exactamente dónde.
 
 `POST /api/checkout/contrato-preview` (`routes/checkout.py::checkout_contrato_preview`)
 arma un `pedido` equivalente **en memoria** desde el carrito de la sesión (mismo
-`_leer_carrito` que usa el portero + `equipos`/`contenido_de_batch`/`clientes`) y llama
-al **mismo `_contrato_html`** (`pdf_templates.py`), con **`mostrar_locador=False`** —
-omite el bloque de datos institucionales de Rambla (nombre/CUIL/domicilio/contacto,
-fijos, no cambian por pedido) y la firma del Locador: en un preview lo que importa es
-que el cliente pueda leer las **cláusulas**, no la ficha del Locador. El contrato REAL
-(de un pedido ya creado) sigue llamando a `_contrato_html(pedido)` sin el flag —
-default `True`, los sigue mostrando siempre. No persiste nada, no crea el pedido. Deja
-que el cliente **lea el contrato antes de confirmar** (sienta base para la firma
-digital de #1098 Fase 5).
+`_leer_carrito` que usa el portero + `equipos`/`contenido_de_batch`) y llama al
+**mismo `_contrato_html`** (`pdf_templates.py`) que genera el contrato real — no
+persiste nada, no crea el pedido. Deja que el cliente **lea el contrato antes de
+confirmar** (sienta base para la firma digital de #1098 Fase 5).
 
 El HTML vuelve marcado como **SIMULACIÓN** (`_marcar_como_simulacion`: banner fijo +
 marca de agua diagonal) — el documento definitivo recién existe cuando el pedido se
@@ -168,15 +163,43 @@ confirma (queda en el portal del cliente + se manda por mail). El front (`lib/ch
 en un iframe sandboxed dentro de un modal, sin salir del checkout (mismo patrón que
 `FacturacionModal`/`TerminosModal`).
 
-**Iframe por Blob URL, no `srcDoc`** — el documento pesa ~1.3MB (fuentes TT Commons/
-Champ Black embebidas en base64, mismo `_fonts_css()` que usan los PDFs reales). Un
-`<iframe srcDoc={html}>` con ese tamaño tarda 10s+ en pintar en un browser real —
-confirmado navegando la app en vivo (Playwright), no solo con curl — y el spinner
-propio del modal ya había desaparecido (el fetch resuelve en 1-2s), dejando una
-pantalla en blanco que parecía rota. `ContratoPreviewModal.tsx` arma un
-`URL.createObjectURL(new Blob([html]))` y lo navega vía `<iframe src={blobUrl}>`
-(igual de lento internamente, pero ahora el spinner queda visible hasta el evento
-`onLoad` del iframe — nunca una pantalla en blanco sin explicación).
+### Datos de muestra, no los reales del cliente/inventario
+
+Es un documento que queda en el DOM del browser marcado "no válido" — no hace falta
+(ni conviene) exponer ahí datos reales que no aportan a la simulación. `routes/
+checkout.py::_CLIENTE_DE_MUESTRA` reemplaza nombre/dirección/teléfono/email/CUIT/
+razón social del Locatario por placeholders fijos ("Juan Pérez", etc.); `_serie_y_
+valor_de_muestra(idx)` hace lo mismo con el número de serie y el valor de reposición
+de cada equipo (`EJEMPLO-0001`, `$100.000`). **Lo único real del cliente es el perfil
+fiscal** (`cliente_perfil_impuestos` — decide si aparece el bloque de Responsable
+Inscripto; no es un dato personal sensible). Con el Locatario ya ficticio, el Locador
+(datos institucionales fijos de Rambla) **sí se muestra** — no hay nada sensible que
+cuidar de ese lado, y así el preview se lee como el contrato real completo. El
+nombre/cantidad/marca/modelo del equipo siguen siendo los reales (el cliente necesita
+verificar QUÉ está por pedir); solo serie y valor son de mentira.
+
+### Performance: sin fuentes de marca embebidas, sin el isologo
+
+`fonts_ligeras=True` (parámetro de `_contrato_html`/`_document`/`_membrete`, propio de
+este endpoint) salta:
+- El `@font-face` en base64 (~1.2MB — TT Commons + Champ Black, el mismo `_fonts_css()`
+  que necesitan los PDFs reales vía Playwright) y el link a Google Fonts. `--font-sans`/
+  `--font-mono` (`_DOC_CSS`) caen a `ui-sans-serif`/`ui-monospace` del sistema.
+- El isologo SVG (`_active_wordmark()`, que hace su propia consulta a `app_settings.
+  wordmark_svg`) — se reemplaza por el texto plano "Rambla".
+
+Motivo: **este documento lo pinta el browser real del cliente, no Playwright.** Un
+`<iframe srcDoc={html}>`/`<iframe src={blobUrl}>` con ~1.3MB tarda 10s+ en parsear
+(confirmado navegando la app en vivo, no solo con curl) — con `fonts_ligeras=True` el
+mismo documento pesa ~18KB y pinta en <500ms. El contrato REAL (de un pedido ya
+creado, generado por Playwright) sigue llamando a `_contrato_html(pedido)` sin el
+flag — default `False`, sigue embebiendo todo siempre.
+
+**Iframe por Blob URL, no `srcDoc`** — `ContratoPreviewModal.tsx` arma un
+`URL.createObjectURL(new Blob([html]))` y lo navega vía `<iframe src={blobUrl}>`. Con
+`fonts_ligeras=True` esto ya es rápido; independientemente, el spinner del modal queda
+visible hasta el evento `onLoad` del iframe — nunca una pantalla en blanco sin
+explicación, incluso si el documento creciera de nuevo en el futuro.
 
 **Robustez del armado en memoria** (edge cases reales, con candado en
 `test_checkout_contrato_preview_db.py`): la lectura de `items_json` reusa
@@ -184,13 +207,12 @@ pantalla en blanco que parecía rota. `ContratoPreviewModal.tsx` arma un
 string JSON — no reimplementa esa ambigüedad); el SELECT de `equipos` filtra
 `eliminado_at IS NULL`, porque un carrito no se purga ni se re-valida solo
 (sin heartbeat nuevo, puede seguir apuntando a un equipo que se borró del
-catálogo después) — sin el filtro, ese equipo se colaba en el preview con
-nombre/serie/valor de reposición; el timestamp "Emitido" usa `now_ar()` (no
-`datetime.now()` crudo, que en la nube corre en UTC). **NO** hay fallback para
-un ítem sin `cantidad`: el único escritor de `items_json`
-(`services.carrito.activos.heartbeat_upsert`) la recibe de un modelo Pydantic
-que la exige (`CartItem.cantidad: int`, sin default) — no existe, ni existió,
-una forma que la omita.
+catálogo después) — sin el filtro, ese equipo se colaba en el preview; el
+timestamp "Emitido" usa `now_ar()` (no `datetime.now()` crudo, que en la nube
+corre en UTC). **NO** hay fallback para un ítem sin `cantidad`: el único
+escritor de `items_json` (`services.carrito.activos.heartbeat_upsert`) la
+recibe de un modelo Pydantic que la exige (`CartItem.cantidad: int`, sin
+default) — no existe, ni existió, una forma que la omita.
 
 ## UI del resumen (`CheckoutResumen.tsx`)
 

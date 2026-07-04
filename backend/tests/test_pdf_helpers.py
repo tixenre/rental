@@ -253,3 +253,42 @@ class TestContratoHtmlMostrarLocador:
         assert "Primero" in html_str
         assert "Cámara test" in html_str
         assert "Ana Gómez" in html_str
+
+    def test_fonts_ligeras_saca_las_fuentes_embebidas(self):
+        """`fonts_ligeras=True` (el preview del checkout, pintado por el browser
+        real del cliente — no por Playwright) saca el @font-face en base64
+        (~1.2MB, causaba 10s+ para pintar el iframe) y el link a Google Fonts.
+        El contenido (cláusulas/equipo/cliente) tiene que seguir intacto."""
+        from pdf_templates import _contrato_html
+
+        pesado = _contrato_html(self._pedido(), mostrar_locador=False)
+        liviano = _contrato_html(self._pedido(), mostrar_locador=False, fonts_ligeras=True)
+
+        assert "@font-face" not in liviano
+        assert "fonts.googleapis.com" not in liviano
+        assert "@font-face" in pesado  # default sigue embebiendo (Playwright/PDF real)
+        assert len(liviano) < len(pesado) / 10  # reducción drástica, no cosmética
+
+        for esperado in ("Primero", "Cámara test", "Ana Gómez"):
+            assert esperado in liviano
+
+    def test_fonts_ligeras_saca_tambien_el_wordmark_svg(self):
+        """`fonts_ligeras=True` es "documento de muestra nomás" — sin el isologo
+        SVG (ni la lectura a `app_settings.wordmark_svg` que eso implica).
+        Cae a texto plano "Rambla"."""
+        from pdf_templates import _contrato_html
+
+        liviano = _contrato_html(self._pedido(), mostrar_locador=False, fonts_ligeras=True)
+        pesado = _contrato_html(self._pedido(), mostrar_locador=False)
+
+        assert "<svg" not in liviano
+        assert "<svg" in pesado
+
+    def test_fonts_ligeras_default_no_cambia_el_pdf_real(self):
+        """El contrato REAL (de un pedido ya creado, generado por Playwright vía
+        `_render_pdf`) sigue embebiendo las fuentes siempre — default `False`."""
+        from pdf_templates import _contrato_html
+
+        html_str = _contrato_html(self._pedido())
+        assert "@font-face" in html_str
+        assert "fonts.googleapis.com" in html_str

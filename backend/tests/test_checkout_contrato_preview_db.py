@@ -128,9 +128,41 @@ def test_contrato_preview_devuelve_html_marcado_como_simulacion(carrito_con_equi
     assert "SIMULACIÓN" in html
     assert "Vista previa" in html
     assert "Cámara contrato-preview-test" in html
-    assert "Ana Gómez" in html
     # No persiste nada: no crea un pedido real.
     assert "preview" not in html.split("<body>", 1)[0]  # sanity: no filtra el id interno al <head>
+
+
+def test_contrato_preview_no_expone_pii_real_del_cliente(carrito_con_equipo):
+    """El preview es una SIMULACIÓN que queda en el DOM del browser — el
+    nombre/email real del cliente logueado NO debe aparecer; en su lugar,
+    datos de muestra (`_CLIENTE_DE_MUESTRA`). Con el Locatario ya ficticio,
+    el Locador (datos institucionales fijos de Rambla, no sensibles) sí se
+    muestra — mismo contrato que el real."""
+    from pdf_templates import OWNER_NOMBRE
+
+    res = client.post(
+        "/api/checkout/contrato-preview",
+        json={"session_id": SESSION_ID},
+        headers={"Cookie": _COOKIE},
+    )
+    assert res.status_code == 200
+    html = res.text
+    assert "Ana Gómez" not in html
+    assert "contrato-preview-db@test.com" not in html
+    assert "Juan Pérez" in html  # placeholder de _CLIENTE_DE_MUESTRA
+    assert OWNER_NOMBRE in html  # Locador vuelve a mostrarse
+
+
+def test_contrato_preview_serie_y_valor_de_equipos_son_ficticios(carrito_con_equipo):
+    """Los números de serie y valores de reposición reales del inventario
+    tampoco se muestran — se reemplazan por placeholders (`EJEMPLO-####`)."""
+    res = client.post(
+        "/api/checkout/contrato-preview",
+        json={"session_id": SESSION_ID},
+        headers={"Cookie": _COOKIE},
+    )
+    assert res.status_code == 200
+    assert "EJEMPLO-0001" in res.text
 
 
 def test_contrato_preview_carrito_vacio_400(carrito_con_equipo):

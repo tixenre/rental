@@ -24,8 +24,6 @@ from pydantic import BaseModel
 
 from auth.stepup import has_recent_stepup
 from database import get_db, now_ar, row_to_dict, MARCA_SUBQUERY
-from identity import nombre_validado, direccion_validada
-from identity.contacts import email_comunicacion, telefono_contacto
 from pdf import _contrato_html
 from routes.cliente_portal import require_cliente
 from services.carrito import desde_items_json
@@ -35,6 +33,27 @@ from services.contenido import contenido_de_batch
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["checkout"])
+
+# Datos de muestra para el preview del contrato (`checkout_contrato_preview`):
+# es una SIMULACIÓN que queda en el DOM del browser del cliente — no hace
+# falta (ni conviene) exponer su nombre/dirección/contacto/CUIT reales ahí.
+# El único dato real del cliente es el perfil fiscal (decide si aparece el
+# bloque de Responsable Inscripto — no es dato personal sensible).
+_CLIENTE_DE_MUESTRA = {
+    "cliente_nombre": "Juan Pérez",
+    "cliente_direccion": "Av. Colón 1234, Mar del Plata",
+    "cliente_telefono": "223 555-0100",
+    "cliente_email": "cliente@ejemplo.com",
+    "cliente_cuit": "20-12345678-9",
+    "cliente_razon_social": "Empresa de Ejemplo S.R.L.",
+}
+
+
+def _serie_y_valor_de_muestra(idx: int) -> tuple[str, int]:
+    """Serie + valor de reposición ficticios para el preview del contrato —
+    mismo criterio que `_CLIENTE_DE_MUESTRA`: no hace falta mostrar el
+    inventario real (números de serie, valores) en una simulación."""
+    return f"EJEMPLO-{idx:04d}", 100_000
 
 
 class CheckoutValidarIn(BaseModel):
@@ -166,20 +185,23 @@ def checkout_contrato_preview(data: ContratoPreviewIn, request: Request):
             ).fetchall()
             componentes = contenido_de_batch(conn, eq_ids)
             items = []
-            for r in rows:
+            for idx, r in enumerate(rows, start=1):
                 eq = row_to_dict(r)
                 eq["cantidad"] = cantidad_por_id.get(eq["equipo_id"], 1)
-                eq["componentes"] = componentes.get(eq["equipo_id"], [])
+                eq["serie"], eq["valor_reposicion"] = _serie_y_valor_de_muestra(idx)
+                eq["componentes"] = [
+                    {**comp, **dict(zip(("serie", "valor_reposicion"), _serie_y_valor_de_muestra(j)))}
+                    for j, comp in enumerate(componentes.get(eq["equipo_id"], []), start=idx * 100)
+                ]
                 items.append(eq)
 
+            # Solo se necesita el perfil fiscal (decide si el bloque de
+            # Responsable Inscripto aparece en el documento) — el resto de
+            # los datos del cliente van con placeholders (ver abajo).
             cli = conn.execute(
-                """SELECT nombre, apellido, direccion, cuit, perfil_impuestos,
-                          razon_social, nombre_renaper, apellido_renaper,
-                          direccion_renaper
-                   FROM clientes WHERE id = %s""",
-                (cliente_id,),
+                "SELECT perfil_impuestos FROM clientes WHERE id = %s", (cliente_id,),
             ).fetchone()
-            c = row_to_dict(cli) if cli else {}
+            perfil_impuestos = row_to_dict(cli).get("perfil_impuestos") if cli else None
 
             pedido = {
                 "id": "preview",
@@ -188,20 +210,26 @@ def checkout_contrato_preview(data: ContratoPreviewIn, request: Request):
                 "fecha_hasta": carrito.get("fecha_hasta"),
                 "emitido": now_ar(),
                 "items": items,
-                "cliente_nombre": nombre_validado(c)
-                or f"{c.get('nombre', '')} {c.get('apellido', '')}".strip(),
-                "cliente_email": email_comunicacion(conn, cliente_id),
-                "cliente_telefono": telefono_contacto(conn, cliente_id),
-                "cliente_direccion": direccion_validada(c) or c.get("direccion"),
-                "cliente_cuit": c.get("cuit"),
-                "cliente_perfil_impuestos": c.get("perfil_impuestos"),
-                "cliente_razon_social": c.get("razon_social"),
+                # Datos del cliente ficticios a propósito: es una SIMULACIÓN
+                # de muestra, no hace falta (ni conviene) exponer el nombre/
+                # dirección/contacto/CUIT reales del cliente logueado en un
+                # documento "no válido" que queda en el DOM del browser. Lo
+                # único real es el perfil fiscal (decide si aparece el bloque
+                # de Responsable Inscripto, no es dato personal sensible).
+                **_CLIENTE_DE_MUESTRA,
+                "cliente_perfil_impuestos": perfil_impuestos,
             }
 
-            # mostrar_locador=False: los datos del Locador (Rambla) son fijos/
-            # institucionales, no aportan nada en un preview — lo que importa
-            # es que el cliente pueda leer las cláusulas.
-            html_str = _marcar_como_simulacion(_contrato_html(pedido, mostrar_locador=False))
+            # mostrar_locador=True (default): con el Locatario ya con datos de
+            # muestra, mostrar ambas partes hace que el preview se lea como el
+            # contrato real completo — nada sensible que cuidar de ese lado
+            # (son los datos institucionales fijos de Rambla). fonts_ligeras=True:
+            # esto lo pinta el browser real del cliente (no Playwright) — sin
+            # esto, el iframe tardaba 10s+ en parsear ~1.2MB de fuentes de
+            # marca embebidas en base64 (ver docs/SISTEMA_CHECKOUT.md).
+            html_str = _marcar_como_simulacion(
+                _contrato_html(pedido, fonts_ligeras=True)
+            )
     except HTTPException:
         raise
     except Exception:

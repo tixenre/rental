@@ -454,7 +454,12 @@ def _ref(pedido):
     return f"#{pedido.get('id', '—')}"
 
 
-def _membrete(pedido, doc_type, num, fecha, estado=True):
+def _membrete(pedido, doc_type, num, fecha, estado=True, wordmark_liviano=False):
+    """`wordmark_liviano=True` (el preview del checkout) salta `_active_wordmark()`
+    — que abre su propia conexión a DB para leer el SVG custom del admin — y
+    muestra el nombre en texto plano: es una simulación, no hace falta el
+    isologo real ni la consulta extra. El resto de los documentos (default
+    `False`) lo sigue mostrando siempre."""
     badge = ""
     if estado and pedido.get("estado") in _ESTADOS:
         color, soft = _ESTADOS[pedido["estado"]]
@@ -463,9 +468,14 @@ def _membrete(pedido, doc_type, num, fecha, estado=True):
                  f'border:1px solid color-mix(in oklch,{color} 28%,transparent)">'
                  f'<span class="dot" style="background:{color}"></span>{label}</span>')
     badge_row = f'<div class="mb-badge-row">{badge}</div>' if badge else ""
+    marca = (
+        '<span style="font-weight:800;font-size:22px;letter-spacing:-.02em">Rambla</span>'
+        if wordmark_liviano
+        else _active_wordmark()
+    )
     return (
         '<header class="membrete"><div class="mb-top">'
-        f'<div class="mb-brand"><span class="mb-wordmark">{_active_wordmark()}</span></div>'
+        f'<div class="mb-brand"><span class="mb-wordmark">{marca}</span></div>'
         '<div class="mb-doc"><div class="mb-eyebrow">Documento</div>'
         f'<div class="mb-type">{html.escape(doc_type)}</div>'
         f'<div class="mb-num">N° {html.escape(num)}</div>'
@@ -497,12 +507,25 @@ def _cliente_block(pedido):
     return "".join(out)
 
 
-def _document(body):
-    head = (
-        '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">'
+def _document(body, fonts_ligeras=False):
+    """`fonts_ligeras=True` omite las fuentes de marca embebidas (TT Commons/
+    Champ Black en base64, ~1.2MB — necesarias para que Playwright las
+    renderice sin depender de la red al generar el PDF real) y el link a
+    Google Fonts. Sin esto, `checkout_contrato_preview` (el PREVIEW que corre
+    en el browser real del cliente, no en Playwright) tardaba 10s+ en pintar
+    el iframe — el string base64 es lento de parsear/pintar inline, no un
+    problema de red. `--font-sans`/`--font-mono` (`_DOC_CSS`) ya caen a
+    `ui-sans-serif`/`ui-monospace` del sistema — aceptable en una SIMULACIÓN
+    marcada como tal; el PDF real (`_render_pdf`, Playwright) sigue
+    embebiendo todo, sin cambios."""
+    fonts_head = "" if fonts_ligeras else (
         '<link rel="preconnect" href="https://fonts.googleapis.com">'
         '<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">'
-        + _fonts_css() + "<style>" + _DOC_CSS + "</style></head><body>"
+        + _fonts_css()
+    )
+    head = (
+        '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">'
+        + fonts_head + "<style>" + _DOC_CSS + "</style></head><body>"
     )
     return head + '<article class="paper">' + body + "</article></body></html>"
 
@@ -722,12 +745,17 @@ _CLAUSULAS = [
 ]
 
 
-def _contrato_html(pedido, mostrar_locador=True):
+def _contrato_html(pedido, mostrar_locador=True, fonts_ligeras=False):
     """`mostrar_locador=False` omite el bloque de datos del Locador (Rambla) —
     son fijos/institucionales, no cambian por pedido, así que no aportan nada
     en el PREVIEW del checkout (`routes/checkout.py::checkout_contrato_preview`):
     ahí lo que importa es que el cliente pueda leer las cláusulas. El contrato
-    REAL (de un pedido ya creado) sigue mostrándolo siempre (default True)."""
+    REAL (de un pedido ya creado) sigue mostrándolo siempre (default True).
+
+    `fonts_ligeras=True` (ver `_document` + `_membrete`) salta las fuentes de
+    marca embebidas y el isologo (SVG + su lectura a DB) — el mismo PREVIEW,
+    liviano para pintar en el browser real del cliente en vez de en
+    Playwright: es una simulación, no hace falta el vestido completo."""
     items = pedido.get("items", [])
     j = _jornadas(pedido)
     rows, i = [], 1
@@ -769,7 +797,7 @@ def _contrato_html(pedido, mostrar_locador=True):
         # "Presupuesto" (todavía modificable, sin confirmar) cuando el cliente
         # ya puede leer/descargar el contrato — el badge de estado es el
         # disclaimer de que todavía no es definitivo.
-        _membrete(pedido, "Contrato", _ref(pedido), fecha_long)
+        _membrete(pedido, "Contrato", _ref(pedido), fecha_long, wordmark_liviano=fonts_ligeras)
         + '<div class="meta">'
           '<div class="meta-block"><div class="meta-label">Período de locación</div>'
           f'<div class="meta-val">{_fmt_date_dow(pedido.get("fecha_desde"))} al {_fmt_date_dow(pedido.get("fecha_hasta"))}</div></div>'
@@ -806,7 +834,7 @@ def _contrato_html(pedido, mostrar_locador=True):
         + f'<div style="text-align:center;font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:28px;letter-spacing:.04em">Emitido en Mar del Plata, {fecha_long}</div>'
         + _footer()
     )
-    return _document(body)
+    return _document(body, fonts_ligeras=fonts_ligeras)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
