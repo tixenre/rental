@@ -319,6 +319,133 @@ class ComprobanteRequest:
         _validar_estructura(self)
 
 
+def letra_comprobante(cbte_tipo: CbteTipo) -> str:
+    """Letra (A/B/C) de un `CbteTipo` — deriva del código WSFEv1, no la vuelvas a hardcodear en
+    un dict aparte (mismo esquema fijo de `FEParamGetTiposCbte` que ya modela `CbteTipo`).
+
+    M y FCE MiPyme también resuelven a su letra base (M→ninguna letra propia, ver abajo; FCE
+    A/B/C→A/B/C) porque comparten el mismo esquema visual de comprobante que su letra homóloga.
+    `ValueError` si `cbte_tipo` no es ninguno de los valores conocidos de `CbteTipo`."""
+    cbte_tipo = CbteTipo(cbte_tipo)
+    if cbte_tipo in (CbteTipo.FACTURA_A, CbteTipo.NOTA_DEBITO_A, CbteTipo.NOTA_CREDITO_A,
+                     CbteTipo.FACTURA_CRED_ELEC_MIPYME_A, CbteTipo.NOTA_DEBITO_CRED_ELEC_MIPYME_A,
+                     CbteTipo.NOTA_CREDITO_CRED_ELEC_MIPYME_A):
+        return "A"
+    if cbte_tipo in (CbteTipo.FACTURA_B, CbteTipo.NOTA_DEBITO_B, CbteTipo.NOTA_CREDITO_B,
+                     CbteTipo.FACTURA_CRED_ELEC_MIPYME_B, CbteTipo.NOTA_DEBITO_CRED_ELEC_MIPYME_B,
+                     CbteTipo.NOTA_CREDITO_CRED_ELEC_MIPYME_B):
+        return "B"
+    if cbte_tipo in (CbteTipo.FACTURA_C, CbteTipo.NOTA_DEBITO_C, CbteTipo.NOTA_CREDITO_C,
+                     CbteTipo.FACTURA_CRED_ELEC_MIPYME_C, CbteTipo.NOTA_DEBITO_CRED_ELEC_MIPYME_C,
+                     CbteTipo.NOTA_CREDITO_CRED_ELEC_MIPYME_C):
+        return "C"
+    if cbte_tipo in (CbteTipo.FACTURA_M, CbteTipo.NOTA_DEBITO_M, CbteTipo.NOTA_CREDITO_M):
+        return "M"
+    raise ValueError(f"letra_comprobante: no hay letra definida para {cbte_tipo!r}.")
+
+
+def es_nota_credito(cbte_tipo: CbteTipo) -> bool:
+    """`True` si `cbte_tipo` es una nota de crédito (A/B/C/M o FCE MiPyme) — para decidir un
+    prefijo/título distinto ("Nota de Crédito" vs. "Factura") sin repetir el mismo set de códigos
+    en cada consumidor."""
+    return CbteTipo(cbte_tipo) in (
+        CbteTipo.NOTA_CREDITO_A, CbteTipo.NOTA_CREDITO_B, CbteTipo.NOTA_CREDITO_C,
+        CbteTipo.NOTA_CREDITO_M, CbteTipo.NOTA_CREDITO_CRED_ELEC_MIPYME_A,
+        CbteTipo.NOTA_CREDITO_CRED_ELEC_MIPYME_B, CbteTipo.NOTA_CREDITO_CRED_ELEC_MIPYME_C,
+    )
+
+
+@dataclass(frozen=True)
+class ItemFactura:
+    """Una línea de detalle de un comprobante ya emitido (para mostrar en el documento — no
+    confundir con `ItemIva`, que es el desglose de IVA por alícuota).
+
+    `precio_unitario`/`subtotal` son montos ya resueltos por el caller (mismo criterio que
+    `ComprobanteRequest.importe_neto`: el motor no calcula plata, la recibe calculada)."""
+
+    codigo: str
+    descripcion: str
+    precio_unitario: Decimal
+    subtotal: Decimal
+    cantidad: Decimal = Decimal("1")
+    unidad_medida: str = "unidad"
+    bonificacion_pct: Decimal = Decimal("0")
+    detalle: str = ""
+
+
+@dataclass(frozen=True)
+class ComprobanteFiscal:
+    """La foto final de un comprobante YA EMITIDO — todo lo que hace falta para renderizar el
+    documento (`arca_fe.pdf.renderizar_comprobante_html`), ya resuelto. Distinto de
+    `ComprobanteRequest` (el pedido, antes del CAE) y de `CaeResult` (resultado transitorio de la
+    llamada SOAP) — este es el registro persistido/completo.
+
+    Reusa `Emisor`/`Receptor` para lo estrictamente fiscal (CUIT, punto de venta, condición IVA,
+    doc.tipo/doc.nro). Los campos `*_label` (concepto/doc.tipo/condición IVA) vienen de catálogos
+    de AFIP que dependen de una consulta viva o un cache propio del caller — `arca_fe` no los
+    resuelve solo, los recibe ya resueltos como texto. Igual con razón social/domicilio de emisor y
+    receptor: son datos de negocio que no viven en `Emisor`/`Receptor` (esos son minimalistas,
+    solo lo fiscal).
+
+    `ValueError` en la construcción si falta `cae`/`numero`/`cae_vto`/`qr_url` — un comprobante sin
+    esos 4 datos no se puede renderizar como válido, se rechaza antes de intentarlo (reemplaza el
+    `RuntimeError` que antes vivía en el adapter Rambla — validación de input del programador, ver
+    criterio de `arca_fe.errores`)."""
+
+    cbte_tipo: CbteTipo
+    pto_vta: int
+    numero: int
+    fecha_emision: date
+    cae: str
+    cae_vto: date
+    qr_url: str
+
+    emisor: Emisor
+    emisor_razon_social: str
+    receptor: Receptor
+    receptor_nombre: str
+
+    concepto_label: str
+    doc_tipo_label: str
+    condicion_iva_receptor_label: str
+    emisor_condicion_iva_label: str
+
+    items: tuple[ItemFactura, ...] = field(default_factory=tuple)
+
+    importe_neto: Decimal = Decimal("0")
+    importe_iva: Decimal = Decimal("0")
+    importe_total: Decimal = Decimal("0")
+    importe_otros_tributos: Decimal = Decimal("0")
+
+    emisor_domicilio: str = ""
+    emisor_iibb: str = ""
+    emisor_inicio_actividades: Optional[date] = None
+    receptor_domicilio: str = ""
+    condicion_venta: str = "Contado"
+
+    periodo_desde: Optional[date] = None
+    periodo_hasta: Optional[date] = None
+    vencimiento_pago: Optional[date] = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "cbte_tipo", CbteTipo(self.cbte_tipo))
+        faltantes = [
+            campo
+            for campo, valor in (
+                ("cae", self.cae),
+                ("numero", self.numero),
+                ("cae_vto", self.cae_vto),
+                ("qr_url", self.qr_url),
+            )
+            if not valor
+        ]
+        if faltantes:
+            raise ValueError(
+                f"ComprobanteFiscal incompleto, faltan: {', '.join(faltantes)} "
+                "— no se puede renderizar un comprobante sin esos datos."
+            )
+
+
 @dataclass(frozen=True)
 class CaeResult:
     """Resultado de `FECAESolicitar`, ya parseado (`WsfeClient.solicitar_cae`/`solicitar_cae_lote`).
