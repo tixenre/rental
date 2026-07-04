@@ -415,7 +415,7 @@ def _factura_oficial_html(f: dict, fonts_css: str) -> str:
             <div style="margin-bottom:9px;">{_arca_logo(120)}</div>
             <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:2px;"><span style="font-weight:700;">CAE N°:</span><span style="font-variant-numeric:tabular-nums;">{_e(f['cae']['nro'])}</span></div>
             <div style="display:flex;justify-content:flex-end;gap:8px;"><span style="font-weight:700;">Fecha de Vto. de CAE:</span><span style="font-variant-numeric:tabular-nums;">{_e(f['cae']['vto'])}</span></div>
-            <div style="margin-top:10px;font-size:9px;color:#333;">Comprobante Autorizado — Verifique la validez de este comprobante en www.arca.gob.ar</div>
+            <div style="margin-top:10px;font-size:9px;color:#333;">Comprobante Autorizado — Verifique la validez de este comprobante en <a href="{_e(f['qr']['url'])}" style="color:#333;">www.arca.gob.ar</a></div>
             <div style="margin-top:4px;font-size:9px;color:#333;">Pág. 1/1</div>
             {transparencia_block}
           </div>
@@ -550,7 +550,7 @@ def _factura_simplificada_html(f: dict, fonts_css: str) -> str:
             <span style="font-size:34px;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;">{_e(f['tot']['totalStr'])}</span>
           </div>
           <div style="margin-top:14px;font-size:11.5px;color:#98a3ae;line-height:1.4;">
-            Comprobante autorizado por ARCA · Verificá la validez escaneando el QR o en <span style="color:#5b6875;font-weight:600;">www.arca.gob.ar</span>
+            Comprobante autorizado por ARCA · Verificá la validez escaneando el QR o en <a href="{_e(f['qr']['url'])}" style="color:#5b6875;font-weight:600;">www.arca.gob.ar</a>
           </div>
           {transparencia_block}
         </div>
@@ -700,7 +700,7 @@ def _factura_detallada_html(f: dict, fonts_css: str) -> str:
             <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#98a3ae;margin-bottom:6px;">Comprobante autorizado por ARCA</div>
             <div style="font-size:15px;margin-bottom:3px;"><span style="color:#5b6875;">CAE N° </span><span style="font-weight:600;font-variant-numeric:tabular-nums;">{_e(f['cae']['nro'])}</span></div>
             <div style="font-size:15px;margin-bottom:12px;"><span style="color:#5b6875;">Vto. CAE </span><span style="font-weight:600;font-variant-numeric:tabular-nums;">{_e(f['cae']['vto'])}</span></div>
-            <div style="font-size:13px;color:#8a97a3;line-height:1.45;">Verificá la validez de este comprobante escaneando el QR o en www.arca.gob.ar</div>
+            <div style="font-size:13px;color:#8a97a3;line-height:1.45;">Verificá la validez de este comprobante escaneando el QR o en <a href="{_e(f['qr']['url'])}" style="color:#8a97a3;">www.arca.gob.ar</a></div>
             {transparencia_block}
           </div>
         </div>
