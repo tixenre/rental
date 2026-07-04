@@ -47,10 +47,6 @@ type ClienteSession = {
   /** Descuento personalizado del cliente (atención manual del admin a
    * buenos clientes, 0..100). Lo lee el carrito; no es público. */
   descuento: number | null;
-  /** Datos fiscales — el resumen del checkout los muestra (con link a
-   * "Modificar datos de facturación" en el perfil), no los edita acá. */
-  cuit: string | null;
-  razon_social: string | null;
 } | null;
 
 let cached: ClienteSession | undefined; // undefined = no fetched yet
@@ -68,8 +64,6 @@ async function fetchClienteSession(): Promise<ClienteSession> {
       nombre: typeof data.nombre === "string" ? data.nombre : null,
       perfil_impuestos: (data.perfil_impuestos ?? null) as PerfilImpuestos | null,
       descuento: typeof data.descuento === "number" ? data.descuento : null,
-      cuit: typeof data.cuit === "string" ? data.cuit : null,
-      razon_social: typeof data.razon_social === "string" ? data.razon_social : null,
     };
   } catch {
     return null;

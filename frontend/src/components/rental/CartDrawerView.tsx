@@ -42,12 +42,7 @@ import {
 /** Forma mínima de la sesión del cliente que usa el panel: nombre + presencia +
  *  perfil fiscal (para la tarjeta "Facturación" del resumen). */
 type ClienteSessionLike =
-  | {
-      nombre?: string | null;
-      perfil_impuestos?: PerfilImpuestos | null;
-      cuit?: string | null;
-      razon_social?: string | null;
-    }
+  | { nombre?: string | null; perfil_impuestos?: PerfilImpuestos | null }
   | null
   | undefined;
 
@@ -294,8 +289,6 @@ export function CartDrawerView({
                 conIva={conIva}
                 clienteNombre={clienteSession?.nombre}
                 perfilImpuestos={clienteSession?.perfil_impuestos}
-                cuit={clienteSession?.cuit}
-                razonSocial={clienteSession?.razon_social}
                 onBack={onVolverAlCarrito}
                 onCrearPedido={onCrearPedido}
               />

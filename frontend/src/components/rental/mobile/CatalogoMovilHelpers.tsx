@@ -534,8 +534,6 @@ export function CartSheet({
               conIva={conIva}
               clienteNombre={clienteSession?.nombre}
               perfilImpuestos={clienteSession?.perfil_impuestos}
-              cuit={clienteSession?.cuit}
-              razonSocial={clienteSession?.razon_social}
               onBack={() => setStep("carrito")}
               onCrearPedido={handleCrearPedido}
             />

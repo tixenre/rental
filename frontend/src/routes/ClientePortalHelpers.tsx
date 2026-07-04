@@ -538,7 +538,10 @@ function ContactoForm({
 }
 
 // ── Facturación: perfil fiscal (condición frente al IVA + CUIT + datos Factura A) ──
-function FacturacionForm({
+// Exportado: también lo reusa `FacturacionModal` (components/rental) para
+// editar el perfil fiscal sin salir del checkout — un solo formulario, dos
+// lugares desde donde se abre.
+export function FacturacionForm({
   perfil,
   onPerfilChange,
 }: {

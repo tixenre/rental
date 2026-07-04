@@ -17,6 +17,7 @@ import {
   VerificacionRequeridaPanel,
   type VerificacionPanelEstado,
 } from "@/components/rental/VerificacionRequeridaPanel";
+import { FacturacionModal } from "@/components/rental/FacturacionModal";
 
 /** El return_to que le pasamos a Didit para que, al volver verificado, el
  *  carrito se reabra directo en ESTE paso (no en la lista de ítems). Espeja
@@ -67,8 +68,6 @@ export function CheckoutResumen({
   conIva,
   clienteNombre,
   perfilImpuestos,
-  cuit,
-  razonSocial,
   onBack,
   onCrearPedido,
 }: {
@@ -89,11 +88,9 @@ export function CheckoutResumen({
   totalNeto: number;
   conIva: boolean;
   clienteNombre?: string | null;
-  /** Perfil fiscal — solo se muestra (con link a "Modificar" en el perfil);
-   *  no se edita desde acá. */
+  /** Perfil fiscal — el valor inicial (el editable en vivo vía
+   *  `FacturacionModal` vive en estado local, sembrado con este prop). */
   perfilImpuestos?: PerfilImpuestos | null;
-  cuit?: string | null;
-  razonSocial?: string | null;
   onBack: () => void;
   /** Crea el pedido de verdad (createOrder) — cada superficie decide qué pasa
    *  después (desktop: toast + redirect al portal; mobile: banner inline). Si
@@ -114,6 +111,11 @@ export function CheckoutResumen({
   // panel reusamos /api/cliente/me (misma fuente que el resto del checkout).
   const [identidadEstado, setIdentidadEstado] = useState<VerificacionPanelEstado>("no-verificado");
   const [identidadMotivo, setIdentidadMotivo] = useState<string | null>(null);
+  // Perfil fiscal en vivo: arranca con lo que llegó por prop, pero si el
+  // cliente lo edita desde `FacturacionModal` (sin salir del checkout) se
+  // refleja al toque acá, sin esperar a que el caller vuelva a pedir la sesión.
+  const [perfilImpuestosLive, setPerfilImpuestosLive] = useState(perfilImpuestos ?? null);
+  const [facturacionOpen, setFacturacionOpen] = useState(false);
 
   async function revalidar(nextSessionConfirmed = sessionConfirmed) {
     setCargando(true);
@@ -210,7 +212,7 @@ export function CheckoutResumen({
   // Facturación solo se muestra una vez que la identidad está confirmada —
   // antes de eso el perfil fiscal puede ni estar cargado, y no es un dato
   // que valga la pena mostrar mientras el pedido puede no prosperar.
-  const mostrarFacturacion = !cargando && !faltaIdentidad && !!perfilImpuestos;
+  const mostrarFacturacion = !cargando && !faltaIdentidad && !!perfilImpuestosLive;
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -265,24 +267,25 @@ export function CheckoutResumen({
             </div>
           )}
 
-          {mostrarFacturacion && perfilImpuestos && (
+          {mostrarFacturacion && perfilImpuestosLive && (
             <div className="rounded-lg border hairline bg-surface p-3">
               <div className="mb-1 flex items-center justify-between gap-2">
                 <span className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
                   Facturación
                 </span>
-                <a
-                  href="/cliente/portal?tab=perfil"
+                <button
+                  type="button"
+                  onClick={() => setFacturacionOpen(true)}
                   className="shrink-0 text-2xs text-muted-foreground underline underline-offset-2 hover:text-ink"
                 >
                   Modificar
-                </a>
+                </button>
               </div>
               <div className="text-sm font-semibold text-ink">
-                {PERFIL_IMPUESTOS_LABEL[perfilImpuestos]}
+                {PERFIL_IMPUESTOS_LABEL[perfilImpuestosLive]}
               </div>
               <div className="mt-0.5 text-xs text-muted-foreground">
-                Te facturamos: {facturaTipoLabel(perfilImpuestos)}
+                Te facturamos: {facturaTipoLabel(perfilImpuestosLive)}
               </div>
             </div>
           )}
@@ -434,6 +437,14 @@ export function CheckoutResumen({
           )}
         </Button>
       </div>
+
+      <FacturacionModal
+        open={facturacionOpen}
+        onOpenChange={setFacturacionOpen}
+        onPerfilChange={(p) =>
+          setPerfilImpuestosLive((p.perfil_impuestos ?? null) as PerfilImpuestos | null)
+        }
+      />
     </div>
   );
 }
