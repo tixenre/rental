@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, AlertCircle, ShieldCheck, FileCheck, Fingerprint } from "lucide-react";
+import { ArrowLeft, AlertCircle, ShieldCheck } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -26,10 +26,14 @@ export const RESUME_STEP_VALUE = "resumen";
  * CheckoutResumen — el paso de revisión entre "Confirmar solicitud" (carrito) y
  * la creación real del pedido. NO hardcodea el orden de las validaciones: le
  * pregunta al backend (`validar_checkout`, el portero de `services/checkout/`)
- * qué falta (`{listo, faltan}`) y resuelve cada ítem con la acción que
- * corresponda (identidad → Didit, T&C → aceptar, firma → passkey). Cuando
- * `listo` queda en true, muestra un solo botón "Confirmar". Fuente única del
- * paso de resumen — la usan el drawer desktop y el sheet mobile por igual.
+ * qué falta (`{listo, faltan}`). Un solo botón "Confirmar" resuelve T&C y firma
+ * (Face ID/huella) EN EL MISMO click, sin tarjetas intermedias — el usuario no
+ * ve un paso separado por cada check, solo Fechas/Total/Tus datos + un botón.
+ * La única excepción es **identidad**: como exige salir a Didit, no se puede
+ * resolver en un click → mientras falte, el botón queda deshabilitado y se
+ * muestra el panel de verificación (con su propio link a Didit) debajo.
+ * Fuente única del paso de resumen — la usan el drawer desktop y el sheet
+ * mobile por igual.
  *
  * El login (401 del guard `require_cliente`, que el portero no valida — es
  * responsabilidad del route) lo filtra el caller ANTES de montar este
@@ -76,7 +80,6 @@ export function CheckoutResumen({
   const [cargando, setCargando] = useState(true);
   const [faltan, setFaltan] = useState<FaltanItem[]>([]);
   const [errorValidar, setErrorValidar] = useState<string | null>(null);
-  const [resolviendo, setResolviendo] = useState<string | null>(null);
   const [creando, setCreando] = useState(false);
   const [errorCrear, setErrorCrear] = useState<string | null>(null);
   // Fallback de firma sin passkey (sin soporte / canceló): "Confirmo y acepto"
@@ -130,45 +133,45 @@ export function CheckoutResumen({
     }
   }
 
-  async function resolverTyc() {
-    setResolviendo("tyc");
-    try {
-      await aceptarTyc();
-      await revalidar();
-    } catch {
-      toast.error("No pudimos registrar la aceptación. Reintentá.");
-    } finally {
-      setResolviendo(null);
-    }
-  }
+  const faltaIdentidad = faltan.some((f) => f.check === "identidad");
+  const otrosFaltantes = faltan.filter((f) => !["identidad", "tyc", "firma"].includes(f.check));
 
-  async function resolverFirma() {
-    setResolviendo("firma");
-    try {
-      const credenciales = await listPasskeys("cliente").catch(() => []);
-      const resultado = await firmarConPasskey(credenciales.length > 0);
-      if (resultado === "passkey") {
-        await revalidar();
-      } else {
-        // Sin soporte de passkey o canceló el prompt: fallback "Confirmo y
-        // acepto" por sesión (mismo criterio que el backend, ver docstring).
-        setSessionConfirmed(true);
-        await revalidar(true);
-      }
-    } catch (err) {
-      toast.error(passkeyErrorMessage(err));
-    } finally {
-      setResolviendo(null);
-    }
-  }
-
+  // Un solo click resuelve T&C + firma (sin tarjetas intermedias) y recién
+  // ahí crea el pedido — identidad es la única excepción (exige salir a
+  // Didit) y por eso el botón está deshabilitado mientras falte.
   async function handleConfirmar() {
     setCreando(true);
     setErrorCrear(null);
     try {
-      await onCrearPedido(sessionConfirmed);
+      if (faltan.some((f) => f.check === "tyc")) {
+        await aceptarTyc();
+      }
+      let confirmado = sessionConfirmed;
+      if (faltan.some((f) => f.check === "firma")) {
+        const credenciales = await listPasskeys("cliente").catch(() => []);
+        const resultado = await firmarConPasskey(credenciales.length > 0);
+        if (resultado !== "passkey") {
+          // Sin soporte de passkey o canceló el prompt: fallback "Confirmo y
+          // acepto" por sesión (mismo criterio que el backend).
+          confirmado = true;
+          setSessionConfirmed(true);
+        }
+      }
+      // Re-confirmamos contra el portero (fuente única) antes de crear — no
+      // confiamos en el estado local de arriba.
+      const { listo: listoAhora, faltan: faltanAhora } = await validarCheckout(
+        sessionId,
+        confirmado,
+      );
+      if (!listoAhora) {
+        setFaltan(faltanAhora);
+        setErrorCrear(faltanAhora.map((f) => f.mensaje).join(" • "));
+        return;
+      }
+      await onCrearPedido(confirmado);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "No pudimos enviar el pedido, reintentá.";
+      const msg =
+        err instanceof Error ? passkeyErrorMessage(err) : "No pudimos enviar el pedido, reintentá.";
       setErrorCrear(msg);
       toast.error(msg, { duration: 6000 });
     } finally {
@@ -176,8 +179,8 @@ export function CheckoutResumen({
     }
   }
 
-  const listo = !cargando && !errorValidar && faltan.length === 0;
-  const otrosFaltantes = faltan.filter((f) => !["identidad", "tyc", "firma"].includes(f.check));
+  const puedeConfirmar =
+    !cargando && !errorValidar && !faltaIdentidad && otrosFaltantes.length === 0 && !creando;
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto overscroll-contain px-5 py-4 sm:px-6">
@@ -277,58 +280,17 @@ export function CheckoutResumen({
           </div>
         )}
 
-        {/* Identidad — reusa el panel existente (distingue no-verificado/en-revisión/rechazado) */}
-        {!cargando && faltan.some((f) => f.check === "identidad") && (
+        {/* Identidad — única excepción que no se resuelve en el mismo click (exige
+            salir a Didit). Reusa el panel existente (distingue no-verificado/
+            en-revisión/rechazado); el botón de confirmar abajo queda deshabilitado
+            mientras tanto. */}
+        {!cargando && faltaIdentidad && (
           <VerificacionRequeridaPanel
             estado={identidadEstado}
             motivo={identidadMotivo}
             iniciando={iniciandoVerif}
             onVerificar={resolverIdentidad}
           />
-        )}
-
-        {/* T&C */}
-        {!cargando && faltan.some((f) => f.check === "tyc") && (
-          <div className="space-y-2 rounded-md border border-amber/40 bg-amber-soft p-3">
-            <p className="flex items-center gap-2 text-sm font-medium text-ink">
-              <FileCheck className="h-4 w-4 shrink-0" />
-              Términos y Condiciones
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Antes de confirmar necesitamos que aceptes los T&C del alquiler.
-            </p>
-            <Button
-              type="button"
-              variant="primary"
-              onClick={() => void resolverTyc()}
-              disabled={resolviendo === "tyc"}
-              className="h-11 w-full font-bold"
-            >
-              {resolviendo === "tyc" ? "Aceptando…" : "Aceptar Términos y Condiciones"}
-            </Button>
-          </div>
-        )}
-
-        {/* Firma (passkey / fallback por sesión) */}
-        {!cargando && faltan.some((f) => f.check === "firma") && (
-          <div className="space-y-2 rounded-md border border-amber/40 bg-amber-soft p-3">
-            <p className="flex items-center gap-2 text-sm font-medium text-ink">
-              <Fingerprint className="h-4 w-4 shrink-0" />
-              Confirmá que sos vos
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Face ID, huella o clave de pantalla — es la firma de tu pedido.
-            </p>
-            <Button
-              type="button"
-              variant="primary"
-              onClick={() => void resolverFirma()}
-              disabled={resolviendo === "firma"}
-              className="h-11 w-full font-bold"
-            >
-              {resolviendo === "firma" ? "Confirmando…" : "Confirmar con Face ID / huella"}
-            </Button>
-          </div>
         )}
 
         {/* Cualquier otro faltante (carrito/fechas/stock/precio/contacto/antelación…):
@@ -361,41 +323,40 @@ export function CheckoutResumen({
       </div>
 
       <div className="mt-auto pt-4">
-        {listo && (
-          <>
-            <Button
-              variant="amber"
-              size="lg"
-              className="w-full uppercase tracking-widest"
-              loading={creando}
-              onClick={() => void handleConfirmar()}
+        <Button
+          variant="amber"
+          size="lg"
+          className="w-full uppercase tracking-widest"
+          disabled={!puedeConfirmar}
+          loading={creando}
+          onClick={() => void handleConfirmar()}
+        >
+          {creando ? (
+            "Enviando…"
+          ) : (
+            <span className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              Confirmar pedido
+              <span className="font-mono text-xs font-normal opacity-70 tracking-normal normal-case tabular-nums">
+                · {formatARS(totalNeto)}
+                {conIva ? " + IVA" : ""}
+              </span>
+            </span>
+          )}
+        </Button>
+        {puedeConfirmar && (
+          <p className="mt-3 text-center text-xs text-muted-foreground leading-tight">
+            Al confirmar aceptás nuestros{" "}
+            <a
+              href="/tyc"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-ink"
             >
-              {creando ? (
-                "Enviando…"
-              ) : (
-                <span className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4" />
-                  Confirmar pedido
-                  <span className="font-mono text-xs font-normal opacity-70 tracking-normal normal-case tabular-nums">
-                    · {formatARS(totalNeto)}
-                    {conIva ? " + IVA" : ""}
-                  </span>
-                </span>
-              )}
-            </Button>
-            <p className="mt-3 text-center text-xs text-muted-foreground leading-tight">
-              Al confirmar aceptás nuestros{" "}
-              <a
-                href="/tyc"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-2 hover:text-ink"
-              >
-                Términos y Condiciones
-              </a>
-              .
-            </p>
-          </>
+              Términos y Condiciones
+            </a>
+            .
+          </p>
         )}
       </div>
     </div>
