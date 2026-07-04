@@ -2530,6 +2530,18 @@ cancel-in-progress` ya cancela corridas viejas.
 - El supervisor marca cualquier query nueva de estadísticas/reportes que reconstruya
   `subtotal * (1 - descuento_pct/100)` (o cualquier variante que recalcule el descuento) en vez de leer
   `alquileres.monto_total` directo o prorrateado.
+- **Adenda 2026-07-04 — devengado, no cobrado.** El dueño preguntó si la sobreestimación podía venir de
+  un descuento no contado (ya arreglado arriba) y, al revisar la pantalla completa, surgió una segunda
+  pregunta: ¿"Facturado total" debería mostrar lo efectivamente cobrado en vez del valor del pedido? El
+  dueño resolvió el criterio explícitamente: **"debería ser lo devengado todo lo de estadísticas"** — la
+  misma línea "facturado" que ya usa la cascada del P&L de Reportes (_2026-06-28 — La ganancia de Rambla
+  descuenta la comisión de los dueños_: `facturado − comisiones a dueños − gastos = ganancia`), no
+  `monto_pagado`/cobros reales (`alquiler_pagos`), que Estadísticas no toca. Consecuencia: **ningún
+  cambio de código** — las 7 agregaciones (`totales`/`por_mes`/`top_equipos`/`top_clientes`/`por_dueno`/
+  `clientes_recurrentes`/`mejor_peor_mes`) ya eran consistentemente devengadas tras el fix de arriba; esto
+  solo deja escrito el criterio para que no se re-litigue. Si a futuro se quisiera un "cobrado real"
+  (`monto_pagado`), sería una tarjeta/métrica NUEVA y explícitamente rotulada, no un reemplazo de
+  "Facturado total".
 
 ### 2026-07-03 — Factura y mail de "pedido creado": línea de bonificación/descuento visible (M5+L1, #1209)
 

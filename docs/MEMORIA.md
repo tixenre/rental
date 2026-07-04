@@ -832,6 +832,12 @@ marca cualquier query nueva de estadísticas/reportes que recalcule `descuento_p
 leer `monto_total`. Regresión: `test_estadisticas_db.py` (Postgres real; pedido con descuento por
 jornadas ganador y descuento de cliente en 0%).
 
+**Criterio explícito del dueño (2026-07-04): todo `/admin/estadisticas` es DEVENGADO, no COBRADO** — la
+misma línea "facturado" de la cascada del P&L de Reportes (_2026-06-28_), no `monto_pagado`/cobros
+reales. Un pedido `confirmado` puede tener saldo pendiente y aun así suma su `monto_total` completo — es
+la semántica esperada, no un bug. El supervisor marca una tarjeta/query de Estadísticas que mezcle
+`monto_pagado` (cobrado) con las agregaciones existentes (devengado) sin distinguirlas explícitamente.
+
 ### 2026-07-03 — Factura y mail de "pedido creado": línea de bonificación/descuento visible (M5+L1, #1209)
 
 Con descuento (el caso común: cualquier alquiler de varios días tiene descuento automático por jornadas),
