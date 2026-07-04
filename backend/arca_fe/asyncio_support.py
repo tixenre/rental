@@ -46,3 +46,27 @@ async def login_async(
     from .wsaa import login
 
     return await asyncio.to_thread(login, tra_cms, endpoint, timeout=timeout)
+
+
+async def login_con_cert_async(
+    servicio: str,
+    cert_pem: bytes,
+    key_pem: bytes,
+    endpoint: str,
+    *,
+    ahora: datetime | None = None,
+    timeout: float = 30.0,
+    key_password: bytes | None = None,
+) -> tuple[str, str, datetime]:
+    """Wrapper cooperativo de `wsaa.login_con_cert` — mismo atajo de alto nivel (construye el TRA,
+    lo firma y autentica en una sola llamada) que `login_async` ya ofrece para `login`, pero para
+    el caso más común (el consumidor solo tiene cert/key, no un TRA ya firmado a mano). Misma
+    firma, mismo resultado `(token, sign, expira_at)`; levanta lo mismo que `login_con_cert`
+    (`ArcaAuthError`/`ArcaNetworkError`/`ArcaResponseError`)."""
+    from .wsaa import login_con_cert
+
+    return await asyncio.to_thread(
+        login_con_cert,
+        servicio, cert_pem, key_pem, endpoint,
+        ahora=ahora, timeout=timeout, key_password=key_password,
+    )

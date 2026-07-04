@@ -16,7 +16,7 @@ probada en producción — bajo SemVer, `0.x` señala justamente que puede rompe
 compatibilidad entre versiones menores, la misma libertad que se usó acá.
 """
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 from .modelos import (
     CondicionIva,
@@ -40,12 +40,16 @@ from .modelos import (
     ItemFactura,
     letra_comprobante,
     es_nota_credito,
+    label_concepto,
+    label_doc_tipo,
+    label_condicion_iva,
+    comprobante_fiscal_desde,
 )
 from .comprobante import tipo_comprobante, calcular_importes, armar_fecae, armar_fecae_lote
-from .qr import armar_qr
+from .qr import armar_qr, qr_svg
 from .pdf import renderizar_comprobante_html, nombre_fiscal_comprobante, page_size_for_layout
 from .seguridad import generar_cert_autofirmado, asegurar_pdf
-from .wsaa import construir_tra, firmar_tra, login, login_con_cert
+from .wsaa import construir_tra, firmar_tra, login, login_con_cert, WSFE_WSAA_SERVICIO
 from .wsfe import WsfeClient, clear_cache as wsfe_clear_cache
 from .padron import (
     PadronClient,
@@ -57,7 +61,12 @@ from .padron import (
 )
 from .validadores import normalizar_cuit, cuit_valido, formatear_cuit
 from .retry import with_retry
-from .asyncio_support import solicitar_cae_async, get_persona_async, login_async
+from .asyncio_support import (
+    solicitar_cae_async,
+    get_persona_async,
+    login_async,
+    login_con_cert_async,
+)
 from .errores import (
     ArcaError,
     ArcaAuthError,
@@ -90,12 +99,17 @@ __all__ = [
     "ItemFactura",
     "letra_comprobante",
     "es_nota_credito",
+    "label_concepto",
+    "label_doc_tipo",
+    "label_condicion_iva",
+    "comprobante_fiscal_desde",
     # lógica fiscal
     "tipo_comprobante",
     "calcular_importes",
     "armar_fecae",
     "armar_fecae_lote",
     "armar_qr",
+    "qr_svg",
     # render de comprobantes (HTML de los 3 layouts + protección del PDF)
     "renderizar_comprobante_html",
     "nombre_fiscal_comprobante",
@@ -107,6 +121,7 @@ __all__ = [
     "firmar_tra",
     "login",
     "login_con_cert",
+    "WSFE_WSAA_SERVICIO",
     # cliente WSFEv1
     "WsfeClient",
     "wsfe_clear_cache",
@@ -127,6 +142,7 @@ __all__ = [
     "solicitar_cae_async",
     "get_persona_async",
     "login_async",
+    "login_con_cert_async",
     # taxonomía de errores (todo lo que el motor levanta hereda de ArcaError)
     "ArcaError",
     "ArcaAuthError",

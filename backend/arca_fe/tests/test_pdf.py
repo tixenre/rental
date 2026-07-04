@@ -245,7 +245,7 @@ def test_si_falla_la_generacion_del_qr_propaga_el_error(layout, monkeypatch):
     def _boom(url, size):
         raise RuntimeError("segno no disponible")
 
-    monkeypatch.setattr("arca_fe.pdf._build_qr_svg", _boom)
+    monkeypatch.setattr("arca_fe.pdf.qr_svg", _boom)
     with pytest.raises(RuntimeError, match="segno no disponible"):
         renderizar_comprobante_html(_comprobante(), layout=layout)
 

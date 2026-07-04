@@ -31,7 +31,7 @@ from .modelos import (
     es_nota_credito,
     letra_comprobante,
 )
-from .qr import _build_qr_svg
+from .qr import qr_svg
 from .validadores import formatear_cuit
 
 # ---------------------------------------------------------------------------
@@ -122,7 +122,7 @@ def _qr_img(url: str, size: int) -> str:
     verificar el comprobante igual. Nunca atrapa errores: si `segno` no puede generarlo, el caller
     tiene que fallar fuerte, no entregar un comprobante con un hueco donde debería ir el QR exigido
     por RG4892."""
-    svg = _build_qr_svg(url, size)
+    svg = qr_svg(url, size)
     svg = svg.replace("<svg ", '<svg style="display:block" ', 1)
     return f'<a href="{_e(url)}" style="display:block;">{svg}</a>'
 

@@ -6,7 +6,12 @@ from __future__ import annotations
 
 import pytest
 
-from arca_fe.asyncio_support import get_persona_async, login_async, solicitar_cae_async
+from arca_fe.asyncio_support import (
+    get_persona_async,
+    login_async,
+    login_con_cert_async,
+    solicitar_cae_async,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -49,3 +54,24 @@ async def test_login_async_delega_a_wsaa_login(monkeypatch):
 
     assert resultado == ("tok", "sign", "expira")
     assert llamadas == [(b"cms", "https://endpoint.fake", 45.0)]
+
+
+@pytest.mark.asyncio
+async def test_login_con_cert_async_delega_a_wsaa_login_con_cert(monkeypatch):
+    """El atajo de alto nivel (construir_tra+firmar_tra+login en una llamada) tiene que tener
+    equivalente async, igual que login_async lo tiene para login — antes faltaba, rompiendo la
+    simetría de cobertura del facade."""
+    llamadas = []
+
+    def _fake_login_con_cert(servicio, cert_pem, key_pem, endpoint, *, ahora=None, timeout=30.0, key_password=None):
+        llamadas.append((servicio, cert_pem, key_pem, endpoint, ahora, timeout, key_password))
+        return ("tok", "sign", "expira")
+
+    monkeypatch.setattr("arca_fe.wsaa.login_con_cert", _fake_login_con_cert)
+
+    resultado = await login_con_cert_async(
+        "wsfe", b"cert", b"key", "https://endpoint.fake", timeout=45.0
+    )
+
+    assert resultado == ("tok", "sign", "expira")
+    assert llamadas == [("wsfe", b"cert", b"key", "https://endpoint.fake", None, 45.0, None)]

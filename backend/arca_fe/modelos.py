@@ -355,6 +355,54 @@ def es_nota_credito(cbte_tipo: CbteTipo) -> bool:
     )
 
 
+# ---------------------------------------------------------------------------
+# Labels ESTRUCTURALES (default) para armar un ComprobanteFiscal — Concepto/DocTipo/CondicionIva
+# son enums FIJOS (no dependen de un catálogo vivo de AFIP, a diferencia de moneda/tributos), así
+# que un texto default acá es seguro. Si tu integración ya cachea el catálogo vivo de ARCA
+# (`WsfeClient.param_tipos_doc`/`param_tipos_concepto`/`param_condicion_iva_receptor` — más preciso
+# si AFIP agrega un código nuevo), pasá ESE texto en su lugar; estos defaults son para quien no
+# tiene esa infraestructura y solo necesita el texto correcto para los códigos ya conocidos.
+# ---------------------------------------------------------------------------
+
+_CONCEPTO_LABEL: dict["Concepto", str] = {
+    Concepto.PRODUCTOS: "Productos",
+    Concepto.SERVICIOS: "Servicios",
+    Concepto.PRODUCTOS_Y_SERVICIOS: "Productos y Servicios",
+}
+
+_DOC_TIPO_LABEL: dict["DocTipo", str] = {
+    DocTipo.CUIT: "CUIT",
+    DocTipo.CUIL: "CUIL",
+    DocTipo.DNI: "DNI",
+    DocTipo.CONSUMIDOR_FINAL: "Consumidor Final",
+}
+
+_CONDICION_IVA_LABEL: dict["CondicionIva", str] = {
+    CondicionIva.RESPONSABLE_INSCRIPTO: "IVA Responsable Inscripto",
+    CondicionIva.EXENTO: "IVA Exento",
+    CondicionIva.CONSUMIDOR_FINAL: "Consumidor Final",
+    CondicionIva.MONOTRIBUTO: "Responsable Monotributo",
+}
+
+
+def label_concepto(concepto: Concepto) -> str:
+    """Texto para mostrar de un `Concepto` ("Servicios", "Productos", ...) — ver nota de labels
+    estructurales arriba. `ValueError` si `concepto` no es un `Concepto` válido."""
+    return _CONCEPTO_LABEL[Concepto(concepto)]
+
+
+def label_doc_tipo(doc_tipo: DocTipo) -> str:
+    """Texto para mostrar de un `DocTipo` ("CUIT", "DNI", ...) — ver nota de labels estructurales
+    arriba. `ValueError` si `doc_tipo` no es un `DocTipo` válido."""
+    return _DOC_TIPO_LABEL[DocTipo(doc_tipo)]
+
+
+def label_condicion_iva(condicion_iva: CondicionIva) -> str:
+    """Texto para mostrar de una `CondicionIva` ("IVA Responsable Inscripto", ...) — ver nota de
+    labels estructurales arriba. `ValueError` si `condicion_iva` no es una `CondicionIva` válida."""
+    return _CONDICION_IVA_LABEL[CondicionIva(condicion_iva)]
+
+
 @dataclass(frozen=True)
 class ItemFactura:
     """Una línea de detalle de un comprobante ya emitido (para mostrar en el documento — no
@@ -449,6 +497,87 @@ class ComprobanteFiscal:
                 f"ComprobanteFiscal incompleto, faltan: {', '.join(faltantes)} "
                 "— no se puede renderizar un comprobante sin esos datos."
             )
+
+
+def comprobante_fiscal_desde(
+    comprobante: ComprobanteRequest,
+    cbte_tipo: CbteTipo,
+    cae_result: CaeResult,
+    qr_url: str,
+    importe_neto: Decimal,
+    importe_iva: Decimal,
+    importe_total: Decimal,
+    fecha_emision: date,
+    *,
+    items: tuple[ItemFactura, ...] = (),
+    importe_otros_tributos: Decimal = Decimal("0"),
+    emisor_cuit: str = "",
+    emisor_razon_social: str = "",
+    emisor_domicilio: str = "",
+    emisor_iibb: str = "",
+    emisor_inicio_actividades: Optional[date] = None,
+    receptor_nombre: str = "",
+    receptor_domicilio: str = "",
+    condicion_venta: str = "Contado",
+    concepto_label: Optional[str] = None,
+    doc_tipo_label: Optional[str] = None,
+    condicion_iva_receptor_label: Optional[str] = None,
+    emisor_condicion_iva_label: Optional[str] = None,
+    periodo_desde: Optional[date] = None,
+    periodo_hasta: Optional[date] = None,
+    vencimiento_pago: Optional[date] = None,
+) -> ComprobanteFiscal:
+    """Arma un `ComprobanteFiscal` a partir del `ComprobanteRequest` ya emitido + su `CaeResult` —
+    reduce el copy manual de campo a campo (pto_vta/receptor ya están en `comprobante`, cae/cae_vto/
+    numero ya están en `cae_result`) a solo lo que `arca_fe` no puede resolver sola: importes ya
+    calculados (`calcular_importes`), datos de negocio del emisor/receptor (razón social,
+    domicilio) y, opcionalmente, los `*_label` (si no los pasás, usa los defaults ESTRUCTURALES de
+    `label_concepto`/`label_doc_tipo`/`label_condicion_iva` — ver esas funciones para cuándo
+    conviene pasar el texto del catálogo vivo de AFIP en su lugar).
+
+    `cbte_tipo`: el tipo YA resuelto (de `tipo_comprobante(comprobante)` o
+    `comprobante.forzar_cbte_tipo`) — esta función no lo rederiva.
+    `cae_result.resultado` tiene que ser `'A'` (aprobado) — `ValueError` si no (un comprobante
+    rechazado o parcial no tiene los datos para armar un `ComprobanteFiscal` válido)."""
+    if cae_result.resultado != "A":
+        raise ValueError(
+            f"comprobante_fiscal_desde: cae_result.resultado tiene que ser 'A' (aprobado), "
+            f"vino '{cae_result.resultado}'."
+        )
+    return ComprobanteFiscal(
+        cbte_tipo=cbte_tipo,
+        pto_vta=comprobante.emisor.punto_venta,
+        numero=cae_result.numero,
+        fecha_emision=fecha_emision,
+        cae=cae_result.cae,
+        cae_vto=cae_result.cae_vto,
+        qr_url=qr_url,
+        receptor=comprobante.receptor,
+        receptor_nombre=receptor_nombre,
+        concepto_label=concepto_label or label_concepto(comprobante.concepto),
+        doc_tipo_label=doc_tipo_label or label_doc_tipo(comprobante.receptor.doc_tipo),
+        condicion_iva_receptor_label=(
+            condicion_iva_receptor_label or label_condicion_iva(comprobante.receptor.condicion_iva)
+        ),
+        emisor_condicion_iva_label=(
+            emisor_condicion_iva_label or label_condicion_iva(comprobante.emisor.condicion_iva)
+        ),
+        items=items,
+        importe_neto=importe_neto,
+        importe_iva=importe_iva,
+        importe_total=importe_total,
+        importe_otros_tributos=importe_otros_tributos,
+        emisor_cuit=emisor_cuit,
+        emisor_razon_social=emisor_razon_social,
+        emisor_domicilio=emisor_domicilio,
+        emisor_iibb=emisor_iibb,
+        emisor_inicio_actividades=emisor_inicio_actividades,
+        receptor_domicilio=receptor_domicilio,
+        condicion_venta=condicion_venta,
+        periodo_desde=periodo_desde,
+        periodo_hasta=periodo_hasta,
+        vencimiento_pago=vencimiento_pago,
+    )
 
 
 @dataclass(frozen=True)
