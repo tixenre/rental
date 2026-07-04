@@ -148,20 +148,30 @@ export function DateRangePickerModal({
   // en el carrito qué ítems no están disponibles para ese período.
   const blocked = devolucionCerrada;
 
-  // ── Clamp hora a franja cuando el día cambia ──────────────────────────
-  // Solo si respetamos horarios; en modo admin la hora es libre.
-  useEffect(() => {
-    if (!respectHorarios) return;
-    if (franjaRetiro && startTime < franjaRetiro.desde) onStartTimeChange(franjaRetiro.desde);
-    else if (franjaRetiro && startTime > franjaRetiro.hasta) onStartTimeChange(franjaRetiro.hasta);
-  }, [respectHorarios, franjaRetiro, startTime, onStartTimeChange]);
-  // Clamp por antelación mínima: si el retiro elegido cae antes del piso
-  // (`earliest`, "ahora" + antelación), lo empuja al primer slot válido — así
-  // no queda seleccionada una hora que el backend igual rechazaría.
+  // ── Clamp de la hora de retiro: franja horaria + antelación mínima ──────
+  // Los dos pisos/techos se combinan en UN solo efecto que calcula el valor
+  // final de una — dos efectos independientes, cada uno empujando hacia su
+  // propio límite, pueden pisarse en loop infinito cuando el rango entre
+  // ambos queda vacío (piso de antelación > cierre de la franja): A sube,
+  // B baja, A vuelve a subir… nunca converge (visto en prod, #maximum-update-
+  // depth). Si el rango queda vacío, la antelación (piso duro — el backend
+  // igual la re-valida) se acota al cierre de la franja para no ofrecer un
+  // slot imposible ni loopear.
   const pisoHoraRetiro = allowPast ? undefined : minTimeForDate(startDate, earliest);
+  const hiHoraRetiro = respectHorarios ? franjaRetiro?.hasta : undefined;
+  let loHoraRetiro = respectHorarios
+    ? laterTime(franjaRetiro?.desde, pisoHoraRetiro)
+    : pisoHoraRetiro;
+  if (loHoraRetiro && hiHoraRetiro && timeToMinutes(loHoraRetiro) > timeToMinutes(hiHoraRetiro)) {
+    loHoraRetiro = hiHoraRetiro;
+  }
   useEffect(() => {
-    if (pisoHoraRetiro && startTime < pisoHoraRetiro) onStartTimeChange(pisoHoraRetiro);
-  }, [pisoHoraRetiro, startTime, onStartTimeChange]);
+    if (!startDate) return;
+    let next = startTime;
+    if (loHoraRetiro && next < loHoraRetiro) next = loHoraRetiro;
+    if (hiHoraRetiro && next > hiHoraRetiro) next = hiHoraRetiro;
+    if (next !== startTime) onStartTimeChange(next);
+  }, [startDate, loHoraRetiro, hiHoraRetiro, startTime, onStartTimeChange]);
   useEffect(() => {
     if (!respectHorarios) return;
     if (franjaDevolucion && endTime < franjaDevolucion.desde)
@@ -290,8 +300,8 @@ export function DateRangePickerModal({
                     <TimeStepSelect
                       value={startTime}
                       onChange={onStartTimeChange}
-                      min={laterTime(franjaRetiro?.desde, pisoHoraRetiro)}
-                      max={franjaRetiro?.hasta}
+                      min={loHoraRetiro}
+                      max={hiHoraRetiro}
                       aria-label="Hora de retiro"
                       className="text-sm font-mono tabular-nums text-ink/80 hover:text-ink rounded-md px-2 py-1 bg-background border hairline"
                     />
