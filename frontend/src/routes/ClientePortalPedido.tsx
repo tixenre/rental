@@ -1026,16 +1026,19 @@ function DocActions({
   description?: string;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
-  // Badge "Nuevo" si todavía no se vio. Sólo para contrato/albaran (los
-  // notificables). El estado vive en localStorage; lo trackeamos con un
-  // ref local para que el badge desaparezca instantáneamente al tocar.
+  // Badge "Nuevo" si todavía no se vio — solo para los notificables
+  // (`DOC_NOTIFICABLE`). "remito" y "packing-list" quedan siempre vistos:
+  // están disponibles desde que se crea el pedido, no son una novedad que
+  // "aparece después" (a diferencia de contrato/albaran/factura). El estado
+  // vive en localStorage; lo trackeamos con un ref local para que el badge
+  // desaparezca instantáneamente al tocar.
   const [seen, setSeen] = useState<boolean>(() =>
-    tipo === "remito" ? true : wasDocSeen(pedidoId, tipo),
+    tipo === "remito" || tipo === "packing-list" ? true : wasDocSeen(pedidoId, tipo),
   );
   const showNewBadge = !seen;
 
   function markSeen() {
-    if (tipo === "remito") return;
+    if (tipo === "remito" || tipo === "packing-list") return;
     markDocSeen(pedidoId, tipo);
     setSeen(true);
   }

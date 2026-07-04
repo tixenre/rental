@@ -102,7 +102,13 @@ export const ACTIVE_STATES = new Set(["borrador", "presupuesto", "confirmado", "
 export const HIST_STATES = new Set(["devuelto", "finalizado", "cancelado"]);
 export const MODIFICABLE_STATES = new Set(["presupuesto", "confirmado"]);
 
-export const DOC_NOTIFICABLE: DocTipo[] = ["contrato", "albaran", "factura", "packing-list"];
+// "packing-list" (Checklist de retiro) queda afuera a propósito, igual que
+// "remito": ambos están disponibles desde el mismo momento que se crea el
+// pedido — no son una novedad que "aparece después" (a diferencia de
+// contrato/albaran/factura, que antes llegaban en estados posteriores). Sin
+// esto, el popup "documentos nuevos" se dispara para TODOS los pedidos
+// históricos apenas se habilita un doc nuevo (nunca se marcó "visto" antes).
+export const DOC_NOTIFICABLE: DocTipo[] = ["contrato", "albaran", "factura"];
 
 export const TAB_OPTIONS: { value: Filtro; label: string }[] = [
   { value: "todos", label: "Todos" },
