@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Check, X as XIcon, ListPlus } from "lucide-react";
 import { toast } from "sonner";
 
+import { Button } from "@/design-system/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
@@ -48,18 +49,16 @@ export function GuardarComoListaView({
 
   if (!editing) {
     return (
-      <button
+      <Button
         type="button"
+        variant="outline"
         onClick={() => setEditing(true)}
         disabled={disabled}
-        className={cn(
-          "inline-flex w-full items-center justify-center gap-1.5 text-xs text-muted-foreground transition hover:text-ink focus:outline-none focus-visible:underline disabled:opacity-40",
-          className,
-        )}
+        className={cn("w-full", className)}
       >
-        <ListPlus className="h-3.5 w-3.5" />
+        <ListPlus />
         Guardar como lista
-      </button>
+      </Button>
     );
   }
 
