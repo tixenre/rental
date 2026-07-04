@@ -52,10 +52,11 @@ bloqueo de negocio → ArcaBusinessError).
 
 from __future__ import annotations
 
+import logging
 import ssl
 import urllib3
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 import requests
 import zeep
@@ -70,6 +71,8 @@ WSAA_SERVICIO = "ws_sr_constancia_inscripcion"
 _CLIENT_CACHE: dict[str, zeep.Client] = {}
 
 _TIMEOUT_SECONDS = 20.0
+
+_log = logging.getLogger(__name__)
 
 # idImpuesto en datosRegimenGeneral.impuesto (padrón A5) — verificado contra
 # pyafipws (referencia de facto del ecosistema): 30 = IVA Responsable
@@ -146,25 +149,27 @@ class PadronClient:
     def _client(self) -> zeep.Client:
         return _get_client(self.endpoint)
 
-    def get_persona(self, cuit_buscado: str) -> Optional[PersonaArca]:
-        """Consulta el padrón para `cuit_buscado`. None solo cuando AFIP no
-        devolvió NINGÚN dato ni motivo (silencio limpio — respuesta vacía sin
-        `personaReturn`, o sin `datosGenerales` y sin ningún error* poblado).
-        Para cualquier otra cosa levanta la taxonomía tipada de `errores`:
-        `ArcaResponseError` ante un Fault SOAP (texto de AFIP en el mensaje y
-        en `.raw`); `ArcaBusinessError` ante un bloqueo de negocio (ej. CUIT
-        sin adhesión a Domicilio Fiscal Electrónico, RG 3990-E — `personaReturn`
-        viene sin `datosGenerales` pero con `errorConstancia`/
-        `errorRegimenGeneral`/`errorMonotributo` poblado, ver manual oficial
-        "WS_SR_constancia_inscripcion" v3.7 §5.3), con los mensajes en
-        `.errores`.
+    def get_persona(self, cuit_buscado: str) -> PersonaArca:
+        """Consulta el padrón para `cuit_buscado`. Devuelve la `PersonaArca` si
+        AFIP la encontró.
 
-        Antes se filtraban los Fault que mencionaban "no se encuentran datos"/
-        "sin resultados" tratándolos como silencio limpio — esa heurística
-        escondía motivos reales (bloqueo de negocio, relación no delegada,
-        cert vencido) detrás de un genérico "sin datos" indistinguible de un
-        CUIT que de verdad no existe. Mostrar el texto de AFIP tal cual es más
-        honesto que adivinar cuáles vale la pena mostrar."""
+        **NUNCA devuelve None en silencio** — ese silencio era la raíz del
+        "ARCA no devolvió datos ni motivo" indistinguible entre un CUIT que no
+        existe, un bloqueo de negocio, una relación no delegada o un ambiente
+        equivocado. Ahora todo lo que no sea "persona encontrada" levanta la
+        taxonomía tipada de `errores`:
+        - `ArcaBusinessError`: AFIP contestó pero rechazó/no encontró por una
+          regla propia — `personaReturn` sin `datosGenerales` pero con
+          `errorConstancia`/`errorRegimenGeneral`/`errorMonotributo` poblado
+          (ej. "No existe persona con ese id", o el bloqueo RG 3990-E por falta
+          de adhesión al Domicilio Fiscal Electrónico; manual oficial
+          "WS_SR_constancia_inscripcion" v3.7 §5.3). Mensajes en `.errores`.
+        - `ArcaResponseError`: AFIP contestó en una forma que no podemos
+          interpretar como persona NI como motivo reconocible (sin
+          `personaReturn`, o `datosGenerales` None sin ningún nodo de error) —
+          lleva la respuesta cruda en `.raw` para diagnosticar, en vez de un
+          None mudo. También ante un Fault SOAP (texto de AFIP en `.raw`).
+        """
         client = self._client()
         try:
             resp = client.service.getPersona(
@@ -178,7 +183,17 @@ class PadronClient:
 
         persona = getattr(resp, "personaReturn", None) if resp is not None else None
         if persona is None:
-            return None
+            crudo = _serializar(resp)
+            _log.warning(
+                "getPersona sin 'personaReturn' para %s — respuesta cruda: %s",
+                cuit_buscado,
+                crudo,
+            )
+            raise ArcaResponseError(
+                "AFIP no devolvió 'personaReturn' para este CUIT (respuesta "
+                "vacía o inesperada, sin un motivo reconocible).",
+                raw=crudo,
+            )
 
         if getattr(persona, "datosGenerales", None) is None:
             mensajes = _errores_constancia(persona)
@@ -187,7 +202,18 @@ class PadronClient:
                     "; ".join(mensajes),
                     errores=tuple((None, m) for m in mensajes),
                 )
-            return None
+            crudo = _serializar(persona)
+            _log.warning(
+                "getPersona sin 'datosGenerales' ni motivo reconocible para %s "
+                "— respuesta cruda: %s",
+                cuit_buscado,
+                crudo,
+            )
+            raise ArcaResponseError(
+                "AFIP devolvió una respuesta sin 'datosGenerales' y sin un "
+                "motivo reconocible (ningún nodo de error poblado).",
+                raw=crudo,
+            )
 
         return _parsear_persona(cuit_buscado, persona)
 
@@ -196,17 +222,52 @@ def _solo_digitos(s: str) -> str:
     return "".join(c for c in str(s) if c.isdigit())
 
 
+def _serializar(obj: Any) -> str:
+    """Serializa una respuesta de zeep a texto para diagnóstico (`.raw` de la
+    excepción la trunca a 2000). Best-effort: si zeep no puede serializar el
+    objeto, cae a `repr`."""
+    if obj is None:
+        return "None"
+    try:
+        return str(zeep.helpers.serialize_object(obj, dict))
+    except Exception:
+        return repr(obj)
+
+
 def _errores_constancia(persona: Any) -> list[str]:
-    """Junta el/los mensaje(s) de error que AFIP puso en `errorConstancia`/
-    `errorRegimenGeneral`/`errorMonotributo` (cada uno con un campo `error`,
-    ver manual §5.3) cuando bloqueó la constancia por una regla de negocio."""
-    mensajes = []
+    """Junta el/los mensaje(s) que AFIP puso en `errorConstancia`/
+    `errorRegimenGeneral`/`errorMonotributo` (manual §5.3) cuando bloqueó o no
+    encontró la constancia. AFIP NO es consistente en la forma: puede venir un
+    objeto con `.error`, un string suelto, o —lo más común— un array/lista
+    (`ArrayOfString`). Antes solo se leía `.error` de un objeto único y un array
+    se perdía → "sin motivo" espurio. Ahora se aplanan todas las formas (mismo
+    criterio que pyafipws)."""
+    mensajes: list[str] = []
     for campo in ("errorConstancia", "errorRegimenGeneral", "errorMonotributo"):
-        err = getattr(persona, campo, None)
-        msg = getattr(err, "error", None) if err is not None else None
-        if msg:
-            mensajes.append(str(msg))
+        mensajes.extend(_extraer_mensajes(getattr(persona, campo, None)))
     return mensajes
+
+
+def _extraer_mensajes(nodo: Any) -> list[str]:
+    """Aplana un nodo de error de AFIP a una lista de strings, sea cual sea su
+    forma: None → []; string → [texto]; lista/tupla → recursivo sobre cada
+    ítem; objeto con `.error` → recursivo sobre `.error`; cualquier otro objeto
+    con contenido → su `str()`."""
+    if nodo is None:
+        return []
+    if isinstance(nodo, str):
+        texto = nodo.strip()
+        return [texto] if texto else []
+    if isinstance(nodo, (list, tuple)):
+        out: list[str] = []
+        for item in nodo:
+            out.extend(_extraer_mensajes(item))
+        return out
+    err_attr = getattr(nodo, "error", None)
+    if err_attr is not None:
+        return _extraer_mensajes(err_attr)
+    texto = str(nodo).strip()
+    return [texto] if texto and texto != "None" else []
 
 
 def _parsear_persona(cuit: str, persona: Any) -> PersonaArca:
