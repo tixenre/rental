@@ -5,6 +5,10 @@ Motor portable de facturación electrónica ARCA (ex-AFIP) — WSFEv1 (facturaci
 framework** (FastAPI, Django, psycopg, etc.) ni de `backend.*` — es una librería reusable, no
 parte de la app de Rambla. El adapter específico de Rambla vive en `backend/services/facturacion/`.
 
+¿Evaluando si te sirve? → [`FEATURES.md`](FEATURES.md) resume qué podés hacer con la librería, en
+términos de qué resuelve (no un listado de funciones). Esta página (el README) es la referencia
+técnica de instalación y uso.
+
 ## Instalación
 
 Como parte del monorepo, ya está disponible al importar `arca_fe` desde `backend/`. Para instalarlo
