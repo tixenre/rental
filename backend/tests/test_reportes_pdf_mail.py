@@ -54,8 +54,55 @@ def test_html_periodo_vacio_no_rompe():
     assert "No hay pedidos saldados" in html
 
 
+def test_html_incluye_pedidos_detalle():
+    # Tabla "Pedidos" (2026-07-04): # de pedido, cliente, fecha, monto — además
+    # de la tabla de equipos, no en su lugar.
+    data = dict(
+        _DATA,
+        por_dueno=[
+            dict(
+                _DATA["por_dueno"][0],
+                pedidos_detalle=[
+                    {"pedido_id": 501, "numero_pedido": 1042, "cliente": "Juan Pérez",
+                     "fecha": "2026-06-15", "monto": 80000},
+                ],
+            )
+        ],
+    )
+    html = _liquidacion_html(data, "junio de 2026")
+    assert "#1042" in html
+    assert "Juan Pérez" in html
+    assert "15/06/2026" in html
+    assert "Cámara A" in html  # la tabla de equipos sigue estando
+
+
+def test_html_pedidos_detalle_vacio_no_rompe():
+    # Compat: dicts sin `pedidos_detalle` (fotos congeladas de antes de este
+    # cambio) no rompen — cae al estado vacío de la tabla.
+    html = _liquidacion_html(_DATA, "junio de 2026")
+    assert "Sin pedidos con ingreso en el período" in html
+
+
 def test_html_escapa_nombres():
     data = dict(_DATA, por_dueno=[{"dueno": "<script>x</script>", "equipos": [], "monto_generado": 0, "pedidos": 0}])
+    html = _liquidacion_html(data, "junio de 2026")
+    assert "<script>x</script>" not in html
+    assert "&lt;script&gt;" in html
+
+
+def test_html_escapa_cliente_en_pedidos_detalle():
+    data = dict(
+        _DATA,
+        por_dueno=[
+            dict(
+                _DATA["por_dueno"][0],
+                pedidos_detalle=[
+                    {"pedido_id": 1, "numero_pedido": 1, "cliente": "<script>x</script>",
+                     "fecha": "2026-06-15", "monto": 1000},
+                ],
+            )
+        ],
+    )
     html = _liquidacion_html(data, "junio de 2026")
     assert "<script>x</script>" not in html
     assert "&lt;script&gt;" in html

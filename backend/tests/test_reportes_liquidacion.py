@@ -110,6 +110,33 @@ class TestAgregar:
         assert d["resumen"]["pedidos"] == 0
         assert d["por_mes"] == [] and d["por_dia"] == [] and d["por_dueno"] == []
 
+    def test_pedidos_detalle_por_dueno(self):
+        # Un pedido con equipos de 2 dueños distintos: cada dueño ve SU monto
+        # para ESE pedido en `pedidos_detalle`, no el total del pedido (2026-07-04).
+        filas = [
+            {"fecha": "2026-06-03", "pedido_id": 1, "numero_pedido": 501,
+             "cliente": "Juan Pérez", "dueno": "Pablo", "equipo": "Sony FX3", "monto": 60000},
+            {"fecha": "2026-06-03", "pedido_id": 1, "numero_pedido": 501,
+             "cliente": "Juan Pérez", "dueno": "Rambla", "equipo": "Canon R5", "monto": 40000},
+        ]
+        d = agregar(filas, DEFAULT_MODELO)
+        duenos = {x["dueno"]: x for x in d["por_dueno"]}
+        pablo_pedidos = duenos["Pablo"]["pedidos_detalle"]
+        rambla_pedidos = duenos["Rambla"]["pedidos_detalle"]
+        assert pablo_pedidos == [
+            {"pedido_id": 1, "numero_pedido": 501, "cliente": "Juan Pérez",
+             "fecha": "2026-06-03", "monto": 60000},
+        ]
+        assert rambla_pedidos[0]["monto"] == 40000
+
+    def test_pedidos_detalle_fallback_sin_numero_ni_cliente(self):
+        # Filas sin numero_pedido/cliente (compat con filas viejas/otros tests)
+        # caen a pedido_id y string vacío — no explota.
+        d = agregar(self._filas(), DEFAULT_MODELO)
+        pablo = {x["dueno"]: x for x in d["por_dueno"]}["Pablo"]
+        assert pablo["pedidos_detalle"][0]["numero_pedido"] == 1  # == pedido_id
+        assert pablo["pedidos_detalle"][0]["cliente"] == ""
+
 
 class TestCierresPuros:
     """Helpers puros de cierres.py (#721): no tocan DB."""
@@ -190,6 +217,11 @@ class TestCombinarMeses:
                     "pedidos": 1,
                     "reparto": {"Pablo": pablo_benef, "Rambla": rambla_benef},
                     "equipos": [{"equipo": "Sony FX3", "monto": pablo_total, "veces": 1}],
+                    "pedidos_detalle": [
+                        {"pedido_id": int(mes.replace("-", "")), "numero_pedido": 900,
+                         "cliente": "Cliente de prueba", "fecha": f"{mes}-10",
+                         "monto": pablo_total},
+                    ],
                 }
             ],
             "modelo": {"Pablo": {"Pablo": 100}},
@@ -222,6 +254,18 @@ class TestCombinarMeses:
         assert pablo["equipos"][0]["equipo"] == "Sony FX3"
         assert pablo["equipos"][0]["monto"] == 140000
         assert pablo["equipos"][0]["veces"] == 2
+
+    def test_por_dueno_concatena_pedidos_detalle(self):
+        # Un pedido pertenece a un único mes de saldado → concatenar las listas
+        # de `pedidos_detalle` de cada mes es seguro, no hay dupes (2026-07-04).
+        junio = self._mes("2026-06", 100000, 50000, 50000)
+        julio = self._mes("2026-07", 40000, 40000, 0)
+        d = combinar_meses([junio, julio])
+        pablo = {x["dueno"]: x for x in d["por_dueno"]}["Pablo"]
+        assert len(pablo["pedidos_detalle"]) == 2
+        assert {p["fecha"] for p in pablo["pedidos_detalle"]} == {"2026-06-10", "2026-07-10"}
+        # Ordenado por monto descendente, igual que `equipos`.
+        assert pablo["pedidos_detalle"][0]["monto"] == 100000
 
     def test_beneficiarios_es_la_union_en_orden_de_aparicion(self):
         junio = self._mes("2026-06", 100000, 50000, 50000)

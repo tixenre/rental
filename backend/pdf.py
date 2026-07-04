@@ -381,6 +381,20 @@ def _liquidacion_html(data: dict, titulo: str, stats: dict | None = None) -> str
             filas = ('<tr><td colspan="3" class="rep-empty-cell">'
                      'Sin equipos con ingreso en el período.</td></tr>')
 
+        # Pedidos/rentals (2026-07-04): mismo total, visto por pedido en vez de
+        # por equipo — # de pedido, cliente, fecha de saldado, monto.
+        filas_pedidos = ""
+        for p in d.get("pedidos_detalle", []):
+            filas_pedidos += (
+                f'<tr><td class="mono">#{esc(p.get("numero_pedido", ""))}</td>'
+                f'<td>{esc(p.get("cliente", "") or "—")}</td>'
+                f'<td class="c mono">{esc(_fmt_date_short(p.get("fecha")))}</td>'
+                f'<td class="r mono">{fmt(p.get("monto", 0))}</td></tr>'
+            )
+        if not filas_pedidos:
+            filas_pedidos = ('<tr><td colspan="4" class="rep-empty-cell">'
+                              'Sin pedidos con ingreso en el período.</td></tr>')
+
         reparto = d.get("reparto", {}) or {}
         chips = []
         for b, m in reparto.items():
@@ -403,6 +417,9 @@ def _liquidacion_html(data: dict, titulo: str, stats: dict | None = None) -> str
             '<table class="rep-tbl"><thead><tr>'
             '<th>Equipo</th><th class="c">Veces</th><th class="r">Generado</th>'
             f'</tr></thead><tbody>{filas}</tbody></table>'
+            '<table class="rep-tbl rep-tbl--pedidos"><thead><tr>'
+            '<th>Pedido</th><th>Cliente</th><th class="c">Fecha</th><th class="r">Monto</th>'
+            f'</tr></thead><tbody>{filas_pedidos}</tbody></table>'
             f'{reparto_html}</div>'
         )
     if not por_dueno:
@@ -483,7 +500,7 @@ def _resumen_general_html(stats: dict) -> str:
     cards = (
         '<div class="rep-stat-card"><div class="rep-stat-label">Facturado neto</div>'
         f'<div class="rep-stat-num">{fmt(total_ars)}</div>'
-        '<div class="rep-stat-sub">ingreso confirmado</div></div>'
+        '<div class="rep-stat-sub">ingreso finalizado</div></div>'
         '<div class="rep-stat-card"><div class="rep-stat-label">Pedidos</div>'
         f'<div class="rep-stat-num">{total_pedidos}</div>'
         f'<div class="rep-stat-sub">{fmt(promedio)} promedio</div></div>'
@@ -570,8 +587,7 @@ def _resumen_general_html(stats: dict) -> str:
         '<section class="rep-section rep-section--stats">'
         '<div class="rep-sec-head"><h2 class="rep-h2">Resumen general</h2>'
         f'<span class="rep-sec-eyebrow">{periodo_eyebrow}</span></div>'
-        '<p class="rep-sub">Contexto · histórico de pedidos confirmados, '
-        'retirados y finalizados.</p>'
+        '<p class="rep-sub">Contexto · histórico de pedidos finalizados.</p>'
         f'<div class="rep-stat-grid">{cards}</div>'
         '<div class="rep-h3-row"><h3 class="rep-h3">Ingresos por dueño</h3>'
         f'<span class="rep-h3-meta">neto · {fmt(suma_dueno)}</span></div>'
@@ -665,6 +681,8 @@ _REP_CSS = r"""
 .rep-tbl .mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
 .rep-tbl td.r,.rep-tbl td.c{white-space:nowrap}
 .rep-dueno .rep-tbl thead th{padding-top:10px}
+.rep-tbl--pedidos{margin-top:4px}
+.rep-tbl--pedidos thead th{border-top:1px solid var(--hairline);padding-top:14px}
 .rep-cli-tbl{border:1px solid var(--hairline);border-radius:var(--r-lg);overflow:hidden}
 .rep-cli-tbl thead th{padding:10px 16px 8px;background:var(--surface)}
 .rep-rank{color:var(--muted)}

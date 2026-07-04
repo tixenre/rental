@@ -832,6 +832,19 @@ marca cualquier query nueva de estadísticas/reportes que recalcule `descuento_p
 leer `monto_total`. Regresión: `test_estadisticas_db.py` (Postgres real; pedido con descuento por
 jornadas ganador y descuento de cliente en 0%).
 
+**Criterio explícito del dueño (2026-07-04): todo `/admin/estadisticas` es DEVENGADO, no COBRADO** — la
+misma línea "facturado" de la cascada del P&L de Reportes (_2026-06-28_), no `monto_pagado`/cobros
+reales. Un pedido `confirmado` puede tener saldo pendiente y aun así suma su `monto_total` completo — es
+la semántica esperada, no un bug. El supervisor marca una tarjeta/query de Estadísticas que mezcle
+`monto_pagado` (cobrado) con las agregaciones existentes (devengado) sin distinguirlas explícitamente.
+
+**Refinado el mismo día: SOLO `estado='finalizado'`, no `confirmado`/`retirado`.** Las 7 agregaciones
+(`totales`/`por_mes`/`top_equipos`/`top_clientes`/`por_dueno`/`clientes_recurrentes`/`mejor_peor_mes`,
+compartidas con la sección "Resumen general" del PDF de Reportes) filtran únicamente pedidos cerrados —
+negocio `confirmado`/`retirado` (que todavía puede cambiar) queda afuera. Regresión:
+`test_estadisticas_excluye_confirmado_y_retirado` (Postgres real). El supervisor marca cualquier query
+de Estadísticas que vuelva a incluir `confirmado`/`retirado` en el `WHERE`.
+
 ### 2026-07-03 — Factura y mail de "pedido creado": línea de bonificación/descuento visible (M5+L1, #1209)
 
 Con descuento (el caso común: cualquier alquiler de varios días tiene descuento automático por jornadas),
@@ -913,6 +926,21 @@ decisión de descuento — moverlas invertiría la dependencia hacia un módulo 
 calcular_total` sigue siendo el motor de TOTALES (IVA/combos), solo importa la decisión de acá. El
 supervisor marca lógica de "quién gana el descuento" reimplementada fuera de `descuentos/queries/decision.py`.
 Cómo → `backend/descuentos/CLAUDE.md`; tracking → issue #1219.
+
+### 2026-07-04 — Liquidación: el reporte que se manda por mail vive también en la vista + detalle de pedidos por dueño
+
+A pedido del dueño ("que lo que se manda sea lo mismo que se ve"): la pantalla `/admin/contabilidad/liquidacion`
+embebe ahora el mismo HTML que se manda por mail (`adminApi.liquidacionPreviewHtml`, mismo `queryKey` que el
+diálogo "Enviar por mail" para compartir caché) en una sección "Reporte del mes" **siempre visible**, no solo
+detrás del diálogo — no puede divergir porque es literalmente el mismo documento. Además, `backend/reportes/
+liquidacion.py::agregar`/`combinar_meses` agregan **`pedidos_detalle`** por dueño (# de pedido, cliente, fecha
+de saldado, monto que ESE pedido aportó a ESE dueño) — **además** de `equipos` (no en su lugar), en ambos
+lugares: el "Resumen por dueño" de la vista web y la tabla "Pedidos" del PDF/mail (`pdf.py::_liquidacion_html`).
+Un pedido con equipos de 2 dueños distintos aporta un monto DISTINTO a cada uno en su propio `pedidos_detalle`.
+Campo **opcional** en el tipo (`LiquidacionDueno.pedidos_detalle?`) — las fotos de meses ya cerrados antes de
+este cambio no lo tienen (JSON congelado), cae a lista vacía sin romper. El supervisor marca un consumidor
+nuevo de `por_dueno` que reimplemente el detalle de pedidos en vez de leer `pedidos_detalle`, o el reporte
+embebido divergiendo del `_liquidacion_html` real (dos fuentes de la misma "Detalle por dueño").
 
 ---
 
