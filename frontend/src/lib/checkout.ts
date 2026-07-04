@@ -15,9 +15,12 @@ export async function aceptarTyc(): Promise<void> {
   await authedPostJson("/api/checkout/aceptar-tyc", {});
 }
 
-export async function validarCheckout(sessionId: string): Promise<CheckoutValidarResult> {
+export async function validarCheckout(
+  sessionId: string,
+  sessionConfirmed = false,
+): Promise<CheckoutValidarResult> {
   return authedPostJson<CheckoutValidarResult>("/api/checkout/validar", {
     session_id: sessionId,
-    session_confirmed: false,
+    session_confirmed: sessionConfirmed,
   });
 }

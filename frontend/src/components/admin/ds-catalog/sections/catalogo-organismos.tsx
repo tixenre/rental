@@ -113,6 +113,10 @@ function CartDrawerDemo() {
         titleId="ds-cart-demo-title"
         onClose={() => setOpen(false)}
         onExplore={noop}
+        step="carrito"
+        sessionId="ds-demo-session"
+        onVolverAlCarrito={noop}
+        onCrearPedido={async () => {}}
         startDate={new Date("2026-07-10T10:00:00")}
         endDate={new Date("2026-07-12T18:00:00")}
         startTime="10:00"
@@ -139,8 +143,6 @@ function CartDrawerDemo() {
         showNotas={false}
         onNotasChange={noop}
         onShowNotas={noop}
-        submitError={null}
-        submitting={false}
         onSubmit={noop}
         hayNoDisponible={false}
         nombresSinDisp={[]}
@@ -150,9 +152,6 @@ function CartDrawerDemo() {
         needsLogin={false}
         onLogin={noop}
         onRegister={noop}
-        verifEstado={null}
-        iniciandoVerif={false}
-        onVerificar={noop}
         clienteSession={{ nombre: "Estudio Demo" }}
         onClear={noop}
       />

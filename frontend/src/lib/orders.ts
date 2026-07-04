@@ -43,6 +43,11 @@ export type CreateOrderInput = {
   days: number;
   resolvedItems: OrderItemInput[];
   notes?: string;
+  /** Fallback de firma sin passkey ("Confirmo y acepto" por sesión) resuelto en
+   *  el paso de resumen del checkout (`CheckoutResumen`) — ver
+   *  `services/checkout/validar.py::_check_firma`. Inerte mientras
+   *  `FIRMA_CHECKOUT_OBLIGATORIA` esté apagado server-side. */
+  sessionConfirmed?: boolean;
 };
 
 export type Order = {
@@ -172,6 +177,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     })),
     // session_id del carrito (#280 Fase 1): cierra el funnel de conversión
     session_id: useCart.getState().sessionId,
+    session_confirmed: input.sessionConfirmed ?? false,
   };
 
   let created: Record<string, unknown>;

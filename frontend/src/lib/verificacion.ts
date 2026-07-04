@@ -89,17 +89,26 @@ export async function iniciarVerificacionIdentidad(returnTo?: string): Promise<v
 // tiene ese handler.
 const RESUME_FLAG = "openCarrito";
 const RESUME_VALUE = "1";
+// Junto a RESUME_FLAG: reabrir directo en el paso de resumen del checkout (no
+// en la lista de ítems) — espeja RESUME_STEP_PARAM/RESUME_STEP_VALUE de
+// CheckoutResumen.tsx (evitamos importar ese módulo acá solo por 2 strings).
+const RESUME_STEP_PARAM = "carritoPaso";
+const RESUME_STEP_VALUE = "resumen";
 
 /** Al volver a una ruta del catálogo con `?openCarrito=1` (tras login o
  *  verificación), reabre el carrito. El flag vive en la URL (NO en el cart-store,
- *  que excluye drawerOpen a propósito). Corre una sola vez en mount; limpia el flag. */
-export function useRetomarPedido(onRetomar: () => void): void {
+ *  que excluye drawerOpen a propósito). Corre una sola vez en mount; limpia el flag.
+ *  `onRetomar` recibe `"resumen"` si además venía `?carritoPaso=resumen` (retorno
+ *  desde el paso de resumen, ver CheckoutResumen.tsx) — el caller decide qué hacer. */
+export function useRetomarPedido(onRetomar: (paso?: "resumen") => void): void {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const sp = new URLSearchParams(window.location.search);
     if (sp.get(RESUME_FLAG) !== RESUME_VALUE) return;
-    onRetomar();
+    const paso = sp.get(RESUME_STEP_PARAM) === RESUME_STEP_VALUE ? "resumen" : undefined;
+    onRetomar(paso);
     sp.delete(RESUME_FLAG);
+    sp.delete(RESUME_STEP_PARAM);
     const url = new URL(window.location.href);
     url.search = sp.toString();
     window.history.replaceState({}, "", url.toString());

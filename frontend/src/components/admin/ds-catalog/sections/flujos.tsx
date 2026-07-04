@@ -205,6 +205,10 @@ function CartDrawerDemo() {
         titleId={titleId}
         onClose={() => setOpen(false)}
         onExplore={() => setOpen(false)}
+        step="carrito"
+        sessionId="ds-demo-session"
+        onVolverAlCarrito={() => {}}
+        onCrearPedido={async () => {}}
         startDate={start}
         endDate={end}
         startTime="09:00"
@@ -233,8 +237,6 @@ function CartDrawerDemo() {
         showNotas={showNotas}
         onNotasChange={setNotas}
         onShowNotas={() => setShowNotas(true)}
-        submitError={null}
-        submitting={false}
         onSubmit={() => toast.success("Confirmar pedido (demo — en la app crea el pedido real)")}
         hayNoDisponible={false}
         nombresSinDisp={[]}
@@ -244,9 +246,6 @@ function CartDrawerDemo() {
         needsLogin={false}
         onLogin={() => {}}
         onRegister={() => {}}
-        verifEstado={null}
-        iniciandoVerif={false}
-        onVerificar={() => {}}
         clienteSession={null}
         onClear={() => setQtys({})}
       />
