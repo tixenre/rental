@@ -47,7 +47,7 @@ def test_filtra_bloqueados_dados_de_baja_y_no_electronicos(monkeypatch):
     assert result["excluidos"] == [
         {"nro": 3, "motivo": "bloqueado"},
         {"nro": 4, "motivo": "dado_de_baja"},
-        {"nro": 5, "motivo": "no_electronico"},
+        {"nro": 5, "motivo": "no_electronico", "raw_emision_tipo": "CAI"},
     ]
 
 

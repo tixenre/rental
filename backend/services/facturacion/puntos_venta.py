@@ -30,12 +30,18 @@ def consultar_puntos_venta(nombre_emisor: str, conn) -> dict:
     facturación electrónica y excluidos (con motivo).
 
     Devuelve `{"habilitados": [{"nro": ...}], "excluidos": [{"nro": ...,
-    "motivo": "bloqueado" | "dado_de_baja" | "no_electronico"}]}`. Antes esto
-    descartaba los no-habilitados en silencio — si ARCA devolvía puntos pero
+    "motivo": "bloqueado" | "dado_de_baja" | "no_electronico", "raw_emision_tipo": ...}]}`.
+    Antes esto descartaba los no-habilitados en silencio — si ARCA devolvía puntos pero
     todos bloqueados, se veía el mismo "no hay nada" que si ARCA no tenía
     NINGÚN punto creado; son causas distintas (desbloquear vs. crear uno
     nuevo), así que el motivo de cada exclusión se preserva para que el
     front pueda mostrarlo en vez de un mensaje genérico.
+
+    `raw_emision_tipo` viaja en CUALQUIER exclusión con motivo `no_electronico` — el valor
+    EXACTO que ARCA devolvió en `EmisionTipo`, sin normalizar. Mismo criterio que el bug real
+    de `FchBaja="NULL"` (ver `_tiene_fecha_de_baja`): la respuesta real de ARCA puede diferir
+    de lo documentado, y no hay forma de confirmar un quirk nuevo sin ver el valor crudo — se
+    expone acá en vez de asumir qué debería decir.
 
     Raises:
         ValueError: emisor no encontrado/inactivo/sin cert (mapea a 400).
@@ -59,7 +65,13 @@ def consultar_puntos_venta(nombre_emisor: str, conn) -> dict:
         elif _tiene_fecha_de_baja(p.get("FchBaja")):
             excluidos.append({"nro": p["Nro"], "motivo": "dado_de_baja"})
         elif p.get("EmisionTipo") != "CAE":
-            excluidos.append({"nro": p["Nro"], "motivo": "no_electronico"})
+            excluidos.append(
+                {
+                    "nro": p["Nro"],
+                    "motivo": "no_electronico",
+                    "raw_emision_tipo": p.get("EmisionTipo"),
+                }
+            )
         else:
             habilitados.append({"nro": p["Nro"]})
 
