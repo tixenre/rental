@@ -257,6 +257,60 @@ def _validar_fechas_servicio(req: ComprobanteRequest) -> None:
         )
 
 
+def _validar_estructura(req: ComprobanteRequest) -> None:
+    """Valida todo lo que es ESTRUCTURAL/fijo por especificación AFIP (nunca lo que depende de un
+    catálogo VIVO de AFIP — moneda/tributos/opcionales/condición IVA solo se validan en FORMATO
+    acá, nunca en vigencia; ver el docstring del módulo `modelos.py`).
+
+    La llama TANTO `ComprobanteRequest.__post_init__` (fail-fast en la construcción, antes de
+    esta iniciativa esto corría recién acá) COMO `armar_fecae`/`armar_fecae_lote` (mismo chequeo,
+    sin duplicar la lógica — el dataclass es `frozen`, así que si pasó por `__post_init__` una
+    vez ya está validado, pero repetir la llamada es barato y no asume que nadie construyó el
+    objeto sin pasar por ahí)."""
+    cbte_tipo = tipo_comprobante(req)
+    _validar_fechas_servicio(req)
+    _validar_fce(req, cbte_tipo)
+
+    if not (1 <= req.emisor.punto_venta <= 9999):
+        raise ValueError(
+            f"emisor.punto_venta fuera de rango (1-9999): {req.emisor.punto_venta}"
+        )
+
+    for nombre, valor in (
+        ("importe_neto", req.importe_neto),
+        ("importe_no_gravado", req.importe_no_gravado),
+        ("importe_exento", req.importe_exento),
+    ):
+        if valor < 0:
+            raise ValueError(f"{nombre} no puede ser negativo: {valor}")
+
+    for item in req.alicuotas_iva:
+        if item.base_imponible < 0:
+            raise ValueError(
+                f"alicuotas_iva: base_imponible no puede ser negativo: {item.base_imponible}"
+            )
+
+    for t in req.tributos:
+        if t.importe < 0:
+            raise ValueError(f"tributos: importe no puede ser negativo: {t.importe}")
+        if t.id <= 0:
+            raise ValueError(f"tributos: id tiene que ser un entero positivo: {t.id}")
+        if not (0 <= t.alicuota_pct <= 100):
+            raise ValueError(f"tributos: alicuota_pct fuera de rango (0-100): {t.alicuota_pct}")
+
+    for o in req.opcionales:
+        if not o.id or not o.valor:
+            raise ValueError("opcionales: id/valor no pueden venir vacíos")
+
+    # Formato de MonId/MonCotiz (WSFEv1) — nunca vigencia (ver docstring de arriba).
+    if len(req.moneda) != 3 or not req.moneda.isalnum():
+        raise ValueError(
+            f"moneda (MonId) tiene que ser exactamente 3 caracteres alfanuméricos: '{req.moneda}'"
+        )
+    if req.cotizacion <= 0:
+        raise ValueError(f"cotizacion (MonCotiz) tiene que ser positiva: {req.cotizacion}")
+
+
 def _validar_fce(req: ComprobanteRequest, cbte_tipo: CbteTipo) -> None:
     """Reglas estructurales de Factura de Crédito Electrónica MiPyme
     (verificadas contra el manual oficial WSFEv1 — NO decide si la operación
@@ -296,22 +350,14 @@ def _validar_fce(req: ComprobanteRequest, cbte_tipo: CbteTipo) -> None:
             )
 
 
-def armar_fecae(req: ComprobanteRequest, numero: int) -> dict:
-    """Arma el dict FECAEReq para FECAESolicitar (sin el nodo Auth).
+def _armar_detalle(req: ComprobanteRequest, numero: int) -> dict:
+    """Arma UN `FECAEDetRequest` (el detalle de un comprobante individual dentro del array que
+    espera `FeDetReq`). Lo reusan `armar_fecae` (arma un array de 1) y `armar_fecae_lote` (arma
+    un array de N) — cero duplicación de la lógica de importes/IVA/FCE entre las dos.
 
-    Retorna:
-        {
-          "FeCabReq": {"CantReg": 1, "PtoVta": ..., "CbteTipo": ...},
-          "FeDetReq": {"FECAEDetRequest": [det]},
-        }
-
-    Levanta ValueError (fail fast, sin red) si el request es incompleto para
-    su Concepto (ver `_validar_fechas_servicio`), si es FCE y le faltan sus
-    campos obligatorios (ver `_validar_fce`), o si `emisor.condicion_iva`/
-    `forzar_cbte_tipo` no son facturables (ver `tipo_comprobante`)."""
-    _validar_fechas_servicio(req)
+    Asume que `req` ya pasó `_validar_estructura` (lo llama el caller UNA vez para todo el lote,
+    no acá por ítem — evita recalcular `tipo_comprobante`/`calcular_importes` dos veces)."""
     cbte_tipo = tipo_comprobante(req)
-    _validar_fce(req, cbte_tipo)
     imp = calcular_importes(req)
     neto, iva, totconc, opex, tributos_total, total = (
         imp["neto"], imp["iva"], imp["totconc"], imp["opex"], imp["tributos"], imp["total"],
@@ -397,6 +443,28 @@ def armar_fecae(req: ComprobanteRequest, numero: int) -> dict:
             "CbteAsoc": [_cbte_asoc_dict(a) for a in req.cbtes_asoc]
         }
 
+    return det
+
+
+def armar_fecae(req: ComprobanteRequest, numero: int) -> dict:
+    """Arma el dict FECAEReq para FECAESolicitar (sin el nodo Auth) — UN solo comprobante.
+
+    Retorna:
+        {
+          "FeCabReq": {"CantReg": 1, "PtoVta": ..., "CbteTipo": ...},
+          "FeDetReq": {"FECAEDetRequest": [det]},
+        }
+
+    Levanta ValueError (fail fast, sin red) si el request es incompleto para su Concepto (ver
+    `_validar_fechas_servicio`), si es FCE y le faltan sus campos obligatorios (ver
+    `_validar_fce`), si `emisor.condicion_iva`/`forzar_cbte_tipo` no son facturables (ver
+    `tipo_comprobante`), o cualquiera de las guardas estructurales de `_validar_estructura` —
+    en la práctica esto ya corrió una vez en `ComprobanteRequest.__post_init__` (fail-fast en la
+    construcción); repetirlo acá es barato y no asume que nadie construyó el objeto sin pasar por
+    ahí."""
+    _validar_estructura(req)
+    cbte_tipo = tipo_comprobante(req)
+    det = _armar_detalle(req, numero)
     return {
         "FeCabReq": {
             "CantReg": 1,
@@ -405,5 +473,64 @@ def armar_fecae(req: ComprobanteRequest, numero: int) -> dict:
         },
         "FeDetReq": {
             "FECAEDetRequest": [det]
+        },
+    }
+
+
+_MAX_LOTE = 250  # tope de FECAESolicitar por lote, manual oficial WSFEv1
+
+
+def armar_fecae_lote(comprobantes: "list[ComprobanteRequest]", numero_desde: int) -> dict:
+    """Arma el dict FECAEReq para pedir CAE de VARIOS comprobantes CONSECUTIVOS en una sola
+    llamada `FECAESolicitar` (`FeDetReq.FECAEDetRequest` es un array — AFIP soporta hasta
+    `_MAX_LOTE` comprobantes por lote, manual oficial WSFEv1).
+
+    Todos los `comprobantes` tienen que compartir el MISMO emisor (`cuit`/`punto_venta`) y el
+    MISMO `cbte_tipo` resuelto (`tipo_comprobante`) — es una regla dura del WSDL (un lote es
+    homogéneo), no una preferencia de este motor. `ValueError` si no son homogéneos, si la lista
+    viene vacía, o si supera `_MAX_LOTE` (la librería NO auto-particiona un lote grande en
+    varios — mismo criterio "predecible, no mágico" del resto del diseño; el consumidor arma sus
+    propios lotes de a lo sumo `_MAX_LOTE`).
+
+    Los números de comprobante son CONSECUTIVOS desde `numero_desde` (uno por cada elemento de
+    `comprobantes`, en orden)."""
+    if not comprobantes:
+        raise ValueError("armar_fecae_lote: la lista de comprobantes no puede estar vacía.")
+    if len(comprobantes) > _MAX_LOTE:
+        raise ValueError(
+            f"armar_fecae_lote: {len(comprobantes)} comprobantes supera el tope de "
+            f"{_MAX_LOTE} por lote (manual WSFEv1) — partí en más de un lote."
+        )
+
+    primero = comprobantes[0]
+    for req in comprobantes:
+        _validar_estructura(req)
+
+    tipos = {tipo_comprobante(req) for req in comprobantes}
+    if len(tipos) > 1:
+        raise ValueError(
+            f"armar_fecae_lote: los comprobantes tienen que compartir el mismo cbte_tipo "
+            f"resuelto — se encontraron: {[t.name for t in tipos]}."
+        )
+    cuits = {req.emisor.cuit for req in comprobantes}
+    ptos_venta = {req.emisor.punto_venta for req in comprobantes}
+    if len(cuits) > 1 or len(ptos_venta) > 1:
+        raise ValueError(
+            "armar_fecae_lote: los comprobantes tienen que compartir el mismo "
+            "emisor.cuit y emisor.punto_venta — un lote homogéneo, no una mezcla."
+        )
+
+    cbte_tipo = tipos.pop()
+    detalles = [
+        _armar_detalle(req, numero_desde + i) for i, req in enumerate(comprobantes)
+    ]
+    return {
+        "FeCabReq": {
+            "CantReg": len(detalles),
+            "PtoVta": primero.emisor.punto_venta,
+            "CbteTipo": int(cbte_tipo),
+        },
+        "FeDetReq": {
+            "FECAEDetRequest": detalles
         },
     }

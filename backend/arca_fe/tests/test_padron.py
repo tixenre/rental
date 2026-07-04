@@ -91,6 +91,124 @@ def test_get_persona_juridica_responsable_inscripto():
     assert result.condicion_iva == "responsable_inscripto"
 
 
+def test_get_persona_ri_expone_tipo_persona_e_impuestos_tal_cual():
+    """Además de derivar `condicion_iva`, el motor expone `tipo_persona` y el
+    tuple `impuestos` con TODOS los impuestos que AFIP reporta (con su estado
+    activo/baja) — útil para diagnosticar si la relación de IVA está
+    REALMENTE activa en AFIP, no solo inferirlo de un id."""
+    from arca_fe.padron import PadronClient
+
+    client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
+
+    dg = MagicMock()
+    dg.razonSocial = "Empresa XYZ SRL"
+    dg.estadoClave = "ACTIVO"
+    dg.domicilioFiscal = None
+    dg.tipoPersona = "JURIDICA"
+
+    imp_iva = MagicMock()
+    imp_iva.idImpuesto = 30
+    imp_iva.descripcionImpuesto = "IVA"
+    imp_iva.estadoImpuesto = "AC"
+    imp_iva.periodo = 202001
+
+    imp_ganancias = MagicMock()
+    imp_ganancias.idImpuesto = 11
+    imp_ganancias.descripcionImpuesto = "Ganancias Sociedades"
+    imp_ganancias.estadoImpuesto = "BA"
+    imp_ganancias.periodo = 201901
+
+    dr = MagicMock()
+    dr.impuesto = [imp_iva, imp_ganancias]
+    dr.actividad = []
+
+    persona = MagicMock(
+        spec=["datosGenerales", "datosMonotributo", "datosRegimenGeneral"]
+    )
+    persona.datosGenerales = dg
+    persona.datosMonotributo = None
+    persona.datosRegimenGeneral = dr
+
+    resp = MagicMock(spec=["personaReturn"])
+    resp.personaReturn = persona
+
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        mock_service.getPersona.return_value = resp
+        mock_client_fn.return_value.service = mock_service
+
+        result = client.get_persona("30712345678")
+
+    assert result.condicion_iva == "responsable_inscripto"
+    assert result.tipo_persona == "JURIDICA"
+    vistos = {(i.descripcion, i.estado) for i in result.impuestos}
+    assert ("IVA", "AC") in vistos
+    assert ("Ganancias Sociedades", "BA") in vistos
+
+
+def test_get_persona_monotributo_categoria_y_actividad():
+    """Monotributista: `categoria_monotributo` y `actividades` (CLAE) se
+    exponen además de `condicion_iva='monotributo'`."""
+    from arca_fe.padron import PadronClient
+
+    client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
+
+    dg = MagicMock()
+    dg.razonSocial = ""
+    dg.nombre = "Juan"
+    dg.apellido = "Pérez"
+    dg.estadoClave = "ACTIVO"
+    dg.domicilioFiscal = None
+    dg.tipoPersona = "FISICA"
+
+    categoria = MagicMock()
+    categoria.descripcionCategoria = "Categoría B"
+
+    act1 = MagicMock()
+    act1.idActividad = 620100
+    act1.descripcionActividad = "Servicios de consultores en informática"
+    act1.periodo = 202301
+    act1.orden = 1
+
+    imp1 = MagicMock()
+    imp1.idImpuesto = 20
+    imp1.descripcionImpuesto = "Monotributo"
+    imp1.estadoImpuesto = "AC"
+    imp1.periodo = 202301
+
+    dm = MagicMock()
+    dm.categoriaMonotributo = categoria
+    dm.actividad = [act1]
+    dm.actividadMonotributista = None
+    dm.impuesto = [imp1]
+
+    persona = MagicMock(
+        spec=["datosGenerales", "datosMonotributo", "datosRegimenGeneral"]
+    )
+    persona.datosGenerales = dg
+    persona.datosMonotributo = dm
+    persona.datosRegimenGeneral = None
+
+    resp = MagicMock(spec=["personaReturn"])
+    resp.personaReturn = persona
+
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        mock_service.getPersona.return_value = resp
+        mock_client_fn.return_value.service = mock_service
+
+        result = client.get_persona("20301234567")
+
+    assert result.condicion_iva == "monotributo"
+    assert result.tipo_persona == "FISICA"
+    assert result.categoria_monotributo == "Categoría B"
+    assert len(result.actividades) == 1
+    assert result.actividades[0].descripcion == "Servicios de consultores en informática"
+    assert len(result.impuestos) == 1
+    assert result.impuestos[0].descripcion == "Monotributo"
+    assert result.impuestos[0].estado == "AC"
+
+
 def test_get_persona_juridica_exento():
     """idImpuesto=32 es EXENTO, no responsable inscripto — regresión del bug
     donde estaban invertidos."""
@@ -447,11 +565,54 @@ def test_get_client_usa_el_endpoint_tal_cual_y_lo_cachea(monkeypatch):
 
     monkeypatch.setattr(padron.zeep, "Client", _FakeZeepClient)
 
-    cliente1 = padron._get_client("https://ejemplo-cualquiera.test/wsdl")
-    cliente2 = padron._get_client("https://ejemplo-cualquiera.test/wsdl")
+    cliente1 = padron._get_client("https://ejemplo-cualquiera.test/wsdl", 20.0)
+    cliente2 = padron._get_client("https://ejemplo-cualquiera.test/wsdl", 20.0)
 
     assert calls == ["https://ejemplo-cualquiera.test/wsdl"]
     assert cliente1 is cliente2
+
+
+def test_get_client_no_colisiona_entre_timeouts_distintos(monkeypatch):
+    from arca_fe import padron
+
+    monkeypatch.setattr(padron, "_CLIENT_CACHE", {})
+    calls = []
+
+    class _FakeZeepClient:
+        def __init__(self, wsdl, transport=None):
+            calls.append(wsdl)
+
+    monkeypatch.setattr(padron.zeep, "Client", _FakeZeepClient)
+
+    cliente_20 = padron._get_client("https://ejemplo.test/wsdl", 20.0)
+    cliente_40 = padron._get_client("https://ejemplo.test/wsdl", 40.0)
+
+    assert cliente_20 is not cliente_40
+    assert len(calls) == 2
+
+
+def test_padron_clear_cache_limpia_de_verdad(monkeypatch):
+    from arca_fe import padron
+
+    monkeypatch.setattr(padron, "_CLIENT_CACHE", {})
+    monkeypatch.setattr(padron.zeep, "Client", lambda wsdl, transport=None: object())
+
+    padron._get_client("https://ejemplo.test/wsdl", 20.0)
+    assert padron._CLIENT_CACHE
+
+    padron.clear_cache()
+
+    assert padron._CLIENT_CACHE == {}
+
+
+def test_padron_client_timeout_configurable_por_instancia():
+    from arca_fe.padron import PadronClient
+
+    client_default = PadronClient("wswhomo.afip.gov.ar", 20301234563, "tok", "sig")
+    client_custom = PadronClient("wswhomo.afip.gov.ar", 20301234563, "tok", "sig", timeout=40.0)
+
+    assert client_default.timeout == 20.0
+    assert client_custom.timeout == 40.0
 
 
 # ── Regresión #personaReturn: la respuesta cruda del WSDL real ──────────────

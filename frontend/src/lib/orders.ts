@@ -43,6 +43,11 @@ export type CreateOrderInput = {
   days: number;
   resolvedItems: OrderItemInput[];
   notes?: string;
+  /** Fallback de firma sin passkey ("Confirmo y acepto" por sesión) resuelto en
+   *  el paso de resumen del checkout (`CheckoutResumen`) — ver
+   *  `services/checkout/validar.py::_check_firma`. Inerte mientras
+   *  `FIRMA_CHECKOUT_OBLIGATORIA` esté apagado server-side. */
+  sessionConfirmed?: boolean;
 };
 
 export type Order = {
@@ -172,6 +177,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     })),
     // session_id del carrito (#280 Fase 1): cierra el funnel de conversión
     session_id: useCart.getState().sessionId,
+    session_confirmed: input.sessionConfirmed ?? false,
   };
 
   let created: Record<string, unknown>;
@@ -211,6 +217,7 @@ export type DocumentosDisponibles = {
   remito: boolean;
   contrato: boolean;
   albaran: boolean;
+  "packing-list": boolean;
 };
 
 export type DocumentoTipo = keyof DocumentosDisponibles;
@@ -218,13 +225,15 @@ export type DocumentoTipo = keyof DocumentosDisponibles;
 export const DOCUMENTO_LABEL: Record<DocumentoTipo, string> = {
   remito: "Remito",
   contrato: "Contrato",
-  albaran: "Albarán",
+  albaran: "Detalle de seguro",
+  "packing-list": "Checklist de retiro",
 };
 
 export const DOCUMENTO_HINT: Record<DocumentoTipo, string> = {
-  remito: "Disponible cuando confirmemos el pedido",
-  contrato: "Disponible cuando confirmemos el pedido",
-  albaran: "Disponible al momento de la entrega",
+  remito: "Disponible apenas se solicita el pedido",
+  contrato: "Disponible apenas se solicita el pedido",
+  albaran: "Disponible apenas se solicita el pedido",
+  "packing-list": "Disponible apenas se solicita el pedido",
 };
 
 export async function getOrder(id: string) {
@@ -238,6 +247,7 @@ export async function getOrder(id: string) {
       remito: !!docs.remito,
       contrato: !!docs.contrato,
       albaran: !!docs.albaran,
+      "packing-list": !!docs["packing-list"],
     } as DocumentosDisponibles,
   };
 }

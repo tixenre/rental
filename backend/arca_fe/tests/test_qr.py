@@ -80,6 +80,27 @@ def test_payload_decodifica_base64_valido():
     assert p["fecha"] == "2024-06-30"
 
 
+def test_ctz_int_default_no_cambia():
+    url = armar_qr(
+        cuit_emisor=20123456789, pto_vta=1, cbte_tipo=1, nro_cmp=1,
+        importe_total=Decimal("100"), doc_tipo_rec=int(DocTipo.CUIT), doc_nro_rec=27111222333,
+        cae="99999999999999", fecha=date(2024, 1, 1),
+    )
+    assert _decode_qr(url)["ctz"] == 1
+
+
+def test_ctz_decimal_no_se_trunca():
+    """Antes el parámetro estaba tipado `int` — un caller con cotización real (con decimales, ej.
+    USD) tenía que truncarla él mismo antes de llamar. Ahora un Decimal se preserva tal cual."""
+    url = armar_qr(
+        cuit_emisor=20123456789, pto_vta=1, cbte_tipo=1, nro_cmp=1,
+        importe_total=Decimal("100"), doc_tipo_rec=int(DocTipo.CUIT), doc_nro_rec=27111222333,
+        cae="99999999999999", fecha=date(2024, 1, 1),
+        moneda="USD", ctz=Decimal("1.35"),
+    )
+    assert _decode_qr(url)["ctz"] == pytest.approx(1.35)
+
+
 def test_importe_dos_decimales():
     # El importe debe tener 2 decimales; sin overflow de float en el JSON
     url = armar_qr(
@@ -104,9 +125,9 @@ def test_importe_dos_decimales():
 
 
 def test_qr_es_svg_vectorial_no_bitmap():
-    from arca_fe.qr import _build_qr_svg
+    from arca_fe.qr import qr_svg
 
-    svg = _build_qr_svg("https://www.afip.gob.ar/fe/qr/?p=" + "x" * 180, size=150)
+    svg = qr_svg("https://www.afip.gob.ar/fe/qr/?p=" + "x" * 180, size=150)
     assert svg.startswith("<svg ")
     assert "<path" in svg  # vectorial: dibujado con paths, no un <image>/bitmap
     assert 'width="150"' in svg

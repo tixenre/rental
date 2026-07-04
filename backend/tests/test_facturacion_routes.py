@@ -107,6 +107,7 @@ class _FakeConnConEmail:
         ("GET", "/api/alquileres/1/facturas"),
         ("GET", "/api/admin/facturas"),
         ("GET", "/api/admin/facturacion/estado"),
+        ("GET", "/api/admin/facturacion/layouts"),
         ("POST", "/api/admin/arca/catalogos/refrescar"),
         ("GET", "/api/admin/emisores-arca"),
         ("POST", "/api/admin/emisores-arca"),
@@ -123,6 +124,23 @@ def test_rutas_facturacion_gatean_por_admin(method, path):
     r = _http.request(method, path)
     assert r.status_code != 422, f"{method} {path} no rutea bien (revisar orden de paths)"
     assert r.status_code in (401, 403)
+
+
+def test_listar_layouts_factura_devuelve_los_3_con_metadata(monkeypatch):
+    """El endpoint es un passthrough de `arca_fe.LAYOUTS_INFO` — el front arma el selector con
+    esto, no debería hardcodear nombre/descripción/advertencia por su cuenta."""
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+
+    result = facturacion_routes.listar_layouts_factura(_fake_request())
+
+    assert {item["id"] for item in result} == {"oficial", "detallada", "simplificada"}
+    for item in result:
+        assert item["nombre"]
+        assert item["descripcion"]
+    simplificada = next(item for item in result if item["id"] == "simplificada")
+    assert simplificada["advertencia"]
+    oficial = next(item for item in result if item["id"] == "oficial")
+    assert oficial["advertencia"] == ""
 
 
 # ── facturar_pedido / nota_credito: mapeo de errores del engine ─────────────
@@ -322,9 +340,9 @@ def test_descargar_pdf_503_si_faltan_datos_de_arca(monkeypatch):
     )
 
     def _raise(*a, **kw):
-        raise RuntimeError("Factura 1 está 'emitida' pero le faltan datos de ARCA (qr_payload)")
+        raise ValueError("ComprobanteFiscal incompleto, faltan: qr_url")
 
-    monkeypatch.setattr("services.facturacion.pdf.factura_html", _raise)
+    monkeypatch.setattr("services.facturacion.comprobante_render.factura_html", _raise)
 
     with pytest.raises(HTTPException) as ei:
         asyncio.run(facturacion_routes.descargar_pdf_factura(1, _fake_request()))
@@ -342,7 +360,7 @@ def test_descargar_pdf_format_html_devuelve_preview_sin_renderer(monkeypatch):
         "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html>FACTURA-X</html>"
+        "services.facturacion.comprobante_render.factura_html", lambda factura, pedido, **_: "<html>FACTURA-X</html>"
     )
 
     resp = asyncio.run(
@@ -362,7 +380,7 @@ def test_descargar_pdf_format_pdf_default_es_attachment(monkeypatch):
         "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html></html>"
+        "services.facturacion.comprobante_render.factura_html", lambda factura, pedido, **_: "<html></html>"
     )
 
     async def _fake_render_pdf(html, **_):
@@ -370,11 +388,11 @@ def test_descargar_pdf_format_pdf_default_es_attachment(monkeypatch):
 
     monkeypatch.setattr("pdf._render_pdf", _fake_render_pdf)
     monkeypatch.setattr(
-        "services.facturacion.pdf_seguridad.get_or_create_signing_cert",
+        "services.facturacion.signing_cert.get_or_create_signing_cert",
         lambda conn: (b"cert", b"key"),
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf_seguridad.asegurar_pdf",
+        "arca_fe.asegurar_pdf",
         lambda pdf_bytes, cert_pem, key_pem: pdf_bytes,
     )
 
@@ -383,6 +401,40 @@ def test_descargar_pdf_format_pdf_default_es_attachment(monkeypatch):
     assert resp.body == b"%PDF-FAKE%"
     assert "attachment" in resp.headers["content-disposition"]
     assert "Factura-C-00002-00000001.pdf" in resp.headers["content-disposition"]
+
+
+def test_descargar_pdf_format_imagen_devuelve_png_sin_firmar(monkeypatch):
+    """`format=imagen` es un artefacto liviano (compartir rápido) — no pasa por
+    `get_or_create_signing_cert`/`asegurar_pdf`, a diferencia del PDF."""
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.repo.get_by_id", lambda factura_id, conn: _fake_factura()
+    )
+    monkeypatch.setattr(
+        "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
+    )
+    monkeypatch.setattr(
+        "services.facturacion.comprobante_render.factura_html", lambda factura, pedido, **_: "<html></html>"
+    )
+
+    async def _fake_render_imagen(html, **_):
+        return b"%PNG-FAKE%"
+
+    monkeypatch.setattr("pdf._render_imagen", _fake_render_imagen)
+
+    def _boom(conn):
+        raise AssertionError("format=imagen no debería pedir el certificado de firma")
+
+    monkeypatch.setattr("services.facturacion.signing_cert.get_or_create_signing_cert", _boom)
+
+    resp = asyncio.run(
+        facturacion_routes.descargar_pdf_factura(1, _fake_request(), format="imagen")
+    )
+    assert resp.status_code == 200
+    assert resp.body == b"%PNG-FAKE%"
+    assert resp.media_type == "image/png"
+    assert "Factura-C-00002-00000001.png" in resp.headers["content-disposition"]
 
 
 # ── enviar_mail_factura: la columna real es c.email, no c.owner_email ───────
@@ -403,14 +455,14 @@ def test_enviar_mail_factura_no_rompe_con_undefined_column(monkeypatch):
         "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html></html>"
+        "services.facturacion.comprobante_render.factura_html", lambda factura, pedido, **_: "<html></html>"
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf_seguridad.get_or_create_signing_cert",
+        "services.facturacion.signing_cert.get_or_create_signing_cert",
         lambda conn: (b"cert", b"key"),
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf_seguridad.asegurar_pdf",
+        "arca_fe.asegurar_pdf",
         lambda pdf_bytes, cert_pem, key_pem: pdf_bytes,
     )
 
@@ -445,10 +497,10 @@ def test_enviar_mail_factura_400_si_sin_email(monkeypatch):
         "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html></html>"
+        "services.facturacion.comprobante_render.factura_html", lambda factura, pedido, **_: "<html></html>"
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf_seguridad.get_or_create_signing_cert",
+        "services.facturacion.signing_cert.get_or_create_signing_cert",
         lambda conn: (b"cert", b"key"),
     )
 
@@ -538,7 +590,7 @@ def test_descargar_pdf_firma_real_no_explota_dentro_de_un_loop_corriendo(monkeyp
     (`asyncio.to_thread` en el route)."""
     import fitz
 
-    from services.facturacion.pdf_seguridad import _generar_cert_autofirmado
+    from arca_fe import generar_cert_autofirmado as _generar_cert_autofirmado
 
     monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
     monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
@@ -549,7 +601,7 @@ def test_descargar_pdf_firma_real_no_explota_dentro_de_un_loop_corriendo(monkeyp
         "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html></html>"
+        "services.facturacion.comprobante_render.factura_html", lambda factura, pedido, **_: "<html></html>"
     )
 
     def _pdf_minimo() -> bytes:
@@ -563,7 +615,7 @@ def test_descargar_pdf_firma_real_no_explota_dentro_de_un_loop_corriendo(monkeyp
     cert_pem, key_pem = _generar_cert_autofirmado("test")
     monkeypatch.setattr("pdf._render_pdf", _fake_render_pdf)
     monkeypatch.setattr(
-        "services.facturacion.pdf_seguridad.get_or_create_signing_cert",
+        "services.facturacion.signing_cert.get_or_create_signing_cert",
         lambda conn: (cert_pem, key_pem),
     )
 
@@ -579,6 +631,15 @@ def test_consultar_padron_encontrado(monkeypatch):
     monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
     monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
 
+    class _Impuesto:
+        id_impuesto = 30
+        descripcion = "IVA"
+        estado = "AC"
+        periodo = 202001
+
+    class _Actividad:
+        descripcion = "Servicios de consultores en informática"
+
     class _Persona:
         razon_social = "Empresa XYZ SRL"
         nombre = ""
@@ -586,6 +647,10 @@ def test_consultar_padron_encontrado(monkeypatch):
         domicilio = "Ruta 88 km 12"
         condicion_iva = "responsable_inscripto"
         estado_clave = "ACTIVO"
+        tipo_persona = "JURIDICA"
+        categoria_monotributo = ""
+        actividades = (_Actividad(),)
+        impuestos = (_Impuesto(),)
 
     monkeypatch.setattr(
         "services.facturacion.padron.resolver_persona",
@@ -601,6 +666,12 @@ def test_consultar_padron_encontrado(monkeypatch):
         "domicilio": "Ruta 88 km 12",
         "condicion_iva": "responsable_inscripto",
         "estado_clave": "ACTIVO",
+        "tipo_persona": "JURIDICA",
+        "categoria_monotributo": "",
+        "actividades": ["Servicios de consultores en informática"],
+        "impuestos": [
+            {"id_impuesto": 30, "descripcion": "IVA", "estado": "AC", "periodo": 202001}
+        ],
     }
 
 
@@ -645,11 +716,17 @@ def test_consultar_puntos_venta_devuelve_lista(monkeypatch):
     )
     monkeypatch.setattr(
         "services.facturacion.puntos_venta.consultar_puntos_venta",
-        lambda nombre_emisor, conn: [{"nro": 2}, {"nro": 5}],
+        lambda nombre_emisor, conn: {
+            "habilitados": [{"nro": 2}, {"nro": 5}],
+            "excluidos": [{"nro": 9, "motivo": "bloqueado"}],
+        },
     )
 
     result = facturacion_routes.consultar_puntos_venta_emisor(1, _fake_request())
-    assert result == {"puntos_venta": [{"nro": 2}, {"nro": 5}]}
+    assert result == {
+        "puntos_venta": [{"nro": 2}, {"nro": 5}],
+        "excluidos": [{"nro": 9, "motivo": "bloqueado"}],
+    }
 
 
 def test_consultar_puntos_venta_emisor_no_encontrado_es_404(monkeypatch):
@@ -727,7 +804,7 @@ def test_consultar_puntos_venta_arca_response_error_es_502(monkeypatch):
 
 
 def test_info_cert_emisor_devuelve_subject_y_serie(monkeypatch):
-    from services.facturacion.pdf_seguridad import _generar_cert_autofirmado
+    from arca_fe import generar_cert_autofirmado as _generar_cert_autofirmado
 
     cert_pem, key_pem = _generar_cert_autofirmado("Comprobantes — Motor de Facturación")
 

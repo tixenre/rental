@@ -43,14 +43,41 @@ def test_filtra_bloqueados_dados_de_baja_y_no_electronicos(monkeypatch):
 
     result = consultar_puntos_venta("pablo", conn=object())
 
-    assert result == [{"nro": 2}, {"nro": 6}]
+    assert result["habilitados"] == [{"nro": 2}, {"nro": 6}]
+    assert result["excluidos"] == [
+        {"nro": 3, "motivo": "bloqueado"},
+        {"nro": 4, "motivo": "dado_de_baja"},
+        {"nro": 5, "motivo": "no_electronico"},
+    ]
 
 
 def test_sin_puntos_habilitados_devuelve_lista_vacia(monkeypatch):
     _patch_auth(monkeypatch)
     monkeypatch.setattr("arca_fe.wsfe.WsfeClient.param_puntos_venta", lambda self: [])
 
-    assert consultar_puntos_venta("pablo", conn=object()) == []
+    assert consultar_puntos_venta("pablo", conn=object()) == {
+        "habilitados": [],
+        "excluidos": [],
+    }
+
+
+def test_todos_bloqueados_da_motivo_bloqueado_para_cada_uno(monkeypatch):
+    _patch_auth(monkeypatch)
+    monkeypatch.setattr(
+        "arca_fe.wsfe.WsfeClient.param_puntos_venta",
+        lambda self: [
+            {"Nro": 1, "EmisionTipo": "CAE", "Bloqueado": "S", "FchBaja": None},
+            {"Nro": 2, "EmisionTipo": "CAE", "Bloqueado": "S", "FchBaja": None},
+        ],
+    )
+
+    result = consultar_puntos_venta("pablo", conn=object())
+
+    assert result["habilitados"] == []
+    assert result["excluidos"] == [
+        {"nro": 1, "motivo": "bloqueado"},
+        {"nro": 2, "motivo": "bloqueado"},
+    ]
 
 
 def test_emisor_sin_cert_propaga_value_error(monkeypatch):

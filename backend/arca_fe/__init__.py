@@ -8,12 +8,15 @@ y cryptography. El consumidor arma los modelos y llama a la API pública; el I/O
 En Rambla el adapter vive en `backend/services/facturacion/`. El día que se
 extraiga a un paquete pip propio, este directorio se levanta tal cual.
 
-Versionado: SemVer en `__version__`. La superficie exportada acá (`__all__`) es
-el CONTRATO público — un cambio incompatible sube MAJOR. Un test de portabilidad
-verifica que el core nunca importe `backend.*`.
+Versionado: `__version__` se queda FIJO en `"0.0.0"` mientras la librería no haya emitido un
+comprobante real en producción — no se bumpea por feature ni por cambio de superficie (decisión
+explícita del dueño). `0.0.0` señala "sin versión todavía"; el día que cruce esa vara (primera
+emisión real en prod) arranca el versionado SemVer de verdad, y ahí sí cada cambio de `__all__`
+sube MINOR/MAJOR según corresponda. Un test de portabilidad verifica que el core nunca importe
+`backend.*`.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.0.0"
 
 from .modelos import (
     CondicionIva,
@@ -33,12 +36,45 @@ from .modelos import (
     ItemIva,
     Tributo,
     Opcional,
+    ComprobanteFiscal,
+    ItemFactura,
+    letra_comprobante,
+    es_nota_credito,
+    label_concepto,
+    label_doc_tipo,
+    label_condicion_iva,
+    comprobante_fiscal_desde,
 )
-from .comprobante import tipo_comprobante, calcular_importes, armar_fecae
-from .qr import armar_qr
-from .wsaa import construir_tra, firmar_tra, login, login_con_cert
-from .wsfe import WsfeClient
-from .padron import PadronClient, PersonaArca
+from .comprobante import tipo_comprobante, calcular_importes, armar_fecae, armar_fecae_lote
+from .qr import armar_qr, qr_svg
+from .render import (
+    renderizar_comprobante_html,
+    nombre_fiscal_comprobante,
+    tamano_pagina_layout,
+    normalizar_layout,
+    LayoutInfo,
+    LAYOUTS_INFO,
+    LAYOUTS_VALIDOS,
+)
+from .seguridad import generar_cert_autofirmado, asegurar_pdf
+from .wsaa import construir_tra, firmar_tra, login, login_con_cert, WSFE_WSAA_SERVICIO
+from .wsfe import WsfeClient, parse_fecha_arca, clear_cache as wsfe_clear_cache
+from .padron import (
+    PadronClient,
+    PersonaArca,
+    Impuesto,
+    Actividad,
+    WSAA_SERVICIO,
+    clear_cache as padron_clear_cache,
+)
+from .validadores import normalizar_cuit, cuit_valido, formatear_cuit
+from .retry import with_retry
+from .asyncio_support import (
+    solicitar_cae_async,
+    get_persona_async,
+    login_async,
+    login_con_cert_async,
+)
 from .errores import (
     ArcaError,
     ArcaAuthError,
@@ -67,21 +103,59 @@ __all__ = [
     "ItemIva",
     "Tributo",
     "Opcional",
+    "ComprobanteFiscal",
+    "ItemFactura",
+    "letra_comprobante",
+    "es_nota_credito",
+    "label_concepto",
+    "label_doc_tipo",
+    "label_condicion_iva",
+    "comprobante_fiscal_desde",
     # lógica fiscal
     "tipo_comprobante",
     "calcular_importes",
     "armar_fecae",
+    "armar_fecae_lote",
     "armar_qr",
+    "qr_svg",
+    # render de comprobantes (HTML de los 3 layouts + protección del PDF)
+    "renderizar_comprobante_html",
+    "nombre_fiscal_comprobante",
+    "tamano_pagina_layout",
+    "normalizar_layout",
+    "LayoutInfo",
+    "LAYOUTS_INFO",
+    "LAYOUTS_VALIDOS",
+    "generar_cert_autofirmado",
+    "asegurar_pdf",
     # auth WSAA
     "construir_tra",
     "firmar_tra",
     "login",
     "login_con_cert",
+    "WSFE_WSAA_SERVICIO",
     # cliente WSFEv1
     "WsfeClient",
+    "parse_fecha_arca",
+    "wsfe_clear_cache",
     # cliente de padrón (Constancia de Inscripción, ws_sr_constancia_inscripcion)
     "PadronClient",
     "PersonaArca",
+    "Impuesto",
+    "Actividad",
+    "WSAA_SERVICIO",
+    "padron_clear_cache",
+    # CUIT: normalizar/validar/formatear
+    "normalizar_cuit",
+    "cuit_valido",
+    "formatear_cuit",
+    # retry/backoff opcional
+    "with_retry",
+    # facade async (asyncio.to_thread — ver docstring del módulo)
+    "solicitar_cae_async",
+    "get_persona_async",
+    "login_async",
+    "login_con_cert_async",
     # taxonomía de errores (todo lo que el motor levanta hereda de ArcaError)
     "ArcaError",
     "ArcaAuthError",

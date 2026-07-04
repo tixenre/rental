@@ -1,6 +1,7 @@
 """Documentos PDF del cliente (#501 — extraído del god-module `routes/cliente_portal.py`).
 
-Remito / contrato / albarán del pedido del cliente (preview HTML embebible + PDF).
+Remito / contrato / detalle de seguro / checklist de retiro del pedido del cliente
+(preview HTML embebible + PDF).
 Registra sus rutas en el router compartido del paquete `routes.cliente_portal`.
 Los helpers/constantes compartidos (`require_cliente`, `_proyectar`,
 `_documentos_disponibles`, `_ITEM_CAMPOS_DOC`, `_COMP_CAMPOS_DOC`) viven en `core`.
@@ -10,7 +11,10 @@ from fastapi.responses import Response
 
 from database import get_db, row_to_dict
 from identity import direccion_validada, nombre_validado
-from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
+from pdf import (
+    _pedido_html, _albaran_html, _contrato_html, _packing_list_html,
+    _render_pdf, _pedido_filename,
+)
 from routes.cliente_portal.core import (
     router, require_cliente, _proyectar, _documentos_disponibles,
     _ITEM_CAMPOS_DOC, _COMP_CAMPOS_DOC,
@@ -106,11 +110,22 @@ def _doc_response(
     return None  # caller sigue con PDF
 
 
-async def _doc_response_or_pdf(html_str: str, pdf_filename: str, format: str, page_size=None):
+async def _doc_response_or_pdf(
+    html_str: str, pdf_filename: str, format: str, page_size=None, cert_pair=None
+):
+    """`cert_pair` (cert_pem, key_pem) es opcional: solo la factura ARCA lo pasa — los otros 4
+    documentos (remito/contrato/albarán/packing-list) no llevan CAE/QR fiscal y no se firman."""
     preview = _doc_response(html_str, pdf_filename, format)
     if preview is not None:
         return preview
     pdf_bytes = await _render_pdf(html_str, page_size=page_size)
+    if cert_pair is not None:
+        import asyncio
+
+        from arca_fe import asegurar_pdf
+
+        cert_pem, key_pem = cert_pair
+        pdf_bytes = await asyncio.to_thread(asegurar_pdf, pdf_bytes, cert_pem, key_pem)
     from fastapi.responses import Response
     return Response(
         content=pdf_bytes,
@@ -127,7 +142,7 @@ async def cliente_pedido_remito(id: int, request: Request, format: str = "pdf"):
     with get_db() as conn:
         pedido = _load_pedido_para_pdf(conn, id, session["cliente_id"])
     if not _documentos_disponibles(pedido.get("estado", ""))["remito"]:
-        raise HTTPException(403, "El remito estará disponible cuando confirmemos el pedido.")
+        raise HTTPException(403, "El remito no está disponible para este pedido.")
     return await _doc_response_or_pdf(
         _pedido_html(pedido), _pedido_filename(pedido), format
     )
@@ -141,7 +156,7 @@ async def cliente_pedido_contrato(id: int, request: Request, format: str = "pdf"
     with get_db() as conn:
         pedido = _load_pedido_para_pdf(conn, id, session["cliente_id"])
     if not _documentos_disponibles(pedido.get("estado", ""))["contrato"]:
-        raise HTTPException(403, "El contrato estará disponible cuando confirmemos el pedido.")
+        raise HTTPException(403, "El contrato no está disponible para este pedido.")
     return await _doc_response_or_pdf(
         _contrato_html(pedido), _pedido_filename(pedido, doc="contrato"), format
     )
@@ -150,30 +165,46 @@ async def cliente_pedido_contrato(id: int, request: Request, format: str = "pdf"
 @router.get("/api/cliente/pedidos/{id}/albaran.pdf")
 @router.get("/api/cliente/pedidos/{id}/albaran")
 async def cliente_pedido_albaran(id: int, request: Request, format: str = "pdf"):
-    """Albarán del pedido. format=pdf (default) o html (preview)."""
+    """Detalle de seguro del pedido. format=pdf (default) o html (preview)."""
     session = require_cliente(request)
     with get_db() as conn:
         pedido = _load_pedido_para_pdf(conn, id, session["cliente_id"])
     if not _documentos_disponibles(pedido.get("estado", ""))["albaran"]:
-        raise HTTPException(403, "El albarán estará disponible al momento de la entrega.")
+        raise HTTPException(403, "El detalle de seguro no está disponible para este pedido.")
     return await _doc_response_or_pdf(
         _albaran_html(pedido), _pedido_filename(pedido, doc="albaran"), format
+    )
+
+
+@router.get("/api/cliente/pedidos/{id}/packing-list.pdf")
+@router.get("/api/cliente/pedidos/{id}/packing-list")
+async def cliente_pedido_packing_list(id: int, request: Request, format: str = "pdf"):
+    """Checklist de retiro del pedido. format=pdf (default) o html (preview)."""
+    session = require_cliente(request)
+    with get_db() as conn:
+        pedido = _load_pedido_para_pdf(conn, id, session["cliente_id"])
+        from routes.alquileres.documentos import _agrupar_items_por_categoria
+        pedido["grupos"] = _agrupar_items_por_categoria(conn, pedido["items"])
+    if not _documentos_disponibles(pedido.get("estado", ""))["packing-list"]:
+        raise HTTPException(403, "El checklist de retiro no está disponible para este pedido.")
+    return await _doc_response_or_pdf(
+        _packing_list_html(pedido), _pedido_filename(pedido, doc="packing-list"), format
     )
 
 
 @router.get("/api/cliente/pedidos/{id}/factura.pdf")
 @router.get("/api/cliente/pedidos/{id}/factura")
 async def cliente_pedido_factura(
-    id: int, request: Request, format: str = "pdf", layout: str = "celular"
+    id: int, request: Request, format: str = "pdf", layout: str = "simplificada"
 ):
     """Factura ARCA del pedido. A diferencia de remito/contrato/albarán, no
     depende del estado del pedido sino de si la factura ya fue emitida —
     aparece como documento recién ahí, no antes (y desaparece si se anula).
-    `layout`: 'celular' (default de Rambla, compacta 4:5) · 'clasica' (réplica
-    oficial AFIP/ARCA, A4) · 'formal'."""
+    `layout`: 'simplificada' (default de Rambla, compacta 4:5, mínimo 1080×1350) · 'oficial'
+    (réplica AFIP/ARCA, A4) · 'detallada' (A4, con el detalle completo)."""
     session = require_cliente(request)
-    if layout not in ("clasica", "celular", "formal"):
-        layout = "celular"
+    from arca_fe.render import normalizar_layout
+    layout = normalizar_layout(layout)
     with get_db() as conn:
         row = conn.execute(
             "SELECT id FROM alquileres WHERE id = %s AND cliente_id = %s",
@@ -188,15 +219,27 @@ async def cliente_pedido_factura(
             raise HTTPException(404, "Todavía no hay factura para este pedido.")
 
         from services.facturacion.engine import _get_pedido
-        from services.facturacion.pdf import factura_html, factura_filename, page_size_for_layout
+        from services.facturacion.comprobante_render import factura_html, factura_filename
+        from arca_fe.render import tamano_pagina_layout
         pedido_data = _get_pedido(conn, id)
         try:
             html_str = factura_html(factura, pedido_data, layout=layout)
-        except RuntimeError as e:
+        except (ValueError, RuntimeError) as e:
+            # ValueError: ComprobanteFiscal incompleto (falta CAE/número/vencimiento/QR).
+            # RuntimeError: catálogo ARCA nunca refrescado (services.facturacion.catalogos).
             raise HTTPException(503, str(e))
+
+        # A diferencia de remito/contrato/albarán/packing-list (sin CAE/QR fiscal), la factura sí
+        # se firma/protege — mismo tratamiento que el canal admin (`descargar_pdf_factura`), antes
+        # esta asimetría dejaba el PDF del portal cliente sin proteger.
+        cert_pair = None
+        if format != "html":
+            from services.facturacion.signing_cert import get_or_create_signing_cert
+            cert_pair = get_or_create_signing_cert(conn)
 
     return await _doc_response_or_pdf(
         html_str, factura_filename(factura, layout=layout), format,
-        page_size=page_size_for_layout(layout),
+        page_size=tamano_pagina_layout(layout),
+        cert_pair=cert_pair,
     )
 

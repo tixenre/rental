@@ -1386,6 +1386,12 @@ def _init_db_schema(conn):
             END IF;
         END $$;
     """)
+    # Fase C-4 (#1231): fuerza el override manual a ganar OUTRIGHT aunque su
+    # valor sea 0 — sin esto, `descuento_pct=0`/`descuento_manual_monto=0` es
+    # indistinguible de "sin override" y no hay forma de expresar "quiero 0%
+    # en ESTE pedido puntual" cuando cliente/jornadas ganarían por fallback
+    # (ver `descuentos/queries/decision.py::resolver_descuento_pedido`).
+    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_manual_activo BOOLEAN NOT NULL DEFAULT FALSE")
 
     # email infra (migración a4e8c2b9d710)
     conn.execute("""
@@ -2210,6 +2216,7 @@ def _init_db_schema(conn):
             moneda                  TEXT NOT NULL DEFAULT 'PES',
             cliente_cuit            TEXT,
             razon_social            TEXT,
+            domicilio               TEXT,
             qr_payload              TEXT,
             pdf_key                 TEXT,
             estado                  TEXT NOT NULL DEFAULT 'pendiente',
@@ -2247,6 +2254,12 @@ def _init_db_schema(conn):
             END IF;
         END $$;
     """)
+    # `domicilio` del receptor — congelado al emitir (razón social/CUIT ya lo
+    # estaban; domicilio antes se leía en vivo de la ficha del cliente en cada
+    # reimpresión, por lo que podía "cambiar" retroactivamente si el cliente
+    # editaba su domicilio después de facturado). NULL en facturas viejas: el
+    # PDF cae al valor en vivo de siempre para esas (backward-compatible).
+    conn.execute("ALTER TABLE facturas ADD COLUMN IF NOT EXISTS domicilio TEXT")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS afip_ta (

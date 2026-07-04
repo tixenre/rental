@@ -173,6 +173,9 @@ export function useCotizacion(args: {
   /** Solo admin, Fase C-2: override manual del pedido en $ fijo, usado cuando
    *  `descuentoTipo === "monto"`. */
   descuentoMonto?: number | null;
+  /** Solo admin, Fase C-4 (#1231): fuerza el override manual a ganar aunque
+   *  valga 0 — única forma de forzar 0% en un pedido puntual. */
+  descuentoManualActivo?: boolean | null;
   /**
    * Solo admin, para el editor de un pedido YA EXISTENTE: respeta el
    * `precioJornada` de cada ítem (el snapshot congelado del pedido, editable
@@ -192,6 +195,7 @@ export function useCotizacion(args: {
     descuentoPct,
     descuentoTipo,
     descuentoMonto,
+    descuentoManualActivo,
     respetarPrecioItem = false,
     enabled = true,
   } = args;
@@ -216,6 +220,7 @@ export function useCotizacion(args: {
     descuento_pct: descuentoPct ?? null,
     descuento_manual_tipo: descuentoTipo ?? null,
     descuento_manual_monto: descuentoMonto ?? null,
+    descuento_manual_activo: descuentoManualActivo ?? null,
     respetar_precio_item: respetarPrecioItem,
   };
 

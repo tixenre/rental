@@ -19,6 +19,7 @@ from arca_fe import (
     Receptor,
     Tributo,
     armar_fecae,
+    armar_fecae_lote,
     calcular_importes,
     tipo_comprobante,
 )
@@ -28,12 +29,15 @@ from arca_fe.modelos import CbteAsoc, ComprobanteRequest
 # Fixtures
 # ---------------------------------------------------------------------------
 
-PABLO = Emisor(cuit=20123456789, punto_venta=1, condicion_iva=CondicionIva.RESPONSABLE_INSCRIPTO)
+# CUITs de prueba con dígito verificador VÁLIDO (mod-11) — desde esta iniciativa `Emisor`/
+# `Receptor` lo validan en la construcción; un CUIT inventado sin chequear el dígito ya no sirve
+# como fixture.
+PABLO = Emisor(cuit=20123456786, punto_venta=1, condicion_iva=CondicionIva.RESPONSABLE_INSCRIPTO)
 SANTINI = Emisor(cuit=30987654321, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
 
 RECEPTOR_RI = Receptor(
     doc_tipo=DocTipo.CUIT,
-    doc_nro=27111222333,
+    doc_nro=27111222334,
     condicion_iva=CondicionIva.RESPONSABLE_INSCRIPTO,
 )
 RECEPTOR_CF = Receptor(
@@ -43,12 +47,12 @@ RECEPTOR_CF = Receptor(
 )
 RECEPTOR_MONO = Receptor(
     doc_tipo=DocTipo.CUIT,
-    doc_nro=20987654321,
+    doc_nro=20987654326,
     condicion_iva=CondicionIva.MONOTRIBUTO,
 )
 RECEPTOR_EXENTO = Receptor(
     doc_tipo=DocTipo.CUIT,
-    doc_nro=33555666777,
+    doc_nro=33555666778,
     condicion_iva=CondicionIva.EXENTO,
 )
 
@@ -246,14 +250,14 @@ class TestArmarFecae:
         req = _req(PABLO, RECEPTOR_RI, importe_neto=Decimal("1000.00"))
         det = armar_fecae(req, 1)["FeDetReq"]["FECAEDetRequest"][0]
         assert det["DocTipo"] == int(DocTipo.CUIT)
-        assert det["DocNro"] == 27111222333
+        assert det["DocNro"] == 27111222334
 
     def test_nc_con_cbte_asoc(self):
         asoc = CbteAsoc(
             tipo=CbteTipo.FACTURA_A,
             punto_venta=1,
             numero=10,
-            cuit=20123456789,
+            cuit=20123456786,
             fecha=date(2024, 1, 1),
         )
         req = _req(PABLO, RECEPTOR_RI, es_nota_credito=True, cbtes_asoc=(asoc,))
@@ -308,21 +312,22 @@ class TestGuardrails:
         dataclass no lo impide en runtime, solo lo documenta en un
         comentario) antes se clasificaba EN SILENCIO como si fuera RI,
         emitiendo Factura A/B con IVA discriminado para un emisor que
-        legalmente no corresponde. Ahora levanta ValueError explícito."""
+        legalmente no corresponde. Ahora levanta ValueError explícito — desde
+        esta iniciativa, en la construcción misma del ComprobanteRequest
+        (`_validar_estructura` corre en `__post_init__`), no recién al
+        llamar `tipo_comprobante`."""
         emisor_invalido = Emisor(
-            cuit=20111222333, punto_venta=1, condicion_iva=CondicionIva.EXENTO
+            cuit=20111222339, punto_venta=1, condicion_iva=CondicionIva.EXENTO
         )
-        req = _req(emisor_invalido, RECEPTOR_RI, alicuota=None)
         with pytest.raises(ValueError, match="EXENTO"):
-            tipo_comprobante(req)
+            _req(emisor_invalido, RECEPTOR_RI, alicuota=None)
 
     def test_armar_fecae_tambien_propaga_el_guardrail_de_condicion_iva(self):
         emisor_invalido = Emisor(
-            cuit=20111222333, punto_venta=1, condicion_iva=CondicionIva.CONSUMIDOR_FINAL
+            cuit=20111222339, punto_venta=1, condicion_iva=CondicionIva.CONSUMIDOR_FINAL
         )
-        req = _req(emisor_invalido, RECEPTOR_RI, alicuota=None)
         with pytest.raises(ValueError, match="CONSUMIDOR_FINAL"):
-            armar_fecae(req, 1)
+            _req(emisor_invalido, RECEPTOR_RI, alicuota=None)
 
     @pytest.mark.parametrize("concepto", [Concepto.SERVICIOS, Concepto.PRODUCTOS_Y_SERVICIOS])
     @pytest.mark.parametrize(
@@ -343,9 +348,8 @@ class TestGuardrails:
             "fecha_vto_pago": date(2024, 1, 31),
         }
         kwargs[campo_ausente] = None
-        req = _req(PABLO, RECEPTOR_RI, concepto=concepto, **kwargs)
         with pytest.raises(ValueError, match=campo_ausente):
-            armar_fecae(req, 1)
+            _req(PABLO, RECEPTOR_RI, concepto=concepto, **kwargs)
 
     def test_concepto_productos_no_exige_fechas_de_servicio(self):
         """Concepto PRODUCTOS (sin servicio) NO exige estas fechas — el
@@ -534,18 +538,16 @@ class TestForzarCbteTipo:
     def test_monotributo_no_puede_forzar_m(self):
         """Un Monotributo NUNCA puede discriminar IVA — es una regla legal
         fija, forzar_cbte_tipo no la puede saltear."""
-        req = _req(
-            SANTINI, RECEPTOR_CF, alicuota=None,
-            forzar_cbte_tipo=CbteTipo.FACTURA_M,
-        )
         with pytest.raises(ValueError, match="MONOTRIBUTO"):
-            tipo_comprobante(req)
+            _req(
+                SANTINI, RECEPTOR_CF, alicuota=None,
+                forzar_cbte_tipo=CbteTipo.FACTURA_M,
+            )
 
     def test_ri_no_puede_forzar_tipo_c(self):
         """Un RI no puede forzar un tipo C — no discrimina IVA, no le corresponde."""
-        req = _req(PABLO, RECEPTOR_RI, forzar_cbte_tipo=CbteTipo.FACTURA_C)
         with pytest.raises(ValueError, match="RESPONSABLE_INSCRIPTO"):
-            tipo_comprobante(req)
+            _req(PABLO, RECEPTOR_RI, forzar_cbte_tipo=CbteTipo.FACTURA_C)
 
     def test_forzar_cbte_tipo_se_propaga_a_armar_fecae(self):
         req = _req(PABLO, RECEPTOR_RI, forzar_cbte_tipo=CbteTipo.FACTURA_M)
@@ -587,34 +589,31 @@ class TestFce:
     def test_fce_factura_sin_vto_pago_levanta_aunque_concepto_sea_productos(self):
         """A diferencia de _validar_fechas_servicio (solo aplica a Concepto
         SERVICIOS/PRODUCTOS_Y_SERVICIOS), FCE exige FchVtoPago SIEMPRE."""
-        req = _req(
-            PABLO, RECEPTOR_RI,
-            concepto=Concepto.PRODUCTOS,
-            fecha_serv_desde=None, fecha_serv_hasta=None, fecha_vto_pago=None,
-            forzar_cbte_tipo=CbteTipo.FACTURA_CRED_ELEC_MIPYME_A,
-            opcionales=(Opcional(id="2101", valor="0000003100012345678"),),
-        )
         with pytest.raises(ValueError, match="fecha_vto_pago"):
-            armar_fecae(req, 1)
+            _req(
+                PABLO, RECEPTOR_RI,
+                concepto=Concepto.PRODUCTOS,
+                fecha_serv_desde=None, fecha_serv_hasta=None, fecha_vto_pago=None,
+                forzar_cbte_tipo=CbteTipo.FACTURA_CRED_ELEC_MIPYME_A,
+                opcionales=(Opcional(id="2101", valor="0000003100012345678"),),
+            )
 
     def test_fce_factura_sin_cbu_alias_ni_transferencia_levanta(self):
-        req = _req(
-            PABLO, RECEPTOR_RI,
-            forzar_cbte_tipo=CbteTipo.FACTURA_CRED_ELEC_MIPYME_A,
-            fecha_vto_pago=date(2024, 2, 15),
-            opcionales=(),
-        )
         with pytest.raises(ValueError, match="CBU"):
-            armar_fecae(req, 1)
+            _req(
+                PABLO, RECEPTOR_RI,
+                forzar_cbte_tipo=CbteTipo.FACTURA_CRED_ELEC_MIPYME_A,
+                fecha_vto_pago=date(2024, 2, 15),
+                opcionales=(),
+            )
 
     def test_fce_nota_credito_exige_codigo_anulacion(self):
-        req = _req(
-            PABLO, RECEPTOR_RI, es_nota_credito=True,
-            forzar_cbte_tipo=CbteTipo.NOTA_CREDITO_CRED_ELEC_MIPYME_A,
-            opcionales=(),
-        )
         with pytest.raises(ValueError, match="Anulación"):
-            armar_fecae(req, 1)
+            _req(
+                PABLO, RECEPTOR_RI, es_nota_credito=True,
+                forzar_cbte_tipo=CbteTipo.NOTA_CREDITO_CRED_ELEC_MIPYME_A,
+                opcionales=(),
+            )
 
     def test_fce_nota_credito_con_codigo_anulacion_ok(self):
         req = _req(
@@ -625,16 +624,15 @@ class TestFce:
         armar_fecae(req, 1)  # no levanta
 
     def test_fce_nota_credito_no_puede_llevar_cbu(self):
-        req = _req(
-            PABLO, RECEPTOR_RI, es_nota_credito=True,
-            forzar_cbte_tipo=CbteTipo.NOTA_CREDITO_CRED_ELEC_MIPYME_A,
-            opcionales=(
-                Opcional(id="22", valor="S"),
-                Opcional(id="2101", valor="0000003100012345678"),
-            ),
-        )
         with pytest.raises(ValueError, match="no puede llevar"):
-            armar_fecae(req, 1)
+            _req(
+                PABLO, RECEPTOR_RI, es_nota_credito=True,
+                forzar_cbte_tipo=CbteTipo.NOTA_CREDITO_CRED_ELEC_MIPYME_A,
+                opcionales=(
+                    Opcional(id="22", valor="S"),
+                    Opcional(id="2101", valor="0000003100012345678"),
+                ),
+            )
 
     def test_fce_c_permitido_para_monotributo(self):
         """FCE-C es la variante MiPyme para el emisor Monotributo (sin
@@ -650,9 +648,178 @@ class TestFce:
         assert "Iva" not in det  # C no discrimina IVA, ni siendo FCE
 
     def test_fce_a_no_permitido_para_monotributo(self):
-        req = _req(
-            SANTINI, RECEPTOR_CF, alicuota=None,
-            forzar_cbte_tipo=CbteTipo.FACTURA_CRED_ELEC_MIPYME_A,
-        )
         with pytest.raises(ValueError, match="MONOTRIBUTO"):
-            tipo_comprobante(req)
+            _req(
+                SANTINI, RECEPTOR_CF, alicuota=None,
+                forzar_cbte_tipo=CbteTipo.FACTURA_CRED_ELEC_MIPYME_A,
+            )
+
+
+# ---------------------------------------------------------------------------
+# _validar_estructura — guardas estructurales fail-fast (gap 10), corren en
+# ComprobanteRequest.__post_init__ (construcción) Y en armar_fecae/_lote.
+# ---------------------------------------------------------------------------
+
+
+class TestValidacionEstructural:
+    def test_punto_venta_fuera_de_rango_levanta(self):
+        emisor_pto_invalido = Emisor(
+            cuit=20123456786, punto_venta=10000, condicion_iva=CondicionIva.RESPONSABLE_INSCRIPTO
+        )
+        with pytest.raises(ValueError, match="punto_venta"):
+            _req(emisor_pto_invalido, RECEPTOR_RI)
+
+    def test_punto_venta_cero_levanta(self):
+        emisor_pto_invalido = Emisor(
+            cuit=20123456786, punto_venta=0, condicion_iva=CondicionIva.RESPONSABLE_INSCRIPTO
+        )
+        with pytest.raises(ValueError, match="punto_venta"):
+            _req(emisor_pto_invalido, RECEPTOR_RI)
+
+    def test_importe_neto_negativo_levanta(self):
+        with pytest.raises(ValueError, match="importe_neto"):
+            _req(PABLO, RECEPTOR_RI, importe_neto=Decimal("-100.00"))
+
+    def test_importe_no_gravado_negativo_levanta(self):
+        with pytest.raises(ValueError, match="importe_no_gravado"):
+            _req(PABLO, RECEPTOR_RI, importe_no_gravado=Decimal("-1.00"))
+
+    def test_importe_exento_negativo_levanta(self):
+        with pytest.raises(ValueError, match="importe_exento"):
+            _req(PABLO, RECEPTOR_RI, importe_exento=Decimal("-1.00"))
+
+    def test_alicuota_iva_base_imponible_negativa_levanta(self):
+        with pytest.raises(ValueError, match="base_imponible"):
+            _req(
+                PABLO, RECEPTOR_RI, alicuota=None,
+                alicuotas_iva=(ItemIva(IVA_21, Decimal("-100.00")),),
+            )
+
+    def test_tributo_importe_negativo_levanta(self):
+        with pytest.raises(ValueError, match="tributos: importe"):
+            _req(
+                PABLO, RECEPTOR_RI,
+                tributos=(
+                    Tributo(id=7, base_imponible=Decimal("100.00"), alicuota_pct=Decimal("3"),
+                            importe=Decimal("-3.00")),
+                ),
+            )
+
+    def test_tributo_id_no_positivo_levanta(self):
+        with pytest.raises(ValueError, match="tributos: id"):
+            _req(
+                PABLO, RECEPTOR_RI,
+                tributos=(
+                    Tributo(id=0, base_imponible=Decimal("100.00"), alicuota_pct=Decimal("3"),
+                            importe=Decimal("3.00")),
+                ),
+            )
+
+    def test_tributo_alicuota_pct_fuera_de_rango_levanta(self):
+        with pytest.raises(ValueError, match="alicuota_pct"):
+            _req(
+                PABLO, RECEPTOR_RI,
+                tributos=(
+                    Tributo(id=7, base_imponible=Decimal("100.00"), alicuota_pct=Decimal("101"),
+                            importe=Decimal("3.00")),
+                ),
+            )
+
+    def test_opcional_id_vacio_levanta(self):
+        with pytest.raises(ValueError, match="opcionales"):
+            _req(PABLO, RECEPTOR_RI, opcionales=(Opcional(id="", valor="algo"),))
+
+    def test_opcional_valor_vacio_levanta(self):
+        with pytest.raises(ValueError, match="opcionales"):
+            _req(PABLO, RECEPTOR_RI, opcionales=(Opcional(id="2101", valor=""),))
+
+    def test_moneda_distinta_de_3_caracteres_levanta(self):
+        with pytest.raises(ValueError, match="moneda"):
+            _req(PABLO, RECEPTOR_RI, moneda="PESOS")
+
+    def test_moneda_se_normaliza_a_mayuscula(self):
+        req = _req(PABLO, RECEPTOR_RI, moneda="pes")
+        assert req.moneda == "PES"
+
+    def test_cotizacion_cero_levanta(self):
+        with pytest.raises(ValueError, match="cotizacion"):
+            _req(PABLO, RECEPTOR_RI, cotizacion=Decimal("0"))
+
+    def test_cotizacion_negativa_levanta(self):
+        with pytest.raises(ValueError, match="cotizacion"):
+            _req(PABLO, RECEPTOR_RI, cotizacion=Decimal("-1"))
+
+    def test_receptor_consumidor_final_con_doc_nro_distinto_de_cero_levanta(self):
+        with pytest.raises(ValueError, match="CONSUMIDOR_FINAL"):
+            Receptor(
+                doc_tipo=DocTipo.CONSUMIDOR_FINAL, doc_nro=123,
+                condicion_iva=CondicionIva.CONSUMIDOR_FINAL,
+            )
+
+    def test_caso_valido_no_levanta_nada(self):
+        """Contraprueba: un ComprobanteRequest bien formado no dispara ninguna
+        de las guardas nuevas."""
+        req = _req(PABLO, RECEPTOR_RI)
+        assert req.moneda == "PES"
+
+
+# ---------------------------------------------------------------------------
+# armar_fecae_lote — facturación por lote (gap 9): homogeneidad + tope + CAE
+# individual por ítem, todo sin red (el armado del payload es puro).
+# ---------------------------------------------------------------------------
+
+
+PABLO_OTRO_PTO_VTA = Emisor(
+    cuit=20123456786, punto_venta=99, condicion_iva=CondicionIva.RESPONSABLE_INSCRIPTO
+)
+
+
+class TestArmarFecaeLote:
+    def test_lote_vacio_levanta(self):
+        with pytest.raises(ValueError, match="vacía"):
+            armar_fecae_lote([], 1)
+
+    def test_lote_homogeneo_arma_cant_reg_y_numeros_consecutivos(self):
+        reqs = [
+            _req(PABLO, RECEPTOR_RI, importe_neto=Decimal("1000.00")),
+            _req(PABLO, RECEPTOR_RI, importe_neto=Decimal("2000.00")),
+            _req(PABLO, RECEPTOR_RI, importe_neto=Decimal("3000.00")),
+        ]
+        payload = armar_fecae_lote(reqs, 10)
+
+        assert payload["FeCabReq"]["CantReg"] == 3
+        assert payload["FeCabReq"]["PtoVta"] == 1
+        detalles = payload["FeDetReq"]["FECAEDetRequest"]
+        assert [d["CbteDesde"] for d in detalles] == [10, 11, 12]
+        assert [d["CbteHasta"] for d in detalles] == [10, 11, 12]
+        assert detalles[0]["ImpNeto"] == "1000.00"
+        assert detalles[1]["ImpNeto"] == "2000.00"
+        assert detalles[2]["ImpNeto"] == "3000.00"
+
+    def test_lote_con_distinto_cbte_tipo_levanta(self):
+        """PABLO (RI) emite A, SANTINI (Monotributo) emite C — mezclar los dos
+        en un lote viola la regla de homogeneidad de AFIP."""
+        reqs = [
+            _req(PABLO, RECEPTOR_RI, importe_neto=Decimal("1000.00")),
+            _req(SANTINI, RECEPTOR_CF, alicuota=None, importe_neto=Decimal("500.00")),
+        ]
+        with pytest.raises(ValueError, match="mismo cbte_tipo"):
+            armar_fecae_lote(reqs, 1)
+
+    def test_lote_con_distinto_punto_venta_levanta(self):
+        reqs = [
+            _req(PABLO, RECEPTOR_RI, importe_neto=Decimal("1000.00")),
+            _req(PABLO_OTRO_PTO_VTA, RECEPTOR_RI, importe_neto=Decimal("500.00")),
+        ]
+        with pytest.raises(ValueError, match="mismo emisor"):
+            armar_fecae_lote(reqs, 1)
+
+    def test_lote_supera_el_tope_levanta(self):
+        from arca_fe.comprobante import _MAX_LOTE
+
+        reqs = [
+            _req(PABLO, RECEPTOR_RI, importe_neto=Decimal("100.00"))
+            for _ in range(_MAX_LOTE + 1)
+        ]
+        with pytest.raises(ValueError, match="supera el tope"):
+            armar_fecae_lote(reqs, 1)
