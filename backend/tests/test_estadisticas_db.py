@@ -7,6 +7,10 @@ correcto (persistido por `_recalcular_total_pedido`); las queries ahora lo leen
 directo (a nivel pedido: totales/por_mes/mejor_peor) o lo prorratean por ítem (a
 nivel equipo/dueño: top_equipos/por_dueno) en vez de reconstruirlo.
 
+También cubre el criterio del dueño (2026-07-04): Estadísticas cuenta SOLO
+pedidos `estado='finalizado'` — `confirmado`/`retirado` quedan afuera de todas
+las secciones (negocio devengado pero aún no cerrado).
+
 OPT-IN y SEGURO POR DEFECTO (mismo gating que los demás `*_db.py`): se saltea
 salvo `RESERVAS_DB_TEST=1` + `DATABASE_URL` a una base con 'test' en el nombre.
 Ids altos + mes sin uso en otros `*_db.py` (2026-04) para no chocar con datos.
@@ -161,3 +165,66 @@ def test_estadisticas_usa_monto_total_no_reconstruye_descuento_de_jornadas(conn)
     mp = despues["mejor_peor_mes"]
     assert (mp["mejor_total"] or 0) >= fila_mes["total_ars"]
     assert (mp["peor_total"] or 0) <= fila_mes["total_ars"]
+
+
+# ── Criterio explícito del dueño (2026-07-04): Estadísticas cuenta SOLO negocio
+# devengado Y CERRADO — únicamente `estado='finalizado'`. `confirmado`/`retirado`
+# todavía pueden cambiar (se cancelan, se modifican) y no deben aparecer.
+E_ID2 = 9_301_002
+P_ID_CONF = 9_301_103
+P_ID_RET = 9_301_104
+NOMBRE_EQUIPO2 = "Cámara test #1209-b (no finalizado)"
+
+
+def _limpiar2(conn):
+    conn.execute(
+        "DELETE FROM alquiler_items WHERE pedido_id IN (%s, %s)", (P_ID_CONF, P_ID_RET)
+    )
+    conn.execute("DELETE FROM alquileres WHERE id IN (%s, %s)", (P_ID_CONF, P_ID_RET))
+    conn.execute("DELETE FROM equipos WHERE id = %s", (E_ID2,))
+
+
+def test_estadisticas_excluye_confirmado_y_retirado(conn):
+    """Un pedido `confirmado` o `retirado` (negocio aún no cerrado) NO debe sumar
+    en ninguna sección — ni siquiera aparecer en `top_equipos`/`por_dueno`."""
+    from routes.estadisticas import compute_estadisticas
+
+    _limpiar2(conn)
+    conn.commit()
+    try:
+        antes = compute_estadisticas(conn)
+        total_antes = antes["totales"]["total_ars"] or 0
+        dueno_antes = next(
+            (d["total_ars"] or 0 for d in antes["por_dueno"] if d["dueno"] == "Rambla"), 0
+        )
+
+        conn.execute(
+            "INSERT INTO equipos (id, nombre, cantidad, dueno, precio_jornada) "
+            "VALUES (%s, %s, 1, 'Rambla', %s)",
+            (E_ID2, NOMBRE_EQUIPO2, PRECIO_JORNADA),
+        )
+        for pid, estado in ((P_ID_CONF, "confirmado"), (P_ID_RET, "retirado")):
+            conn.execute(
+                """INSERT INTO alquileres
+                       (id, cliente_nombre, estado, fecha_desde, fecha_hasta, monto_total)
+                   VALUES (%s, %s, %s, %s, %s, %s)""",
+                (pid, "Cliente #1209-b", estado, f"{MES}-05T09:00:00", f"{MES}-12T09:00:00", NETO),
+            )
+            conn.execute(
+                "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal) "
+                "VALUES (%s, %s, 1, %s, %s)",
+                (pid, E_ID2, PRECIO_JORNADA, BRUTO),
+            )
+        conn.commit()
+
+        despues = compute_estadisticas(conn)
+
+        assert (despues["totales"]["total_ars"] or 0) == total_antes
+        assert not any(e["equipo"] == NOMBRE_EQUIPO2 for e in despues["top_equipos"])
+        dueno_despues = next(
+            (d["total_ars"] or 0 for d in despues["por_dueno"] if d["dueno"] == "Rambla"), 0
+        )
+        assert dueno_despues == dueno_antes
+    finally:
+        _limpiar2(conn)
+        conn.commit()

@@ -80,6 +80,7 @@ export type Pedido = {
     contrato: boolean;
     albaran: boolean;
     factura: boolean;
+    "packing-list": boolean;
   };
   bruto?: number;
   descuento_monto?: number;
@@ -92,7 +93,7 @@ export type Pedido = {
 };
 
 export type PortalTab = "pedidos" | "listas" | "notificaciones" | "perfil";
-export type DocTipo = "remito" | "contrato" | "albaran" | "factura";
+export type DocTipo = "remito" | "contrato" | "albaran" | "factura" | "packing-list";
 export type Filtro = "todos" | "activos" | "historial";
 
 // ── Constantes compartidas con el componente principal ───────────────────────
@@ -101,7 +102,31 @@ export const ACTIVE_STATES = new Set(["borrador", "presupuesto", "confirmado", "
 export const HIST_STATES = new Set(["devuelto", "finalizado", "cancelado"]);
 export const MODIFICABLE_STATES = new Set(["presupuesto", "confirmado"]);
 
+// "packing-list" (Checklist de retiro) queda afuera a propósito, igual que
+// "remito": ambos están disponibles desde el mismo momento que se crea el
+// pedido — no son una novedad que "aparece después" (a diferencia de
+// contrato/albaran/factura, que antes llegaban en estados posteriores). Sin
+// esto, el popup "documentos nuevos" se dispara para TODOS los pedidos
+// históricos apenas se habilita un doc nuevo (nunca se marcó "visto" antes).
 export const DOC_NOTIFICABLE: DocTipo[] = ["contrato", "albaran", "factura"];
+
+// Copy de los documentos — fuente única (portal + checkout, que muestra la
+// sección "Documentos de tu pedido" antes de confirmar). "remito" no tenía
+// descripción propia porque el portal ya lo identifica por el label solo.
+export const DOC_LABEL: Record<DocTipo, string> = {
+  remito: "Remito",
+  contrato: "Contrato",
+  albaran: "Detalle de seguro",
+  factura: "Factura",
+  "packing-list": "Checklist de retiro",
+};
+export const DOC_DESCRIPTION: Partial<Record<DocTipo, string>> = {
+  remito: "El comprobante de tu pedido: ítems, fechas y precio.",
+  contrato: "Es el documento de alquiler firmado entre vos y nosotros.",
+  albaran: "Te sirve para tener constancia ante tu aseguradora.",
+  factura: "Tu factura electrónica, ya autorizada por ARCA.",
+  "packing-list": "El detalle de equipos para controlar al retirar y al devolver.",
+};
 
 export const TAB_OPTIONS: { value: Filtro; label: string }[] = [
   { value: "todos", label: "Todos" },

@@ -1,6 +1,6 @@
 import "./styles.css";
 import { RouterProvider } from "@tanstack/react-router";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { MotionConfig } from "framer-motion";
 import ReactDOM from "react-dom/client";
 import { createRouter } from "@tanstack/react-router";
@@ -8,6 +8,7 @@ import { routeTree } from "./routeTree.gen";
 import { initGA, trackPageView, initWebVitals } from "./lib/analytics";
 import { apiGetAnalyticsConfig, type BackendEquipo } from "./lib/api";
 import { backendToEquipment } from "./hooks/useEquipos";
+import { queryClient } from "./lib/queryClient";
 
 // Sentry diferido: se carga tras la primera interacción del usuario, no en el
 // bundle inicial. Sentry no envuelve el router, por lo que diferirlo es seguro
@@ -31,33 +32,6 @@ if (SENTRY_DSN) {
   window.addEventListener("pointerdown", initSentry, { once: true });
   window.addEventListener("keydown", initSentry, { once: true });
 }
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-      // Mantener datos "frescos" 30 segundos antes de re-fetchear.
-      // Para datos que cambian con baja frecuencia (catálogo, categorías,
-      // marcas) y querés que la navegación instantánea sea rápida.
-      // Endpoints específicos pueden sobrescribir con staleTime propio
-      // (ej. admin/pedidos.index.tsx con refetchInterval: 5000).
-      staleTime: 30_000,
-      // Mantener en caché 5 minutos después de que se quede sin observadores.
-      // Mejora navegación back/forward.
-      gcTime: 30 * 60_000,
-    },
-  },
-});
-
-// Back-office sin cache de frescura: pocos admins, prioridad total a ver el
-// dato recién guardado sobre ahorrar un fetch (el público SÍ se beneficia de
-// cachear, así que su staleTime de 30-60s queda intacto — ver hooks
-// compartidos en useEquipos.ts/useSettings.ts, que exponen un override
-// explícito para sus call-sites admin en vez de tocar el default público).
-// setQueryDefaults matchea por PREFIJO — cubre toda query cuya key empiece
-// con "admin" (la convención ya usada en absolutamente todo el back-office).
-queryClient.setQueryDefaults(["admin"], { staleTime: 0 });
 
 // Hydrate React Query desde el catálogo inlineado por el backend en /rental.
 // El handler Python inyecta <script id="__INITIAL__" type="application/json">

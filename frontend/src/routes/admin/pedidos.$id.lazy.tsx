@@ -25,7 +25,6 @@ import {
   ShieldAlert,
   ShieldCheck,
   Copy,
-  Smartphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -47,11 +46,20 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 
+import { Chequeos } from "@/design-system/composites/Chequeos";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
+import { Switch } from "@/design-system/ui/switch";
 import { MoneyInput } from "@/design-system/ui/money-input";
 import { Textarea } from "@/design-system/ui/textarea";
 import { Skeleton } from "@/design-system/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/design-system/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -168,6 +176,7 @@ function PedidoEditorPage() {
     descuentoPct: draft.datos?.descuento_pct ?? null,
     descuentoTipo: draft.datos?.descuento_manual_tipo ?? null,
     descuentoMonto: draft.datos?.descuento_manual_monto ?? null,
+    descuentoManualActivo: draft.datos?.descuento_manual_activo ?? null,
   });
 
   // Modales
@@ -716,7 +725,9 @@ function PedidoEditorPage() {
                 selector a "%" solo. Con 2+ controles adentro, un <label> no
                 es seguro; FieldLabel sigue bien para los campos de un solo input. */}
             <div className="block mt-3">
-              <span className="block t-eyebrow mb-1">Descuento manual (0 = automático)</span>
+              <span className="block t-eyebrow mb-1">
+                Descuento manual (0 = automático, salvo "Forzar" activado)
+              </span>
               <div className="flex items-center gap-2">
                 <SegmentedControl
                   value={datos.descuento_manual_tipo}
@@ -783,6 +794,19 @@ function PedidoEditorPage() {
                   </div>
                 )}
               </div>
+              {/* Fase C-4 (#1231): `0` es el sentinel de "sin override" — sin
+                  esto, no hay forma de forzar "quiero 0% en ESTE pedido
+                  puntual" cuando cliente/jornadas ganarían por fallback (ej.
+                  un `descuento_cliente_pct` congelado que ya no corresponde). */}
+              <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <Switch
+                  checked={datos.descuento_manual_activo}
+                  onCheckedChange={(v) =>
+                    setDatos((d) => d && { ...d, descuento_manual_activo: v })
+                  }
+                />
+                Forzar este valor (permite 0% aunque cliente/jornadas tengan descuento)
+              </label>
             </div>
           </RailSection>
 
@@ -1037,6 +1061,16 @@ function FacturacionRailSection({
     queryFn: () => facturacionApi.listFacturasPedido(pedidoId),
   });
 
+  // Layouts disponibles (nombre/descripción/advertencia) — estáticos en la práctica, cache larga.
+  const layoutsQ = useQuery({
+    queryKey: ["admin", "facturacion", "layouts"],
+    queryFn: () => facturacionApi.getLayouts(),
+    staleTime: Infinity,
+  });
+  const layouts = layoutsQ.data ?? [];
+  const [layout, setLayout] = useState<string>("simplificada");
+  const layoutInfo = layouts.find((l) => l.id === layout);
+
   const [showPreview, setShowPreview] = useState(false);
 
   const preview = useMutation({
@@ -1064,7 +1098,7 @@ function FacturacionRailSection({
   });
 
   const enviarMail = useMutation({
-    mutationFn: (facturaId: number) => facturacionApi.enviarMailFactura(facturaId),
+    mutationFn: (facturaId: number) => facturacionApi.enviarMailFactura(facturaId, layout),
     onSuccess: (data) => toast.success(`Factura enviada a ${data.to}`),
     onError: (e: Error) => toast.error(e.message),
   });
@@ -1133,41 +1167,58 @@ function FacturacionRailSection({
           )}
 
           {principal.estado === "emitida" && (
-            <div className="flex flex-wrap gap-1.5">
-              <a
-                href={`/api/facturas/${principal.id}/pdf?format=html`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
-              >
-                <Eye className="h-3 w-3" /> Ver
-              </a>
-              <a
-                href={`/api/facturas/${principal.id}/pdf`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
-              >
-                <Download className="h-3 w-3" /> Descargar PDF
-              </a>
-              <a
-                href={`/api/facturas/${principal.id}/pdf?layout=celular`}
-                target="_blank"
-                rel="noreferrer"
-                title="Versión compacta para compartir por WhatsApp"
-                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
-              >
-                <Smartphone className="h-3 w-3" /> Para WhatsApp
-              </a>
-              <button
-                type="button"
-                onClick={() => enviarMail.mutate(principal.id)}
-                disabled={enviarMail.isPending}
-                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30 disabled:opacity-50"
-              >
-                <Mail className="h-3 w-3" />
-                {enviarMail.isPending ? "Enviando…" : "Enviar por mail"}
-              </button>
+            <div className="space-y-1.5">
+              <Select value={layout} onValueChange={setLayout}>
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue placeholder="Formato" />
+                </SelectTrigger>
+                <SelectContent>
+                  {layouts.map((l) => (
+                    <SelectItem key={l.id} value={l.id} title={l.descripcion}>
+                      {l.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {layoutInfo?.descripcion && (
+                <p className="text-2xs text-muted-foreground leading-snug">
+                  {layoutInfo.descripcion}
+                </p>
+              )}
+              {layoutInfo?.advertencia && (
+                // eslint-disable-next-line no-restricted-syntax -- amber: paleta categórica de advertencia (Tier 3)
+                <p className="text-2xs text-amber-700 leading-snug flex items-start gap-1">
+                  <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
+                  {layoutInfo.advertencia}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-1.5">
+                <a
+                  href={`/api/facturas/${principal.id}/pdf?format=html&layout=${layout}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
+                >
+                  <Eye className="h-3 w-3" /> Ver
+                </a>
+                <a
+                  href={`/api/facturas/${principal.id}/pdf?layout=${layout}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
+                >
+                  <Download className="h-3 w-3" /> Descargar PDF
+                </a>
+                <button
+                  type="button"
+                  onClick={() => enviarMail.mutate(principal.id)}
+                  disabled={enviarMail.isPending}
+                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30 disabled:opacity-50"
+                >
+                  <Mail className="h-3 w-3" />
+                  {enviarMail.isPending ? "Enviando…" : "Enviar por mail"}
+                </button>
+              </div>
             </div>
           )}
 
@@ -1285,29 +1336,7 @@ function FacturacionRailSection({
             </div>
           )}
 
-          {preview.data && (
-            <div className="space-y-1.5">
-              {preview.data.chequeos.map((c) => (
-                <div key={c.check} className="flex items-start gap-2 text-xs">
-                  {c.ok ? (
-                    <Check className="h-3.5 w-3.5 shrink-0 mt-0.5 text-verde-ink" />
-                  ) : c.bloqueante ? (
-                    <X className="h-3.5 w-3.5 shrink-0 mt-0.5 text-destructive" />
-                  ) : (
-                    // eslint-disable-next-line no-restricted-syntax -- amber: paleta categórica de advertencia (Tier 3), ya usada en esta pantalla
-                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600" />
-                  )}
-                  <span
-                    className={cn(
-                      !c.ok && c.bloqueante ? "text-destructive" : "text-muted-foreground",
-                    )}
-                  >
-                    {c.mensaje}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          {preview.data && <Chequeos items={preview.data.chequeos} />}
 
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>

@@ -15,6 +15,7 @@ export type ClientePedidoFull = Pedido & {
     contrato: boolean;
     albaran: boolean;
     factura: boolean;
+    "packing-list": boolean;
   };
   solicitudes?: SolicitudModificacion[];
 };

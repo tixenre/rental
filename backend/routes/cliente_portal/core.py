@@ -38,8 +38,12 @@ _ITEM_CAMPOS_PORTAL = (
     "cantidad", "precio_jornada", "subtotal", "equipo_id", "nombre", "marca",
     "modelo", "foto_url", "nombre_publico", "nombre_publico_largo",
 )
-# Los documentos (contrato/remito) suman los campos de identificación del equipo.
-_ITEM_CAMPOS_DOC = _ITEM_CAMPOS_PORTAL + ("serie", "valor_reposicion")
+# Los documentos (contrato/remito/albarán/checklist) suman los campos de
+# identificación del equipo + los que usa el checklist de retiro (fecha de
+# compra, accesorios incluidos vía `_contenido_pairs` en pdf_templates.py).
+_ITEM_CAMPOS_DOC = _ITEM_CAMPOS_PORTAL + (
+    "serie", "valor_reposicion", "fecha_compra", "contenido_incluido_json",
+)
 _COMP_CAMPOS_DOC = (
     "cantidad", "nombre", "marca", "modelo", "serie", "valor_reposicion",
     "nombre_publico", "nombre_publico_largo",
@@ -69,13 +73,24 @@ def _ventana_cumple(fecha_desde: Optional[str], ventana_horas: int) -> bool:
 # ── Documentos disponibles según estado del pedido ───────────────────────────
 
 def _documentos_disponibles(estado: str) -> dict:
-    """Devuelve qué PDFs puede descargar el cliente según el estado del pedido."""
+    """Devuelve qué PDFs puede descargar el cliente según el estado del pedido.
+
+    Los cuatro (Remito, Contrato, Detalle de seguro, Checklist de retiro) están
+    disponibles desde "presupuesto" — apenas se solicita, antes de que Rambla
+    lo confirme — para que el cliente tenga tiempo de leerlos o consultar a
+    su aseguradora sin esperar. El pedido puede seguir modificándose hasta
+    que se confirma (`ESTADOS_MODIFICABLES` incluye "presupuesto"), así que
+    cada PDF sigue mostrando el badge de estado real (`_membrete(..., estado=True)`
+    en pdf_templates.py) como disclaimer — un pedido en "Presupuesto" queda
+    visiblemente marcado como provisorio, no como confirmado. "borrador"
+    (solo admin, nunca un pedido de cliente) y "cancelado" quedan afuera."""
     e = (estado or "").lower()
-    confirmado_o_mas = e in ("confirmado", "retirado", "devuelto", "finalizado")
+    disponible = e not in ("borrador", "cancelado", "")
     return {
-        "remito": confirmado_o_mas,
-        "contrato": confirmado_o_mas,
-        "albaran": e in ("retirado", "devuelto", "finalizado"),
+        "remito": disponible,
+        "contrato": disponible,
+        "albaran": disponible,
+        "packing-list": disponible,
     }
 
 

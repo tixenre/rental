@@ -5,17 +5,20 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { useClienteSession } from "@/lib/iva";
-import { createOrder, OrderVerificationError } from "@/lib/orders";
-import { chequearEstadoVerificacion, iniciarVerificacionIdentidad } from "@/lib/verificacion";
-import type { VerificacionPanelEstado } from "@/components/rental/VerificacionRequeridaPanel";
-import { stepUpWithPasskey, passkeyErrorMessage } from "@/lib/passkey";
-import { aceptarTyc, validarCheckout } from "@/lib/checkout";
+import { createOrder } from "@/lib/orders";
 import { toLocalISO } from "@/lib/rental-dates";
 import { useCotizacion } from "@/lib/cotizacion";
 import { useAntelacionMinimaHoras } from "@/hooks/useSettings";
 import { useBusinessPhone } from "@/lib/business";
 import { whatsappLink } from "@/lib/whatsapp";
 import { CartDrawerView } from "./CartDrawerView";
+
+type CheckoutStep = "carrito" | "resumen" | "exito";
+
+/** Cuánto se muestra la pantalla de éxito antes de redirigir al portal —
+ *  tiempo para que se lea "Pedido #X enviado" sin que se pise con el toast
+ *  de siempre (que coincidía con la navegación al portal). */
+const EXITO_REDIRECT_MS = 5000;
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -32,9 +35,14 @@ const FOCUSABLE =
 export function CartDrawer({
   allEquipos,
   getDisponible,
+  resumeStep,
 }: {
   allEquipos: Equipment[];
   getDisponible?: (item: Equipment) => number | undefined;
+  /** Si el carrito se reabre volviendo de un desvío (Didit) con
+   *  `?carritoPaso=resumen`, entra directo al paso de resumen en vez de la
+   *  lista de ítems — ver `RESUME_STEP_PARAM` en CheckoutResumen.tsx. */
+  resumeStep?: "resumen";
 }) {
   const {
     drawerOpen,
@@ -50,17 +58,17 @@ export function CartDrawer({
     endDate,
     startTime,
     endTime,
+    sessionId,
   } = useCart();
 
   const isBottom = drawerPlacement === "bottom";
 
   const navigate = useNavigate();
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [step, setStep] = useState<CheckoutStep>("carrito");
+  const [pedidoEnviado, setPedidoEnviado] = useState<{ id: number; numeroPedido: string } | null>(
+    null,
+  );
   const [needsLogin, setNeedsLogin] = useState(false);
-  const [verifEstado, setVerifEstado] = useState<VerificacionPanelEstado | null>(null);
-  const [verifMotivo, setVerifMotivo] = useState<string | null>(null);
-  const [iniciandoVerif, setIniciandoVerif] = useState(false);
   const [notas, setNotas] = useState("");
   const [showNotas, setShowNotas] = useState(false);
   const [dateModalOpen, setDateModalOpen] = useState(false);
@@ -115,6 +123,35 @@ export function CartDrawer({
     }
   }, [clienteSession, needsLogin]);
 
+  // Retorno de un desvío (Didit) con ?carritoPaso=resumen: reabrir directo en
+  // el paso de resumen en vez de la lista de ítems (rental.tsx limpia el query
+  // param al toque; este efecto solo actúa mientras `resumeStep` sigue vivo en
+  // esa misma tanda de renders).
+  useEffect(() => {
+    if (drawerOpen && resumeStep === "resumen") {
+      setStep("resumen");
+    }
+  }, [drawerOpen, resumeStep]);
+
+  // Pantalla de éxito (paso "exito"): se muestra unos segundos y RECIÉN
+  // después redirige al portal — antes el toast de éxito se pisaba con la
+  // navegación (pasaban casi al mismo tiempo).
+  useEffect(() => {
+    if (!pedidoEnviado) return;
+    const id = pedidoEnviado.id;
+    const t = setTimeout(() => {
+      clear();
+      setShowNotas(false);
+      setNotas("");
+      setDrawerOpen(false);
+      setStep("carrito");
+      setPedidoEnviado(null);
+      navigate({ to: "/cliente/portal", search: { nuevo: id } });
+    }, EXITO_REDIRECT_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clear/navigate/setDrawerOpen son estables; solo debe re-armar el timer cuando cambia pedidoEnviado
+  }, [pedidoEnviado]);
+
   // Total calculado por el BACKEND (fuente única, /api/cotizar). El front no
   // reimplementa la fórmula: manda ítems + fechas y muestra el desglose. #617.
   const totales = useCotizacion({
@@ -146,6 +183,13 @@ export function CartDrawer({
     message:
       "¡Hola! Necesito un alquiler con urgencia (dentro del plazo mínimo de antelación). ¿Me pueden ayudar?",
   });
+
+  // Al cerrar el carrito (X, Esc, click afuera) volvemos al paso "carrito" —
+  // si no, reabrirlo dejaba al usuario mismo paso en el que lo cerró (ej. el
+  // resumen), en vez de arrancar de nuevo desde la lista de ítems.
+  useEffect(() => {
+    if (!drawerOpen) setStep("carrito");
+  }, [drawerOpen]);
 
   // Lock scroll del body + guardar foco al abrir, restaurar al cerrar
   useEffect(() => {
@@ -197,7 +241,10 @@ export function CartDrawer({
     return () => document.removeEventListener("keydown", onKey);
   }, [drawerOpen, setDrawerOpen]);
 
-  async function handleSubmit() {
+  // "Revisar pedido" (paso carrito): solo lo que el portero NO puede chequear
+  // (fechas, sesión de cliente) — el resto (identidad/T&C/firma/etc.) lo
+  // resuelve el paso de resumen preguntándole al backend (`CheckoutResumen`).
+  function handleIrAResumen() {
     if (list.length === 0) return;
 
     // #28 — Validación de fechas explícita con toast
@@ -219,94 +266,40 @@ export function CartDrawer({
       return;
     }
 
-    setSubmitting(true);
-    setSubmitError(null);
-    setNeedsLogin(false);
-    setVerifEstado(null);
-    setVerifMotivo(null);
-
-    // #27 — Pre-check de cuenta antes de submitear (fuente única en
-    // verificacion.ts). Sin sesión → panel login/registro; logueado pero sin
-    // DNI validado → panel de verificación de identidad (distingue no-verificado
-    // / en-revision / rechazado); en vez del 401/403 críptico.
-    const { estado, motivo } = await chequearEstadoVerificacion();
-    if (estado === "no-logueado") {
+    // El check de login no vive en el portero (lo dueña el guard del route) —
+    // se sigue filtrando acá con la sesión ya cacheada por useClienteSession.
+    if (!clienteSession) {
       setNeedsLogin(true);
-      setSubmitting(false);
       return;
     }
-    if (estado === "error") {
-      toast.error("No pudimos verificar tu cuenta, reintentá.");
-      setSubmitting(false);
-      return;
-    }
-    if (estado === "no-verificado" || estado === "en-revision" || estado === "rechazado") {
-      setVerifEstado(estado);
-      setVerifMotivo(motivo ?? null);
-      setSubmitting(false);
-      return;
-    }
-    // "logueado-verificado" → sigue al createOrder
+    setNeedsLogin(false);
+    setStep("resumen");
+  }
 
-    try {
-      // 1. Registrar aceptación de T&C (idempotente)
-      await aceptarTyc();
-
-      // 2. Passkey step-up: Face ID / huella = firma del pedido + aceptación de T&C
-      await stepUpWithPasskey();
-
-      // 3. Portero: verificar que todo esté en orden antes de crear
-      const { listo, faltan } = await validarCheckout(useCart.getState().sessionId);
-      if (!listo) {
-        const msg = faltan.map((f) => f.mensaje).join(" • ");
-        setSubmitError(msg);
-        toast.error("Revisá los datos antes de continuar", { description: msg, duration: 8000 });
-        setSubmitting(false);
-        return;
-      }
-
-      // 4. Crear el pedido
-      const order = await createOrder({
-        status: "solicitado",
-        startDate,
-        endDate,
-        startTime,
-        endTime,
-        days: d,
-        notes: notas.trim() || undefined,
-        resolvedItems: list.map(({ it, qty }) => ({
-          id: it.id,
-          name: it.name,
-          brand: it.brand,
-          category: it.category,
-          qty,
-          pricePerDay: it.pricePerDay,
-          backendId: it._backendId,
-        })),
-      });
-      clear();
-      setShowNotas(false);
-      setNotas("");
-      setDrawerOpen(false);
-      toast.success(`Pedido #${order.numero_pedido} enviado`, {
-        description: "Te llevamos a tu portal para seguir el estado y los próximos pasos.",
-        duration: 6000,
-      });
-      navigate({ to: "/cliente/portal", search: { nuevo: Number(order.id) } });
-    } catch (err: unknown) {
-      // Backstop: si el backend rechaza por identidad (403), mostramos el panel
-      // de verificación en vez del toast genérico.
-      if (err instanceof OrderVerificationError) {
-        setVerifEstado("no-verificado");
-        setSubmitting(false);
-        return;
-      }
-      const msg = passkeyErrorMessage(err);
-      setSubmitError(msg);
-      toast.error(msg, { duration: 6000 });
-    } finally {
-      setSubmitting(false);
-    }
+  async function handleCrearPedido(sessionConfirmed: boolean) {
+    const order = await createOrder({
+      status: "solicitado",
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      days: d,
+      notes: notas.trim() || undefined,
+      sessionConfirmed,
+      resolvedItems: list.map(({ it, qty }) => ({
+        id: it.id,
+        name: it.name,
+        brand: it.brand,
+        category: it.category,
+        qty,
+        pricePerDay: it.pricePerDay,
+        backendId: it._backendId,
+      })),
+    });
+    // La pantalla de éxito (paso "exito") se encarga de limpiar/cerrar/redirigir
+    // después de EXITO_REDIRECT_MS (ver el efecto de arriba).
+    setStep("exito");
+    setPedidoEnviado({ id: Number(order.id), numeroPedido: order.numero_pedido });
   }
 
   function goToLogin() {
@@ -319,17 +312,6 @@ export function CartDrawer({
     navigate({ to: "/cliente/registro", search: { from: "carrito" } });
   }
 
-  async function onVerificar() {
-    setIniciandoVerif(true);
-    try {
-      await iniciarVerificacionIdentidad("/?openCarrito=1");
-    } catch {
-      /* el helper ya hizo toast */
-    } finally {
-      setIniciandoVerif(false);
-    }
-  }
-
   return (
     <CartDrawerView
       drawerOpen={drawerOpen}
@@ -339,6 +321,8 @@ export function CartDrawer({
       titleId={titleId}
       onClose={() => setDrawerOpen(false)}
       onExplore={() => setDrawerOpen(false, "bottom")}
+      step={step}
+      pedidoEnviado={pedidoEnviado}
       startDate={startDate}
       endDate={endDate}
       startTime={startTime}
@@ -365,9 +349,7 @@ export function CartDrawer({
       showNotas={showNotas}
       onNotasChange={setNotas}
       onShowNotas={() => setShowNotas(true)}
-      submitError={submitError}
-      submitting={submitting}
-      onSubmit={handleSubmit}
+      onSubmit={handleIrAResumen}
       hayNoDisponible={hayNoDisponible}
       nombresSinDisp={nombresSinDisp}
       dentroDeLeadTime={dentroDeLeadTime}
@@ -376,12 +358,11 @@ export function CartDrawer({
       needsLogin={needsLogin}
       onLogin={goToLogin}
       onRegister={goToRegister}
-      verifEstado={verifEstado}
-      verifMotivo={verifMotivo}
-      iniciandoVerif={iniciandoVerif}
-      onVerificar={onVerificar}
       clienteSession={clienteSession}
       onClear={clear}
+      sessionId={sessionId}
+      onVolverAlCarrito={() => setStep("carrito")}
+      onCrearPedido={handleCrearPedido}
     />
   );
 }

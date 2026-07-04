@@ -217,3 +217,111 @@ def test_confirmado_sin_override_congela_el_fallback_del_cliente(setup):
     assert ped["monto_neto"] == 2700  # desglose de DISPLAY — el que este test protege
     assert ped["descuento_efectivo_pct"] == 10.0  # el 10% congelado, NO el 80% actual
     assert ped["descuento_origen"] == "cliente"
+
+
+def test_confirmado_editar_datos_no_pisa_el_descuento_congelado(setup):
+    """Bug real (reportado por el dueño — 'aparece un descuento que el
+    cliente no tiene'): `_apply_pedido_datos` dispara `_recalcular_total_pedido`
+    en CUALQUIER guardado que incluya `descuento_pct` en el payload — y el
+    front SIEMPRE lo manda (autosave manda el objeto `datos` completo, no solo
+    el campo tocado). Antes del guard de estado, eso releía
+    `obtener_descuento_cliente` EN VIVO y pisaba `descuento_cliente_pct` sin
+    mirar si el pedido ya estaba confirmado — rompiendo 'plata congelada' con
+    CUALQUIER edición, no solo una relacionada al descuento."""
+    from database import get_db, row_to_dict
+    from routes.alquileres import (
+        create_pedido, PedidoCreate, PedidoItem, PedidoDatos, _apply_pedido_datos,
+    )
+    from services.finanzas_flujo.pedido import desglose_de_pedido
+
+    created_ids = setup
+
+    pedido = create_pedido(PedidoCreate(
+        cliente_id=CLIENTE_ID,
+        fecha_desde=FD, fecha_hasta=FH,
+        estado="presupuesto",
+        items=[PedidoItem(equipo_id=EQ_ID, cantidad=1, precio_jornada=1000)],
+    ), es_admin=True)
+    pid = pedido["id"]
+    created_ids.append(pid)
+
+    with get_db() as conn:
+        conn.execute("UPDATE alquileres SET estado='confirmado' WHERE id=%s", (pid,))
+        conn.commit()
+
+    # El cliente pierde su descuento DESPUÉS de confirmar (el caso reportado:
+    # el perfil ahora muestra "—" pero el pedido ya confirmado sigue mostrando
+    # el % viejo).
+    with get_db() as conn:
+        conn.execute("UPDATE clientes SET descuento=%s WHERE id=%s", (0, CLIENTE_ID))
+        conn.commit()
+
+    # El admin guarda CUALQUIER cambio de "datos" del pedido — acá, notas. El
+    # front manda `descuento_pct` en el mismo payload (autosave del objeto
+    # completo) aunque el admin no haya tocado ese campo.
+    with get_db() as conn:
+        _apply_pedido_datos(
+            conn, pid,
+            PedidoDatos(notas="actualicé una nota, no el descuento", descuento_pct=0),
+            es_admin=True,
+        )
+        conn.commit()
+
+    with get_db() as conn:
+        row = conn.execute("SELECT monto_total, descuento_cliente_pct FROM alquileres WHERE id=%s", (pid,)).fetchone()
+        ped = row_to_dict(conn.execute("SELECT * FROM alquileres WHERE id=%s", (pid,)).fetchone())
+        ped["items"] = [{"equipo_id": EQ_ID, "cantidad": 1, "precio_jornada": 1000, "cobro_modo": "jornada"}]
+        desglose_de_pedido(conn, ped)
+
+    # Sin el guard de estado, esto habría vuelto a 0% (el cliente en vivo) y
+    # monto_total a 3000 — el bug reportado.
+    assert float(row["descuento_cliente_pct"]) == 10.0
+    assert row["monto_total"] == 2700
+    assert ped["descuento_efectivo_pct"] == 10.0
+    assert ped["descuento_origen"] == "cliente"
+
+
+def test_manual_activo_fuerza_cero_en_pedido_ya_confirmado(setup):
+    """El fix del bug de arriba deja el % viejo CONGELADO — pero el dueño
+    todavía necesita una forma de corregirlo si de verdad quiere 0% en ESE
+    pedido puntual. `descuento_manual_activo=True` con `descuento_pct=0` es
+    esa vía (Fase C-4, #1231): antes, `0` era indistinguible de "sin
+    override" y caía siempre al fallback congelado."""
+    from database import get_db, row_to_dict
+    from routes.alquileres import (
+        create_pedido, PedidoCreate, PedidoItem, PedidoDatos, _apply_pedido_datos,
+    )
+    from services.finanzas_flujo.pedido import desglose_de_pedido
+
+    created_ids = setup
+
+    pedido = create_pedido(PedidoCreate(
+        cliente_id=CLIENTE_ID,
+        fecha_desde=FD, fecha_hasta=FH,
+        estado="presupuesto",
+        items=[PedidoItem(equipo_id=EQ_ID, cantidad=1, precio_jornada=1000)],
+    ), es_admin=True)
+    pid = pedido["id"]
+    created_ids.append(pid)
+
+    with get_db() as conn:
+        conn.execute("UPDATE alquileres SET estado='confirmado' WHERE id=%s", (pid,))
+        conn.commit()
+
+    with get_db() as conn:
+        _apply_pedido_datos(
+            conn, pid,
+            PedidoDatos(descuento_pct=0, descuento_manual_activo=True),
+            es_admin=True,
+        )
+        conn.commit()
+
+    with get_db() as conn:
+        row = conn.execute("SELECT monto_total FROM alquileres WHERE id=%s", (pid,)).fetchone()
+        ped = row_to_dict(conn.execute("SELECT * FROM alquileres WHERE id=%s", (pid,)).fetchone())
+        ped["items"] = [{"equipo_id": EQ_ID, "cantidad": 1, "precio_jornada": 1000, "cobro_modo": "jornada"}]
+        desglose_de_pedido(conn, ped)
+
+    assert row["monto_total"] == 3000  # sin descuento — forzado a 0
+    assert ped["descuento_efectivo_pct"] == 0.0
+    assert ped["descuento_origen"] == "manual"

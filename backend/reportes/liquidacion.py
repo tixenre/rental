@@ -60,6 +60,9 @@ SALDADO_CTE = f"""
 def filas_atribucion(conn, desde: str, hasta: str) -> list[dict]:
     """Filas `(fecha, dueno, equipo, monto)`: el monto prorrateado que cada equipo
     aportó, fechado en el día en que su pedido quedó saldado, dentro del rango.
+    Incluye también `pedido_id`/`numero_pedido`/`cliente` (metadata del pedido,
+    misma para todas las filas de un mismo pedido) para el detalle de "pedidos"
+    por dueño en `agregar` — no se agrega en SQL, se agrupa en Python.
 
     Cuando `suma_items = 0` (todos los ítems del pedido tienen `subtotal` 0, ej.
     100% de descuento a nivel ítem) pero `monto_total > 0`, el prorrateo
@@ -83,6 +86,8 @@ def filas_atribucion(conn, desde: str, hasta: str) -> list[dict]:
         )
         SELECT r.fecha_saldado::date                              AS fecha,
                al.id                                              AS pedido_id,
+               COALESCE(al.numero_pedido, al.id)                  AS numero_pedido,
+               COALESCE(c.nombre || ' ' || c.apellido, al.cliente_nombre) AS cliente,
                COALESCE(e.dueno, 'Rambla')                        AS dueno,
                COALESCE(e.nombre, pi.nombre_libre)                AS equipo,
                CASE
@@ -93,6 +98,7 @@ def filas_atribucion(conn, desde: str, hasta: str) -> list[dict]:
         JOIN alquileres al ON al.id = r.pedido_id
         JOIN alquiler_items pi ON pi.pedido_id = al.id
         LEFT JOIN equipos e ON e.id = pi.equipo_id
+        LEFT JOIN clientes c ON c.id = al.cliente_id
         JOIN tot t ON t.pedido_id = al.id
     """
     rows = conn.execute(sql, (desde, hasta)).fetchall()
@@ -117,6 +123,12 @@ def agregar(filas: list[dict], modelo: dict) -> dict:
     pedidos_global: set = set()
     dueno_pedidos: dict[str, set] = defaultdict(set)
     equipo_pedidos: dict[str, dict[str, set]] = defaultdict(lambda: defaultdict(set))
+    # Detalle de "rentals" por dueño (2026-07-04): cuánto aportó cada PEDIDO
+    # (no equipo) a cada dueño — un pedido con equipos de 2 dueños distintos
+    # aporta un monto DISTINTO a cada uno. `pedido_meta` es la metadata (fecha/
+    # cliente/numero_pedido) del pedido, igual para todas sus filas.
+    dueno_pedido_monto: dict[str, dict[int, float]] = defaultdict(lambda: defaultdict(float))
+    pedido_meta: dict[int, dict] = {}
 
     for f in filas:
         monto = float(f["monto"] or 0)
@@ -138,6 +150,15 @@ def agregar(filas: list[dict], modelo: dict) -> dict:
             pedidos_global.add(pid)
             dueno_pedidos[dueno].add(pid)
             equipo_pedidos[dueno][equipo].add(pid)
+            dueno_pedido_monto[dueno][pid] += monto
+            pedido_meta.setdefault(
+                pid,
+                {
+                    "numero_pedido": f.get("numero_pedido") or pid,
+                    "cliente": f.get("cliente") or "",
+                    "fecha": fecha,
+                },
+            )
 
         for benef, m in repartir(dueno, monto, modelo).items():
             por_benef[benef] += m
@@ -170,6 +191,23 @@ def agregar(filas: list[dict], modelo: dict) -> dict:
                         "veces": len(equipo_pedidos[dn][e]),
                     }
                     for e, v in dueno_equipos[dn].items()
+                ),
+                key=lambda x: x["monto"],
+                reverse=True,
+            ),
+            # Detalle de pedidos/rentals (2026-07-04): el mismo total de arriba,
+            # visto por PEDIDO en vez de por equipo — # de pedido, cliente, fecha
+            # de saldado, monto que ese pedido aportó a ESTE dueño.
+            "pedidos_detalle": sorted(
+                (
+                    {
+                        "pedido_id": pid,
+                        "numero_pedido": pedido_meta[pid]["numero_pedido"],
+                        "cliente": pedido_meta[pid]["cliente"],
+                        "fecha": pedido_meta[pid]["fecha"],
+                        "monto": int(round(v)),
+                    }
+                    for pid, v in dueno_pedido_monto[dn].items()
                 ),
                 key=lambda x: x["monto"],
                 reverse=True,
@@ -226,6 +264,7 @@ def combinar_meses(meses_data: list[dict]) -> dict:
                     "pedidos": 0,
                     "reparto": defaultdict(int),
                     "equipos": defaultdict(lambda: [0, 0]),  # [monto, veces]
+                    "pedidos_detalle": [],
                 },
             )
             acc["monto_generado"] += d.get("monto_generado", 0)
@@ -236,6 +275,9 @@ def combinar_meses(meses_data: list[dict]) -> dict:
                 agg = acc["equipos"][eq["equipo"]]
                 agg[0] += eq.get("monto", 0)
                 agg[1] += eq.get("veces", 0)
+            # Un pedido pertenece a UN ÚNICO mes de saldado (mismo invariante que
+            # el resto de esta función) → concatenar es seguro, no hay dupes.
+            acc["pedidos_detalle"].extend(d.get("pedidos_detalle", []))
 
         # El modelo/beneficiarios "representativo" es el del último mes de la
         # lista (si es abierto, el vigente hoy; si está cerrado, el que se
@@ -260,6 +302,9 @@ def combinar_meses(meses_data: list[dict]) -> dict:
                 ),
                 key=lambda x: x["monto"],
                 reverse=True,
+            ),
+            "pedidos_detalle": sorted(
+                acc["pedidos_detalle"], key=lambda x: x["monto"], reverse=True
             ),
         }
         for acc in duenos.values()

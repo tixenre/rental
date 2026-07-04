@@ -6,6 +6,12 @@
  * pedido). Decisión del dueño 2026-06-06: el nombre se muestra **"Nombre
  * Apellido"** (nombre primero) en todas las superficies. Espeja el helper
  * backend `routes/clientes.nombre_completo_cliente`.
+ *
+ * La versión "legal" (RENAPER si está verificado) + el contacto canónico NO
+ * se resuelven acá — los devuelve ya armados `GET /api/cliente/me`
+ * (`nombre_legal`/`direccion_legal`/`email_comunicacion`/`telefono_contacto`,
+ * misma fuente que usan contrato/remito en `identity/`): una sola regla, del
+ * lado del backend, no una copia en TypeScript.
  */
 
 /** Devuelve "Nombre Apellido" (recortado). Si falta el apellido, solo el nombre. */

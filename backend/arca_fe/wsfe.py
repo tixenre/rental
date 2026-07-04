@@ -25,13 +25,14 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 import urllib3
 from dataclasses import dataclass
 from datetime import date
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
-    from .modelos import CaeResult
+    from .modelos import CaeResult, ComprobanteRequest
 
 import requests
 import zeep
@@ -44,8 +45,11 @@ from .errores import ArcaBusinessError, ArcaResponseError
 
 _logger = logging.getLogger(__name__)
 
-# Caché local de clientes SOAP (por endpoint, dentro del proceso)
-_CLIENT_CACHE: dict[str, zeep.Client] = {}
+# Caché local de clientes SOAP (por (endpoint, timeout), dentro del proceso) — protegida por
+# `_cache_lock` (check-then-set no atómico en Python puro: dos threads pidiendo el mismo cliente
+# por primera vez podían construirlo dos veces; con el lock, uno construye y el otro reusa).
+_CLIENT_CACHE: dict[tuple[str, float], zeep.Client] = {}
+_cache_lock = threading.Lock()
 
 # Códigos de error de FECompConsultar que significan "no existe" (no un error
 # real): 10016 = hueco en una secuencia con historial; 602 = combinación
@@ -66,10 +70,10 @@ class _AfipSSLAdapter(HTTPAdapter):
         )
 
 
-_TIMEOUT_SECONDS = 30.0
+_TIMEOUT_SECONDS = 30.0  # default de `WsfeClient.timeout` — configurable por instancia
 
 
-def _afip_transport() -> zeep.transports.Transport:
+def _afip_transport(timeout: float) -> zeep.transports.Transport:
     session = requests.Session()
     session.mount("https://", _AfipSSLAdapter())
     # operation_timeout: sin esto zeep no aplica límite a las llamadas SOAP —
@@ -77,17 +81,26 @@ def _afip_transport() -> zeep.transports.Transport:
     # advisory lock + el FOR UPDATE de afip_ta (bloquea TODA la facturación
     # de ese emisor). `timeout` cubre el fetch inicial del WSDL.
     return zeep.transports.Transport(
-        session=session, timeout=_TIMEOUT_SECONDS, operation_timeout=_TIMEOUT_SECONDS
+        session=session, timeout=timeout, operation_timeout=timeout
     )
 
 
-def _get_client(endpoint: str) -> zeep.Client:
-    """Devuelve el cliente zeep (cacheado en memoria por proceso). `endpoint`
-    es la URL COMPLETA del WSDL, ya resuelta por el caller según ambiente."""
+def _get_client(endpoint: str, timeout: float) -> zeep.Client:
+    """Devuelve el cliente zeep (cacheado en memoria por proceso, por `(endpoint, timeout)`).
+    `endpoint` es la URL COMPLETA del WSDL, ya resuelta por el caller según ambiente."""
     ep = endpoint.rstrip("/")
-    if ep not in _CLIENT_CACHE:
-        _CLIENT_CACHE[ep] = zeep.Client(ep, transport=_afip_transport())
-    return _CLIENT_CACHE[ep]
+    clave = (ep, timeout)
+    with _cache_lock:
+        if clave not in _CLIENT_CACHE:
+            _CLIENT_CACHE[clave] = zeep.Client(ep, transport=_afip_transport(timeout))
+        return _CLIENT_CACHE[clave]
+
+
+def clear_cache() -> None:
+    """Limpia el cache de clientes SOAP — para tests, o para un consumidor multi-tenant que
+    necesite forzar un cliente nuevo (ej. tras rotar un certificado)."""
+    with _cache_lock:
+        _CLIENT_CACHE.clear()
 
 
 @dataclass
@@ -97,18 +110,21 @@ class WsfeClient:
     `endpoint`: base URL del servicio (ej: "wswhomo.afip.gov.ar").
     `cuit`: CUIT del emisor (sin guiones).
     `token`, `sign`: del TA vigente.
-    """
+    `timeout`: segundos para el fetch del WSDL y cada operación SOAP (default 30.0) —
+    configurable por instancia; dos instancias con distinto `timeout` al mismo `endpoint`
+    cachean clientes zeep separados (no colisionan)."""
 
     endpoint: str
     cuit: int
     token: str
     sign: str
+    timeout: float = _TIMEOUT_SECONDS
 
     def _auth(self) -> dict:
         return {"Token": self.token, "Sign": self.sign, "Cuit": str(self.cuit)}
 
     def _client(self) -> zeep.Client:
-        return _get_client(self.endpoint)
+        return _get_client(self.endpoint, self.timeout)
 
     @staticmethod
     def _soap(op: str, fn, /, *args, **kwargs):
@@ -199,15 +215,55 @@ class WsfeClient:
     # COMMANDS (efecto en AFIP — emite un comprobante legal)
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _parse_det_resp(result_obj: Any) -> "CaeResult":
+        """Parsea UN elemento de `FeDetResp.FECAEDetResponse` a un `CaeResult` — sin errores de
+        cabecera (esos los agrega el caller si corresponde; ver `solicitar_cae` vs.
+        `solicitar_cae_lote`, que los atribuyen distinto)."""
+        from .modelos import CaeResult  # import local para evitar circulares
+
+        resultado = result_obj.Resultado  # 'A' | 'R' | 'P'
+
+        cae: Optional[str] = None
+        cae_vto: Optional[date] = None
+        numero: Optional[int] = None
+        observaciones: list[str] = []
+        errores: list[str] = []
+
+        if resultado == "A":
+            cae = result_obj.CAE
+            cae_vto = parse_fecha_arca(result_obj.CAEFchVto)
+            numero = int(result_obj.CbteDesde)
+
+        if hasattr(result_obj, "Observaciones") and result_obj.Observaciones:
+            for obs in result_obj.Observaciones.Obs:
+                observaciones.append(f"{obs.Code}: {obs.Msg}")
+
+        if hasattr(result_obj, "Errors") and result_obj.Errors:
+            for err in result_obj.Errors.Err:
+                errores.append(f"{err.Code}: {err.Msg}")
+
+        return CaeResult(
+            resultado=resultado,
+            cae=cae,
+            cae_vto=cae_vto,
+            numero=numero,
+            observaciones=tuple(observaciones),
+            errores=tuple(errores),
+        )
+
     # FECAESolicitar — solicitar CAE
 
-    def solicitar_cae(self, fecae: dict) -> CaeResult:
-        """Envía FECAESolicitar y parsea la respuesta en un CaeResult.
+    def solicitar_cae(self, comprobante: "ComprobanteRequest", numero: int) -> CaeResult:
+        """Arma el payload (`comprobante.armar_fecae`) y envía FECAESolicitar — UNA sola forma
+        tipada, ya no acepta el `dict` crudo (el armado del payload dejó de ser responsabilidad
+        del caller). Parsea la respuesta en un CaeResult.
 
         NUNCA asume éxito: valida Resultado == 'A' y extrae errores si 'R'.
         """
-        from .modelos import CaeResult  # import local para evitar circulares
+        from .comprobante import armar_fecae
 
+        fecae = armar_fecae(comprobante, numero)
         client = self._client()
         resp = self._soap(
             "FECAESolicitar",
@@ -235,42 +291,62 @@ class WsfeClient:
                 raw=str(resp),
             )
 
-        result_obj = detalles[0]
-        resultado = result_obj.Resultado  # 'A' | 'R' | 'P'
+        resultado = self._parse_det_resp(detalles[0])
 
-        cae: Optional[str] = None
-        cae_vto: Optional[date] = None
-        numero: Optional[int] = None
-        observaciones: list[str] = []
-        errores: list[str] = []
-
-        if resultado == "A":
-            cae = result_obj.CAE
-            cae_vto = _parse_fecha(result_obj.CAEFchVto)
-            numero = int(result_obj.CbteDesde)
-
-        if hasattr(result_obj, "Observaciones") and result_obj.Observaciones:
-            for obs in result_obj.Observaciones.Obs:
-                observaciones.append(f"{obs.Code}: {obs.Msg}")
-
-        # Errores a nivel cabecera
+        # Errores a nivel cabecera (solo acá — para un comprobante SUELTO, el
+        # header cubre exactamente este único ítem; en `solicitar_cae_lote`
+        # el header cubre TODO el lote, así que ahí no se atribuyen a cada
+        # ítem individual — ver ese método).
+        errores_cabecera: list[str] = []
         if hasattr(resp, "Errors") and resp.Errors:
             for err in resp.Errors.Err:
-                errores.append(f"{err.Code}: {err.Msg}")
+                errores_cabecera.append(f"{err.Code}: {err.Msg}")
+        if errores_cabecera:
+            from dataclasses import replace
 
-        # Errores a nivel ítem
-        if hasattr(result_obj, "Errors") and result_obj.Errors:
-            for err in result_obj.Errors.Err:
-                errores.append(f"{err.Code}: {err.Msg}")
+            resultado = replace(resultado, errores=resultado.errores + tuple(errores_cabecera))
 
-        return CaeResult(
-            resultado=resultado,
-            cae=cae,
-            cae_vto=cae_vto,
-            numero=numero,
-            observaciones=tuple(observaciones),
-            errores=tuple(errores),
+        return resultado
+
+    # FECAESolicitar — solicitar CAE de un LOTE de comprobantes consecutivos
+
+    def solicitar_cae_lote(
+        self, comprobantes: "list[ComprobanteRequest]", numero_desde: int
+    ) -> "list[CaeResult]":
+        """Pide CAE para VARIOS comprobantes CONSECUTIVOS (mismo emisor/pto_vta/cbte_tipo) en UNA
+        sola llamada SOAP (`comprobante.armar_fecae_lote` arma el payload, valida homogeneidad y
+        el tope de 250 por lote — ver su docstring).
+
+        Devuelve la lista de `CaeResult` EN EL MISMO ORDEN que `comprobantes` — AFIP puede aprobar
+        unos y rechazar otros dentro del mismo lote (`FeCabResp.Resultado` puede venir 'P' =
+        parcial); cada `CaeResult` refleja el resultado INDIVIDUAL de su ítem, para que el
+        consumidor decida item por item qué hacer. A diferencia de `solicitar_cae`, los errores de
+        CABECERA no se atribuyen a cada ítem (el header cubre TODO el lote, no un ítem puntual —
+        atribuirlo a cada uno sería un dato engañoso en un lote con aprobación parcial)."""
+        from .comprobante import armar_fecae_lote
+
+        fecae = armar_fecae_lote(comprobantes, numero_desde)
+        client = self._client()
+        resp = self._soap(
+            "FECAESolicitar",
+            client.service.FECAESolicitar,
+            Auth=self._auth(),
+            FeCAEReq=fecae,
         )
+
+        det_resp = getattr(resp, "FeDetResp", None)
+        detalles = (
+            getattr(det_resp, "FECAEDetResponse", None) if det_resp is not None else None
+        )
+        if not detalles:
+            _check_errors(resp, "FECAESolicitar")
+            raise ArcaResponseError(
+                "FECAESolicitar (lote): AFIP no devolvió FeDetResp/FECAEDetResponse ni "
+                "Errors — respuesta inesperada, no se puede determinar el resultado.",
+                raw=str(resp),
+            )
+
+        return [self._parse_det_resp(d) for d in detalles]
 
     # ------------------------------------------------------------------
     # QUERIES (FEParamGet* — catálogos/validaciones, sin efecto en AFIP)
@@ -404,7 +480,15 @@ class WsfeClient:
 # ---------------------------------------------------------------------------
 
 
-def _parse_fecha(s: Any) -> Optional[date]:
+def parse_fecha_arca(s: Any) -> Optional[date]:
+    """Parsea una fecha en el formato que devuelve WSFEv1 (`YYYYMMDD` sin separadores, ej.
+    `CAEFchVto`/`CbteFch`) o ISO (`YYYY-MM-DD`) — pública porque un adapter que reconstruye datos
+    de una respuesta cruda de ARCA (ej. al recuperar un comprobante por idempotencia) necesita el
+    mismo parseo, no debería reimplementarlo ni importar un símbolo privado de este módulo.
+
+    `None` si `s` es `None`/vacío (ausente es legítimo, no un error) o si el formato es inesperado
+    (se loguea un warning — una fecha de AFIP con formato raro es señal de que algo cambió del
+    otro lado, pero no amerita romper todo el parseo de la respuesta)."""
     if s is None:
         return None
     raw = str(s).strip()

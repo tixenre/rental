@@ -15,10 +15,17 @@ descubrir recién al pedir el primer CAE que estaba mal.
 from __future__ import annotations
 
 
-def consultar_puntos_venta(nombre_emisor: str, conn) -> list[dict]:
-    """Puntos de venta de `nombre_emisor` habilitados para facturación
-    electrónica: excluye los bloqueados, dados de baja, o que no emiten por
-    CAE (los puntos de venta "manuales"/imprenta no sirven acá).
+def consultar_puntos_venta(nombre_emisor: str, conn) -> dict:
+    """Puntos de venta de `nombre_emisor`, separados en habilitados para
+    facturación electrónica y excluidos (con motivo).
+
+    Devuelve `{"habilitados": [{"nro": ...}], "excluidos": [{"nro": ...,
+    "motivo": "bloqueado" | "dado_de_baja" | "no_electronico"}]}`. Antes esto
+    descartaba los no-habilitados en silencio — si ARCA devolvía puntos pero
+    todos bloqueados, se veía el mismo "no hay nada" que si ARCA no tenía
+    NINGÚN punto creado; son causas distintas (desbloquear vs. crear uno
+    nuevo), así que el motivo de cada exclusión se preserva para que el
+    front pueda mostrarlo en vez de un mensaje genérico.
 
     Raises:
         ValueError: emisor no encontrado/inactivo/sin cert (mapea a 400).
@@ -34,8 +41,16 @@ def consultar_puntos_venta(nombre_emisor: str, conn) -> list[dict]:
     wsfe = WsfeClient(endpoint=cred.endpoint_wsfe, cuit=cred.cuit, token=token, sign=sign)
     puntos = wsfe.param_puntos_venta()
 
-    return [
-        {"nro": p["Nro"]}
-        for p in puntos
-        if p.get("EmisionTipo") == "CAE" and p.get("Bloqueado") != "S" and not p.get("FchBaja")
-    ]
+    habilitados = []
+    excluidos = []
+    for p in puntos:
+        if p.get("Bloqueado") == "S":
+            excluidos.append({"nro": p["Nro"], "motivo": "bloqueado"})
+        elif p.get("FchBaja"):
+            excluidos.append({"nro": p["Nro"], "motivo": "dado_de_baja"})
+        elif p.get("EmisionTipo") != "CAE":
+            excluidos.append({"nro": p["Nro"], "motivo": "no_electronico"})
+        else:
+            habilitados.append({"nro": p["Nro"]})
+
+    return {"habilitados": habilitados, "excluidos": excluidos}

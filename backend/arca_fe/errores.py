@@ -5,7 +5,7 @@ para que quien use la librería pueda `except ArcaError` y atrapar cualquier
 falla del motor — y discriminar por subtipo cuando le importa el porqué:
 
     try:
-        cae = client.solicitar_cae(fecae)
+        cae = client.solicitar_cae(comprobante, numero)
     except ArcaBusinessError as e:   # AFIP rechazó por regla de negocio
         for codigo, msg in e.errores: ...
     except ArcaAuthError:            # cert/relación/WSAA

@@ -82,6 +82,33 @@ real falle si otra reserva se concretó entre el check y la creación. Esto es
 comportamiento normal de un sistema de reservas concurrente; el gate real
 (`create_pedido_retry`) maneja la race condition con advisory lock + retry → 503.
 
+## Robustez: cada check corre aislado (`_run_check`)
+
+Con 10 checks corriendo en secuencia, un bug INESPERADO dentro de uno (no la
+falla de negocio que el check ya modela con su propio `_falta` — eso retorna
+normal) no debe tirar abajo a los que faltan correr. `_run_check` envuelve
+cada llamada:
+
+- Si `fn` levanta cualquier excepción no anticipada, se loguea
+  (`logger.exception`) con el **nombre del check + cliente_id + session_id**
+  — el contexto para diagnosticar sin tener que reproducir el request.
+- Se agrega un `_falta(nombre, "No pudimos validar esto — reintentá en unos
+  segundos.")` — **fail-closed**: bloquea el checkout, nunca deja pasar en
+  silencio.
+- Los checks siguientes en la secuencia **siguen corriendo** — la garantía
+  fail-not-fast se mantiene incluso ante una falla inesperada, no solo ante
+  faltantes de negocio.
+
+La lectura del carrito (`_leer_carrito` + parseo de `items_json`) tiene la
+misma protección: un carrito con JSON corrupto no tira un 500 crudo, se
+trata como "carrito en mal estado" (check `carrito`).
+
+**Red residual en el route** (`routes/checkout.py::checkout_validar`): si algo
+escapa a `_run_check` (ej. un bug en el propio `validar_checkout`, fuera de
+los checks), el route atrapa cualquier excepción, loguea con el mismo
+contexto, y devuelve **503** ("No pudimos validar tu pedido. Reintentá en
+unos segundos.") — nunca un 500 con detalle interno de Postgres/Python.
+
 ## T&C: versionado
 
 La versión actual vive en `TYC_VERSION_ACTUAL = "v1"` (`services/checkout/tyc.py`).
@@ -119,6 +146,22 @@ el portero pero siempre retornan OK. Para activarlos:
 
 Los comentarios `TODO (#NNNN)` marcan exactamente dónde.
 
+## Preview del contrato (antes de crear el pedido)
+
+`POST /api/checkout/contrato-preview` (`routes/checkout.py::checkout_contrato_preview`)
+arma un `pedido` equivalente **en memoria** desde el carrito de la sesión (mismo
+`_leer_carrito` que usa el portero + `equipos`/`contenido_de_batch`/`clientes`) y llama
+al **mismo `_contrato_html`** (`pdf_templates.py`) que genera el contrato real de un
+pedido ya creado — no persiste nada, no crea el pedido. Deja que el cliente **lea el
+contrato antes de confirmar** (sienta base para la firma digital de #1098 Fase 5).
+
+El HTML vuelve marcado como **SIMULACIÓN** (`_marcar_como_simulacion`: banner fijo +
+marca de agua diagonal) — el documento definitivo recién existe cuando el pedido se
+confirma (queda en el portal del cliente + se manda por mail). El front (`lib/checkout.ts
+::obtenerContratoPreviewHtml` + `components/rental/ContratoPreviewModal.tsx`) lo muestra
+en un iframe sandboxed dentro de un modal, sin salir del checkout (mismo patrón que
+`FacturacionModal`/`TerminosModal`).
+
 ## Archivos clave
 
 ```
@@ -127,7 +170,10 @@ backend/services/checkout/
 ├── validar.py           — el portero (validar_checkout + 10 checks)
 └── tyc.py               — T&C (TYC_VERSION_ACTUAL, ya_acepto, registrar_aceptacion)
 
-backend/tests/test_checkout_portero.py   — 30 candados unitarios (sin DB real)
+backend/routes/checkout.py                     — validar / aceptar-tyc / contrato-preview
+backend/tests/test_checkout_portero.py         — candados unitarios (sin DB real)
+backend/tests/test_checkout_route_robustez.py  — candado del 503 limpio a nivel HTTP
+backend/tests/test_checkout_contrato_preview_db.py — candado del preview (Postgres real)
 backend/database/schema.py               — tabla aceptaciones_tyc (init_db)
 backend/migrations/versions/b1a2c3d4e5f6_checkout_aceptaciones_tyc.py
 ```

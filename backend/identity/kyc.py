@@ -5,9 +5,17 @@ CUIL, dirección oficial → columnas `*_renaper`) y el ancla CUIL. Recibe los d
 NORMALIZADOS de `services/didit/` (DatosRenaper, ContactosVerificados); nunca ve el
 payload crudo de Didit. Movido desde `routes/didit.py` (que queda fino).
 
-Idempotente y scopeado al `didit_session_id` (defensa en profundidad anti vendor_data
-forjado, sobre la firma HMAC que ya validó el webhook). Re-verificación: el COALESCE
-deja entrar el dato nuevo de RENAPER (no pisa con NULL, ni con input del usuario).
+Idempotente y scopeado a una sesión que efectivamente pertenece al cliente (defensa en
+profundidad anti vendor_data forjado, sobre la firma HMAC que ya validó el webhook):
+o es el puntero VIGENTE (`clientes.didit_session_id`), o quedó registrada en su
+historial (`kyc_events`) al crearla — nunca una sesión ajena. `aprobar()` acepta
+cualquiera de las dos y MUEVE el puntero a la sesión aprobada si no era la vigente
+(ver `_sesion_conocida_del_cliente`): un cliente que reintentó la verificación
+pisa `didit_session_id` con la sesión nueva, y si Didit aprueba una sesión ANTERIOR
+(el intento que en verdad completó), esa aprobación no se puede perder solo porque
+ya no es "la actual" — quedaba silenciosamente descartada antes de este fix.
+Re-verificación: el COALESCE deja entrar el dato nuevo de RENAPER (no pisa con NULL,
+ni con input del usuario).
 """
 import logging
 
@@ -62,6 +70,29 @@ def _session_coincide(conn, cliente_id, session_id) -> bool:
     return row is not None and row_to_dict(row).get("didit_session_id") == session_id
 
 
+def _sesion_conocida_del_cliente(conn, cliente_id, session_id) -> bool:
+    """Como `_session_coincide`, pero además acepta una sesión que ya NO es el
+    puntero vigente si efectivamente se creó para este cliente (tiene un evento
+    propio en `kyc_events` — se registra al crearla, ver `routes/didit.py`).
+    Usado SOLO por `aprobar`: una aprobación es un hecho consumado de Didit y no
+    se puede perder por un reintento que corrió el puntero; en cambio
+    `actualizar_estado` (rechazado/en_revisión) sigue con el chequeo estricto —
+    no tiene sentido "resucitar" un estado intermedio de una sesión vieja
+    mientras hay una más nueva en curso. Sigue rechazando un `session_id` que
+    nunca se creó para este cliente (anti-forgery de `vendor_data`)."""
+    row = conn.execute(
+        "SELECT didit_session_id FROM clientes WHERE id=%s", (cliente_id,)
+    ).fetchone()
+    if row is None:
+        return False
+    if row_to_dict(row).get("didit_session_id") == session_id:
+        return True
+    return conn.execute(
+        "SELECT 1 FROM kyc_events WHERE cliente_id=%s AND session_id=%s LIMIT 1",
+        (cliente_id, session_id),
+    ).fetchone() is not None
+
+
 def _ya_registrado(conn, session_id, evento) -> bool:
     """Idempotencia: ¿ya procesamos este `evento` para este `session_id`? Didit re-entrega
     el webhook (reintenta ante cualquier no-200) → sin esto, una re-entrega de 'approved'
@@ -79,11 +110,14 @@ def _ya_registrado(conn, session_id, evento) -> bool:
 def aprobar(*, cliente_id, session_id, datos, contactos=None, conn=None) -> bool:
     """Persiste una verificación Didit APROBADA: identidad RENAPER (COALESCE, única
     pluma) + ancla CUIL (validado mod-11) + contactos verificados + evento. Atómico.
-    Devuelve False si el `session_id` no coincide (vendor_data forjado / carrera)."""
+    Mueve `didit_session_id` a `session_id` si un reintento posterior había corrido
+    el puntero (ver `_sesion_conocida_del_cliente`) — la aprobación de Didit gana.
+    Devuelve False si el `session_id` nunca se creó para este cliente (vendor_data
+    forjado / carrera)."""
     own = conn is None
     conn = conn or get_db()
     try:
-        if not _session_coincide(conn, cliente_id, session_id):
+        if not _sesion_conocida_del_cliente(conn, cliente_id, session_id):
             logger.warning("identity: session_id no coincide cliente_id=%s — no se aplica", cliente_id)
             return False
         if _ya_registrado(conn, session_id, "approved"):
@@ -100,6 +134,7 @@ def aprobar(*, cliente_id, session_id, datos, contactos=None, conn=None) -> bool
         with conn.transaction():
             conn.execute(
                 """UPDATE clientes SET
+                       didit_session_id=%s,
                        dni=COALESCE(%s, dni),
                        cuil=COALESCE(%s, cuil),
                        dni_validado_at=%s,
@@ -118,14 +153,14 @@ def aprobar(*, cliente_id, session_id, datos, contactos=None, conn=None) -> bool
                        tipo_documento_renaper=COALESCE(%s, tipo_documento_renaper),
                        estado_civil_renaper=COALESCE(%s, estado_civil_renaper),
                        updated_at=%s
-                   WHERE id=%s AND didit_session_id=%s""",
-                (datos.dni, cuil, ahora,
+                   WHERE id=%s""",
+                (session_id, datos.dni, cuil, ahora,
                  datos.nombre, datos.apellido, datos.nombre_completo,
                  datos.fecha_nacimiento, datos.direccion,
                  datos.genero, datos.nacionalidad, datos.lugar_nacimiento,
                  datos.vencimiento_documento, datos.emision_documento,
                  datos.tipo_documento, datos.estado_civil,
-                 ahora, cliente_id, session_id),
+                 ahora, cliente_id),
             )
             if contactos is not None:
                 guardar_contactos_didit(conn, cliente_id, contactos)

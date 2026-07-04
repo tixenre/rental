@@ -108,9 +108,9 @@ def test_factura_503_si_faltan_datos_de_arca(monkeypatch):
     )
 
     def _raise(*a, **kw):
-        raise RuntimeError("Factura 14 está 'emitida' pero le faltan datos de ARCA (cae)")
+        raise ValueError("ComprobanteFiscal incompleto, faltan: cae")
 
-    monkeypatch.setattr("services.facturacion.pdf.factura_html", _raise)
+    monkeypatch.setattr("services.facturacion.comprobante_render.factura_html", _raise)
 
     with pytest.raises(HTTPException) as ei:
         asyncio.run(documentos_routes.cliente_pedido_factura(422, _fake_request()))
@@ -134,7 +134,7 @@ def test_factura_format_html_devuelve_preview(monkeypatch):
         "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf.factura_html",
+        "services.facturacion.comprobante_render.factura_html",
         lambda factura, pedido, **_: "<html>FACTURA-CLIENTE</html>",
     )
 
@@ -164,7 +164,14 @@ def test_factura_format_pdf_default_devuelve_inline(monkeypatch):
         "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html></html>"
+        "services.facturacion.comprobante_render.factura_html", lambda factura, pedido, **_: "<html></html>"
+    )
+    monkeypatch.setattr(
+        "services.facturacion.signing_cert.get_or_create_signing_cert",
+        lambda conn: (b"cert", b"key"),
+    )
+    monkeypatch.setattr(
+        "arca_fe.asegurar_pdf", lambda pdf_bytes, cert_pem, key_pem: pdf_bytes
     )
 
     async def _fake_render_pdf(html, **_):
@@ -177,6 +184,84 @@ def test_factura_format_pdf_default_devuelve_inline(monkeypatch):
     assert resp.body == b"%PDF-FAKE%"
     assert "inline" in resp.headers["content-disposition"]
     assert "Factura-C-00002-00000001.pdf" in resp.headers["content-disposition"]
+
+
+def test_factura_pdf_queda_firmada_igual_que_en_el_admin(monkeypatch):
+    """Regresión: a diferencia del canal admin (`descargar_pdf_factura`), el PDF de factura del
+    portal cliente no quedaba firmado/protegido — misma factura, mismo `asegurar_pdf`."""
+    monkeypatch.setattr(
+        "routes.cliente_portal.documentos.require_cliente",
+        lambda request: {"cliente_id": 1},
+    )
+    monkeypatch.setattr(
+        "routes.cliente_portal.documentos.get_db",
+        lambda: _FakeConn(pedido_row={"id": 422}),
+    )
+    monkeypatch.setattr(
+        "services.facturacion.repo.get_factura_principal_emitida",
+        lambda pedido_id, conn: _fake_factura(),
+    )
+    monkeypatch.setattr(
+        "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
+    )
+    monkeypatch.setattr(
+        "services.facturacion.comprobante_render.factura_html", lambda factura, pedido, **_: "<html></html>"
+    )
+    monkeypatch.setattr(
+        "services.facturacion.signing_cert.get_or_create_signing_cert",
+        lambda conn: (b"cert", b"key"),
+    )
+
+    firmado_con = {}
+
+    def _fake_asegurar_pdf(pdf_bytes, cert_pem, key_pem):
+        firmado_con["cert_pem"] = cert_pem
+        firmado_con["key_pem"] = key_pem
+        return b"%PDF-FIRMADO%"
+
+    monkeypatch.setattr("arca_fe.asegurar_pdf", _fake_asegurar_pdf)
+
+    async def _fake_render_pdf(html, **_):
+        return b"%PDF-SIN-FIRMAR%"
+
+    monkeypatch.setattr("routes.cliente_portal.documentos._render_pdf", _fake_render_pdf)
+
+    resp = asyncio.run(documentos_routes.cliente_pedido_factura(422, _fake_request()))
+    assert resp.body == b"%PDF-FIRMADO%"
+    assert firmado_con == {"cert_pem": b"cert", "key_pem": b"key"}
+
+
+def test_factura_format_html_no_pide_certificado(monkeypatch):
+    """El preview HTML no necesita firmar nada — `get_or_create_signing_cert` ni se llama."""
+    monkeypatch.setattr(
+        "routes.cliente_portal.documentos.require_cliente",
+        lambda request: {"cliente_id": 1},
+    )
+    monkeypatch.setattr(
+        "routes.cliente_portal.documentos.get_db",
+        lambda: _FakeConn(pedido_row={"id": 422}),
+    )
+    monkeypatch.setattr(
+        "services.facturacion.repo.get_factura_principal_emitida",
+        lambda pedido_id, conn: _fake_factura(),
+    )
+    monkeypatch.setattr(
+        "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
+    )
+    monkeypatch.setattr(
+        "services.facturacion.comprobante_render.factura_html",
+        lambda factura, pedido, **_: "<html>PREVIEW</html>",
+    )
+
+    def _boom(conn):
+        raise AssertionError("no debería pedir el certificado para un preview HTML")
+
+    monkeypatch.setattr("services.facturacion.signing_cert.get_or_create_signing_cert", _boom)
+
+    resp = asyncio.run(
+        documentos_routes.cliente_pedido_factura(422, _fake_request(), format="html")
+    )
+    assert resp.status_code == 200
 
 
 # ── pedidos_con_factura_emitida (batch, para el listado) ────────────────────

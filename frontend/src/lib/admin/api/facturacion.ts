@@ -26,6 +26,15 @@ export type EstadoFacturacion = {
   catalogos_actualizados_at: string | null;
 };
 
+// Formato de renderizado de una factura — ver `arca_fe.LAYOUTS_INFO`. `advertencia` viene vacía
+// ("") cuando no aplica; se muestra solo para "simplificada".
+export type LayoutFactura = {
+  id: "oficial" | "detallada" | "simplificada";
+  nombre: string;
+  descripcion: string;
+  advertencia: string;
+};
+
 export type FacturaEstado = "pendiente" | "emitida" | "error" | "anulada";
 
 export type Factura = {
@@ -72,6 +81,10 @@ export type PadronResult =
       domicilio: string;
       condicion_iva: string;
       estado_clave: string;
+      tipo_persona: string;
+      categoria_monotributo: string;
+      actividades: string[];
+      impuestos: { id_impuesto: number; descripcion: string; estado: string; periodo: number }[];
     }
   // `motivo` presente = no pudimos ni completar la consulta (WSAA/relación/
   // cert/red) — distinto de "ARCA no tiene datos para este CUIT" (sin motivo).
@@ -97,6 +110,8 @@ export type PreviewFactura = {
 
 export const facturacionApi = {
   getEstado: () => authedJson<EstadoFacturacion>("/api/admin/facturacion/estado"),
+  // Layouts disponibles (nombre/descripción/advertencia) — fuente única, no hardcodear el copy acá.
+  getLayouts: () => authedJson<LayoutFactura[]>("/api/admin/facturacion/layouts"),
 
   // Autocompletar razón social/domicilio/condición IVA desde el padrón ARCA.
   consultarPadron: (cuit: string) =>
@@ -130,8 +145,14 @@ export const facturacionApi = {
   desactivarEmisor: (id: number) =>
     authedJson<void>(`/api/admin/emisores-arca/${id}`, { method: "DELETE" }),
   // Puntos de venta habilitados en ARCA para ESTE emisor (requiere cert cargado).
+  // `excluidos` explica por qué un punto que ARCA sí devolvió no cuenta como
+  // habilitado (bloqueado / dado de baja / no electrónico) — evita el mensaje
+  // genérico "no hay nada" cuando en realidad ARCA tiene puntos, pero ninguno sirve.
   consultarPuntosVenta: (id: number) =>
-    authedJson<{ puntos_venta: { nro: number }[] }>(`/api/admin/emisores-arca/${id}/puntos-venta`),
+    authedJson<{
+      puntos_venta: { nro: number }[];
+      excluidos: { nro: number; motivo: "bloqueado" | "dado_de_baja" | "no_electronico" }[];
+    }>(`/api/admin/emisores-arca/${id}/puntos-venta`),
   // Metadata del cert cargado (subject/serie/vigencia) — para comparar contra
   // el "Computador Fiscal" delegado en el Administrador de Relaciones de ARCA.
   consultarCertInfo: (id: number) =>
@@ -141,6 +162,15 @@ export const facturacionApi = {
       vigente_desde: string;
       vigente_hasta: string;
     }>(`/api/admin/emisores-arca/${id}/cert-info`),
+  // Diagnóstico de configuración: capa local (CUIT/cert/punto de venta) +
+  // capa AFIP (wsfe delegado, punto de venta habilitado, padrón delegado) —
+  // solo pega contra AFIP si la capa local no garantiza ya el fracaso.
+  diagnosticarEmisor: (id: number) =>
+    authedJson<{ chequeos: ChequeoPreview[]; listo: boolean }>(
+      `/api/admin/emisores-arca/${id}/diagnostico`,
+    ),
+  // Guía de trámites de AFIP — fuente única, lee arca_fe/TRAMITES_AFIP.md tal cual.
+  getGuiaAfip: () => authedJson<{ markdown: string }>("/api/admin/emisores-arca/guia"),
 
   // Facturas
   previewFactura: (pedidoId: number) =>
@@ -151,8 +181,11 @@ export const facturacionApi = {
     authedJson<Factura[]>(`/api/alquileres/${pedidoId}/facturas`),
   notaCreditoFactura: (facturaId: number) =>
     authedPostJson<Factura>(`/api/facturas/${facturaId}/nota-credito`, {}),
-  enviarMailFactura: (facturaId: number) =>
-    authedPostJson<{ ok: boolean; to: string }>(`/api/facturas/${facturaId}/enviar-mail`, {}),
+  enviarMailFactura: (facturaId: number, layout?: string) =>
+    authedPostJson<{ ok: boolean; to: string }>(
+      `/api/facturas/${facturaId}/enviar-mail${layout ? `?layout=${layout}` : ""}`,
+      {},
+    ),
   listFacturas: (params?: { emisor?: string; estado?: string; desde?: string; hasta?: string }) => {
     const sp = new URLSearchParams();
     if (params?.emisor) sp.set("emisor", params.emisor);

@@ -177,10 +177,10 @@ def _slug(s: str) -> str:
 # entre el número de pedido y el nombre del cliente para que, en la vista de
 # adjuntos, se distingan de un vistazo (R-0405_Albaran_..., R-0405_Contrato_...).
 _DOC_LABELS = {
-    "presupuesto": "Presupuesto",
-    "albaran": "Albaran",
+    "presupuesto": "Remito",
+    "albaran": "Detalle-de-seguro",
     "contrato": "Contrato",
-    "packing-list": "Packing-list",
+    "packing-list": "Checklist-de-retiro",
 }
 
 
@@ -220,7 +220,7 @@ async def _render_pdf(html: str, *, page_size: tuple[int, int | None] | None = N
     Reutiliza un único proceso Chromium; abre y cierra una page por request.
     Por default exporta A4 (documentos de pedido/reportes). `page_size`
     (width_px, height_px) fuerza un tamaño de página propio en vez de A4 —
-    para piezas que no son A4 (p.ej. la factura "celular", pensada para
+    para piezas que no son A4 (p.ej. la factura "simplificada", pensada para
     compartir por WhatsApp). `height_px=None` mide el alto real del
     contenido (`document.body.scrollHeight`) para que la página termine
     justo donde termina el comprobante, sin cortar ni dejar espacio de más.
@@ -243,6 +243,39 @@ async def _render_pdf(html: str, *, page_size: tuple[int, int | None] | None = N
     finally:
         await page.close()
     return pdf_bytes
+
+
+async def _render_imagen(
+    html: str, *, page_size: tuple[int, int | None] | None = None, formato: str = "png"
+) -> bytes:
+    """Screenshot del HTML (Playwright `page.screenshot`) — misma infraestructura que
+    `_render_pdf` (mismo browser compartido), para compartir un layout como imagen en vez de PDF
+    (ej. el layout "simplificada" de una factura, pensado para WhatsApp — una imagen se ve inline
+    en el chat, un PDF aparece como ícono de archivo). Disponible para cualquier layout, no solo
+    "simplificada": mismo contrato de `page_size` que `_render_pdf` — sin especificar, usa el
+    ancho A4 (794px) con el alto real del contenido; con `page_size` (width_px, height_px|None),
+    fuerza ese tamaño (simplificada: 4:5 fijo, mínimo 1080×1350). `formato`: "png" (default, sin
+    pérdida) o "jpeg".
+
+    Es un artefacto de nivel "compartir rápido" (como el preview HTML) — no pasa por
+    `arca_fe.asegurar_pdf` (esa firma es específica de PDF), no reemplaza al documento
+    certificado."""
+    browser = await _get_browser()
+    page = await browser.new_page()
+    try:
+        await page.set_content(html, wait_until="networkidle")
+        if page_size:
+            width_px, height_px = page_size
+            if height_px is None:
+                height_px = await page.evaluate("document.body.scrollHeight")
+        else:
+            width_px = 794
+            height_px = await page.evaluate("document.body.scrollHeight") or 1123
+        await page.set_viewport_size({"width": width_px, "height": height_px})
+        img_bytes = await page.screenshot(type=formato)
+    finally:
+        await page.close()
+    return img_bytes
 
 
 # ── Reporte de liquidación (#88) ──────────────────────────────────────────────
@@ -381,6 +414,20 @@ def _liquidacion_html(data: dict, titulo: str, stats: dict | None = None) -> str
             filas = ('<tr><td colspan="3" class="rep-empty-cell">'
                      'Sin equipos con ingreso en el período.</td></tr>')
 
+        # Pedidos/rentals (2026-07-04): mismo total, visto por pedido en vez de
+        # por equipo — # de pedido, cliente, fecha de saldado, monto.
+        filas_pedidos = ""
+        for p in d.get("pedidos_detalle", []):
+            filas_pedidos += (
+                f'<tr><td class="mono">#{esc(p.get("numero_pedido", ""))}</td>'
+                f'<td>{esc(p.get("cliente", "") or "—")}</td>'
+                f'<td class="c mono">{esc(_fmt_date_short(p.get("fecha")))}</td>'
+                f'<td class="r mono">{fmt(p.get("monto", 0))}</td></tr>'
+            )
+        if not filas_pedidos:
+            filas_pedidos = ('<tr><td colspan="4" class="rep-empty-cell">'
+                              'Sin pedidos con ingreso en el período.</td></tr>')
+
         reparto = d.get("reparto", {}) or {}
         chips = []
         for b, m in reparto.items():
@@ -403,6 +450,9 @@ def _liquidacion_html(data: dict, titulo: str, stats: dict | None = None) -> str
             '<table class="rep-tbl"><thead><tr>'
             '<th>Equipo</th><th class="c">Veces</th><th class="r">Generado</th>'
             f'</tr></thead><tbody>{filas}</tbody></table>'
+            '<table class="rep-tbl rep-tbl--pedidos"><thead><tr>'
+            '<th>Pedido</th><th>Cliente</th><th class="c">Fecha</th><th class="r">Monto</th>'
+            f'</tr></thead><tbody>{filas_pedidos}</tbody></table>'
             f'{reparto_html}</div>'
         )
     if not por_dueno:
@@ -483,7 +533,7 @@ def _resumen_general_html(stats: dict) -> str:
     cards = (
         '<div class="rep-stat-card"><div class="rep-stat-label">Facturado neto</div>'
         f'<div class="rep-stat-num">{fmt(total_ars)}</div>'
-        '<div class="rep-stat-sub">ingreso confirmado</div></div>'
+        '<div class="rep-stat-sub">ingreso finalizado</div></div>'
         '<div class="rep-stat-card"><div class="rep-stat-label">Pedidos</div>'
         f'<div class="rep-stat-num">{total_pedidos}</div>'
         f'<div class="rep-stat-sub">{fmt(promedio)} promedio</div></div>'
@@ -570,8 +620,7 @@ def _resumen_general_html(stats: dict) -> str:
         '<section class="rep-section rep-section--stats">'
         '<div class="rep-sec-head"><h2 class="rep-h2">Resumen general</h2>'
         f'<span class="rep-sec-eyebrow">{periodo_eyebrow}</span></div>'
-        '<p class="rep-sub">Contexto · histórico de pedidos confirmados, '
-        'retirados y finalizados.</p>'
+        '<p class="rep-sub">Contexto · histórico de pedidos finalizados.</p>'
         f'<div class="rep-stat-grid">{cards}</div>'
         '<div class="rep-h3-row"><h3 class="rep-h3">Ingresos por dueño</h3>'
         f'<span class="rep-h3-meta">neto · {fmt(suma_dueno)}</span></div>'
@@ -665,6 +714,8 @@ _REP_CSS = r"""
 .rep-tbl .mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
 .rep-tbl td.r,.rep-tbl td.c{white-space:nowrap}
 .rep-dueno .rep-tbl thead th{padding-top:10px}
+.rep-tbl--pedidos{margin-top:4px}
+.rep-tbl--pedidos thead th{border-top:1px solid var(--hairline);padding-top:14px}
 .rep-cli-tbl{border:1px solid var(--hairline);border-radius:var(--r-lg);overflow:hidden}
 .rep-cli-tbl thead th{padding:10px 16px 8px;background:var(--surface)}
 .rep-rank{color:var(--muted)}

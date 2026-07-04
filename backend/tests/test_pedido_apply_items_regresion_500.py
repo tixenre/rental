@@ -86,12 +86,15 @@ def test_apply_items_preserva_descuento_jornadas(monkeypatch):
     pedido = {
         "id": 1,
         "cliente_id": None,
+        "estado": "presupuesto",
         "fecha_desde": "2026-06-01T10:00:00",
         "fecha_hasta": "2026-06-08T10:00:00",  # 7 jornadas
         "descuento_pct": 0,
         "descuento_jornadas_pct": 10.0,
+        "descuento_cliente_pct": 0,
         "descuento_manual_tipo": "pct",
         "descuento_manual_monto": 0,
+        "descuento_manual_activo": False,
     }
     # Descuentos por jornadas: a 7 jornadas → 10%.
     puntos = [(1, 0.0), (7, 10.0)]

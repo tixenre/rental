@@ -1,0 +1,43 @@
+[project]
+name = "arca-fe"
+version = "0.0.0"
+description = "Motor portable de facturación electrónica ARCA (ex-AFIP) — WSFEv1 + WSAA + padrón, sin dependencias de ningún framework."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Proprietary" }
+
+# Sincronizado a mano con `arca_fe.__version__` — `arca_fe/tests/test_portabilidad.py`
+# verifica que coincidan (no hay build tooling que lo haga automático todavía).
+dependencies = [
+    "zeep>=4.2.1",
+    "requests",
+    "httpx",
+    "cryptography",
+    "pyhanko",
+    "pyhanko-certvalidator",
+    "asn1crypto",
+]
+
+# `segno` (renderizar el QR fiscal como SVG, `arca_fe.qr._build_qr_svg`) es un import
+# LAZY — solo hace falta si se usa esa función puntual, no para el resto de la librería.
+[project.optional-dependencies]
+qr = ["segno>=1.5.0"]
+
+# Sin build-backend real todavía (no se publica a un índice) — esta metadata alcanza
+# para `pip install -e backend/arca_fe` el día que un segundo consumidor lo necesite.
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+# Este `pyproject.toml` vive DENTRO del paquete (`backend/arca_fe/`), no en un
+# directorio padre — `where=[".."]` le dice a setuptools que busque el paquete
+# `arca_fe` un nivel arriba (en `backend/`), filtrado por `include` para no
+# levantar ningún otro paquete del monorepo que viva ahí al lado.
+[tool.setuptools.packages.find]
+where = [".."]
+include = ["arca_fe*"]
+
+# El logo oficial de ARCA (agnóstico de marca, usado por `arca_fe.render`) — asset propio
+# del paquete, empaquetado como cualquier ícono de una librería instalable.
+[tool.setuptools.package-data]
+arca_fe = ["assets/*.svg"]

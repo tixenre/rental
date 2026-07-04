@@ -39,10 +39,10 @@ _DOC_NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 
 # Documentos del pedido y su etiqueta legible (para la UI de envío por mail).
 DOCUMENTOS = {
-    "pdf": "Cotización",
-    "albaran": "Remito / Albarán",
+    "pdf": "Remito",
+    "albaran": "Detalle de seguro",
     "contrato": "Contrato",
-    "packing-list": "Packing list",
+    "packing-list": "Checklist de retiro",
 }
 
 

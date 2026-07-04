@@ -15,6 +15,9 @@ from itsdangerous import BadSignature, SignatureExpired
 
 from database import get_db, row_to_dict
 from auth.session import signer, _make_session_response
+from identity import nombre_validado, direccion_validada
+from identity.anchor import cuil_valido
+from identity.contacts import email_comunicacion, telefono_contacto
 from services.precios import es_responsable_inscripto
 from rate_limit import limiter
 from routes.cliente_portal.core import router, require_cliente, cliente_verificado
@@ -198,7 +201,69 @@ def cliente_me(request: Request):
         ).fetchone()
         if not row:
             raise HTTPException(404, "Cliente no encontrado")
-        return row_to_dict(row)
+        d = row_to_dict(row)
+        # Vista resuelta para DISPLAY (checkout/portal/donde haga falta mostrar
+        # "quién es" sin reimplementar la regla): mismo criterio que ya usan
+        # contrato/remito — RENAPER si está verificado, si no el dato base
+        # (`nombre_validado`/`direccion_validada`, identity/__init__.py) — y el
+        # contacto CANÓNICO (`email_comunicacion`/`telefono_contacto`,
+        # identity/contacts.py: el teléfono verificado por Didit puede diferir
+        # del autodeclarado). Los campos base de arriba siguen intactos para
+        # los forms de edición (Contacto/Facturación) — esto es aditivo.
+        d["nombre_legal"] = nombre_validado(d) or f"{d.get('nombre', '')} {d.get('apellido', '')}".strip()
+        d["direccion_legal"] = direccion_validada(d) or d.get("direccion")
+        d["email_comunicacion"] = email_comunicacion(conn, cliente_id)
+        d["telefono_contacto"] = telefono_contacto(conn, cliente_id)
+        return d
+
+
+class VerificarCuitIn(BaseModel):
+    # Default "" (no obligatorio a nivel Pydantic) para que el candado de
+    # guard (`test_endpoint_cliente_rechaza_sesion_no_cliente`, body {}) llegue
+    # a `require_cliente` — la validación real del CUIT es la de abajo.
+    cuit: str = ""
+
+
+@router.post("/api/cliente/facturacion/verificar-cuit")
+@limiter.limit("10/minute")
+def cliente_verificar_cuit(data: VerificarCuitIn, request: Request):
+    """Verifica el CUIT del cliente contra el padrón de ARCA — mismo criterio
+    que ya usa `emitir_factura` al facturar de verdad (`verificar_y_actualizar_
+    receptor`), pero disparado ACÁ, como Didit con RENAPER: el cliente solo
+    tipea el CUIT, ARCA confirma condición IVA/razón social/domicilio, y esos
+    datos (+ el propio CUIT, ya confirmado) quedan PERSISTIDOS en la cuenta al
+    toque — no hace falta que el cliente los autocomplete a mano (ARCA los
+    corrige igual al momento de facturar, así que pedírselos dos veces es
+    trabajo redundante).
+
+    Best-effort a nivel HTTP (siempre 200, mismo patrón que `/admin/arca/
+    padron/{cuit}`): si ARCA no puede confirmarlo, no se persiste nada — el
+    front cae al formulario editable a mano de siempre."""
+    session = require_cliente(request)
+    cliente_id = session["cliente_id"]
+    cuit = data.cuit.strip()
+    if not cuil_valido(cuit):
+        raise HTTPException(400, "CUIT/CUIL inválido — verificá el número.")
+
+    from services.facturacion.padron import verificar_y_actualizar_receptor
+    with get_db() as conn:
+        try:
+            persona = verificar_y_actualizar_receptor(cuit, cliente_id, conn)
+        except RuntimeError as e:
+            return {"encontrado": False, "motivo": str(e)}
+        # El CUIT en sí no lo toca `verificar_y_actualizar_receptor` (ahí es
+        # el INPUT/receptor, no algo a corregir) — acá SÍ es el dato nuevo que
+        # el cliente acaba de confirmar contra ARCA.
+        conn.execute("UPDATE clientes SET cuit = %s WHERE id = %s", (cuit, cliente_id))
+        conn.commit()
+
+    return {
+        "encontrado": True,
+        "cuit": cuit,
+        "perfil_impuestos": persona.condicion_iva,
+        "razon_social": persona.razon_social,
+        "domicilio_fiscal": persona.domicilio,
+    }
 
 
 class PerfilUpdate(BaseModel):
@@ -219,10 +284,16 @@ class PerfilUpdate(BaseModel):
 def cliente_update_me(data: PerfilUpdate, request: Request):
     """Permite al cliente actualizar sus datos personales.
 
-    Tras verificar identidad (dni_validado_at IS NOT NULL) solo `telefono` y
-    `apodo` son editables — el resto queda bloqueado (los datos legales los
-    certifica RENAPER). NO se permite cambiar email (clave de identidad OAuth)
-    ni descuento.
+    Tras verificar identidad (dni_validado_at IS NOT NULL), `nombre`/`apellido`/
+    `direccion` quedan bloqueados — son los datos que certifica RENAPER, y el
+    portal los muestra en modo lectura desde `*_renaper` una vez verificado.
+    Los datos FISCALES (perfil_impuestos/cuit/razon_social/domicilio_fiscal/
+    email_facturacion) NO se bloquean — son de facturación, no de identidad
+    (el `cuit` de la factura puede diferir del `cuil` verificado por RENAPER,
+    ver el hint del form en ClientePortalHelpers.tsx), y el cliente tiene que
+    poder actualizarlos siempre (ej. desde `FacturacionModal` en el checkout).
+    `telefono`/`apodo` tampoco se bloquean nunca. NO se permite cambiar email
+    (clave de identidad OAuth) ni descuento.
     """
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
@@ -230,9 +301,8 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
     with get_db() as conn:
         verificado = cliente_verificado(conn, cliente_id)
 
-    # Campos bloqueados post-verificación (datos que certifica RENAPER).
-    _BLOQUEADOS = ("nombre", "apellido", "direccion", "cuit",
-                   "perfil_impuestos", "razon_social", "domicilio_fiscal", "email_facturacion")
+    # Campos bloqueados post-verificación: solo los que certifica RENAPER.
+    _BLOQUEADOS = ("nombre", "apellido", "direccion")
     if verificado:
         for campo in _BLOQUEADOS:
             if getattr(data, campo, None) is not None:
@@ -255,7 +325,15 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
     if data.direccion is not None:
         sets.append("direccion = %s"); vals.append(data.direccion.strip())
     if data.cuit is not None:
-        sets.append("cuit = %s"); vals.append(data.cuit.strip() or None)
+        cuit_in = data.cuit.strip()
+        # Mismo dígito verificador (mod-11) que ancla el CUIL de identidad
+        # (identity/anchor.py) — el CUIT de facturación es un número distinto,
+        # pero el checksum de 11 dígitos es el mismo algoritmo en Argentina.
+        # No se normaliza el string guardado (se acepta con guiones/espacios,
+        # como ya lo tolera `comprobante_pedido.py` al leerlo para ARCA).
+        if cuit_in and not cuil_valido(cuit_in):
+            raise HTTPException(400, "CUIT/CUIL inválido — verificá el número.")
+        sets.append("cuit = %s"); vals.append(cuit_in or None)
     if data.apodo is not None:
         sets.append("apodo = %s"); vals.append(data.apodo.strip() or None)
     if data.perfil_impuestos is not None:

@@ -33,7 +33,11 @@ from .errores import ArcaAuthError, ArcaNetworkError, ArcaResponseError
 
 _logger = logging.getLogger(__name__)
 
-_WSAA_SERVICE = "wsfe"
+WSFE_WSAA_SERVICIO = "wsfe"
+"""El `servicio` WSAA para facturación (WSFEv1) — pasalo a `construir_tra`/`login_con_cert` en vez
+de hardcodear `"wsfe"` a mano (mismo motivo que `arca_fe.padron.WSAA_SERVICIO`: un id de servicio
+mal escrito rompe la autenticación en silencio contra AFIP, no da un error claro)."""
+
 _TRA_TTL_SECONDS = 12 * 3600  # 12 h — AFIP rechaza expirationTime > 24 h
 
 
@@ -43,15 +47,22 @@ _TRA_TTL_SECONDS = 12 * 3600  # 12 h — AFIP rechaza expirationTime > 24 h
 
 
 def construir_tra(
-    servicio: str = _WSAA_SERVICE,
+    servicio: str = WSFE_WSAA_SERVICIO,
     *,
     ahora: Optional[datetime] = None,
     ttl: int = _TRA_TTL_SECONDS,
 ) -> bytes:
-    """Construye el XML del TRA (LoginTicketRequest).
+    """Construye el XML del TRA (LoginTicketRequest) — el pedido de autenticación que después
+    firma `firmar_tra` y envía `login`/`login_con_cert` al WSAA.
 
-    `ahora` es la hora UTC de generación (inyectable para tests). Por defecto = now(UTC).
-    """
+    `servicio`: el WSAA_SERVICIO a autenticar (ej. `"wsfe"` para facturación,
+    `"ws_sr_constancia_inscripcion"` para el padrón — `arca_fe.padron.WSAA_SERVICIO`) — CADA
+    servicio necesita su propio TA, no son intercambiables.
+    `ahora`: hora UTC de generación (inyectable para tests). Por defecto = now(UTC).
+    `ttl`: segundos de vigencia del TRA (no del TA que WSAA devuelve — eso lo decide AFIP,
+    típicamente ~12hs) antes de que expire el REQUEST mismo si no se usa.
+
+    Devuelve el XML como bytes UTF-8, listo para `firmar_tra`."""
     if ahora is None:
         ahora = datetime.now(timezone.utc)
 
@@ -156,12 +167,20 @@ def login(
     *,
     timeout: float = 30.0,
 ) -> tuple[str, str, datetime]:
-    """POST al WSAA con el CMS firmado, devuelve (token, sign, expira_at UTC).
+    """POST al WSAA con el CMS firmado (operación `loginCms`), devuelve `(token, sign, expira_at)`
+    — `expira_at` en UTC, la vigencia real del TA que decide AFIP (típicamente ~12hs; el caller
+    es responsable de cachear y renovar antes de que venza, ver `wsaa_cache.get_ta` del adapter
+    de Rambla para un ejemplo).
 
     `tra_cms` puede ser:
-    - bytes DER del CMS (firma cruda) → se codifica en base64 internamente.
-    - bytes ya en base64 (ASCII) → se usa directamente.
-    """
+    - bytes DER del CMS (firma cruda, lo que devuelve `firmar_tra`) → se codifica en base64
+      internamente.
+    - bytes ya en base64 (ASCII) → se usa directamente, sin doble-codificar.
+    `endpoint`: URL del servicio WSAA (homologación o producción — ya resuelta por el caller).
+    `timeout`: segundos para la llamada HTTP (default 30.0).
+
+    Levanta `ArcaNetworkError` si el WSAA no responde o devuelve un status HTTP de error;
+    `ArcaResponseError` si la respuesta no trae `token`/`sign` en la forma esperada."""
     if _parece_base64(tra_cms):
         cms_b64 = tra_cms.decode("ascii")
     else:
@@ -218,9 +237,20 @@ def login_con_cert(
     timeout: float = 30.0,
     key_password: Optional[bytes] = None,
 ) -> tuple[str, str, datetime]:
-    """Helper de alto nivel: construye TRA, firma y llama a `login`.
+    """Helper de alto nivel: construye el TRA (`construir_tra`), lo firma (`firmar_tra`) y llama
+    a `login` — el atajo habitual para autenticar contra un servicio en un solo llamado, en vez
+    de encadenar las 3 funciones a mano.
 
-    `key_password`: passphrase de la clave privada (None si no está cifrada)."""
+    `servicio`: el WSAA_SERVICIO a autenticar (ver `construir_tra`).
+    `cert_pem`/`key_pem`: certificado y clave privada del emisor, en PEM.
+    `endpoint`: URL del servicio WSAA (homologación o producción).
+    `ahora`: hora UTC de generación del TRA (inyectable para tests; ver `construir_tra`).
+    `timeout`: segundos para la llamada HTTP (default 30.0).
+    `key_password`: passphrase de la clave privada (`None` si no está cifrada).
+
+    Devuelve `(token, sign, expira_at)` — mismo contrato que `login`. Levanta `ArcaAuthError`
+    (cert/clave inválidos, ver `firmar_tra`), `ArcaNetworkError` o `ArcaResponseError` (ver
+    `login`)."""
     tra = construir_tra(servicio, ahora=ahora)
     der = firmar_tra(tra, cert_pem, key_pem, key_password=key_password)
     return login(der, endpoint, timeout=timeout)

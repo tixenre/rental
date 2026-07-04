@@ -45,6 +45,12 @@ class Factura:
     fecha_emision: Optional[datetime]
     created_at: datetime
     created_by: Optional[str]
+    # Domicilio del receptor, congelado al emitir — a diferencia de
+    # razón_social/CUIT (arriba, ya se congelaban desde siempre), este es
+    # NUEVO (ver migración d4e6f8a2b1c3): las facturas emitidas antes quedan
+    # con NULL acá, así que va al final CON DEFAULT para no romper ninguna
+    # construcción existente de `Factura(...)` en tests/callers.
+    domicilio: Optional[str] = None
 
 
 def _row_to_factura(row: dict) -> Factura:
@@ -68,6 +74,7 @@ def _row_to_factura(row: dict) -> Factura:
         moneda=row["moneda"],
         cliente_cuit=row["cliente_cuit"],
         razon_social=row["razon_social"],
+        domicilio=row["domicilio"],
         qr_payload=row["qr_payload"],
         pdf_key=row["pdf_key"],
         estado=row["estado"],
@@ -201,23 +208,28 @@ def insert_factura(
     moneda: str = "PES",
     cliente_cuit: Optional[str] = None,
     razon_social: Optional[str] = None,
+    domicilio: Optional[str] = None,
     raw_request: Optional[dict] = None,
     created_by: Optional[str] = None,
 ) -> int:
-    """Inserta una factura en estado 'pendiente'. Devuelve el id."""
+    """Inserta una factura en estado 'pendiente'. Devuelve el id.
+
+    `domicilio`: el del receptor, ya verificado contra el padrón de ARCA al
+    emitir (`engine.py`) — queda FIJO acá (a diferencia de antes, que se leía
+    en vivo de la ficha del cliente en cada reimpresión del PDF)."""
     row = conn.execute(
         """
         INSERT INTO facturas (
             pedido_id, emisor, ambiente, cbte_tipo, pto_vta,
             doc_tipo, doc_nro, condicion_iva_receptor, concepto,
             imp_neto, imp_iva, imp_total, moneda,
-            cliente_cuit, razon_social,
+            cliente_cuit, razon_social, domicilio,
             raw_request, estado, created_by
         ) VALUES (
             %s, %s, %s, %s, %s,
             %s, %s, %s, %s,
             %s, %s, %s, %s,
-            %s, %s,
+            %s, %s, %s,
             %s, 'pendiente', %s
         )
         RETURNING id
@@ -226,7 +238,7 @@ def insert_factura(
             pedido_id, emisor, ambiente, cbte_tipo, pto_vta,
             doc_tipo, doc_nro, condicion_iva_receptor, concepto,
             imp_neto, imp_iva, imp_total, moneda,
-            cliente_cuit, razon_social,
+            cliente_cuit, razon_social, domicilio,
             json.dumps(raw_request) if raw_request else None,
             created_by,
         ),

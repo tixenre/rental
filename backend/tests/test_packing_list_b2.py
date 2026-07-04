@@ -66,7 +66,7 @@ def test_packing_list_html_cabecera():
     pedido = _make_pedido()
     result = _packing_list_html(pedido)
 
-    assert "Packing List" in result
+    assert "Checklist de retiro" in result
     assert "R-0007" in result
     assert "Ana G" in result       # cliente_nombre
     assert "ana@example.com" in result
@@ -121,7 +121,7 @@ def test_packing_list_html_contenido_incluido_json_invalido():
     result = _packing_list_html(pedido)
 
     # Debe seguir generando HTML válido
-    assert "Packing List" in result
+    assert "Checklist de retiro" in result
     assert "FX3" in result
 
 
@@ -131,7 +131,7 @@ def test_packing_list_html_sin_items():
     pedido = _make_pedido(items=[])
     result = _packing_list_html(pedido)
 
-    assert "Packing List" in result
+    assert "Checklist de retiro" in result
     # Tabla vacía pero válida
     assert "<tbody>" in result
 
@@ -171,12 +171,12 @@ def test_pedido_filename_lleva_tipo_de_documento():
     from pdf import _pedido_filename
 
     pedido = _make_pedido()  # numero_pedido=7, cliente_nombre="Ana Gómez"
-    assert _pedido_filename(pedido) == "R-0007_Presupuesto_Ana-Gómez.pdf"
-    assert _pedido_filename(pedido, doc="albaran") == "R-0007_Albaran_Ana-Gómez.pdf"
+    assert _pedido_filename(pedido) == "R-0007_Remito_Ana-Gómez.pdf"
+    assert _pedido_filename(pedido, doc="albaran") == "R-0007_Detalle-de-seguro_Ana-Gómez.pdf"
     assert _pedido_filename(pedido, doc="contrato") == "R-0007_Contrato_Ana-Gómez.pdf"
     assert (
         _pedido_filename(pedido, doc="packing-list")
-        == "R-0007_Packing-list_Ana-Gómez.pdf"
+        == "R-0007_Checklist-de-retiro_Ana-Gómez.pdf"
     )
 
 

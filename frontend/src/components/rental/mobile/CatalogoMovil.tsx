@@ -53,6 +53,7 @@ export function CatalogoMovil() {
       endTime: s.endTime,
       days: s.days,
       clear: s.clear,
+      sessionId: s.sessionId,
     })),
   );
 
@@ -82,8 +83,14 @@ export function CatalogoMovil() {
 
   // Al volver con ?openCarrito=1 (tras login o verificación) reabrimos el carrito
   // mobile; sigue persistido en localStorage por el cart-store. El desktop tiene
-  // su propio handler en index.tsx; este hook cubre el mobile (CartSheet).
-  useRetomarPedido(() => setShowCartSheet(true));
+  // su propio handler en index.tsx; este hook cubre el mobile (CartSheet). Si
+  // además venía `?carritoPaso=resumen` (retorno desde Didit en el paso de
+  // resumen), se lo pasamos al CartSheet para que entre directo ahí.
+  const [cartResumeStep, setCartResumeStep] = useState<"resumen" | undefined>(undefined);
+  useRetomarPedido((paso) => {
+    setShowCartSheet(true);
+    setCartResumeStep(paso);
+  });
 
   const navigate = useNavigate();
 
@@ -540,11 +547,13 @@ export function CatalogoMovil() {
           onOpenDateSheet={() => setShowDateSheet(true)}
           equipos={allEquipos}
           cartItems={cart.items}
+          sessionId={cart.sessionId}
           jornadas={jornadas}
           fechaDesde={fechaDesde}
           fechaHasta={fechaHasta}
           horaDesde={horaDesde}
           horaHasta={horaHasta}
+          resumeStep={cartResumeStep}
         />
       )}
       <BrandSheet
