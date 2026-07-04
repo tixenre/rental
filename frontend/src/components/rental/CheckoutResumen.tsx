@@ -20,7 +20,7 @@ import {
 import { FacturacionModal } from "@/components/rental/FacturacionModal";
 import { TerminosModal } from "@/components/rental/TerminosModal";
 import { ContratoPreviewModal } from "@/components/rental/ContratoPreviewModal";
-import { DOC_LABEL, DOC_DESCRIPTION } from "@/routes/ClientePortalTypes";
+import { DOC_LABEL } from "@/routes/ClientePortalTypes";
 
 /** Los 4 docs disponibles desde "presupuesto" (ver `_documentos_disponibles`
  *  en el backend) — "factura" queda afuera, no existe hasta que se facture. */
@@ -250,7 +250,7 @@ export function CheckoutResumen({
           Volver al pedido
         </button>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           <div className="rounded-lg border hairline bg-surface p-3">
             <div className="mb-1 font-mono text-2xs uppercase tracking-widest text-muted-foreground">
               Fechas
@@ -279,6 +279,9 @@ export function CheckoutResumen({
             </div>
           </div>
 
+          {/* "Tus datos" + "Facturación" en una sola tarjeta (antes 2 — cada
+            borde/padding propio sumaba altura sin aportar separación real:
+            son ambos "tu info para este pedido"). */}
           {clienteNombre && (
             <div className="space-y-0.5 rounded-lg border hairline bg-surface p-3">
               <div className="mb-0.5 font-mono text-2xs uppercase tracking-widest text-muted-foreground">
@@ -294,29 +297,27 @@ export function CheckoutResumen({
               {direccionLegal && (
                 <div className="text-sm text-muted-foreground">{direccionLegal}</div>
               )}
-            </div>
-          )}
 
-          {mostrarFacturacion && perfilImpuestosLive && (
-            <div className="rounded-lg border hairline bg-surface p-3">
-              <div className="mb-1 flex items-center justify-between gap-2">
-                <span className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
-                  Facturación
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setFacturacionOpen(true)}
-                  className="shrink-0 text-2xs text-muted-foreground underline underline-offset-2 hover:text-ink"
-                >
-                  Modificar
-                </button>
-              </div>
-              <div className="text-sm font-semibold text-ink">
-                {PERFIL_IMPUESTOS_LABEL[perfilImpuestosLive]}
-              </div>
-              <div className="mt-0.5 text-xs text-muted-foreground">
-                Te facturamos: {facturaTipoLabel(perfilImpuestosLive)}
-              </div>
+              {mostrarFacturacion && perfilImpuestosLive && (
+                <div className="mt-2 flex items-center justify-between gap-2 border-t hairline pt-2">
+                  <div className="text-sm">
+                    <span className="font-semibold text-ink">
+                      {PERFIL_IMPUESTOS_LABEL[perfilImpuestosLive]}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {facturaTipoLabel(perfilImpuestosLive)}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFacturacionOpen(true)}
+                    className="shrink-0 text-2xs text-muted-foreground underline underline-offset-2 hover:text-ink"
+                  >
+                    Modificar
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -345,69 +346,28 @@ export function CheckoutResumen({
 
           {/* Documentos — qué se va a encontrar en el portal apenas se hace el
             pedido, para que sepa qué esperar (no solo el disclaimer de
-            seguro). El Contrato además se puede LEER ahora mismo: una
-            simulación del pedido en curso, antes de firmar nada (sienta base
-            para la firma digital de #1098 Fase 5). */}
-          <div className="space-y-1.5 rounded-lg border hairline bg-surface p-3">
-            <div className="mb-0.5 font-mono text-2xs uppercase tracking-widest text-muted-foreground">
-              Documentos de tu pedido
+            seguro). Compacto: una línea con los 4 nombres (la descripción de
+            cada uno ya se explica en el portal, donde el cliente los ve de
+            verdad) + "Leer contrato" para la simulación del pedido en curso. */}
+          <div className="space-y-1 rounded-lg border hairline bg-surface p-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
+                Documentos de tu pedido
+              </span>
+              <button
+                type="button"
+                onClick={() => setContratoOpen(true)}
+                className="shrink-0 text-xs text-muted-foreground underline underline-offset-2 hover:text-ink"
+              >
+                Leer contrato
+              </button>
             </div>
-            <ul className="space-y-1.5">
-              {DOCS_CHECKOUT.map((tipo) => (
-                <li key={tipo} className="flex items-start justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">
-                    <span className="font-medium text-ink">{DOC_LABEL[tipo]}</span>
-                    {DOC_DESCRIPTION[tipo] && <> · {DOC_DESCRIPTION[tipo]}</>}
-                  </span>
-                  {tipo === "contrato" && (
-                    <button
-                      type="button"
-                      onClick={() => setContratoOpen(true)}
-                      className="shrink-0 text-xs text-muted-foreground underline underline-offset-2 hover:text-ink"
-                    >
-                      Leer
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-            <p className="pt-0.5 text-2xs text-muted-foreground">
+            <p className="text-sm text-ink">
+              {DOCS_CHECKOUT.map((tipo) => DOC_LABEL[tipo]).join(" · ")}
+            </p>
+            <p className="text-2xs text-muted-foreground">
               Los vas a encontrar en tu portal apenas hagas el pedido.
             </p>
-          </div>
-
-          {/* Total — al final, justo arriba del botón de confirmar (en el
-            footer fijo, inmediatamente debajo de esta tarjeta). */}
-          <div className="space-y-2 rounded-lg border hairline bg-surface p-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">
-                Subtotal · {itemCount} {itemCount === 1 ? "ítem" : "ítems"} · {d}{" "}
-                {d === 1 ? "jornada" : "jornadas"}
-              </span>
-              <span className="tabular">{formatARS(subtotalTotal)}</span>
-            </div>
-            {descuentoPct > 0 && (
-              <div className="flex items-center justify-between text-sm text-verde-ink">
-                <span>
-                  {descuentoLabel(descuentoOrigen, d, clienteNombre)} · {descuentoPct}%
-                </span>
-                <span className="tabular">−{formatARS(descuentoMonto)}</span>
-              </div>
-            )}
-            <div className="flex items-center justify-between border-t hairline pt-2">
-              <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                Total
-              </span>
-              <span className="font-display text-2xl tabular text-ink">
-                {formatARS(totalNeto)}
-                {conIva && (
-                  <span className="ml-1 align-baseline font-sans text-sm text-muted-foreground">
-                    {" "}
-                    + IVA
-                  </span>
-                )}
-              </span>
-            </div>
           </div>
 
           {cargando && (
@@ -484,11 +444,46 @@ export function CheckoutResumen({
         </div>
       </div>
 
-      {/* Footer fijo — mismo criterio que el paso "carrito" (footer sticky con totales). */}
+      {/* Footer fijo — mismo criterio que el paso "carrito" (footer sticky con
+        totales). El Total vive ACÁ (no en una tarjeta más arriba en el
+        scroll): es el dato que más importa para decidir + el botón, así que
+        tiene que verse siempre sin scrollear, sea cual sea la altura de las
+        tarjetas de arriba. */}
       <div
-        className="border-t hairline bg-background px-5 py-4 sm:px-6"
+        className="border-t hairline bg-background px-5 py-3 sm:px-6"
         style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
       >
+        <div className="mb-2.5 space-y-1">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>
+              Subtotal · {itemCount} {itemCount === 1 ? "ítem" : "ítems"} · {d}{" "}
+              {d === 1 ? "jornada" : "jornadas"}
+            </span>
+            <span className="tabular">{formatARS(subtotalTotal)}</span>
+          </div>
+          {descuentoPct > 0 && (
+            <div className="flex items-center justify-between text-xs text-verde-ink">
+              <span>
+                {descuentoLabel(descuentoOrigen, d, clienteNombre)} · {descuentoPct}%
+              </span>
+              <span className="tabular">−{formatARS(descuentoMonto)}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between border-t hairline pt-1.5">
+            <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              Total
+            </span>
+            <span className="font-display text-2xl tabular text-ink">
+              {formatARS(totalNeto)}
+              {conIva && (
+                <span className="ml-1 align-baseline font-sans text-sm text-muted-foreground">
+                  {" "}
+                  + IVA
+                </span>
+              )}
+            </span>
+          </div>
+        </div>
         <Button
           variant="amber"
           size="lg"

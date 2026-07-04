@@ -231,11 +231,18 @@ Tarjetas del resumen, en orden:
 | Tarjeta | Qué muestra | Fuente del dato |
 |---|---|---|
 | **Fechas** | Rango + horario elegido, jornadas, dirección de retiro | Props del caller + `useBusinessContact()` |
-| **Tus datos** | Nombre/email/teléfono/dirección — RENAPER si está verificado, si no el dato base; contacto canónico (Didit-preferido) | `GET /api/cliente/me` → `nombre_legal`/`direccion_legal`/`email_comunicacion`/`telefono_contacto` (resueltos por `identity/__init__.py` + `identity/contacts.py` — el front NO reimplementa la regla RENAPER-si-verificado) |
-| **Facturación** | Perfil fiscal + qué tipo de factura le corresponde (`facturaTipoLabel`), con botón "Modificar" | Estado local `perfilImpuestosLive`, sembrado por prop y actualizado en vivo por `FacturacionModal` |
+| **Tus datos + Facturación** | Nombre/email/teléfono/dirección (RENAPER si está verificado, si no el dato base; contacto canónico Didit-preferido) + perfil fiscal/tipo de factura con botón "Modificar", en una sola tarjeta | `GET /api/cliente/me` (`nombre_legal`/`direccion_legal`/`email_comunicacion`/`telefono_contacto`, resueltos por `identity/__init__.py` + `identity/contacts.py`) + estado local `perfilImpuestosLive`, actualizado en vivo por `FacturacionModal` |
 | **Disclaimer de seguro** | Responsabilidad del cliente por daños/pérdida/robo desde el retiro + link a T&C | Copy estático; el link abre `TerminosModal` |
-| **Documentos de tu pedido** | Los 4 docs disponibles desde "presupuesto" (Remito/Contrato/Detalle de seguro/Checklist de retiro) con descripción breve; "Leer" en Contrato abre `ContratoPreviewModal` | `DOC_LABEL`/`DOC_DESCRIPTION` (`ClientePortalTypes.ts`, fuente única compartida con el portal) |
-| **Total** | Subtotal, descuento (si aplica), total (+ IVA si `conIva`) | Props (`totalNeto`/`conIva`/etc.) — el front NUNCA calcula plata, solo muestra lo que ya vino resuelto de `/api/cotizar` |
+| **Documentos de tu pedido** | Los 4 docs disponibles desde "presupuesto", en una línea (Remito · Contrato · Detalle de seguro · Checklist de retiro) + "Leer contrato" que abre `ContratoPreviewModal` | `DOC_LABEL` (`ClientePortalTypes.ts`, fuente única compartida con el portal) |
+
+**Total y Confirmar viven en el footer fijo, no en una tarjeta del scroll** —
+Subtotal/descuento/Total son el dato que más importa para decidir, así que tienen
+que verse siempre sin scrollear, sea cual sea la altura de las tarjetas de arriba
+(hallazgo de un caso real: con varias tarjetas + un faltante, el Total quedaba
+atrapado en el scroll). "Tus datos"+"Facturación" se fusionaron en una tarjeta
+(antes 2, cada borde/padding propio sumaba altura) y "Documentos" se compactó a una
+línea (antes una descripción por doc) — juntas, estas 3 cosas hacen que el resumen
+"feliz" (sin faltantes) entre casi siempre sin scroll en un viewport normal.
 
 Después de las tarjetas: estados de carga/error, el panel de identidad si falta, y
 cualquier otro faltante (carrito/fechas/stock/precio/contacto/antelación) como alert.
