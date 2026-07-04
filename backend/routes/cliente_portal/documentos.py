@@ -110,11 +110,22 @@ def _doc_response(
     return None  # caller sigue con PDF
 
 
-async def _doc_response_or_pdf(html_str: str, pdf_filename: str, format: str, page_size=None):
+async def _doc_response_or_pdf(
+    html_str: str, pdf_filename: str, format: str, page_size=None, cert_pair=None
+):
+    """`cert_pair` (cert_pem, key_pem) es opcional: solo la factura ARCA lo pasa — los otros 4
+    documentos (remito/contrato/albarán/packing-list) no llevan CAE/QR fiscal y no se firman."""
     preview = _doc_response(html_str, pdf_filename, format)
     if preview is not None:
         return preview
     pdf_bytes = await _render_pdf(html_str, page_size=page_size)
+    if cert_pair is not None:
+        import asyncio
+
+        from arca_fe import asegurar_pdf
+
+        cert_pem, key_pem = cert_pair
+        pdf_bytes = await asyncio.to_thread(asegurar_pdf, pdf_bytes, cert_pem, key_pem)
     from fastapi.responses import Response
     return Response(
         content=pdf_bytes,
@@ -208,15 +219,27 @@ async def cliente_pedido_factura(
             raise HTTPException(404, "Todavía no hay factura para este pedido.")
 
         from services.facturacion.engine import _get_pedido
-        from services.facturacion.pdf import factura_html, factura_filename, page_size_for_layout
+        from services.facturacion.comprobante_render import factura_html, factura_filename
+        from arca_fe.pdf import page_size_for_layout
         pedido_data = _get_pedido(conn, id)
         try:
             html_str = factura_html(factura, pedido_data, layout=layout)
-        except RuntimeError as e:
+        except (ValueError, RuntimeError) as e:
+            # ValueError: ComprobanteFiscal incompleto (falta CAE/número/vencimiento/QR).
+            # RuntimeError: catálogo ARCA nunca refrescado (services.facturacion.catalogos).
             raise HTTPException(503, str(e))
+
+        # A diferencia de remito/contrato/albarán/packing-list (sin CAE/QR fiscal), la factura sí
+        # se firma/protege — mismo tratamiento que el canal admin (`descargar_pdf_factura`), antes
+        # esta asimetría dejaba el PDF del portal cliente sin proteger.
+        cert_pair = None
+        if format != "html":
+            from services.facturacion.pdf_seguridad import get_or_create_signing_cert
+            cert_pair = get_or_create_signing_cert(conn)
 
     return await _doc_response_or_pdf(
         html_str, factura_filename(factura, layout=layout), format,
         page_size=page_size_for_layout(layout),
+        cert_pair=cert_pair,
     )
 

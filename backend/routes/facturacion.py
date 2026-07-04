@@ -533,7 +533,7 @@ def _factura_html_o_404(factura_id: int, conn, layout: str = "celular"):
     vez emitida, así que no hace falta guardar el PDF: regenerar da lo mismo."""
     from services.facturacion.repo import get_by_id
     from services.facturacion.engine import _get_pedido
-    from services.facturacion.pdf import factura_html
+    from services.facturacion.comprobante_render import factura_html
 
     factura = get_by_id(factura_id, conn)
     if factura is None:
@@ -544,7 +544,9 @@ def _factura_html_o_404(factura_id: int, conn, layout: str = "celular"):
     pedido = _get_pedido(conn, factura.pedido_id)
     try:
         html_str = factura_html(factura, pedido, layout=layout)
-    except RuntimeError as e:
+    except (ValueError, RuntimeError) as e:
+        # ValueError: ComprobanteFiscal incompleto (falta CAE/número/vencimiento/QR).
+        # RuntimeError: catálogo ARCA nunca refrescado (services.facturacion.catalogos).
         raise HTTPException(503, str(e))
     return factura, html_str
 
@@ -575,8 +577,9 @@ async def descargar_pdf_factura(
         return HTMLResponse(content=html_str, headers=_DOC_NO_CACHE)
 
     from pdf import _render_pdf
-    from services.facturacion.pdf import factura_filename, page_size_for_layout
-    from services.facturacion.pdf_seguridad import asegurar_pdf
+    from arca_fe import asegurar_pdf
+    from arca_fe.pdf import page_size_for_layout
+    from services.facturacion.comprobante_render import factura_filename
     try:
         pdf_bytes = await _render_pdf(html_str, page_size=page_size_for_layout(layout))
         # asegurar_pdf firma con pyhanko, cuyo sign_pdf sync internamente hace
@@ -607,15 +610,18 @@ async def descargar_pdf_factura(
 # Sin @map_pg_errors: es async y el decorator no le hace `await` a la corrutina
 # (mismo motivo por el que `subir_comprobante`, también async, en contabilidad.py
 # no lo lleva) — no hay escritura propensa a UniqueViolation acá de todos modos.
-async def enviar_mail_factura(factura_id: int, request: Request):
+async def enviar_mail_factura(factura_id: int, request: Request, layout: str = "celular"):
     """Envía el PDF de la factura (renderizado on-demand) al email del cliente del pedido."""
     require_admin(request)
+
+    if layout not in ("clasica", "celular", "formal"):
+        layout = "celular"
 
     from services.email import send_raw_email, Attachment
     from services.facturacion.pdf_seguridad import get_or_create_signing_cert
 
     with get_db() as conn:
-        factura, html_str = _factura_html_o_404(factura_id, conn)
+        factura, html_str = _factura_html_o_404(factura_id, conn, layout=layout)
         cert_pem, key_pem = get_or_create_signing_cert(conn)
 
         # Email del cliente: está en el pedido
@@ -636,18 +642,21 @@ async def enviar_mail_factura(factura_id: int, request: Request):
     nombre_cliente = f"{row['nombre'] or ''} {row['apellido'] or ''}".strip() or email_cliente
 
     from pdf import _render_pdf
-    from services.facturacion.pdf import factura_filename
-    from services.facturacion.pdf_seguridad import asegurar_pdf
+    from arca_fe import asegurar_pdf
+    from arca_fe.pdf import page_size_for_layout
+    from services.facturacion.comprobante_render import factura_filename
     try:
-        pdf_bytes = await _render_pdf(html_str)
+        pdf_bytes = await _render_pdf(html_str, page_size=page_size_for_layout(layout))
         pdf_bytes = await asyncio.to_thread(asegurar_pdf, pdf_bytes, cert_pem, key_pem)
     except Exception as e:
         raise HTTPException(503, f"No se pudo generar el PDF para el mail: {e}")
 
-    cbte_tipo_letra = {1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C"}.get(
-        factura.cbte_tipo, "X"
-    )
-    filename = factura_filename(factura)
+    from arca_fe import letra_comprobante
+    try:
+        cbte_tipo_letra = letra_comprobante(factura.cbte_tipo)
+    except ValueError:
+        cbte_tipo_letra = "X"
+    filename = factura_filename(factura, layout=layout)
 
     nro = f"{factura.pto_vta:05d}-{factura.cbte_nro or 0:08d}"
     subject = f"Tu factura {cbte_tipo_letra} Nº {nro} — Rambla Rental"

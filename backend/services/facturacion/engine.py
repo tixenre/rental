@@ -313,7 +313,11 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
     )
     listo = all(c["ok"] or not c["bloqueante"] for c in chequeos)
 
-    from services.facturacion.pdf import _CBTE_TIPO_LABEL
+    from arca_fe import letra_comprobante
+    try:
+        letra = letra_comprobante(cbte_tipo)
+    except ValueError:
+        letra = "?"
 
     return {
         "ambiente": cred.ambiente,
@@ -331,7 +335,7 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
             or "",
         },
         "comprobante": {
-            "letra": _CBTE_TIPO_LABEL.get(int(cbte_tipo), "?"),
+            "letra": letra,
             "tipo_nro": int(cbte_tipo),
             "numero_a_emitir": numero_a_emitir,
             "pto_vta": emisor_obj.punto_venta,

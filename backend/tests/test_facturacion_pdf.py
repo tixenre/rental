@@ -1,9 +1,10 @@
-"""Tests de services.facturacion.pdf — templates HTML de la factura (3 layouts).
+"""Tests de services.facturacion.comprobante_render — el mapeo Factura+pedido → ComprobanteFiscal
+y su delegación a arca_fe. Sin red, sin Playwright.
 
-Sin red, sin Playwright: solo la construcción del contexto (`_build_ctx`) y el
-HTML resultante. Cubre la regresión de la NC en celular/formal (el banner de
-tipo de documento estaba hardcodeado a "Factura electrónica" en los dos,
-incluso para una Nota de Crédito).
+El contenido/HTML de los 3 layouts (clásica/celular/formal) ya está cubierto en
+`arca_fe/tests/test_pdf.py` (construyendo `ComprobanteFiscal` directo) — acá solo se prueba lo que
+es responsabilidad de ESTE adapter: resolver el emisor (`emisores_arca`), los catálogos ARCA
+(`services.facturacion.catalogos`), el nombre de archivo, y la propagación de errores (fail-fast).
 """
 from __future__ import annotations
 
@@ -12,17 +13,18 @@ from datetime import date
 
 import pytest
 
-from services.facturacion.pdf import factura_filename, factura_html, page_size_for_layout
+from services.facturacion.comprobante_render import (
+    CONCEPTO_MARCA,
+    factura_filename,
+    factura_html,
+)
 from services.facturacion.repo import Factura
 
 pytestmark = pytest.mark.unit
 
 
-# ── Catálogos ARCA (doc_tipo/concepto/condición IVA receptor): en tests se
-# simula que YA se corrió "Actualizar catálogos ARCA" (ver
-# services.facturacion.catalogos) con los valores reales vigentes — no se
-# vuelve a escribir la traducción a mano acá, es el mismo texto que devuelve
-# el catálogo real de ARCA, solo que servido desde un fake en vez de Postgres.
+# ── Catálogos ARCA (doc_tipo/concepto/condición IVA receptor): en tests se simula que YA se corrió
+# "Actualizar catálogos ARCA" (ver services.facturacion.catalogos) con los valores reales vigentes.
 _CATALOGOS_SEED = {
     "arca_catalogo_doc_tipo": [
         {"id": 80, "desc": "CUIT"}, {"id": 86, "desc": "CUIL"},
@@ -40,9 +42,8 @@ _CATALOGOS_SEED = {
 
 
 class _FakeCatalogConn:
-    """Fake de `database.get_db()` — solo entiende el SELECT de `app_settings`
-    que usan los catálogos (`_emisor_row` se mockea aparte, por test, cuando
-    hace falta)."""
+    """Fake de `database.get_db()` — solo entiende el SELECT de `app_settings` que usan los
+    catálogos (`_emisor_row` se mockea aparte, por test, cuando hace falta)."""
 
     def execute(self, sql, params=None):
         key = params[0] if params else None
@@ -90,14 +91,14 @@ def _pedido(**overrides) -> dict:
     return base
 
 
-# ── Datos legales del emisor: SIEMPRE de la DB, nunca hardcodeados por nombre
-# (bug real: un emisor nuevo que no fuera "pablo"/"santini" heredaba en
-# silencio la condición IVA / domicilio / IIBB de Santini) ──────────────────
+# ── Datos legales del emisor: SIEMPRE de la DB, nunca hardcodeados por nombre (bug real: un
+# emisor nuevo que no fuera "pablo"/"santini" heredaba en silencio la condición IVA / domicilio /
+# IIBB de Santini) ────────────────────────────────────────────────────────────
 
 
 def test_emisor_desconocido_usa_sus_propios_datos_no_los_de_otro(monkeypatch):
     monkeypatch.setattr(
-        "services.facturacion.pdf._emisor_row",
+        "services.facturacion.comprobante_render._emisor_row",
         lambda nombre: {
             "razon_social": "Empresa XYZ SRL",
             "cuit": "30-71234567-8",
@@ -120,10 +121,18 @@ def test_emisor_desconocido_usa_sus_propios_datos_no_los_de_otro(monkeypatch):
 
 
 def test_emisor_sin_domicilio_configurado_muestra_guion_no_hueco():
-    """`domicilio` siempre se muestra (a diferencia de iibb/inicio, que se
-    omiten) — sin configurar cae a "—", nunca a un renglón vacío."""
+    """`domicilio` siempre se muestra (a diferencia de iibb/inicio, que se omiten) — sin
+    configurar cae a "—", nunca a un renglón vacío."""
     html = factura_html(_factura(emisor="sin_configurar"), _pedido(), layout="clasica")
     assert "Domicilio Comercial:</span> —" in html
+
+
+def test_emisor_no_configurado_en_absoluto_no_rompe_muestra_guion():
+    """Emisor que ni siquiera tiene fila en `emisores_arca` (renombrado/borrado después de
+    facturar) — el render tiene que degradar a "—", no romper (regresión del bug de diseño donde
+    `ComprobanteFiscal.emisor` exigía un CUIT ya validado)."""
+    html = factura_html(_factura(emisor="no-existe-en-la-base"), _pedido(), layout="clasica")
+    assert "CUIT:</span> —" in html
 
 
 # ── factura_filename ─────────────────────────────────────────────────────────
@@ -145,7 +154,8 @@ def test_filename_nc_usa_prefijo_nc():
     assert factura_filename(f) == "NC-C-00002-00000001.pdf"
 
 
-# ── factura_html: smoke test de los 3 layouts ───────────────────────────────
+# ── factura_html: smoke test de los 3 layouts (el HTML detallado ya está cubierto en
+# arca_fe/tests/test_pdf.py) ─────────────────────────────────────────────────
 
 
 @pytest.mark.parametrize("layout", ["clasica", "celular", "formal"])
@@ -162,131 +172,6 @@ def test_layout_desconocido_cae_al_default_de_rambla_celular():
     assert html == html_celular
 
 
-def test_page_size_solo_celular_tiene_tamano_propio_4x5_fijo():
-    assert page_size_for_layout("clasica") is None
-    assert page_size_for_layout("formal") is None
-    # 688 = 640 tarjeta + 24×2 margen; 860 = 688 × 5/4 (proporción 4:5 fija,
-    # identidad visual — no varía con la cantidad de conceptos).
-    assert page_size_for_layout("celular") == (688, 860)
-
-
-# ── Regresión: NC en celular/formal tiene que decir "Nota de crédito" ───────
-# (estaba hardcodeado a "Factura electrónica" en los dos, sin importar es_nc).
-# La celular (rediseño 2026-07-02) rotula "FACTURA"/"NOTA DE CRÉDITO" en vez de
-# "Factura electrónica · Original" — la formal conserva el rótulo viejo.
-
-
-@pytest.mark.parametrize("layout", ["celular", "formal"])
-def test_nc_en_celular_y_formal_dice_nota_de_credito(layout):
-    nc = _factura(cbte_tipo=13, nota_credito_de=1)  # NOTA_CREDITO_C
-    html = factura_html(nc, _pedido(), layout=layout).lower()
-    assert "nota de crédito" in html
-    assert "factura electrónica" not in html
-
-
-def test_factura_en_formal_dice_factura_electronica():
-    html = factura_html(_factura(), _pedido(), layout="formal").lower()
-    assert "factura electrónica" in html
-    assert "nota de crédito" not in html
-
-
-def test_factura_en_celular_dice_factura():
-    html = factura_html(_factura(), _pedido(), layout="celular").lower()
-    assert "factura" in html
-    assert "nota de crédito" not in html
-
-
-def test_clasica_ya_distinguia_nc_del_titulo():
-    """La clásica no tenía el bug (usa `titulo`, no un banner hardcodeado)."""
-    nc = _factura(cbte_tipo=13, nota_credito_de=1)
-    html = factura_html(nc, _pedido(), layout="clasica")
-    assert "NOTA DE CRÉDITO" in html
-
-
-# ── IVA discriminado solo en A/B, nunca en C ─────────────────────────────────
-
-
-def test_factura_c_no_discrimina_iva():
-    html = factura_html(_factura(cbte_tipo=11, imp_iva=0), _pedido(), layout="clasica")
-    assert "IVA 21%" not in html
-
-
-def test_factura_a_discrimina_iva_si_hay_monto():
-    fa = _factura(cbte_tipo=1, imp_neto=4711, imp_iva=989, imp_total=5700, condicion_iva_receptor=1)
-    html = factura_html(fa, _pedido(), layout="clasica")
-    assert "IVA 21%" in html
-
-
-# ── % de IVA y rubro (Productos/Servicios) se DERIVAN de la factura real —
-# el motor no puede asumir "siempre 21%, siempre Servicios" (se va a reusar
-# para otros negocios con otras alícuotas/rubros) ──────────────────────────
-
-
-def test_iva_pct_se_calcula_no_se_hardcodea():
-    fa = _factura(
-        cbte_tipo=1, imp_neto=10000, imp_iva=1050, imp_total=11050, condicion_iva_receptor=1,
-    )
-    html = factura_html(fa, _pedido(), layout="clasica")
-    assert "IVA 10,5%" in html
-
-
-def test_iva_pct_27_tambien_se_reconoce():
-    from services.facturacion.pdf import _iva_pct_label
-    assert _iva_pct_label(1000, 270) == "27%"
-    assert _iva_pct_label(1000, 210) == "21%"
-    assert _iva_pct_label(1000, 105) == "10,5%"
-    assert _iva_pct_label(1000, 0) == "0%"
-
-
-def test_concepto_productos_no_queda_fijo_en_servicios():
-    """El rótulo de rubro sale de `factura.concepto` (persistido), no de un
-    texto fijo — Rambla siempre factura Servicios, pero el motor tiene que
-    poder mostrar "Productos" para otro negocio."""
-    f_productos = _factura(concepto=1)
-    html = factura_html(f_productos, _pedido(), layout="celular")
-    assert "Productos" in html
-    assert "Servicios" not in html
-
-
-def test_concepto_servicios_sigue_siendo_el_default_de_rambla():
-    html = factura_html(_factura(concepto=2), _pedido(), layout="celular")
-    assert "Servicios" in html
-
-
-# ── Datos de ARCA incompletos: fallar fuerte, nunca un comprobante a medias ──
-# (decisión explícita del dueño: mejor un 503 que una factura que "parece"
-# válida sin serlo — ni placeholder de QR ni "—" en el CAE)
-
-
-# ── Ley 27.743 / RG 5614 — Transparencia Fiscal al Consumidor: leyenda +
-# desglose de IVA y otros impuestos nacionales indirectos, obligatoria en
-# toda venta a consumidor final (Facturas B/C). La Factura A es RI-a-RI
-# (no consumidor final por definición) y queda fuera del alcance de la norma.
-
-
-@pytest.mark.parametrize("layout", ["clasica", "celular", "formal"])
-def test_factura_c_incluye_leyenda_transparencia_fiscal(layout):
-    html = factura_html(_factura(cbte_tipo=11, imp_iva=0), _pedido(), layout=layout)
-    assert "Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)" in html
-    assert "IVA Contenido" in html
-    assert "Otros Impuestos Nacionales Indirectos" in html
-
-
-@pytest.mark.parametrize("layout", ["clasica", "celular", "formal"])
-def test_factura_a_no_lleva_leyenda_transparencia_fiscal(layout):
-    """La A es RI-a-RI (nunca consumidor final en este motor) — la norma no
-    aplica y no hay que sumarle una leyenda que no le corresponde."""
-    fa = _factura(cbte_tipo=1, imp_neto=4711, imp_iva=989, imp_total=5700, condicion_iva_receptor=1)
-    html = factura_html(fa, _pedido(), layout=layout)
-    assert "Transparencia Fiscal" not in html
-
-
-def test_leyenda_transparencia_fiscal_usa_el_iva_real_no_hardcodeado():
-    fb = _factura(cbte_tipo=6, imp_neto=10000, imp_iva=2100, imp_total=12100, condicion_iva_receptor=5)
-    html = factura_html(fb, _pedido(), layout="clasica")
-    assert "IVA Contenido: $ 2.100,00" in html
-
-
 # ── Concepto: default de Rambla = una sola línea "Rambla #N", sin desglose ──
 
 
@@ -296,8 +181,8 @@ def test_concepto_es_marca_mas_numero_de_pedido_sin_desglose():
 
 
 def test_concepto_ignora_el_desglose_por_equipo_del_pedido():
-    """Aunque el pedido tenga varios ítems, la factura muestra una sola línea
-    (decisión de negocio de Rambla — no un límite de ARCA)."""
+    """Aunque el pedido tenga varios ítems, la factura muestra una sola línea (decisión de
+    negocio de Rambla — no un límite de ARCA)."""
     pedido = _pedido(numero_pedido="231", items=[
         {"nombre": "Cámara Sony FX3", "cantidad": 1, "subtotal": 3000},
         {"nombre": "Trípode Manfrotto", "cantidad": 1, "subtotal": 2700},
@@ -311,32 +196,41 @@ def test_concepto_ignora_el_desglose_por_equipo_del_pedido():
 def test_concepto_marca_es_configurable(monkeypatch):
     monkeypatch.setenv("FACTURACION_CONCEPTO_MARCA", "Otro Negocio")
     import importlib
-    import services.facturacion.pdf as pdf_mod
-    importlib.reload(pdf_mod)
+
+    import services.facturacion.comprobante_render as render_mod
+    importlib.reload(render_mod)
     try:
-        html = pdf_mod.factura_html(_factura(), _pedido(numero_pedido="9"), layout="celular")
+        html = render_mod.factura_html(_factura(), _pedido(numero_pedido="9"), layout="celular")
         assert "Otro Negocio #9" in html
     finally:
         monkeypatch.delenv("FACTURACION_CONCEPTO_MARCA", raising=False)
-        importlib.reload(pdf_mod)
+        importlib.reload(render_mod)
+
+
+def test_concepto_marca_default_es_rambla():
+    assert CONCEPTO_MARCA == "Rambla"
+
+
+# ── Datos de ARCA incompletos: fallar fuerte, nunca un comprobante a medias (decisión explícita
+# del dueño: mejor un 503 que una factura que "parece" válida sin serlo) ────────────────────────
 
 
 @pytest.mark.parametrize("layout", ["clasica", "celular", "formal"])
 def test_sin_qr_payload_falla_fuerte(layout):
     sin_qr = _factura(qr_payload=None)
-    with pytest.raises(RuntimeError, match="qr_payload"):
+    with pytest.raises(ValueError, match="qr_url"):
         factura_html(sin_qr, _pedido(), layout=layout)
 
 
 @pytest.mark.parametrize("layout", ["clasica", "celular", "formal"])
 def test_si_falla_la_generacion_del_qr_propaga_el_error(layout, monkeypatch):
-    """Hay payload pero segno/la generación de la imagen falla — tiene que
-    propagar el error (el route lo convierte en 503), no devolver un HTML
-    con un hueco donde debería ir el QR exigido por RG4892."""
+    """Hay payload pero segno/la generación de la imagen falla — tiene que propagar el error (el
+    route lo convierte en 503), no devolver un HTML con un hueco donde debería ir el QR exigido
+    por RG4892."""
     def _boom(url, size):
         raise RuntimeError("segno no disponible")
 
-    monkeypatch.setattr("arca_fe.qr._build_qr_svg", _boom)
+    monkeypatch.setattr("arca_fe.pdf._build_qr_svg", _boom)
     with pytest.raises(RuntimeError, match="segno no disponible"):
         factura_html(_factura(), _pedido(), layout=layout)
 
@@ -344,12 +238,12 @@ def test_si_falla_la_generacion_del_qr_propaga_el_error(layout, monkeypatch):
 @pytest.mark.parametrize("campo", ["cae", "cbte_nro", "cae_vto", "qr_payload"])
 def test_falta_cualquier_dato_de_arca_falla_fuerte(campo):
     incompleta = _factura(**{campo: None})
-    with pytest.raises(RuntimeError, match=campo):
+    with pytest.raises(ValueError, match="ComprobanteFiscal incompleto"):
         factura_html(incompleta, _pedido())
 
 
-# ── Etiquetas de doc_tipo/concepto/condición IVA: salen del catálogo de ARCA
-# (cacheado), no de una traducción escrita a mano — ver services.facturacion.catalogos
+# ── Etiquetas de doc_tipo/concepto/condición IVA: salen del catálogo de ARCA (cacheado), no de
+# una traducción escrita a mano — ver services.facturacion.catalogos ────────────────────────────
 
 
 def test_doc_tipo_y_condicion_iva_salen_del_catalogo_no_de_un_diccionario_fijo():
@@ -358,16 +252,9 @@ def test_doc_tipo_y_condicion_iva_salen_del_catalogo_no_de_un_diccionario_fijo()
     assert "Consumidor Final" in html
 
 
-def test_id_no_catalogado_muestra_el_codigo_crudo_no_inventa_un_texto():
-    """Un doc_tipo que el catálogo cacheado no tiene (quedó desactualizado)
-    muestra el número, no un texto adivinado."""
-    html = factura_html(_factura(doc_tipo=999), _pedido())
-    assert "999" in html
-
-
 def test_catalogo_nunca_refrescado_falla_fuerte_no_completa_con_texto_fijo():
-    """Si nadie corrió "Actualizar catálogos ARCA" todavía, el PDF tiene que
-    fallar (503) en vez de mostrar una traducción inventada."""
+    """Si nadie corrió "Actualizar catálogos ARCA" todavía, el PDF tiene que fallar (503, vía
+    RuntimeError de `services.facturacion.catalogos`) en vez de mostrar una traducción inventada."""
     original = dict(_CATALOGOS_SEED)
     _CATALOGOS_SEED.clear()
     try:

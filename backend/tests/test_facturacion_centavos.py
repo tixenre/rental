@@ -23,7 +23,8 @@ from services.facturacion.repo import Factura
 pytestmark = pytest.mark.unit
 
 # Catálogos ARCA (doc_tipo/condición IVA receptor) resueltos vía `database.get_db`
-# desde `services.facturacion.pdf._catalogo` — mismo fake que `test_facturacion_pdf.py`.
+# desde `services.facturacion.comprobante_render._catalogo` — mismo fake que
+# `test_facturacion_pdf.py`.
 _CATALOGOS_SEED = {
     "arca_catalogo_doc_tipo": [{"id": 80, "desc": "CUIT"}],
     "arca_catalogo_concepto": [{"id": 2, "desc": "Servicios"}],
@@ -207,7 +208,7 @@ def test_pdf_muestra_centavos_no_redondea_a_peso_entero(monkeypatch):
     con los valores exactos que hubiera dejado el escenario de arriba.
     """
     monkeypatch.setattr("database.get_db", lambda: _FakeCatalogConn())
-    from services.facturacion.pdf import factura_html
+    from services.facturacion.comprobante_render import factura_html
 
     factura = Factura(
         id=500, pedido_id=42, emisor="pablo", ambiente="homologacion",

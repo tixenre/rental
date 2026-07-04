@@ -322,9 +322,9 @@ def test_descargar_pdf_503_si_faltan_datos_de_arca(monkeypatch):
     )
 
     def _raise(*a, **kw):
-        raise RuntimeError("Factura 1 está 'emitida' pero le faltan datos de ARCA (qr_payload)")
+        raise ValueError("ComprobanteFiscal incompleto, faltan: qr_url")
 
-    monkeypatch.setattr("services.facturacion.pdf.factura_html", _raise)
+    monkeypatch.setattr("services.facturacion.comprobante_render.factura_html", _raise)
 
     with pytest.raises(HTTPException) as ei:
         asyncio.run(facturacion_routes.descargar_pdf_factura(1, _fake_request()))
@@ -342,7 +342,7 @@ def test_descargar_pdf_format_html_devuelve_preview_sin_renderer(monkeypatch):
         "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html>FACTURA-X</html>"
+        "services.facturacion.comprobante_render.factura_html", lambda factura, pedido, **_: "<html>FACTURA-X</html>"
     )
 
     resp = asyncio.run(
@@ -362,7 +362,7 @@ def test_descargar_pdf_format_pdf_default_es_attachment(monkeypatch):
         "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html></html>"
+        "services.facturacion.comprobante_render.factura_html", lambda factura, pedido, **_: "<html></html>"
     )
 
     async def _fake_render_pdf(html, **_):
@@ -374,7 +374,7 @@ def test_descargar_pdf_format_pdf_default_es_attachment(monkeypatch):
         lambda conn: (b"cert", b"key"),
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf_seguridad.asegurar_pdf",
+        "arca_fe.asegurar_pdf",
         lambda pdf_bytes, cert_pem, key_pem: pdf_bytes,
     )
 
@@ -403,14 +403,14 @@ def test_enviar_mail_factura_no_rompe_con_undefined_column(monkeypatch):
         "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html></html>"
+        "services.facturacion.comprobante_render.factura_html", lambda factura, pedido, **_: "<html></html>"
     )
     monkeypatch.setattr(
         "services.facturacion.pdf_seguridad.get_or_create_signing_cert",
         lambda conn: (b"cert", b"key"),
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf_seguridad.asegurar_pdf",
+        "arca_fe.asegurar_pdf",
         lambda pdf_bytes, cert_pem, key_pem: pdf_bytes,
     )
 
@@ -445,7 +445,7 @@ def test_enviar_mail_factura_400_si_sin_email(monkeypatch):
         "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html></html>"
+        "services.facturacion.comprobante_render.factura_html", lambda factura, pedido, **_: "<html></html>"
     )
     monkeypatch.setattr(
         "services.facturacion.pdf_seguridad.get_or_create_signing_cert",
@@ -538,7 +538,7 @@ def test_descargar_pdf_firma_real_no_explota_dentro_de_un_loop_corriendo(monkeyp
     (`asyncio.to_thread` en el route)."""
     import fitz
 
-    from services.facturacion.pdf_seguridad import _generar_cert_autofirmado
+    from arca_fe import generar_cert_autofirmado as _generar_cert_autofirmado
 
     monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
     monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
@@ -549,7 +549,7 @@ def test_descargar_pdf_firma_real_no_explota_dentro_de_un_loop_corriendo(monkeyp
         "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html></html>"
+        "services.facturacion.comprobante_render.factura_html", lambda factura, pedido, **_: "<html></html>"
     )
 
     def _pdf_minimo() -> bytes:
@@ -752,7 +752,7 @@ def test_consultar_puntos_venta_arca_response_error_es_502(monkeypatch):
 
 
 def test_info_cert_emisor_devuelve_subject_y_serie(monkeypatch):
-    from services.facturacion.pdf_seguridad import _generar_cert_autofirmado
+    from arca_fe import generar_cert_autofirmado as _generar_cert_autofirmado
 
     cert_pem, key_pem = _generar_cert_autofirmado("Comprobantes — Motor de Facturación")
 
