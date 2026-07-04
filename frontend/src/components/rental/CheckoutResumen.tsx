@@ -348,7 +348,7 @@ export function CheckoutResumen({
                       onClick={() => setContratoOpen(true)}
                       className="shrink-0 text-xs text-muted-foreground underline underline-offset-2 hover:text-ink"
                     >
-                      Leer ahora
+                      Leer contrato ahora
                     </button>
                   )}
                 </li>
