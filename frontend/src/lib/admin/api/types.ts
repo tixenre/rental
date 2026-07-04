@@ -888,6 +888,16 @@ export type LiquidacionDueno = {
   pedidos: number;
   reparto: PorBeneficiario;
   equipos: { equipo: string; monto: number; veces: number }[];
+  // Detalle por PEDIDO (rentals), en vez de por equipo — # de pedido, cliente,
+  // fecha de saldado, monto que ese pedido aportó a este dueño (2026-07-04).
+  // Opcional: las fotos de meses cerrados ANTES de este cambio no lo tienen.
+  pedidos_detalle?: {
+    pedido_id: number;
+    numero_pedido: number;
+    cliente: string;
+    fecha: string;
+    monto: number;
+  }[];
 };
 export type LiquidacionData = {
   desde: string;
