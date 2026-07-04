@@ -20,7 +20,7 @@ import {
 import { FacturacionModal } from "@/components/rental/FacturacionModal";
 import { TerminosModal } from "@/components/rental/TerminosModal";
 import { ContratoPreviewModal } from "@/components/rental/ContratoPreviewModal";
-import { DOC_LABEL } from "@/routes/ClientePortalTypes";
+import { DOC_DESCRIPTION, DOC_LABEL } from "@/routes/ClientePortalTypes";
 
 /** Los 4 docs disponibles desde "presupuesto" (ver `_documentos_disponibles`
  *  en el backend) — "factura" queda afuera, no existe hasta que se facture. */
@@ -321,11 +321,47 @@ export function CheckoutResumen({
             </div>
           )}
 
-          {/* Disclaimer de responsabilidad/seguro — tiene que leerse, no pasar
-            desapercibido: un ítem más del resumen, con el rojo suave del DS
-            (mismo token que los alerts de error) y tamaño de texto normal
-            (no letra chica) para que llame la atención sin gritar tanto como
-            un error real. */}
+          {/* Documentos — antes esto se enfocaba solo en "Leer contrato"; ahora
+            nombra y describe brevemente los 4 documentos que va a encontrar en
+            su portal apenas confirme, para que sepa bien qué esperar (no solo
+            el contrato). El contrato sigue siendo el único leíble ACÁ, antes
+            de confirmar — por eso conserva su link propio en la fila. */}
+          <div className="space-y-2 rounded-lg border hairline bg-surface p-3">
+            <div className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
+              Documentos de tu pedido
+            </div>
+            <p className="text-xs text-muted-foreground">
+              En tu portal vas a encontrar estos documentos apenas hagas el pedido:
+            </p>
+            <ul className="space-y-1.5">
+              {DOCS_CHECKOUT.map((tipo) => (
+                <li key={tipo} className="flex items-start justify-between gap-3">
+                  <div className="text-sm leading-snug">
+                    <span className="font-semibold text-ink">{DOC_LABEL[tipo]}</span>
+                    {DOC_DESCRIPTION[tipo] && (
+                      <span className="text-muted-foreground"> — {DOC_DESCRIPTION[tipo]}</span>
+                    )}
+                  </div>
+                  {tipo === "contrato" && (
+                    <button
+                      type="button"
+                      onClick={() => setContratoOpen(true)}
+                      className="shrink-0 text-xs text-muted-foreground underline underline-offset-2 hover:text-ink"
+                    >
+                      Leer ahora
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Disclaimer de responsabilidad/seguro — debajo de los documentos
+            (antes arriba): recién ahí el cliente ya sabe que existe el
+            "Detalle de seguro" que este párrafo menciona, así que el orden de
+            lectura tiene más sentido. Tiene que leerse igual, no pasar
+            desapercibido: rojo suave del DS (mismo token que los alerts de
+            error) y tamaño de texto normal (no letra chica). */}
           <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
             <p className="text-sm leading-relaxed text-destructive">
@@ -341,32 +377,6 @@ export function CheckoutResumen({
                 Términos y Condiciones
               </button>
               .
-            </p>
-          </div>
-
-          {/* Documentos — qué se va a encontrar en el portal apenas se hace el
-            pedido, para que sepa qué esperar (no solo el disclaimer de
-            seguro). Compacto: una línea con los 4 nombres (la descripción de
-            cada uno ya se explica en el portal, donde el cliente los ve de
-            verdad) + "Leer contrato" para la simulación del pedido en curso. */}
-          <div className="space-y-1 rounded-lg border hairline bg-surface p-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
-                Documentos de tu pedido
-              </span>
-              <button
-                type="button"
-                onClick={() => setContratoOpen(true)}
-                className="shrink-0 text-xs text-muted-foreground underline underline-offset-2 hover:text-ink"
-              >
-                Leer contrato
-              </button>
-            </div>
-            <p className="text-sm text-ink">
-              {DOCS_CHECKOUT.map((tipo) => DOC_LABEL[tipo]).join(" · ")}
-            </p>
-            <p className="text-2xs text-muted-foreground">
-              Los vas a encontrar en tu portal apenas hagas el pedido.
             </p>
           </div>
 
