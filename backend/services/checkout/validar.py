@@ -18,11 +18,21 @@ El portero NO crea pedidos. La creación es exclusiva de `create_pedido_retry`
 La sesión del cliente (autenticación) la verifica el guard del route (`require_cliente`)
 ANTES de llegar al portero. El portero recibe `cliente_id` ya autenticado.
 
+Robustez de los checks (`_run_check`): cada check corre AISLADO — si alguno
+revienta con algo INESPERADO (no la falla de negocio que el propio check ya
+modela con su `_falta`), no tira abajo el resto del portero. Se loguea con el
+nombre del check + cliente_id/session_id (para diagnosticar qué rompió) y se
+trata como "no se pudo validar" — fail-closed, bloquea el checkout, nunca deja
+pasar en silencio — mientras los checks restantes siguen corriendo (mantiene
+la garantía fail-not-fast también ante fallas inesperadas, no solo ante
+faltantes de negocio).
+
 Ver `docs/SISTEMA_CHECKOUT.md` para el flujo completo.
 """
 
 import datetime
 import json
+import logging
 
 from fastapi import HTTPException
 
@@ -37,6 +47,8 @@ from services.fechas import (
     validar_rango_fechas,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class _Item:
     """Proxy liviano para que las funciones del motor reciban .equipo_id y .cantidad."""
@@ -50,6 +62,30 @@ class _Item:
 
 def _falta(check: str, mensaje: str, accion: str | None = None) -> dict:
     return {"check": check, "mensaje": mensaje, "accion": accion}
+
+
+def _run_check(
+    nombre: str, cliente_id: int, session_id: str, fn, *args, faltan: list[dict],
+) -> None:
+    """Corre un check AISLADO del resto del portero.
+
+    Si `fn` levanta algo INESPERADO (no la falla de negocio que el check ya
+    modela agregando su propio `_falta` — eso simplemente retorna normal),
+    no tira abajo los checks que faltan correr: se loguea con el nombre del
+    check + cliente_id/session_id (el contexto para diagnosticar qué rompió,
+    sin tener que reproducir el request) y se agrega un `_falta` fail-closed
+    — "no se pudo validar" bloquea el checkout, nunca deja pasar en
+    silencio. `services/checkout` sigue siendo pequeño (2 archivos): esto es
+    la robustez que un módulo de 10 checks necesita sin justificar todavía
+    el split queries/commands (contabilidad/descuentos)."""
+    try:
+        fn(*args, faltan)
+    except Exception:
+        logger.exception(
+            "checkout: error inesperado validando '%s' (cliente_id=%s, session_id=%s)",
+            nombre, cliente_id, session_id,
+        )
+        faltan.append(_falta(nombre, "No pudimos validar esto — reintentá en unos segundos."))
 
 
 def _date_str(v) -> str | None:
@@ -83,36 +119,53 @@ def validar_checkout(
     faltan: list[dict] = []
 
     # ── Leer el carrito (owner-scoped: session + cliente) ────────────────────
-    carrito = _leer_carrito(conn, session_id, cliente_id)
-    if carrito is None:
+    # Aislado como los checks de abajo: un carrito con `items_json` corrupto
+    # (JSON inválido, fila con forma inesperada) no debe tirar un 500 crudo —
+    # se loguea con contexto y se trata como "carrito en mal estado".
+    try:
+        carrito = _leer_carrito(conn, session_id, cliente_id)
+        if carrito is None:
+            return {
+                "listo": False,
+                "faltan": [_falta("carrito", "No encontramos tu carrito. Recargá la página.")],
+            }
+
+        raw_json = carrito.get("items_json") or []
+        if isinstance(raw_json, str):
+            raw_json = json.loads(raw_json)
+        items = [_Item(r["equipo_id"], r["cantidad"]) for r in raw_json if r.get("equipo_id")]
+    except Exception:
+        logger.exception(
+            "checkout: error inesperado leyendo el carrito (cliente_id=%s, session_id=%s)",
+            cliente_id, session_id,
+        )
         return {
             "listo": False,
-            "faltan": [_falta("carrito", "No encontramos tu carrito. Recargá la página.")],
+            "faltan": [_falta("carrito", "Tu carrito quedó en un estado inválido. Volvé a armarlo.")],
         }
-
-    raw_json = carrito.get("items_json") or []
-    if isinstance(raw_json, str):
-        raw_json = json.loads(raw_json)
-    items = [_Item(r["equipo_id"], r["cantidad"]) for r in raw_json if r.get("equipo_id")]
 
     fd = _date_str(carrito.get("fecha_desde"))
     fh = _date_str(carrito.get("fecha_hasta"))
     hora_desde = carrito.get("hora_desde")
 
-    # ── Checks (todos corren, nunca fail-fast) ───────────────────────────────
-    _check_identidad(conn, cliente_id, faltan)
-    _check_carrito(conn, items, faltan)
-    _check_fechas(fd, fh, es_admin, faltan)
+    # ── Checks (todos corren, nunca fail-fast — ni siquiera si alguno revienta
+    # con algo inesperado, ver `_run_check`) ──────────────────────────────────
+    def _run(nombre: str, fn, *args) -> None:
+        _run_check(nombre, cliente_id, session_id, fn, *args, faltan=faltan)
+
+    _run("identidad", _check_identidad, conn, cliente_id)
+    _run("carrito", _check_carrito, conn, items)
+    _run("fechas", _check_fechas, fd, fh, es_admin)
     if items and fd and fh:
-        _check_stock_preflight(conn, items, fd, fh, faltan)
+        _run("stock", _check_stock_preflight, conn, items, fd, fh)
     if items:
-        _check_precio(conn, items, faltan)
-    _check_contacto(conn, cliente_id, faltan)
-    _check_tyc(conn, cliente_id, faltan)
-    _check_firma(firma_ok, faltan)
-    _check_bloqueo(conn, cliente_id, faltan)   # cableado-apagado #1125
+        _run("precio", _check_precio, conn, items)
+    _run("contacto", _check_contacto, conn, cliente_id)
+    _run("tyc", _check_tyc, conn, cliente_id)
+    _run("firma", _check_firma, firma_ok)
+    _run("bloqueo", _check_bloqueo, conn, cliente_id)   # cableado-apagado #1125
     if fd:
-        _check_antelacion(conn, fd, hora_desde, faltan)   # lead-time configurable #1126
+        _run("antelacion", _check_antelacion, conn, fd, hora_desde)   # lead-time configurable #1126
 
     return {"listo": len(faltan) == 0, "faltan": faltan}
 

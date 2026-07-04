@@ -8,9 +8,14 @@ Cubre:
   4. Los checks cableado-apagado (#1125, #1126) siempre retornan OK.
   5. TYC: ya_acepto / registrar_aceptacion son idempotentes.
   6. Carrito no encontrado → único falta de "carrito".
+  7. Robustez (`_run_check`): un check que revienta con algo INESPERADO no
+     tira abajo el resto del portero — se aísla, se loguea con contexto
+     diagnosticable, y se trata fail-closed (bloquea) sin frenar a los
+     checks que faltan correr.
 """
 
 import datetime
+import logging
 
 from services.checkout.validar import (
     _Item,
@@ -26,6 +31,7 @@ from services.checkout.validar import (
     _check_antelacion,
     _date_str,
     _leer_carrito,
+    _run_check,
     validar_checkout,
     faltan_firma_tyc,
 )
@@ -500,3 +506,79 @@ def test_validar_checkout_fail_not_fast(monkeypatch):
     assert "firma" in checks
     # Al menos 4 checks fallaron
     assert len(result["faltan"]) >= 4
+
+
+# ── Robustez: un check que revienta no tira abajo el portero ─────────────────
+
+
+def test_run_check_aisla_excepcion_inesperada_y_bloquea(caplog):
+    def _explota(conn, cliente_id, faltan):
+        raise RuntimeError("boom — bug interno del check")
+
+    faltan: list[dict] = []
+    with caplog.at_level(logging.ERROR):
+        _run_check("mi_check", 42, "sess-1", _explota, None, 42, faltan=faltan)
+
+    assert len(faltan) == 1
+    assert faltan[0]["check"] == "mi_check"
+    # Fail-closed: se agrega un faltante, no se deja pasar en silencio.
+    assert faltan[0]["mensaje"]
+    # Se logueó con el nombre del check + cliente_id/session_id (diagnosticable).
+    assert any("mi_check" in r.message for r in caplog.records)
+    assert any("42" in r.message for r in caplog.records)
+    assert any("sess-1" in r.message for r in caplog.records)
+
+
+def test_run_check_no_interfiere_con_la_falla_de_negocio_normal():
+    """Un check que agrega su propio `_falta` (camino normal, sin excepción)
+    no debe verse alterado por el wrapper de aislamiento."""
+    faltan: list[dict] = []
+    _run_check("identidad", 1, "abc", _check_identidad, _FakeConn({"dni_validado_at": None}), 1, faltan=faltan)
+    assert len(faltan) == 1
+    assert faltan[0]["check"] == "identidad"
+    assert "verificar tu identidad" in faltan[0]["mensaje"]
+
+
+def test_validar_checkout_check_roto_no_frena_a_los_demas(monkeypatch):
+    """Si UN check revienta con algo inesperado, los checks que corren
+    DESPUÉS en la secuencia siguen ejecutándose (fail-not-fast se mantiene
+    incluso ante una falla inesperada, no solo ante faltantes de negocio)."""
+    monkeypatch.setattr(
+        "services.checkout.validar._check_stock_preflight",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("stock explotó")),
+    )
+    monkeypatch.setattr(
+        "services.checkout.validar.precios_catalogo_para_reserva",
+        lambda *a, **k: {1: 1000},
+    )
+    monkeypatch.setattr(
+        "services.checkout.validar.email_comunicacion",
+        lambda *a, **k: None,  # contacto falla también — debe seguir corriendo
+    )
+
+    conn = _conn_all_ok()
+    result = validar_checkout(conn, cliente_id=1, session_id="abc", firma_ok=True)
+
+    assert result["listo"] is False
+    checks = {f["check"] for f in result["faltan"]}
+    # El check roto aparece como faltante (fail-closed)...
+    assert "stock" in checks
+    # ...y el check que corre DESPUÉS en la secuencia (contacto) igual se ejecutó.
+    assert "contacto" in checks
+
+
+def test_validar_checkout_carrito_corrupto_no_500ea():
+    """`items_json` con una forma inesperada (no lista de dicts con equipo_id)
+    no debe tirar un 500 crudo — se trata como carrito en mal estado."""
+    conn = _FakeConn({
+        "carritos_activos": {
+            "items_json": "no es json válido {{{",
+            "fecha_desde": datetime.date.today() + datetime.timedelta(days=2),
+            "fecha_hasta": datetime.date.today() + datetime.timedelta(days=5),
+            "hora_desde": "09:00",
+            "hora_hasta": "18:00",
+        },
+    })
+    result = validar_checkout(conn, cliente_id=1, session_id="abc", firma_ok=True)
+    assert result["listo"] is False
+    assert result["faltan"][0]["check"] == "carrito"

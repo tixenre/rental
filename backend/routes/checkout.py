@@ -11,6 +11,7 @@ POST /api/checkout/aceptar-tyc
 Ver `docs/SISTEMA_CHECKOUT.md` para el flujo completo y el contrato de respuesta.
 """
 
+import logging
 import uuid as _uuid
 
 from fastapi import APIRouter, HTTPException, Request
@@ -21,6 +22,7 @@ from database import get_db
 from routes.cliente_portal import require_cliente
 from services.checkout import registrar_aceptacion, validar_checkout
 
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["checkout"])
 
 
@@ -45,12 +47,24 @@ def checkout_validar(data: CheckoutValidarIn, request: Request):
     firma_ok = has_recent_stepup(request, cliente_id) or data.session_confirmed
 
     with get_db() as conn:
-        return validar_checkout(
-            conn,
-            cliente_id=cliente_id,
-            session_id=data.session_id,
-            firma_ok=firma_ok,
-        )
+        try:
+            return validar_checkout(
+                conn,
+                cliente_id=cliente_id,
+                session_id=data.session_id,
+                firma_ok=firma_ok,
+            )
+        except Exception:
+            # El portero ya aísla cada check (`_run_check`) — esto es la red
+            # residual para lo que corre ANTES/fuera de esos checks (ej. el
+            # guard de auth, o un bug en el propio `validar_checkout`). Nunca
+            # un 500 crudo con detalle interno; se loguea con contexto para
+            # diagnosticar.
+            logger.exception(
+                "checkout: error inesperado en el portero (cliente_id=%s, session_id=%s)",
+                cliente_id, data.session_id,
+            )
+            raise HTTPException(503, "No pudimos validar tu pedido. Reintentá en unos segundos.")
 
 
 @router.post("/checkout/aceptar-tyc")
