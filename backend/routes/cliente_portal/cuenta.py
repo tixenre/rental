@@ -219,10 +219,16 @@ class PerfilUpdate(BaseModel):
 def cliente_update_me(data: PerfilUpdate, request: Request):
     """Permite al cliente actualizar sus datos personales.
 
-    Tras verificar identidad (dni_validado_at IS NOT NULL) solo `telefono` y
-    `apodo` son editables — el resto queda bloqueado (los datos legales los
-    certifica RENAPER). NO se permite cambiar email (clave de identidad OAuth)
-    ni descuento.
+    Tras verificar identidad (dni_validado_at IS NOT NULL), `nombre`/`apellido`/
+    `direccion` quedan bloqueados — son los datos que certifica RENAPER, y el
+    portal los muestra en modo lectura desde `*_renaper` una vez verificado.
+    Los datos FISCALES (perfil_impuestos/cuit/razon_social/domicilio_fiscal/
+    email_facturacion) NO se bloquean — son de facturación, no de identidad
+    (el `cuit` de la factura puede diferir del `cuil` verificado por RENAPER,
+    ver el hint del form en ClientePortalHelpers.tsx), y el cliente tiene que
+    poder actualizarlos siempre (ej. desde `FacturacionModal` en el checkout).
+    `telefono`/`apodo` tampoco se bloquean nunca. NO se permite cambiar email
+    (clave de identidad OAuth) ni descuento.
     """
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
@@ -230,9 +236,8 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
     with get_db() as conn:
         verificado = cliente_verificado(conn, cliente_id)
 
-    # Campos bloqueados post-verificación (datos que certifica RENAPER).
-    _BLOQUEADOS = ("nombre", "apellido", "direccion", "cuit",
-                   "perfil_impuestos", "razon_social", "domicilio_fiscal", "email_facturacion")
+    # Campos bloqueados post-verificación: solo los que certifica RENAPER.
+    _BLOQUEADOS = ("nombre", "apellido", "direccion")
     if verificado:
         for campo in _BLOQUEADOS:
             if getattr(data, campo, None) is not None:
