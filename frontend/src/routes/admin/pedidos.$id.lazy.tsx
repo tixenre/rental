@@ -1313,6 +1313,16 @@ function FacturacionRailSection({
                   )}
                 </span>
               </div>
+              {preview.data.receptor.doc_tipo !== "CONSUMIDOR_FINAL" && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Domicilio</span>
+                  <span className="text-right">
+                    {preview.data.receptor.domicilio || (
+                      <span className="text-destructive">sin confirmar</span>
+                    )}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between border-t hairline pt-2">
                 <span className="text-muted-foreground">Neto</span>
                 <span className="font-mono">{formatARS(preview.data.importes.neto)}</span>

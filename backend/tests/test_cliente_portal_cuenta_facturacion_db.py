@@ -146,6 +146,48 @@ class TestFacturacionEditablePostVerificacion:
         assert r.json()["cuit"] is None
 
 
+class TestPerfilImpuestosExigeCuit:
+    """Regresión de bug real en producción: un cliente guardó `perfil_impuestos='monotributo'`
+    desde el <select> del portal SIN pasar nunca por "Verificar" contra ARCA — Responsable
+    Inscripto/Monotributo/Exento no existen sin CUIT en Argentina. La factura emitida después
+    salió con el perfil guardado pero sin domicilio, sin confirmar. `cliente_update_me` ahora
+    exige un CUIT con formato válido (11 dígitos) para cualquier perfil que no sea
+    'consumidor_final' — el CUIT puede venir del mismo request o ya estar guardado."""
+
+    def test_monotributo_sin_cuit_en_ningun_lado_se_rechaza(self, cliente_verificado_fixture):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(main.app)
+        r = _patch(client, {"perfil_impuestos": "monotributo"})
+        assert r.status_code == 400, r.text
+
+    def test_monotributo_con_cuit_en_el_mismo_request_se_acepta(self, cliente_verificado_fixture):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(main.app)
+        r = _patch(client, {"perfil_impuestos": "monotributo", "cuit": "27230938607"})
+        assert r.status_code == 200, r.text
+        assert r.json()["perfil_impuestos"] == "monotributo"
+
+    def test_exento_con_cuit_ya_guardado_previamente_se_acepta(self, cliente_verificado_fixture):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(main.app)
+        r1 = _patch(client, {"cuit": "27230938607"})
+        assert r1.status_code == 200, r1.text
+
+        r2 = _patch(client, {"perfil_impuestos": "exento"})
+        assert r2.status_code == 200, r2.text
+        assert r2.json()["perfil_impuestos"] == "exento"
+
+    def test_consumidor_final_no_exige_cuit(self, cliente_verificado_fixture):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(main.app)
+        r = _patch(client, {"perfil_impuestos": "consumidor_final"})
+        assert r.status_code == 200, r.text
+
+
 CLIENTE_ID_DISPLAY = 9_330_002
 _COOKIE_DISPLAY = f"session={signer.dumps({'email': 'display-db@test.com', 'role': 'cliente', 'cliente_id': CLIENTE_ID_DISPLAY, 'jti': 'display-cli'})}"
 
