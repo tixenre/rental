@@ -69,7 +69,7 @@ def _advisory_hash(pto_vta: int, cbte_tipo: int) -> int:
 
 def _get_pedido(conn, pedido_id: int) -> dict:
     from database import row_to_dict
-    from routes.alquileres import (
+    from services.pedidos_enriquecimiento import (
         _enriquecer_pedido_con_cliente_fiscal,
         _enriquecer_pedido_con_cliente,
         _batch_get_alquiler_items,
@@ -88,9 +88,9 @@ def _get_pedido(conn, pedido_id: int) -> dict:
     items_map = _batch_get_alquiler_items(conn, [pedido_id])
     pedido["items"] = items_map.get(pedido_id, [])
 
-    # El desglose de plata (bruto/neto/IVA, cobro_modo-aware) pasa por la
-    # fachada de finanzas_flujo, no por routes.alquileres — un service no
-    # debería importar de un route (auditoría cruzada de plata, 2026-07-02).
+    # El desglose de plata (bruto/neto/IVA, cobro_modo-aware) y el enriquecimiento de cliente pasan
+    # por módulos de services/, nunca por routes.alquileres — un service no debería depender de un
+    # route (auditoría cruzada de plata, 2026-07-02).
     desglose_de_pedido(conn, pedido)
     _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
     _enriquecer_pedido_con_cliente(conn, pedido)
