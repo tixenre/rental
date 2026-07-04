@@ -1,8 +1,9 @@
-# SISTEMA_CHECKOUT — portero del checkout
+# SISTEMA_CHECKOUT — portero del checkout + UI del resumen
 
-> **Fuente única del "cómo funciona" el checkout.** Las reglas de criterio y el
-> _por qué_ viven en `MEMORIA.md` y `DECISIONES.md`. Este doc describe qué hace el
-> portero, qué puntos de entrada tiene, y cómo se encadena con el motor de reservas.
+> **Fuente única del "cómo funciona" el checkout**, de punta a punta: el
+> **portero** (`backend/services/checkout/`, qué precondiciones corre) y la
+> **UI del resumen** (`CheckoutResumen.tsx` + sus 3 modales) que lo consume. Las
+> reglas de criterio y el _por qué_ viven en `MEMORIA.md` y `DECISIONES.md`.
 
 ## Qué es
 
@@ -167,6 +168,72 @@ confirma (queda en el portal del cliente + se manda por mail). El front (`lib/ch
 en un iframe sandboxed dentro de un modal, sin salir del checkout (mismo patrón que
 `FacturacionModal`/`TerminosModal`).
 
+## UI del resumen (`CheckoutResumen.tsx`)
+
+Es el paso entre "Revisar pedido" (carrito) y la creación real del pedido — fuente
+única, la usan el drawer desktop y el sheet mobile por igual. NO hardcodea el orden
+de las validaciones: al montarse (y cada vez que hace falta re-chequear) llama a
+`POST /api/checkout/validar` y renderiza `faltan` tal cual lo manda el backend. Un
+solo botón **"Confirmar pedido"** resuelve T&C + firma en el mismo click (sin
+tarjetas intermedias por check) y recién ahí llama a `onCrearPedido` (que termina en
+`create_pedido_retry`, motor sagrado). **Identidad** es la única excepción que no se
+resuelve en un click (exige salir a Didit) — mientras falte, el botón queda
+deshabilitado y se muestra `VerificacionRequeridaPanel`.
+
+Tarjetas del resumen, en orden:
+
+| Tarjeta | Qué muestra | Fuente del dato |
+|---|---|---|
+| **Fechas** | Rango + horario elegido, jornadas, dirección de retiro | Props del caller + `useBusinessContact()` |
+| **Tus datos** | Nombre/email/teléfono/dirección — RENAPER si está verificado, si no el dato base; contacto canónico (Didit-preferido) | `GET /api/cliente/me` → `nombre_legal`/`direccion_legal`/`email_comunicacion`/`telefono_contacto` (resueltos por `identity/__init__.py` + `identity/contacts.py` — el front NO reimplementa la regla RENAPER-si-verificado) |
+| **Facturación** | Perfil fiscal + qué tipo de factura le corresponde (`facturaTipoLabel`), con botón "Modificar" | Estado local `perfilImpuestosLive`, sembrado por prop y actualizado en vivo por `FacturacionModal` |
+| **Disclaimer de seguro** | Responsabilidad del cliente por daños/pérdida/robo desde el retiro + link a T&C | Copy estático; el link abre `TerminosModal` |
+| **Documentos de tu pedido** | Los 4 docs disponibles desde "presupuesto" (Remito/Contrato/Detalle de seguro/Checklist de retiro) con descripción breve; "Leer" en Contrato abre `ContratoPreviewModal` | `DOC_LABEL`/`DOC_DESCRIPTION` (`ClientePortalTypes.ts`, fuente única compartida con el portal) |
+| **Total** | Subtotal, descuento (si aplica), total (+ IVA si `conIva`) | Props (`totalNeto`/`conIva`/etc.) — el front NUNCA calcula plata, solo muestra lo que ya vino resuelto de `/api/cotizar` |
+
+Después de las tarjetas: estados de carga/error, el panel de identidad si falta, y
+cualquier otro faltante (carrito/fechas/stock/precio/contacto/antelación) como alert
+con botón "Volver" — el mensaje ya lo da el backend, no se reinterpreta acá.
+
+### Los 3 modales in-place (no navegan fuera del checkout)
+
+Mismo patrón los tres: envuelven contenido existente en un `Dialog` del design
+system, para que el cliente resuelva algo **sin perder el paso del carrito en el
+que estaba** (antes, "Modificar facturación" y "Ver T&C" navegaban a otra pantalla).
+
+| Modal | Qué hace | Se cierra solo al guardar |
+|---|---|---|
+| `FacturacionModal.tsx` | Fetchea `/api/cliente/me`, renderiza `FacturacionForm` (`ClientePortalHelpers.tsx`, compartido con el portal) | Sí (`onSaved`) |
+| `TerminosModal.tsx` | Renderiza `TERMS_SECTIONS`/`LAST_UPDATED` de `data/legal.ts` (mismo contenido que `/terminos`) | No (solo lectura) |
+| `ContratoPreviewModal.tsx` | Llama a `lib/checkout.ts::obtenerContratoPreviewHtml(sessionId)` y muestra el HTML en un `<iframe sandbox="" srcDoc={html}>` (ver sección de abajo) | No (solo lectura) |
+
+### Verificación de CUIT contra ARCA (dentro de `FacturacionForm`)
+
+`FacturacionForm` valida el **formato** del CUIT/CUIL en el input (`lib/cuit.ts
+::cuitValido`, mod-11 — mismo checksum que `identity/anchor.py::cuil_valido` en el
+backend, verificado byte-idéntico) antes de habilitar "Verificar". Al verificar:
+
+```
+Cliente tipea CUIT → cuitValido() lo formatea/valida en el input
+    → botón "Verificar" → POST /api/cliente/facturacion/verificar-cuit
+        → cuil_valido() (formato; 400 si inválido, NO llama a ARCA)
+        → services.facturacion.padron.verificar_y_actualizar_receptor (WSAA/padrón AFIP)
+        → encontrado=True: persiste cuit + corrige perfil_impuestos/razon_social/
+          domicilio_fiscal desde el padrón → UI muestra card "Verificado con ARCA"
+          (read-only) → invalidateClienteSession() (refresca /api/cotizar: el Total
+          puede haber cambiado el "+ IVA")
+        → encontrado=False (ARCA no lo tiene / servicio caído): NO persiste nada,
+          la UI cae a los inputs manuales (dropdown de perfil + razón social/
+          domicilio a mano) — "como si fuera Didit": se verifica una vez, después
+          se trae de la cuenta.
+```
+
+Este es el **mismo criterio "verificar y persistir en el momento"** que usa Didit
+para identidad — la diferencia es que acá es opcional (el cliente puede seguir con
+carga manual si ARCA no lo encuentra). El endpoint vive en
+`routes/cliente_portal/cuenta.py::cliente_verificar_cuit`; el padrón real en
+`docs/SISTEMA_ARCA.md` (no se duplica acá el detalle del WSAA).
+
 ## Archivos clave
 
 ```
@@ -176,11 +243,25 @@ backend/services/checkout/
 └── tyc.py               — T&C (TYC_VERSION_ACTUAL, ya_acepto, registrar_aceptacion)
 
 backend/routes/checkout.py                     — validar / aceptar-tyc / contrato-preview
+backend/routes/cliente_portal/cuenta.py        — GET /api/cliente/me + verificar-cuit
+backend/pdf_templates.py::_contrato_html        — genera el contrato (real Y preview)
 backend/tests/test_checkout_portero.py         — candados unitarios (sin DB real)
 backend/tests/test_checkout_route_robustez.py  — candado del 503 limpio a nivel HTTP
 backend/tests/test_checkout_contrato_preview_db.py — candado del preview (Postgres real)
+backend/tests/test_pdf_helpers.py::TestContratoHtmlMostrarLocador — candado mostrar_locador
+backend/tests/test_cliente_portal_cuenta_facturacion_db.py — candado facturación + ARCA
 backend/database/schema.py               — tabla aceptaciones_tyc (init_db)
 backend/migrations/versions/b1a2c3d4e5f6_checkout_aceptaciones_tyc.py
+
+frontend/src/components/rental/CheckoutResumen.tsx     — la UI del resumen (fuente única)
+frontend/src/components/rental/FacturacionModal.tsx    — editar perfil fiscal in-place
+frontend/src/components/rental/TerminosModal.tsx       — T&C in-place
+frontend/src/components/rental/ContratoPreviewModal.tsx — preview del contrato in-place
+frontend/src/routes/ClientePortalHelpers.tsx::FacturacionForm — form fiscal (portal + checkout)
+frontend/src/lib/checkout.ts    — validarCheckout / aceptarTyc / obtenerContratoPreviewHtml
+frontend/src/lib/cuit.ts        — cuitValido (mod-11) + verificarCuitArca
+frontend/src/lib/iva.ts         — useClienteSession, aplicaIva, facturaTipoLabel
+frontend/src/routes/ClientePortalTypes.ts — DOC_LABEL/DOC_DESCRIPTION (fuente única)
 ```
 
 ## Qué NO toca
