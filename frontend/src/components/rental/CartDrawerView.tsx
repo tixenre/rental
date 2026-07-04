@@ -503,15 +503,7 @@ export function CartDrawerView({
                     disabled={list.length === 0 || hayNoDisponible || dentroDeLeadTime}
                     onClick={onSubmit}
                   >
-                    <span className="flex items-center gap-2">
-                      Confirmar solicitud
-                      {list.length > 0 && totalNeto > 0 && (
-                        <span className="font-mono text-xs font-normal opacity-70 tracking-normal normal-case tabular-nums">
-                          · {formatARS(totalNeto)}
-                          {conIva ? " + IVA" : ""}
-                        </span>
-                      )}
-                    </span>
+                    Confirmar solicitud
                   </Button>
 
                   {/* Lead-time (#1126): el retiro cae dentro de la ventana de antelación

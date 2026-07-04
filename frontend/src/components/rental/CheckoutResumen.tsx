@@ -337,10 +337,6 @@ export function CheckoutResumen({
             <span className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4" />
               Confirmar pedido
-              <span className="font-mono text-xs font-normal opacity-70 tracking-normal normal-case tabular-nums">
-                · {formatARS(totalNeto)}
-                {conIva ? " + IVA" : ""}
-              </span>
             </span>
           )}
         </Button>
