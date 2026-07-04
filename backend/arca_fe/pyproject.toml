@@ -33,3 +33,8 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = [".."]
 include = ["arca_fe*"]
+
+# El logo oficial de ARCA (agnóstico de marca, usado por `arca_fe.pdf`) — asset propio
+# del paquete, empaquetado como cualquier ícono de una librería instalable.
+[tool.setuptools.package-data]
+arca_fe = ["assets/*.svg"]
