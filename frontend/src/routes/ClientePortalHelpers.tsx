@@ -545,9 +545,13 @@ function ContactoForm({
 export function FacturacionForm({
   perfil,
   onPerfilChange,
+  onSaved,
 }: {
   perfil: Perfil;
   onPerfilChange: (p: Perfil) => void;
+  /** Se llama tras un guardado exitoso — lo usa `FacturacionModal` para
+   *  cerrarse solo; en el perfil del portal (no es un modal) se omite. */
+  onSaved?: () => void;
 }) {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -569,6 +573,7 @@ export function FacturacionForm({
     try {
       await patchPerfil(perfil, onPerfilChange, form, { invalidate: true });
       toast.success("Facturación actualizada");
+      onSaved?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al guardar");
     } finally {

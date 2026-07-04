@@ -75,6 +75,7 @@ export function FacturacionModal({
               setPerfil(p);
               onPerfilChange(p);
             }}
+            onSaved={() => onOpenChange(false)}
           />
         )}
       </DialogContent>
