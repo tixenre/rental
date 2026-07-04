@@ -219,6 +219,24 @@ def test_veces_alquilado(setup):
     assert pablo["pedidos"] == 2
 
 
+def test_pedidos_detalle_incluye_cliente_y_numero_pedido(setup):
+    # `pedidos_detalle` (2026-07-04) trae el pedido con cliente/numero_pedido
+    # (cae a `cliente_nombre`/`id` cuando no hay cliente registrado/numero_pedido
+    # asignado, como en el fixture de este archivo) y el monto que le tocó a ESE
+    # dueño para ESE pedido — no el total del pedido cuando hay 2 dueños (P_MIXTO).
+    junio = _liquidar("2026-06-01", "2026-06-30")
+    duenos = {d["dueno"]: d for d in junio["por_dueno"]}
+
+    pablo_ped = {p["pedido_id"]: p for p in duenos["Pablo"]["pedidos_detalle"]}
+    assert pablo_ped[P_CRUCE]["numero_pedido"] == P_CRUCE  # sin numero_pedido → cae al id
+    assert pablo_ped[P_CRUCE]["cliente"] == "Cliente liquidación"
+    assert pablo_ped[P_CRUCE]["monto"] == 100000
+    assert pablo_ped[P_MIXTO]["monto"] == 40000  # su parte del pedido mixto, no los 100k
+
+    rambla_ped = {p["pedido_id"]: p for p in duenos["Rambla"]["pedidos_detalle"]}
+    assert rambla_ped[P_MIXTO]["monto"] == 60000  # la parte de Rambla del mismo pedido
+
+
 def test_reconciliacion_caza_pagado_sin_ledger(setup):
     from database import get_db
     from reportes.reconciliacion import reconciliar

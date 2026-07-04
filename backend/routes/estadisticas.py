@@ -47,12 +47,13 @@ def compute_estadisticas(conn) -> dict:
     `get_estadisticas` (transporte HTTP) como el PDF de Reportes (sección
     'Resumen general'). No abre ni cierra la conexión: el caller la administra.
     """
-    # ── Totales generales (solo pedidos confirmados/finalizados) ──────────────
-    # A nivel PEDIDO: `monto_total` directo, sin join a `alquiler_items` — sumarlo
-    # por ítem lo multiplicaría por cada línea del pedido. Mismo universo de
-    # pedidos que antes: todo pedido en estos 3 estados tiene ≥1 ítem (invariante
-    # de creación, `routes/alquileres/core.py`), así que no hace falta el join
-    # para filtrar "tiene ítems".
+    # ── Totales generales (SOLO pedidos `finalizado` — devengado + cerrado) ───
+    # Criterio explícito del dueño (2026-07-04): Estadísticas cuenta negocio YA
+    # cerrado, no `confirmado`/`retirado` (que todavía pueden cambiar). A nivel
+    # PEDIDO: `monto_total` directo, sin join a `alquiler_items` — sumarlo por
+    # ítem lo multiplicaría por cada línea del pedido. Todo pedido `finalizado`
+    # tiene ≥1 ítem (invariante de creación, `routes/alquileres/core.py`), así
+    # que no hace falta el join para filtrar "tiene ítems".
     totales = conn.execute("""
         SELECT
             COUNT(*)                       AS total_pedidos,
@@ -61,7 +62,7 @@ def compute_estadisticas(conn) -> dict:
             MIN(p.fecha_desde)             AS desde,
             MAX(p.fecha_desde)             AS hasta
         FROM alquileres p
-        WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
+        WHERE p.estado = 'finalizado'
     """).fetchone()
 
     # ── Por mes ───────────────────────────────────────────────────────────────
@@ -71,7 +72,7 @@ def compute_estadisticas(conn) -> dict:
             COUNT(*)                       AS pedidos,
             SUM(p.monto_total)             AS total_ars
         FROM alquileres p
-        WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
+        WHERE p.estado = 'finalizado'
         GROUP BY to_char(p.fecha_desde, 'YYYY-MM')
         ORDER BY to_char(p.fecha_desde, 'YYYY-MM') DESC
         LIMIT 24
@@ -90,7 +91,7 @@ def compute_estadisticas(conn) -> dict:
         JOIN alquileres p  ON p.id  = pi.pedido_id
         JOIN equipos e  ON e.id  = pi.equipo_id
         JOIN tot t ON t.pedido_id = p.id
-        WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
+        WHERE p.estado = 'finalizado'
         GROUP BY pi.equipo_id, e.nombre
         ORDER BY total_ars DESC
         LIMIT 15
@@ -104,7 +105,7 @@ def compute_estadisticas(conn) -> dict:
             COUNT(DISTINCT p.id)           AS pedidos
         FROM alquileres p
         LEFT JOIN clientes c ON c.id = p.cliente_id
-        WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
+        WHERE p.estado = 'finalizado'
         GROUP BY COALESCE(CAST(p.cliente_id AS TEXT), 'txt:' || p.cliente_nombre)
         ORDER BY total_ars DESC
         LIMIT 10
@@ -122,7 +123,7 @@ def compute_estadisticas(conn) -> dict:
         JOIN alquileres p ON p.id = pi.pedido_id
         JOIN equipos e ON e.id = pi.equipo_id
         JOIN tot t ON t.pedido_id = p.id
-        WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
+        WHERE p.estado = 'finalizado'
         GROUP BY COALESCE(e.dueno, 'Rambla')
         ORDER BY total_ars DESC
     """).fetchall()
@@ -157,7 +158,7 @@ def compute_estadisticas(conn) -> dict:
             SUM(p.monto_total)             AS total_ars
         FROM alquileres p
         LEFT JOIN clientes c ON c.id = p.cliente_id
-        WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
+        WHERE p.estado = 'finalizado'
         GROUP BY COALESCE(CAST(p.cliente_id AS TEXT), 'txt:' || p.cliente_nombre)
         HAVING COUNT(DISTINCT p.id) > 1
         ORDER BY veces_alquiladas DESC
@@ -173,7 +174,7 @@ def compute_estadisticas(conn) -> dict:
         WITH por_mes_full AS (
             SELECT to_char(p.fecha_desde, 'YYYY-MM') AS mes, SUM(p.monto_total) AS total
             FROM alquileres p
-            WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
+            WHERE p.estado = 'finalizado'
             GROUP BY to_char(p.fecha_desde, 'YYYY-MM')
         )
         SELECT

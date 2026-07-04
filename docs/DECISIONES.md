@@ -2530,6 +2530,31 @@ cancel-in-progress` ya cancela corridas viejas.
 - El supervisor marca cualquier query nueva de estadísticas/reportes que reconstruya
   `subtotal * (1 - descuento_pct/100)` (o cualquier variante que recalcule el descuento) en vez de leer
   `alquileres.monto_total` directo o prorrateado.
+- **Adenda 2026-07-04 — devengado, no cobrado.** El dueño preguntó si la sobreestimación podía venir de
+  un descuento no contado (ya arreglado arriba) y, al revisar la pantalla completa, surgió una segunda
+  pregunta: ¿"Facturado total" debería mostrar lo efectivamente cobrado en vez del valor del pedido? El
+  dueño resolvió el criterio explícitamente: **"debería ser lo devengado todo lo de estadísticas"** — la
+  misma línea "facturado" que ya usa la cascada del P&L de Reportes (_2026-06-28 — La ganancia de Rambla
+  descuenta la comisión de los dueños_: `facturado − comisiones a dueños − gastos = ganancia`), no
+  `monto_pagado`/cobros reales (`alquiler_pagos`), que Estadísticas no toca. Consecuencia: **ningún
+  cambio de código** — las 7 agregaciones (`totales`/`por_mes`/`top_equipos`/`top_clientes`/`por_dueno`/
+  `clientes_recurrentes`/`mejor_peor_mes`) ya eran consistentemente devengadas tras el fix de arriba; esto
+  solo deja escrito el criterio para que no se re-litigue. Si a futuro se quisiera un "cobrado real"
+  (`monto_pagado`), sería una tarjeta/métrica NUEVA y explícitamente rotulada, no un reemplazo de
+  "Facturado total".
+- **Refinado el mismo día — solo `finalizado`.** Tras la adenda de arriba, el dueño precisó más: "solo de
+  finalizados, eso son las estadísticas, solo de pedidos finalizados y devengados" — Estadísticas no debe
+  contar negocio `confirmado`/`retirado` (todavía puede cancelarse o modificarse), solo pedidos YA
+  cerrados. **Esta vez sí hubo cambio de código:** las 7 queries de `compute_estadisticas`
+  (`backend/routes/estadisticas.py`) pasan de `WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')`
+  a `WHERE p.estado = 'finalizado'` — mismo criterio en las 7, sin excepciones (la función es fuente única
+  compartida con la sección "Resumen general" del PDF de Reportes, `backend/pdf.py::_resumen_general_html`,
+  que también ajustó sus 2 textos: "ingreso confirmado" → "ingreso finalizado"; "histórico de pedidos
+  confirmados, retirados y finalizados" → "histórico de pedidos finalizados"). El invariante "todo pedido
+  en este filtro tiene ≥1 ítem" se preserva (`finalizado` es subconjunto del set viejo). Regresión nueva:
+  `test_estadisticas_excluye_confirmado_y_retirado` (Postgres real) — inserta un pedido `confirmado` y uno
+  `retirado` con montos no-cero y verifica que NO mueven `totales`/`top_equipos`/`por_dueno`. Suite
+  completa verde (2769 tests) tras el cambio.
 
 ### 2026-07-03 — Factura y mail de "pedido creado": línea de bonificación/descuento visible (M5+L1, #1209)
 
@@ -2809,3 +2834,59 @@ cancel-in-progress` ya cancela corridas viejas.
   en `routes/clientes.py::update_cliente` (placeholders `?` de sqlite3 nunca migrados a `%s`, cualquier
   edición de cliente fallaba en runtime) — pusheado directo a `dev` (commit `5eb5e18`), con test de
   regresión.
+
+### 2026-07-04 — Liquidación: los segmentos del export viven NATIVOS en la web (no un iframe) + detalle de pedidos por dueño
+
+- **Contexto.** El dueño, mirando la pantalla `/admin/contabilidad/liquidacion` (Junio de 2026, mes ya
+  cerrado), pidió dos cosas: (1) "viste que hacemos un reporte y lo mandamos por mail, ¿podemos tenerlo en
+  la vista?" y (2) "no solo los equipos sino que los rentals me gustaría mostrar" (en el "Resumen por
+  dueño", que hoy solo lista por equipo, ej. "Filmar · 1× alquilado · $797.000"). Antes de implementar se
+  preguntó explícitamente para no adivinar sobre el motor de reportes (sagrado): confirmó "quisiera que lo
+  que se manda sea lo mismo de lo que se ve. así también vive en la web" (embeber el HTML real, no
+  reimplementar) y "agregar lista de pedidos, además de equipos" (sumar, no reemplazar).
+- **Decisión — reporte embebido.** El componente `LiquidacionReporte.tsx` agrega una query de nivel
+  superior (`reporteQ`) con el **mismo `queryKey`** (`["admin", "reporte-preview", mesDesde, mesHasta]`) que
+  ya usaba `EnviarReporteDialog` — comparten caché, sin duplicar el fetch — y renderiza una sección "Reporte
+  del mes" con el iframe `srcDoc` del HTML real (`adminApi.liquidacionPreviewHtml`), **siempre visible en la
+  página**, no solo detrás del diálogo de "Enviar por mail". Como es literalmente el mismo documento que se
+  adjunta al mail/PDF, no puede haber drift entre "lo que ves" y "lo que se manda".
+- **Decisión — detalle de pedidos por dueño.** `backend/reportes/liquidacion.py::filas_atribucion` suma al
+  SELECT `numero_pedido` (fallback a `id`, mismo patrón que el resto del repo) y `cliente` (`LEFT JOIN
+  clientes` + `COALESCE(nombre || apellido, cliente_nombre)`, mismo patrón que `estadisticas.py`).
+  `agregar()` acumula un nuevo `dueno_pedido_monto: dict[dueno][pedido_id] -> monto` (en paralelo a
+  `dueno_equipos`) y emite **`pedidos_detalle`** por dueño — ordenado por monto descendente, igual que
+  `equipos` — **ADEMÁS de `equipos`, no en su lugar** (per la decisión del dueño). Un pedido con equipos de 2
+  dueños distintos (ej. P_MIXTO en los tests) aporta un monto DISTINTO a cada uno en su propio
+  `pedidos_detalle` — no es "el total del pedido" repetido. `combinar_meses` concatena las listas entre
+  meses (mismo invariante que el resto de la función: un pedido pertenece a un único mes de saldado, nunca
+  se solapan, así que concatenar es seguro sin dedup). Se renderiza en dos lugares: el "Resumen por dueño"
+  de la vista web (nuevo `RankList` de pedidos al lado del de equipos, ícono `Receipt`) y una segunda tabla
+  "Pedidos" en `pdf.py::_liquidacion_html` (mismo `_liquidacion_html` que alimenta tanto el PDF adjunto como
+  el iframe embebido de arriba — una sola fuente para las tres superficies).
+- **Compat con meses ya cerrados.** El mes mostrado en el pedido del dueño (junio 2026) ya estaba **cerrado**
+  — su `snapshot_json` es una foto JSON congelada de ANTES de este cambio, sin la clave `pedidos_detalle`.
+  Se resolvió con `.get("pedidos_detalle", [])` en Python (`combinar_meses`, `pdf.py`) y el campo se declaró
+  **opcional** en el tipo TS (`LiquidacionDueno.pedidos_detalle?`), con `d.pedidos_detalle ?? []` en el
+  render — cae a "Sin datos"/tabla vacía en vez de romper. Se recupera reabriendo y volviendo a cerrar el
+  mes (el cierre nuevo sí incluye el campo).
+- **Consecuencias.** Cambios en `backend/reportes/liquidacion.py` (SQL + `agregar`/`combinar_meses`),
+  `backend/pdf.py` (tabla "Pedidos" + CSS `.rep-tbl--pedidos`), `frontend/.../LiquidacionReporte.tsx` (RankList
+  de pedidos + sección "Reporte del mes"), `frontend/.../types.ts` (`pedidos_detalle?`). Candados nuevos: 3
+  tests puros (`test_reportes_liquidacion.py` — split por dueño, fallback sin `numero_pedido`/`cliente`,
+  concatenación en `combinar_meses`), 1 test Postgres real (`test_reportes_liquidacion_db.py` — cliente/
+  numero_pedido reales vía el fixture existente, incluido el caso de 2 dueños en un mismo pedido), 3 tests de
+  PDF (`test_reportes_pdf_mail.py` — tabla se renderiza, escapa el nombre del cliente, no rompe sin el campo).
+  Suite completa (2775 unit + toda la integración salvo `test_catalogo_motor_shape.py`, que ya fallaba igual
+  sin este cambio por depender de datos reales de catálogo ausentes en una DB de test vacía) verde. `tsc`/
+  `eslint`/`prettier`/`ruff` limpios.
+- **Corrección — el iframe se descartó, mismo día.** El primer intento del punto (1) (ver bullet "Decisión —
+  reporte embebido" arriba) fue literal: un iframe con `srcDoc` del HTML branded de `_liquidacion_html`,
+  siempre visible en una sección "Reporte del mes". El dueño lo vio en staging y corrigió: "embebiste el
+  reporte, yo quiero que eso que pusiste sea el export, en la web que aparezcan los segmentos nativamente" —
+  la lectura correcta de "que viva en la web" era que el CONTENIDO (los segmentos: beneficiarios, detalle por
+  dueño con equipos+pedidos) esté disponible como componentes nativos del DS, no que el documento de
+  exportación se incruste como un iframe ajeno dentro de la SPA. Se sacó la sección "Reporte del mes" y la
+  query `reporteQ` — el resto (KPIs de beneficiarios, `Section` de "Resumen por dueño" con `RankList` de
+  equipos + pedidos) YA cumplía el pedido nativamente, sin cambios adicionales. El preview de
+  `EnviarReporteDialog` (el iframe que sí queda) es un caso distinto y correcto: previsualiza el adjunto real
+  antes de mandarlo, no una vista permanente de página.
