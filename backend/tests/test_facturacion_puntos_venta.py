@@ -73,6 +73,30 @@ def test_fchbaja_string_null_de_arca_no_cuenta_como_dado_de_baja(monkeypatch):
     assert result["excluidos"] == []
 
 
+def test_emisiontipo_con_sufijo_de_regimen_cuenta_como_electronico(monkeypatch):
+    """Regresión de bug real en producción: la respuesta REAL de ARCA trae `EmisionTipo` con el
+    régimen fiscal del emisor como sufijo (`"CAE - Monotributo"`, confirmado por el dueño en un
+    punto de venta usado con éxito para facturar) — NO el literal `"CAE"` que el código esperaba.
+    `"CAEA"` (Autorización Anticipada, un mecanismo distinto) sigue contando como no-electrónico
+    para esta librería, que no la implementa."""
+    _patch_auth(monkeypatch)
+    monkeypatch.setattr(
+        "arca_fe.wsfe.WsfeClient.param_puntos_venta",
+        lambda self: [
+            {"Nro": 2, "EmisionTipo": "CAE - Monotributo", "Bloqueado": "N", "FchBaja": None},
+            {"Nro": 3, "EmisionTipo": "CAE - Responsable Inscripto", "Bloqueado": "N", "FchBaja": None},
+            {"Nro": 5, "EmisionTipo": "CAEA", "Bloqueado": "N", "FchBaja": None},
+        ],
+    )
+
+    result = consultar_puntos_venta("pablo", conn=object())
+
+    assert result["habilitados"] == [{"nro": 2}, {"nro": 3}]
+    assert result["excluidos"] == [
+        {"nro": 5, "motivo": "no_electronico", "raw_emision_tipo": "CAEA"},
+    ]
+
+
 def test_sin_puntos_habilitados_devuelve_lista_vacia(monkeypatch):
     _patch_auth(monkeypatch)
     monkeypatch.setattr("arca_fe.wsfe.WsfeClient.param_puntos_venta", lambda self: [])

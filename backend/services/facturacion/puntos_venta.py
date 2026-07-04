@@ -25,6 +25,19 @@ def _tiene_fecha_de_baja(fch_baja) -> bool:
     return bool(fch_baja) and str(fch_baja).strip().upper() != "NULL"
 
 
+def _es_cae(emision_tipo) -> bool:
+    """`EmisionTipo` en la respuesta REAL de `FEParamGetPtosVenta` NO es el literal `"CAE"` — ARCA
+    le agrega el régimen fiscal del emisor como sufijo (confirmado en producción: `"CAE -
+    Monotributo"` para un punto de venta habilitado y usado con éxito para facturar). Sin este
+    chequeo, `EmisionTipo != "CAE"` marcaba TODO punto de venta electrónico como "no_electronico"
+    sin importar su estado real (mismo patrón que el bug de `FchBaja="NULL"`). Se acepta el
+    prefijo `"CAE"` seguido de nada o de `" - <lo que sea>"` — pero NO `"CAEA"` (Autorización
+    Electrónica Anticipada, un mecanismo distinto: lote pre-autorizado en vez de `FECAESolicitar`
+    online, que esta librería no implementa)."""
+    valor = str(emision_tipo or "").strip()
+    return valor == "CAE" or valor.startswith("CAE -")
+
+
 def consultar_puntos_venta(nombre_emisor: str, conn) -> dict:
     """Puntos de venta de `nombre_emisor`, separados en habilitados para
     facturación electrónica y excluidos (con motivo).
@@ -64,7 +77,7 @@ def consultar_puntos_venta(nombre_emisor: str, conn) -> dict:
             excluidos.append({"nro": p["Nro"], "motivo": "bloqueado"})
         elif _tiene_fecha_de_baja(p.get("FchBaja")):
             excluidos.append({"nro": p["Nro"], "motivo": "dado_de_baja"})
-        elif p.get("EmisionTipo") != "CAE":
+        elif not _es_cae(p.get("EmisionTipo")):
             excluidos.append(
                 {
                     "nro": p["Nro"],
