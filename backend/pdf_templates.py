@@ -484,10 +484,13 @@ def _membrete(pedido, doc_type, num, fecha, estado=True, wordmark_liviano=False)
     )
 
 
-def _footer():
+def _footer(direccion=None, telefono=None):
+    """`direccion`/`telefono` opcionales — el preview del checkout
+    (`_contrato_html(..., locador_override=...)`) los pisa con datos de
+    muestra; el resto de los documentos (default `None`) usa los reales."""
     return (
         '<footer class="doc-footer"><span class="fb">Rambla Rental</span>'
-        f'<span>{html.escape(OWNER_DIRECCION)} · {html.escape(OWNER_TELEFONO)}</span>'
+        f'<span>{html.escape(direccion or OWNER_DIRECCION)} · {html.escape(telefono or OWNER_TELEFONO)}</span>'
         f'<span>{html.escape(OWNER_WEB)}</span></footer>'
     )
 
@@ -745,7 +748,7 @@ _CLAUSULAS = [
 ]
 
 
-def _contrato_html(pedido, mostrar_locador=True, fonts_ligeras=False):
+def _contrato_html(pedido, mostrar_locador=True, fonts_ligeras=False, locador_override=None):
     """`mostrar_locador=False` omite el bloque de datos del Locador (Rambla) —
     son fijos/institucionales, no cambian por pedido, así que no aportan nada
     en el PREVIEW del checkout (`routes/checkout.py::checkout_contrato_preview`):
@@ -755,7 +758,20 @@ def _contrato_html(pedido, mostrar_locador=True, fonts_ligeras=False):
     `fonts_ligeras=True` (ver `_document` + `_membrete`) salta las fuentes de
     marca embebidas y el isologo (SVG + su lectura a DB) — el mismo PREVIEW,
     liviano para pintar en el browser real del cliente en vez de en
-    Playwright: es una simulación, no hace falta el vestido completo."""
+    Playwright: es una simulación, no hace falta el vestido completo.
+
+    `locador_override` (dict opcional con `nombre`/`cuil`/`direccion`/
+    `telefono`/`email`) reemplaza los `OWNER_*` reales en el bloque de datos
+    del Locador y en su firma — mismo criterio que `_CLIENTE_DE_MUESTRA`
+    (`routes/checkout.py`): el preview del checkout es un documento "de
+    mentira" de punta a punta, ninguna de las dos partes lleva datos reales.
+    `None` (default) usa los `OWNER_*` reales — el contrato REAL no cambia."""
+    loc_nombre = (locador_override or {}).get("nombre") or OWNER_NOMBRE
+    loc_cuil = (locador_override or {}).get("cuil") or OWNER_CUIL
+    loc_direccion = (locador_override or {}).get("direccion") or OWNER_DIRECCION
+    loc_telefono = (locador_override or {}).get("telefono") or OWNER_TELEFONO
+    loc_email = (locador_override or {}).get("email") or OWNER_EMAIL
+
     items = pedido.get("items", [])
     j = _jornadas(pedido)
     rows, i = [], 1
@@ -788,6 +804,13 @@ def _contrato_html(pedido, mostrar_locador=True, fonts_ligeras=False):
         )
     fecha_long = _fmt_date_long(pedido.get("emitido") or datetime.now())
     clausulas = "".join(f'<p class="clausula"><b>{html.escape(t)}.</b> {b}</p>' for t, b in _CLAUSULAS)
+    if locador_override:
+        # La cláusula "Jurisdicción" (`_CLAUSULAS`, lista módulo-level) hornea
+        # `OWNER_DIRECCION` en su texto al importar — no está parametrizada
+        # por-llamada. Con `locador_override` puesto, ese domicilio también
+        # tiene que ser de mentira: se reemplaza el texto real por el de
+        # muestra en vez de reescribir `_CLAUSULAS` como función.
+        clausulas = clausulas.replace(html.escape(OWNER_DIRECCION), html.escape(loc_direccion))
     # Sin Locador, el bloque de Locatario (y su firma) ocupan la fila entera
     # en vez de quedar a media grilla con un hueco vacío al lado.
     _full_col_attrs = "" if mostrar_locador else ' style="grid-column:1/-1"'
@@ -806,10 +829,10 @@ def _contrato_html(pedido, mostrar_locador=True, fonts_ligeras=False):
         + '<div class="partes">'
         + (
             '<div class="parte"><div class="parte-head">Locador</div>'
-            f'<div class="parte-row"><div class="parte-k">Nombre</div><div class="parte-v">{html.escape(OWNER_NOMBRE)}</div></div>'
-            f'<div class="parte-row"><div class="parte-k">CUIL</div><div class="parte-v">{html.escape(OWNER_CUIL)}</div></div>'
-            f'<div class="parte-row"><div class="parte-k">Domicilio</div><div class="parte-v">{html.escape(OWNER_DIRECCION)}</div></div>'
-            f'<div class="parte-row"><div class="parte-k">Contacto</div><div class="parte-v">{html.escape(OWNER_TELEFONO)} · {html.escape(OWNER_EMAIL)}</div></div></div>'
+            f'<div class="parte-row"><div class="parte-k">Nombre</div><div class="parte-v">{html.escape(loc_nombre)}</div></div>'
+            f'<div class="parte-row"><div class="parte-k">CUIL</div><div class="parte-v">{html.escape(loc_cuil)}</div></div>'
+            f'<div class="parte-row"><div class="parte-k">Domicilio</div><div class="parte-v">{html.escape(loc_direccion)}</div></div>'
+            f'<div class="parte-row"><div class="parte-k">Contacto</div><div class="parte-v">{html.escape(loc_telefono)} · {html.escape(loc_email)}</div></div></div>'
             if mostrar_locador else ""
           )
         + f'<div class="parte"{_full_col_attrs}><div class="parte-head">Locatario</div>'
@@ -827,12 +850,12 @@ def _contrato_html(pedido, mostrar_locador=True, fonts_ligeras=False):
         + '<div class="firmas">'
           f'<div class="firma"{_full_col_attrs}><div class="rol">Firma Locatario</div><div class="name">{html.escape(pedido.get("cliente_nombre") or "—")}</div><div class="sub">Aclaración / DNI</div></div>'
         + (
-            f'<div class="firma"><div class="rol">Firma Locador</div><div class="name">{html.escape(OWNER_NOMBRE)}</div><div class="sub">Aclaración / DNI</div></div>'
+            f'<div class="firma"><div class="rol">Firma Locador</div><div class="name">{html.escape(loc_nombre)}</div><div class="sub">Aclaración / DNI</div></div>'
             if mostrar_locador else ""
           )
         + "</div>"
         + f'<div style="text-align:center;font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:28px;letter-spacing:.04em">Emitido en Mar del Plata, {fecha_long}</div>'
-        + _footer()
+        + _footer(loc_direccion, loc_telefono)
     )
     return _document(body, fonts_ligeras=fonts_ligeras)
 

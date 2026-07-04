@@ -172,9 +172,16 @@ razón social del Locatario por placeholders fijos ("Juan Pérez", etc.); `_seri
 valor_de_muestra(idx)` hace lo mismo con el número de serie y el valor de reposición
 de cada equipo (`EJEMPLO-0001`, `$100.000`). **Lo único real del cliente es el perfil
 fiscal** (`cliente_perfil_impuestos` — decide si aparece el bloque de Responsable
-Inscripto; no es un dato personal sensible). Con el Locatario ya ficticio, el Locador
-(datos institucionales fijos de Rambla) **sí se muestra** — no hay nada sensible que
-cuidar de ese lado, y así el preview se lee como el contrato real completo. El
+Inscripto; no es un dato personal sensible).
+
+El Locador (datos institucionales de Rambla — `OWNER_*` en `pdf_templates.py`) **también
+es ficticio en el preview**: `_LOCADOR_DE_MUESTRA` (`routes/checkout.py`) se pasa como
+`_contrato_html(..., locador_override=_LOCADOR_DE_MUESTRA)`, que pisa nombre/CUIL/
+domicilio/contacto en el bloque de datos, en la firma **y** en el texto de la cláusula
+"Decimotercero — Jurisdicción" (`_CLAUSULAS`, único lugar donde el domicilio real queda
+horneado aparte del bloque de datos — se resuelve con un reemplazo de texto puntual, no
+reescribiendo `_CLAUSULAS` como función) y en el pie de página (`_footer(direccion,
+telefono)`). `locador_override=None` (default) no cambia nada del contrato REAL. El
 nombre/cantidad/marca/modelo del equipo siguen siendo los reales (el cliente necesita
 verificar QUÉ está por pedir); solo serie y valor son de mentira.
 

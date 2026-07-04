@@ -48,6 +48,20 @@ _CLIENTE_DE_MUESTRA = {
     "cliente_razon_social": "Empresa de Ejemplo S.R.L.",
 }
 
+# Mismo criterio para el Locador: es todo de mentira de punta a punta, así
+# que los datos institucionales reales de Rambla (`OWNER_*` en pdf_templates)
+# tampoco hace falta mostrarlos en la simulación — `_contrato_html(...,
+# locador_override=...)` los reemplaza en el bloque de datos, la firma y la
+# cláusula de Jurisdicción (único lugar donde el domicilio real quedaba
+# horneado aparte).
+_LOCADOR_DE_MUESTRA = {
+    "nombre": "Rambla Rental de Muestra S.R.L.",
+    "cuil": "30-12345678-9",
+    "direccion": "Av. de Muestra 100, Mar del Plata",
+    "telefono": "223 555-0200",
+    "email": "contacto@ejemplo.com",
+}
+
 
 def _serie_y_valor_de_muestra(idx: int) -> tuple[str, int]:
     """Serie + valor de reposición ficticios para el preview del contrato —
@@ -220,15 +234,17 @@ def checkout_contrato_preview(data: ContratoPreviewIn, request: Request):
                 "cliente_perfil_impuestos": perfil_impuestos,
             }
 
-            # mostrar_locador=True (default): con el Locatario ya con datos de
-            # muestra, mostrar ambas partes hace que el preview se lea como el
-            # contrato real completo — nada sensible que cuidar de ese lado
-            # (son los datos institucionales fijos de Rambla). fonts_ligeras=True:
-            # esto lo pinta el browser real del cliente (no Playwright) — sin
-            # esto, el iframe tardaba 10s+ en parsear ~1.2MB de fuentes de
-            # marca embebidas en base64 (ver docs/SISTEMA_CHECKOUT.md).
+            # mostrar_locador=True (default): con las dos partes ya con datos
+            # de muestra, mostrar ambas hace que el preview se lea como el
+            # contrato real completo. locador_override=_LOCADOR_DE_MUESTRA:
+            # los datos institucionales de Rambla tampoco son necesarios en
+            # una simulación — mismo criterio que el Locatario.
+            # fonts_ligeras=True: esto lo pinta el browser real del cliente
+            # (no Playwright) — sin esto, el iframe tardaba 10s+ en parsear
+            # ~1.2MB de fuentes de marca embebidas en base64 (ver
+            # docs/SISTEMA_CHECKOUT.md).
             html_str = _marcar_como_simulacion(
-                _contrato_html(pedido, fonts_ligeras=True)
+                _contrato_html(pedido, fonts_ligeras=True, locador_override=_LOCADOR_DE_MUESTRA)
             )
     except HTTPException:
         raise

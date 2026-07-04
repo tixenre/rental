@@ -133,12 +133,12 @@ def test_contrato_preview_devuelve_html_marcado_como_simulacion(carrito_con_equi
 
 
 def test_contrato_preview_no_expone_pii_real_del_cliente(carrito_con_equipo):
-    """El preview es una SIMULACIÓN que queda en el DOM del browser — el
-    nombre/email real del cliente logueado NO debe aparecer; en su lugar,
-    datos de muestra (`_CLIENTE_DE_MUESTRA`). Con el Locatario ya ficticio,
-    el Locador (datos institucionales fijos de Rambla, no sensibles) sí se
-    muestra — mismo contrato que el real."""
-    from pdf_templates import OWNER_NOMBRE
+    """El preview es una SIMULACIÓN que queda en el DOM del browser — ni el
+    nombre/email real del cliente logueado (Locatario) NI los datos
+    institucionales reales de Rambla (Locador) deben aparecer; ambas partes
+    llevan datos de muestra (`_CLIENTE_DE_MUESTRA` / `_LOCADOR_DE_MUESTRA`)."""
+    from pdf_templates import OWNER_CUIL, OWNER_NOMBRE
+    from routes.checkout import _LOCADOR_DE_MUESTRA
 
     res = client.post(
         "/api/checkout/contrato-preview",
@@ -150,7 +150,9 @@ def test_contrato_preview_no_expone_pii_real_del_cliente(carrito_con_equipo):
     assert "Ana Gómez" not in html
     assert "contrato-preview-db@test.com" not in html
     assert "Juan Pérez" in html  # placeholder de _CLIENTE_DE_MUESTRA
-    assert OWNER_NOMBRE in html  # Locador vuelve a mostrarse
+    assert OWNER_NOMBRE not in html
+    assert OWNER_CUIL not in html
+    assert _LOCADOR_DE_MUESTRA["nombre"] in html  # placeholder de _LOCADOR_DE_MUESTRA
 
 
 def test_contrato_preview_serie_y_valor_de_equipos_son_ficticios(carrito_con_equipo):

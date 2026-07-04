@@ -292,3 +292,34 @@ class TestContratoHtmlMostrarLocador:
         html_str = _contrato_html(self._pedido())
         assert "@font-face" in html_str
         assert "fonts.googleapis.com" in html_str
+
+    def test_locador_override_reemplaza_datos_reales(self):
+        """`locador_override` (usado por el preview del checkout) reemplaza los
+        `OWNER_*` reales en el bloque de datos, la firma Y la cláusula de
+        Jurisdicción (que hornea el domicilio real aparte, en `_CLAUSULAS`)."""
+        from pdf_templates import OWNER_CUIL, OWNER_DIRECCION, OWNER_NOMBRE, _contrato_html
+
+        override = {
+            "nombre": "Locador de Muestra S.R.L.",
+            "cuil": "30-00000000-0",
+            "direccion": "Calle Falsa 123, Muestra",
+            "telefono": "223 000-0000",
+            "email": "muestra@ejemplo.com",
+        }
+        html_str = _contrato_html(self._pedido(), locador_override=override)
+
+        assert OWNER_NOMBRE not in html_str
+        assert OWNER_CUIL not in html_str
+        assert OWNER_DIRECCION not in html_str  # incluye la cláusula de Jurisdicción
+        assert override["nombre"] in html_str
+        assert override["cuil"] in html_str
+        assert override["direccion"] in html_str
+        assert "Firma Locador" in html_str  # el bloque se sigue mostrando, con datos falsos
+
+    def test_locador_override_none_no_cambia_el_contrato_real(self):
+        """Sin override (default `None`), el contrato REAL sigue mostrando los
+        datos institucionales reales — no hay regresión para el documento válido."""
+        from pdf_templates import OWNER_NOMBRE, _contrato_html
+
+        html_str = _contrato_html(self._pedido(), locador_override=None)
+        assert OWNER_NOMBRE in html_str
