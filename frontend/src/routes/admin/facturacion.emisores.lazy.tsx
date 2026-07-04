@@ -20,6 +20,8 @@ import {
   Fingerprint,
   MoreHorizontal,
   Power,
+  Stethoscope,
+  BookOpen,
 } from "lucide-react";
 
 import { facturacionApi, type EmisorArca } from "@/lib/admin/api";
@@ -33,6 +35,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/design-system/ui/dropdown-menu";
+import { Chequeos } from "@/design-system/composites/Chequeos";
 
 export const Route = createLazyFileRoute("/admin/facturacion/emisores")({
   component: EmisoresPage,
@@ -56,6 +59,7 @@ function EmisoresPage() {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [certId, setCertId] = useState<number | null>(null);
+  const [showGuia, setShowGuia] = useState(false);
 
   const emisores = q.data ?? [];
   const editEmisor = editId !== null ? emisores.find((e) => e.id === editId) : null;
@@ -76,17 +80,27 @@ function EmisoresPage() {
             antes de guardarse.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setEditId(null);
-            setShowForm(true);
-          }}
-          className="shrink-0 flex items-center gap-1.5 h-9 px-3 rounded-md bg-ink text-background text-sm font-medium"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Nuevo emisor
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowGuia(true)}
+            className="flex items-center gap-1.5 h-9 px-3 rounded-md border hairline text-sm font-medium text-ink hover:bg-muted/50"
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            Guía de AFIP
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEditId(null);
+              setShowForm(true);
+            }}
+            className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-ink text-background text-sm font-medium"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nuevo emisor
+          </button>
+        </div>
       </header>
 
       {q.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
@@ -136,7 +150,45 @@ function EmisoresPage() {
       {certId !== null && certEmisor && (
         <CertFormModal emisor={certEmisor} onClose={() => setCertId(null)} onSaved={invalidate} />
       )}
+
+      {/* Guía de trámites de AFIP */}
+      {showGuia && <GuiaAfipModal onClose={() => setShowGuia(false)} />}
     </div>
+  );
+}
+
+// ── Guía de trámites de AFIP ───────────────────────────────────────────────────
+
+function GuiaAfipModal({ onClose }: { onClose: () => void }) {
+  const q = useQuery({
+    queryKey: ["admin", "emisores-arca", "guia"],
+    queryFn: () => facturacionApi.getGuiaAfip(),
+  });
+
+  return (
+    <Overlay onClose={onClose}>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-display text-xl text-ink">Guía de trámites de AFIP</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-ink hover:bg-muted"
+        >
+          <XCircle className="h-4 w-4" />
+        </button>
+      </div>
+      {q.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
+      {q.isError && (
+        <div className="text-sm text-destructive">
+          No se pudo cargar la guía. {(q.error as Error)?.message}
+        </div>
+      )}
+      {q.data && (
+        <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-ink bg-surface-elevated rounded-md p-4 border hairline">
+          {q.data.markdown}
+        </pre>
+      )}
+    </Overlay>
   );
 }
 
@@ -172,6 +224,11 @@ function EmisorCard({
 
   const certInfo = useMutation({
     mutationFn: () => facturacionApi.consultarCertInfo(emisor.id),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const diagnostico = useMutation({
+    mutationFn: () => facturacionApi.diagnosticarEmisor(emisor.id),
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -228,6 +285,10 @@ function EmisorCard({
                 {certInfo.isPending ? "Leyendo…" : "Ver cert"}
               </DropdownMenuItem>
             )}
+            <DropdownMenuItem onClick={() => diagnostico.mutate()} disabled={diagnostico.isPending}>
+              <Stethoscope className="mr-2 h-4 w-4" />
+              {diagnostico.isPending ? "Diagnosticando…" : "Diagnosticar"}
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={onCert}>
               <KeyRound className="mr-2 h-4 w-4" />
               {emisor.cert_cargado ? "Renovar cert" : "Cargar cert"}
@@ -262,6 +323,19 @@ function EmisorCard({
             Comparar el Nº de serie contra el "Computador Fiscal" en Administración de Certificados
             Digitales de ARCA.
           </div>
+        </div>
+      )}
+      {diagnostico.data && (
+        <div className="rounded-md border hairline bg-surface-elevated px-3 py-2.5">
+          <div
+            className={cn(
+              "text-2xs font-mono font-medium mb-2",
+              diagnostico.data.listo ? "text-verde-ink" : "text-destructive",
+            )}
+          >
+            {diagnostico.data.listo ? "✓ Listo para facturar" : "✗ Hay algo por resolver"}
+          </div>
+          <Chequeos items={diagnostico.data.chequeos} />
         </div>
       )}
     </div>
