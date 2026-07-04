@@ -94,15 +94,23 @@ export type ChequeoPreview = { check: string; ok: boolean; bloqueante: boolean; 
 
 export type PreviewFactura = {
   ambiente: "homologacion" | "produccion";
-  emisor: { nombre: string; cuit: number; condicion_iva: string };
+  emisor: { nombre: string; cuit: number; condicion_iva: string; condicion_iva_label: string };
   receptor: {
     doc_tipo: string;
     doc_nro: string;
     condicion_iva: string;
+    condicion_iva_label: string;
     razon_social: string;
     domicilio: string;
   };
-  comprobante: { letra: string; tipo_nro: number; numero_a_emitir: number; pto_vta: number };
+  comprobante: {
+    letra: string;
+    tipo_nro: number;
+    numero_a_emitir: number;
+    pto_vta: number;
+    concepto: string;
+    condicion_venta: string;
+  };
   importes: { neto: number; iva: number; total: number };
   fechas: {
     emision: string;
