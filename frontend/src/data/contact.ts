@@ -17,15 +17,16 @@ export const CONTACT = {
   /** TODO: confirmar email real. */
   email: "hola@rambla.studio",
 
-  /** TODO: confirmar dirección exacta. */
+  // Misma dirección que `OWNER_DIRECCION` en el backend (pdf.py/pdf_templates.py,
+  // la que ya sale impresa en facturas) — una sola fuente para el domicilio real.
   address: {
     line1: "Mar del Plata",
-    line2: "", // calle + número, barrio
+    line2: "Falucho 4625",
     city: "Mar del Plata",
     province: "Buenos Aires",
     country: "Argentina",
-    /** Link a Google Maps. TODO: completar con coordenadas reales. */
-    mapsUrl: "https://maps.google.com/?q=Mar+del+Plata",
+    /** TODO: completar con coordenadas reales (por ahora busca la dirección en texto). */
+    mapsUrl: "https://maps.google.com/?q=Falucho+4625+Mar+del+Plata",
   },
 
   /** TODO: confirmar horarios reales de atención (retiro/devolución). */

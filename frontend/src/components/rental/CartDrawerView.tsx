@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   X,
@@ -7,6 +8,7 @@ import {
   AlertCircle,
   Trash2,
   MessageCircle,
+  CheckCircle2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -25,9 +27,32 @@ import { GuardarComoListaButton } from "./GuardarComoListaButton";
 import { CompartirComposicionButton } from "./CompartirComposicionButton";
 import { RentalDateModal } from "./RentalDateModal";
 import { CheckoutResumen } from "./CheckoutResumen";
+import type { PerfilImpuestos } from "@/lib/iva";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/design-system/ui/alert-dialog";
 
-/** Forma mínima de la sesión del cliente que usa el panel (nombre + presencia). */
-type ClienteSessionLike = { nombre?: string | null } | null | undefined;
+/** Forma mínima de la sesión del cliente que usa el panel: nombre + presencia +
+ *  perfil fiscal (tarjeta "Facturación") + identidad/contacto YA RESUELTOS
+ *  por el backend (tarjeta "Tus datos" del resumen). */
+type ClienteSessionLike =
+  | {
+      nombre?: string | null;
+      nombreLegal?: string | null;
+      emailComunicacion?: string | null;
+      telefonoContacto?: string | null;
+      direccionLegal?: string | null;
+      perfil_impuestos?: PerfilImpuestos | null;
+    }
+  | null
+  | undefined;
 
 /**
  * CartDrawerView — el SHELL presentacional del drawer del carrito (checkout).
@@ -49,6 +74,7 @@ export function CartDrawerView({
   onClose,
   onExplore,
   step,
+  pedidoEnviado,
   sessionId,
   onVolverAlCarrito,
   onCrearPedido,
@@ -104,8 +130,11 @@ export function CartDrawerView({
   onClose: () => void;
   onExplore: () => void;
   /** "carrito" = lista de ítems (default); "resumen" = paso de revisión/confirmación
-   *  (`CheckoutResumen`, backend-driven vía el portero de checkout). */
-  step: "carrito" | "resumen";
+   *  (`CheckoutResumen`, backend-driven vía el portero de checkout); "exito" =
+   *  pantalla post-creación, unos segundos antes de redirigir al portal. */
+  step: "carrito" | "resumen" | "exito";
+  /** Presente solo en el paso "exito" — número de pedido para el mensaje. */
+  pedidoEnviado: { id: number; numeroPedido: string } | null;
   sessionId: string;
   onVolverAlCarrito: () => void;
   onCrearPedido: (sessionConfirmed: boolean) => Promise<void>;
@@ -147,6 +176,11 @@ export function CartDrawerView({
   clienteSession: ClienteSessionLike;
   onClear: () => void;
 }) {
+  // Confirmación de "Vaciar pedido" — un accidental antes vaciaba el carrito
+  // directo (sin deshacer posible). Estado puramente de UI, no necesita subir
+  // al container.
+  const [askVaciar, setAskVaciar] = useState(false);
+
   return (
     <AnimatePresence>
       {drawerOpen && (
@@ -229,7 +263,19 @@ export function CartDrawerView({
             )}
 
             {/* Contenido */}
-            {step === "resumen" ? (
+            {step === "exito" && pedidoEnviado ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+                <div className="grid h-16 w-16 place-items-center rounded-full bg-verde/15">
+                  <CheckCircle2 className="h-9 w-9 text-verde-ink" />
+                </div>
+                <h3 className="font-display text-2xl text-ink">
+                  Pedido #{pedidoEnviado.numeroPedido} enviado
+                </h3>
+                <p className="max-w-xs text-sm text-muted-foreground">
+                  Te llevamos a tu portal para seguir el estado y los próximos pasos…
+                </p>
+              </div>
+            ) : step === "resumen" ? (
               <CheckoutResumen
                 sessionId={sessionId}
                 startDate={startDate}
@@ -237,7 +283,12 @@ export function CartDrawerView({
                 startTime={startTime}
                 endTime={endTime}
                 d={d}
-                itemCount={list.reduce((acc, { qty }) => acc + qty, 0)}
+                items={list.map(({ it, qty }) => ({
+                  id: it.id,
+                  nombre: it.name,
+                  marca: it.brand,
+                  cantidad: qty,
+                }))}
                 subtotalTotal={subtotalTotal}
                 descuentoPct={descuentoPct}
                 descuentoOrigen={descuentoOrigen}
@@ -245,6 +296,11 @@ export function CartDrawerView({
                 totalNeto={totalNeto}
                 conIva={conIva}
                 clienteNombre={clienteSession?.nombre}
+                nombreLegal={clienteSession?.nombreLegal}
+                emailComunicacion={clienteSession?.emailComunicacion}
+                telefonoContacto={clienteSession?.telefonoContacto}
+                direccionLegal={clienteSession?.direccionLegal}
+                perfilImpuestos={clienteSession?.perfil_impuestos}
                 onBack={onVolverAlCarrito}
                 onCrearPedido={onCrearPedido}
               />
@@ -479,14 +535,6 @@ export function CartDrawerView({
                     </span>
                   </div>
 
-                  {!showNotas && list.length > 0 && (
-                    <button
-                      onClick={onShowNotas}
-                      className="w-full text-xs text-muted-foreground hover:text-ink focus:outline-none focus-visible:underline"
-                    >
-                      Agregar una nota
-                    </button>
-                  )}
                   <Button
                     variant="amber"
                     size="lg"
@@ -494,15 +542,7 @@ export function CartDrawerView({
                     disabled={list.length === 0 || hayNoDisponible || dentroDeLeadTime}
                     onClick={onSubmit}
                   >
-                    <span className="flex items-center gap-2">
-                      Confirmar solicitud
-                      {list.length > 0 && totalNeto > 0 && (
-                        <span className="font-mono text-xs font-normal opacity-70 tracking-normal normal-case tabular-nums">
-                          · {formatARS(totalNeto)}
-                          {conIva ? " + IVA" : ""}
-                        </span>
-                      )}
-                    </span>
+                    Revisar pedido
                   </Button>
 
                   {/* Lead-time (#1126): el retiro cae dentro de la ventana de antelación
@@ -582,16 +622,6 @@ export function CartDrawerView({
                     </div>
                   )}
 
-                  {/* Guardar como lista — solo logueado (las listas son server-only). */}
-                  {clienteSession && list.length > 0 && (
-                    <GuardarComoListaButton
-                      items={list.map(({ it, qty }) => ({
-                        equipo_id: it._backendId ?? Number(it.id),
-                        cantidad: qty,
-                      }))}
-                    />
-                  )}
-
                   {/* Compartir — público: anda logueado o anónimo (la puerta /api/public/compartir
                     no pide sesión), así un gaffer le pasa el carrito a un productor sin cuenta. */}
                   {list.length > 0 && (
@@ -604,13 +634,39 @@ export function CartDrawerView({
                     />
                   )}
 
+                  {/* Guardar como lista — solo logueado (las listas son server-only). */}
+                  {clienteSession && list.length > 0 && (
+                    <GuardarComoListaButton
+                      items={list.map(({ it, qty }) => ({
+                        equipo_id: it._backendId ?? Number(it.id),
+                        cantidad: qty,
+                      }))}
+                    />
+                  )}
+
+                  {/* Utilitarias de baja frecuencia, agrupadas y centradas como
+                      UN solo grupo (no en los extremos — en un drawer ancho
+                      quedaban huérfanas, cada una perdida en su esquina). */}
                   {list.length > 0 && (
-                    <button
-                      onClick={onClear}
-                      className="w-full text-xs text-muted-foreground hover:text-destructive focus:outline-none focus-visible:underline"
-                    >
-                      Vaciar pedido
-                    </button>
+                    <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                      {!showNotas && (
+                        <>
+                          <button
+                            onClick={onShowNotas}
+                            className="transition hover:text-ink focus:outline-none focus-visible:underline"
+                          >
+                            Agregar una nota
+                          </button>
+                          <span aria-hidden="true">·</span>
+                        </>
+                      )}
+                      <button
+                        onClick={() => setAskVaciar(true)}
+                        className="transition hover:text-destructive focus:outline-none focus-visible:underline"
+                      >
+                        Vaciar pedido
+                      </button>
+                    </div>
                   )}
                 </div>
               </>
@@ -619,6 +675,22 @@ export function CartDrawerView({
 
           {/* Modal de fechas — montado fuera del drawer para que se vea encima */}
           <RentalDateModal open={dateModalOpen} onOpenChange={onDateModalChange} />
+
+          {/* Confirmación de "Vaciar pedido" — accidental antes borraba directo, sin deshacer. */}
+          <AlertDialog open={askVaciar} onOpenChange={setAskVaciar}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Vaciar el pedido</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Vas a sacar todos los equipos de tu pedido. Esta acción no se puede deshacer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Volver</AlertDialogCancel>
+                <AlertDialogAction onClick={onClear}>Vaciar pedido</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </>
       )}
     </AnimatePresence>

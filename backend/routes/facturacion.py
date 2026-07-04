@@ -111,13 +111,14 @@ def refrescar_catalogos_arca(request: Request):
 
 @router.get("/admin/arca/padron/{cuit}")
 def consultar_padron(cuit: str, request: Request):
-    """Autocompleta razón social/domicilio/condición IVA desde el padrón de
-    ARCA (ws_sr_constancia_inscripcion) — mismo autocompletado que hace el
-    facturador oficial al tipear un CUIT. Best-effort: nunca un error HTTP —
-    el formulario sigue siendo editable a mano. `resolver_persona` levanta
-    RuntimeError para cualquier cosa que no sea un CUIT encontrado (ya no
-    hay un "sin datos" silencioso) — se muestra tal cual, es más útil para
-    diagnosticar que un genérico "sin datos"."""
+    """Autocompleta datos desde el padrón de ARCA (ws_sr_constancia_inscripcion)
+    — mismo autocompletado que hace el facturador oficial al tipear un CUIT.
+    Best-effort a nivel HTTP: nunca un error HTTP, siempre 200 — el caller
+    decide qué hacer con `encontrado: False` (algunos forms siguen siendo
+    editables a mano, otros no). `resolver_persona` levanta RuntimeError para
+    cualquier cosa que no sea un CUIT encontrado (ya no hay un "sin datos"
+    silencioso) — se muestra tal cual, es más útil para diagnosticar que un
+    genérico "sin datos"."""
     require_admin(request)
 
     from services.facturacion.padron import resolver_persona
@@ -135,6 +136,18 @@ def consultar_padron(cuit: str, request: Request):
         "domicilio": persona.domicilio,
         "condicion_iva": persona.condicion_iva,
         "estado_clave": persona.estado_clave,
+        "tipo_persona": persona.tipo_persona,
+        "categoria_monotributo": persona.categoria_monotributo,
+        "actividades": [a.descripcion for a in persona.actividades],
+        "impuestos": [
+            {
+                "id_impuesto": i.id_impuesto,
+                "descripcion": i.descripcion,
+                "estado": i.estado,
+                "periodo": i.periodo,
+            }
+            for i in persona.impuestos
+        ],
     }
 
 
@@ -286,8 +299,7 @@ def info_cert_emisor(emisor_id: int, request: Request):
     delegada al certificado viejo."""
     require_admin(request)
 
-    from cryptography import x509
-
+    from services.facturacion.diagnostico import cert_info
     from services.facturacion.emisores_repo import get_cert_pem
 
     try:
@@ -296,12 +308,12 @@ def info_cert_emisor(emisor_id: int, request: Request):
     except ValueError as e:
         raise HTTPException(400, str(e))
 
-    cert = x509.load_pem_x509_certificate(cert_pem)
+    info = cert_info(cert_pem)
     return {
-        "subject": cert.subject.rfc4514_string(),
-        "numero_serie": format(cert.serial_number, "X"),
-        "vigente_desde": cert.not_valid_before_utc.date().isoformat(),
-        "vigente_hasta": cert.not_valid_after_utc.date().isoformat(),
+        "subject": info["subject"],
+        "numero_serie": info["numero_serie"],
+        "vigente_desde": info["vigente_desde"].date().isoformat(),
+        "vigente_hasta": info["vigente_hasta"].date().isoformat(),
     }
 
 
@@ -330,6 +342,35 @@ def consultar_puntos_venta_emisor(emisor_id: int, request: Request):
             raise HTTPException(503, str(e))
 
     return {"puntos_venta": resultado["habilitados"], "excluidos": resultado["excluidos"]}
+
+
+@router.get("/admin/emisores-arca/{emisor_id}/diagnostico")
+def diagnostico_emisor(emisor_id: int, request: Request):
+    """Chequeo previo de configuración (dos capas: local sin red, después AFIP solo si el
+    certificado pasa la capa local) — ver `services.facturacion.diagnostico`. Nunca devuelve un
+    5xx por una falla de AFIP (eso queda DENTRO de la lista de chequeos, con `bloqueante` según
+    corresponda); solo el emisor inexistente mapea a 400."""
+    require_admin(request)
+
+    from services.facturacion.diagnostico import diagnosticar_emisor
+
+    with get_db() as conn:
+        try:
+            return diagnosticar_emisor(emisor_id, conn)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+
+
+@router.get("/admin/emisores-arca/guia")
+def guia_emisores_arca(request: Request):
+    """Guía de trámites de AFIP necesarios para facturar — fuente única: lee
+    `arca_fe/TRAMITES_AFIP.md` tal cual (nunca se duplica el contenido en el frontend)."""
+    require_admin(request)
+
+    import pathlib
+
+    ruta = pathlib.Path(__file__).resolve().parent.parent / "arca_fe" / "TRAMITES_AFIP.md"
+    return {"markdown": ruta.read_text(encoding="utf-8")}
 
 
 @router.delete("/admin/emisores-arca/{emisor_id}", status_code=204)

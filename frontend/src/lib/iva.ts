@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { authedFetch } from "./authedFetch";
+import { queryClient } from "./queryClient";
 
 export type PerfilImpuestos =
   | "consumidor_final"
@@ -28,6 +29,13 @@ export function aplicaIva(perfil: PerfilImpuestos | null | undefined): boolean {
   return perfil === "responsable_inscripto";
 }
 
+/** Qué tipo de comprobante espera recibir el cliente, a nivel informativo —
+ *  la determinación real (que también depende de la condición del emisor)
+ *  la hace `services/facturacion/engine.py::tipo_comprobante` al emitir. */
+export function facturaTipoLabel(perfil: PerfilImpuestos | null | undefined): string {
+  return aplicaIva(perfil) ? "Factura A" : "Factura B";
+}
+
 // ── Hook de sesión cliente (lightweight, una sola llamada compartida) ────
 
 type ClienteSession = {
@@ -40,11 +48,24 @@ type ClienteSession = {
   /** Descuento personalizado del cliente (atención manual del admin a
    * buenos clientes, 0..100). Lo lee el carrito; no es público. */
   descuento: number | null;
+  /** Vista de identidad/contacto YA RESUELTA por el backend — mismo criterio
+   *  que contrato/remito (RENAPER si está verificado, si no el dato base;
+   *  teléfono verificado por Didit si existe, si no el autodeclarado; ver
+   *  `identity/__init__.py` + `identity/contacts.py`). El resumen del
+   *  checkout ("Tus datos") los muestra tal cual — no reimplementa la regla. */
+  nombreLegal: string | null;
+  direccionLegal: string | null;
+  emailComunicacion: string | null;
+  telefonoContacto: string | null;
 } | null;
 
 let cached: ClienteSession | undefined; // undefined = no fetched yet
 let pending: Promise<ClienteSession> | null = null;
 const subscribers = new Set<(s: ClienteSession) => void>();
+
+function _str(v: unknown): string | null {
+  return typeof v === "string" ? v : null;
+}
 
 async function fetchClienteSession(): Promise<ClienteSession> {
   try {
@@ -54,9 +75,13 @@ async function fetchClienteSession(): Promise<ClienteSession> {
     return {
       id: data.id,
       email: data.email,
-      nombre: typeof data.nombre === "string" ? data.nombre : null,
+      nombre: _str(data.nombre),
       perfil_impuestos: (data.perfil_impuestos ?? null) as PerfilImpuestos | null,
       descuento: typeof data.descuento === "number" ? data.descuento : null,
+      nombreLegal: _str(data.nombre_legal),
+      direccionLegal: _str(data.direccion_legal),
+      emailComunicacion: _str(data.email_comunicacion),
+      telefonoContacto: _str(data.telefono_contacto),
     };
   } catch {
     return null;
@@ -104,4 +129,11 @@ export function useClienteSession(): { data: ClienteSession; loading: boolean } 
 export function invalidateClienteSession() {
   cached = undefined;
   pending = null;
+  // El perfil fiscal recién cambió (editar perfil, verificar CUIT con ARCA) —
+  // toda cotización en cache puede tener el "+ IVA"/total viejo: `/api/cotizar`
+  // resuelve `con_iva` según el perfil ACTUAL del cliente autenticado (no lo
+  // manda el front, #617), así que el queryKey de `useCotizacion` (items/fechas)
+  // no cambia solo porque el perfil cambió — sin esto, el Total del checkout
+  // quedaba stale si el cliente verificaba su CUIT en el mismo modal.
+  void queryClient.invalidateQueries({ queryKey: ["cotizar"] });
 }

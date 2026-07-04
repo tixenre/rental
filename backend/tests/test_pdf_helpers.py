@@ -200,3 +200,56 @@ class TestAbsImageUrl:
     def test_relativa_sin_base_devuelve_vacio(self, monkeypatch):
         monkeypatch.delenv("FRONTEND_BASE_URL", raising=False)
         assert _abs_image_url("/uploads/foo.jpg") == ""
+
+
+class TestContratoHtmlMostrarLocador:
+    """`_contrato_html(pedido, mostrar_locador=False)` — usado por el preview
+    del checkout (`routes/checkout.py::checkout_contrato_preview`): al
+    cliente le importa leer las cláusulas, no los datos institucionales de
+    Rambla (fijos, no cambian por pedido). Default `True` no cambia — el
+    contrato REAL (de un pedido ya creado) los sigue mostrando siempre."""
+
+    def _pedido(self):
+        return {
+            "id": "preview",
+            "estado": "presupuesto",
+            "fecha_desde": "2026-07-10",
+            "fecha_hasta": "2026-07-12",
+            "emitido": None,
+            "items": [
+                {
+                    "nombre": "Cámara test",
+                    "cantidad": 1,
+                    "serie": "ABC123",
+                    "valor_reposicion": 100000,
+                    "componentes": [],
+                }
+            ],
+            "cliente_nombre": "Ana Gómez",
+            "cliente_email": "ana@test.com",
+            "cliente_telefono": "2235551234",
+            "cliente_direccion": "Calle Falsa 123",
+            "cliente_cuit": None,
+            "cliente_perfil_impuestos": "consumidor_final",
+            "cliente_razon_social": None,
+        }
+
+    def test_default_muestra_locador(self):
+        from pdf_templates import OWNER_CUIL, OWNER_NOMBRE, _contrato_html
+
+        html_str = _contrato_html(self._pedido())
+        assert OWNER_NOMBRE in html_str
+        assert OWNER_CUIL in html_str
+        assert "Firma Locador" in html_str
+
+    def test_mostrar_locador_false_omite_datos_institucionales(self):
+        from pdf_templates import OWNER_CUIL, OWNER_NOMBRE, _contrato_html
+
+        html_str = _contrato_html(self._pedido(), mostrar_locador=False)
+        assert OWNER_NOMBRE not in html_str
+        assert OWNER_CUIL not in html_str
+        assert "Firma Locador" not in html_str
+        # Lo que sí importa sigue: cláusulas, equipo, locatario.
+        assert "Primero" in html_str
+        assert "Cámara test" in html_str
+        assert "Ana Gómez" in html_str

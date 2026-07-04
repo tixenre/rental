@@ -54,6 +54,7 @@ from __future__ import annotations
 
 import logging
 import ssl
+import threading
 import urllib3
 from dataclasses import dataclass
 from typing import Any
@@ -68,9 +69,12 @@ from .errores import ArcaBusinessError, ArcaResponseError
 
 WSAA_SERVICIO = "ws_sr_constancia_inscripcion"
 
-_CLIENT_CACHE: dict[str, zeep.Client] = {}
+# Caché de clientes SOAP por (endpoint, timeout), protegida por `_cache_lock` — mismo patrón que
+# `wsfe.py` (thread-safe, no solo "funciona en la práctica").
+_CLIENT_CACHE: dict[tuple[str, float], zeep.Client] = {}
+_cache_lock = threading.Lock()
 
-_TIMEOUT_SECONDS = 20.0
+_TIMEOUT_SECONDS = 20.0  # default de `PadronClient.timeout` — configurable por instancia
 
 _log = logging.getLogger(__name__)
 
@@ -98,21 +102,56 @@ class _AfipSSLAdapter(HTTPAdapter):
         )
 
 
-def _afip_transport() -> zeep.transports.Transport:
+def _afip_transport(timeout: float) -> zeep.transports.Transport:
     session = requests.Session()
     session.mount("https://", _AfipSSLAdapter())
     return zeep.transports.Transport(
-        session=session, timeout=_TIMEOUT_SECONDS, operation_timeout=_TIMEOUT_SECONDS
+        session=session, timeout=timeout, operation_timeout=timeout
     )
 
 
-def _get_client(endpoint: str) -> zeep.Client:
+def _get_client(endpoint: str, timeout: float) -> zeep.Client:
     """`endpoint` es la URL COMPLETA del WSDL, ya resuelta por el caller
-    según ambiente (ver docstring del módulo)."""
+    según ambiente (ver docstring del módulo). Cacheada por `(endpoint, timeout)`."""
     ep = endpoint.rstrip("/")
-    if ep not in _CLIENT_CACHE:
-        _CLIENT_CACHE[ep] = zeep.Client(ep, transport=_afip_transport())
-    return _CLIENT_CACHE[ep]
+    clave = (ep, timeout)
+    with _cache_lock:
+        if clave not in _CLIENT_CACHE:
+            _CLIENT_CACHE[clave] = zeep.Client(ep, transport=_afip_transport(timeout))
+        return _CLIENT_CACHE[clave]
+
+
+def clear_cache() -> None:
+    """Limpia el cache de clientes SOAP — para tests, o para un consumidor multi-tenant que
+    necesite forzar un cliente nuevo (ej. tras rotar un certificado)."""
+    with _cache_lock:
+        _CLIENT_CACHE.clear()
+
+
+@dataclass(frozen=True)
+class Impuesto:
+    """Un impuesto/régimen en el que el CUIT está inscripto ante AFIP — nodo
+    `impuesto` de `datosMonotributo`/`datosRegimenGeneral` (manual oficial
+    "WS_SR_constancia_inscripcion" v3.7). `id_impuesto`: 30 = IVA Responsable
+    Inscripto, 32 = IVA Exento (ver `_ID_IMPUESTO_RI`/`_ID_IMPUESTO_EXENTO`,
+    ya usados para derivar `condicion_iva`) — el resto son otros impuestos
+    (Ganancias, Bienes Personales, etc.), tal cual los reporta AFIP."""
+
+    id_impuesto: int
+    descripcion: str
+    estado: str  # texto de AFIP tal cual (ej. "AC" activo / "BA" baja)
+    periodo: int  # AAAAMM del alta/último movimiento
+
+
+@dataclass(frozen=True)
+class Actividad:
+    """Una actividad económica declarada ante AFIP — nodo `actividad`
+    (clasificador CLAE), bajo `datosMonotributo`/`datosRegimenGeneral`."""
+
+    id_actividad: int
+    descripcion: str
+    periodo: int
+    orden: int  # 1 = actividad principal
 
 
 @dataclass
@@ -137,17 +176,39 @@ class PersonaArca:
     estado_clave: str  # 'ACTIVO' | 'INACTIVO' | '' — señal de calidad de dato,
     # no bloqueante: un CUIT dado de baja en AFIP es motivo de aviso al
     # usuario, no un error del autocompletado en sí.
+    tipo_persona: str = ""  # 'FISICA' | 'JURIDICA' | '' — tal cual AFIP lo da
+    categoria_monotributo: str = ""  # descripción de la categoría (A, B, C…);
+    # "" si no es monotributista (RI no tiene categoría).
+    actividades: tuple[Actividad, ...] = ()  # CLAE declarados (principal primero)
+    impuestos: tuple[Impuesto, ...] = ()  # todos los impuestos/regímenes que
+    # AFIP reporta — de acá se deriva `condicion_iva`, pero se expone también
+    # tal cual para diagnóstico (ver si la relación de IVA está realmente
+    # activa en AFIP, no solo inferirlo).
 
 
 @dataclass
 class PadronClient:
+    """Cliente de alto nivel para el padrón de ARCA (Constancia de Inscripción, WSDL
+    `personaServiceA5`).
+
+    `endpoint`: URL COMPLETA del WSDL, ya resuelta por el caller según ambiente (este cliente no
+    guarda su propia copia de las URLs de homologación/producción).
+    `cuit_representada`: CUIT del emisor cuyo TA se está usando para autenticar (el padrón
+    responde por CUALQUIER CUIT consultado, no hace falta que coincida con este).
+    `token`, `sign`: del TA vigente para el servicio `WSAA_SERVICIO` (`"ws_sr_constancia_inscripcion"`
+    — NO el mismo TA que usa `WsfeClient`, son servicios WSAA distintos).
+    `timeout`: segundos para el fetch del WSDL y la operación SOAP (default 20.0) — configurable
+    por instancia; dos instancias con distinto `timeout` al mismo `endpoint` cachean clientes zeep
+    separados."""
+
     endpoint: str
     cuit_representada: int
     token: str
     sign: str
+    timeout: float = _TIMEOUT_SECONDS
 
     def _client(self) -> zeep.Client:
-        return _get_client(self.endpoint)
+        return _get_client(self.endpoint, self.timeout)
 
     def get_persona(self, cuit_buscado: str) -> PersonaArca:
         """Consulta el padrón para `cuit_buscado`. Devuelve la `PersonaArca` si
@@ -182,15 +243,23 @@ class PadronClient:
             raise ArcaResponseError(str(exc), raw=str(exc)) from exc
 
         persona = getattr(resp, "personaReturn", None) if resp is not None else None
+        # Algunos clientes SOAP "desenvuelven" el único elemento de retorno del
+        # WSDL: en ese caso `resp` YA ES el contenido de personaReturn
+        # (datosGenerales/datosMonotributo/... directo), no un wrapper con
+        # `.personaReturn`. El schema dice `.personaReturn`, pero contra la
+        # respuesta REAL de AFIP en prod conviene no depender solo de eso — se
+        # contemplan ambas formas.
+        if persona is None and _parece_persona(resp):
+            persona = resp
         if persona is None:
             crudo = _serializar(resp)
             _log.warning(
-                "getPersona sin 'personaReturn' para %s — respuesta cruda: %s",
+                "getPersona sin datos de persona para %s — respuesta cruda: %s",
                 cuit_buscado,
                 crudo,
             )
             raise ArcaResponseError(
-                "AFIP no devolvió 'personaReturn' para este CUIT (respuesta "
+                "AFIP no devolvió datos de persona para este CUIT (respuesta "
                 "vacía o inesperada, sin un motivo reconocible).",
                 raw=crudo,
             )
@@ -232,6 +301,25 @@ def _serializar(obj: Any) -> str:
         return str(zeep.helpers.serialize_object(obj, dict))
     except Exception:
         return repr(obj)
+
+
+def _parece_persona(obj: Any) -> bool:
+    """True si `obj` tiene pinta de ser el contenido de `personaReturn` ya
+    desenvuelto por el cliente SOAP — algún nodo de datos o de error de la
+    constancia colgando directo de `obj` (en vez de bajo `.personaReturn`)."""
+    if obj is None:
+        return False
+    return any(
+        getattr(obj, campo, None) is not None
+        for campo in (
+            "datosGenerales",
+            "datosMonotributo",
+            "datosRegimenGeneral",
+            "errorConstancia",
+            "errorRegimenGeneral",
+            "errorMonotributo",
+        )
+    )
 
 
 def _errores_constancia(persona: Any) -> list[str]:
@@ -278,6 +366,7 @@ def _parsear_persona(cuit: str, persona: Any) -> PersonaArca:
     apellido = ""
     domicilio = ""
     estado_clave = ""
+    tipo_persona = ""
     if dg is not None:
         razon_social = str(getattr(dg, "razonSocial", "") or "")
         if not razon_social:
@@ -286,6 +375,7 @@ def _parsear_persona(cuit: str, persona: Any) -> PersonaArca:
             razon_social = f"{nombre} {apellido}".strip()
 
         estado_clave = str(getattr(dg, "estadoClave", "") or "")
+        tipo_persona = str(getattr(dg, "tipoPersona", "") or "")
 
         dom = getattr(dg, "domicilioFiscal", None)
         if dom is not None:
@@ -296,22 +386,32 @@ def _parsear_persona(cuit: str, persona: Any) -> PersonaArca:
             ]
             domicilio = ", ".join(p for p in partes if p)
 
+    dm = getattr(persona, "datosMonotributo", None)
+    dr = getattr(persona, "datosRegimenGeneral", None)
+
     # Orden de chequeo — mismo criterio que pyafipws (referencia de facto):
     # exento se chequea ANTES que RI (un mismo padrón podría traer ambos
     # ids en teoría; exento es la condición más específica).
     condicion_iva = ""
-    if getattr(persona, "datosMonotributo", None) is not None:
+    if dm is not None:
         condicion_iva = "monotributo"
     else:
-        dr = getattr(persona, "datosRegimenGeneral", None)
-        impuestos = getattr(dr, "impuesto", None) if dr is not None else None
+        impuestos_dr = getattr(dr, "impuesto", None) if dr is not None else None
         ids = (
-            {getattr(i, "idImpuesto", None) for i in impuestos} if impuestos else set()
+            {getattr(i, "idImpuesto", None) for i in impuestos_dr}
+            if impuestos_dr
+            else set()
         )
         if _ID_IMPUESTO_EXENTO in ids:
             condicion_iva = "exento"
         elif _ID_IMPUESTO_RI in ids:
             condicion_iva = "responsable_inscripto"
+
+    categoria_monotributo = ""
+    if dm is not None:
+        cat = getattr(dm, "categoriaMonotributo", None)
+        if cat is not None:
+            categoria_monotributo = str(getattr(cat, "descripcionCategoria", "") or "")
 
     return PersonaArca(
         cuit=cuit,
@@ -321,4 +421,56 @@ def _parsear_persona(cuit: str, persona: Any) -> PersonaArca:
         domicilio=domicilio,
         condicion_iva=condicion_iva,
         estado_clave=estado_clave,
+        tipo_persona=tipo_persona,
+        categoria_monotributo=categoria_monotributo,
+        actividades=_mapear_actividades(dm, dr),
+        impuestos=_mapear_impuestos(dm, dr),
+    )
+
+
+def _mapear_actividades(dm: Any, dr: Any) -> tuple[Actividad, ...]:
+    """Junta las actividades económicas declaradas — `datosMonotributo.actividad[]`
+    + `datosMonotributo.actividadMonotributista` (nodo singular, no lista) +
+    `datosRegimenGeneral.actividad[]` — lo que esté poblado. Ordenadas por
+    `orden` (1 = principal)."""
+    crudas: list[Any] = []
+    if dm is not None:
+        crudas.extend(getattr(dm, "actividad", None) or ())
+        unica = getattr(dm, "actividadMonotributista", None)
+        if unica is not None:
+            crudas.append(unica)
+    if dr is not None:
+        crudas.extend(getattr(dr, "actividad", None) or ())
+
+    actividades = tuple(
+        Actividad(
+            id_actividad=int(getattr(a, "idActividad", 0) or 0),
+            descripcion=str(getattr(a, "descripcionActividad", "") or ""),
+            periodo=int(getattr(a, "periodo", 0) or 0),
+            orden=int(getattr(a, "orden", 0) or 0),
+        )
+        for a in crudas
+    )
+    return tuple(sorted(actividades, key=lambda a: a.orden or 999))
+
+
+def _mapear_impuestos(dm: Any, dr: Any) -> tuple[Impuesto, ...]:
+    """Junta los impuestos/regímenes inscriptos — `datosMonotributo.impuesto[]`
+    + `datosRegimenGeneral.impuesto[]` — tal cual AFIP los reporta (con
+    estado activo/baja), para diagnóstico más allá de la `condicion_iva`
+    derivada."""
+    crudos: list[Any] = []
+    if dm is not None:
+        crudos.extend(getattr(dm, "impuesto", None) or ())
+    if dr is not None:
+        crudos.extend(getattr(dr, "impuesto", None) or ())
+
+    return tuple(
+        Impuesto(
+            id_impuesto=int(getattr(i, "idImpuesto", 0) or 0),
+            descripcion=str(getattr(i, "descripcionImpuesto", "") or ""),
+            estado=str(getattr(i, "estadoImpuesto", "") or ""),
+            periodo=int(getattr(i, "periodo", 0) or 0),
+        )
+        for i in crudos
     )

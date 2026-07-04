@@ -12,9 +12,9 @@ from datetime import datetime
 
 import pytest
 
-from arca_fe.padron import WSAA_SERVICIO
+from arca_fe.padron import WSAA_SERVICIO, PersonaArca
 from services.facturacion.emisores_repo import EmisorArca
-from services.facturacion.padron import resolver_persona
+from services.facturacion.padron import resolver_persona, verificar_y_actualizar_receptor
 
 pytestmark = pytest.mark.unit
 
@@ -78,15 +78,18 @@ def test_afip_sin_datos_levanta_nombrando_el_emisor_y_el_ambiente(monkeypatch):
     monkeypatch.setattr(
         "arca_fe.padron.PadronClient.get_persona",
         lambda self, cuit: (_ for _ in ()).throw(
-            ArcaResponseError("AFIP no devolvió 'personaReturn'", raw="<crudo>")
+            ArcaResponseError("AFIP no devolvió datos de persona", raw="<XML-CRUDO>")
         ),
     )
 
     with pytest.raises(RuntimeError, match="pablo.*20300000000") as ei:
         resolver_persona("23373891029", conn=object())
 
-    assert "AMBIENTE" in str(ei.value)
-    assert "personaReturn" in str(ei.value)
+    msg = str(ei.value)
+    assert "AMBIENTE" in msg
+    # el motivo real de AFIP + su respuesta cruda quedan en el mensaje
+    assert "AFIP no devolvió datos de persona" in msg
+    assert "<XML-CRUDO>" in msg
 
 
 def test_usa_el_unico_emisor_activo_con_cert(monkeypatch):
@@ -273,3 +276,143 @@ def test_mensaje_final_incluye_el_ambiente_en_que_consulto(monkeypatch, prod, es
 
     with pytest.raises(RuntimeError, match=esperado):
         resolver_persona("23373891029", conn=object())
+
+
+# ── verificar_y_actualizar_receptor: SÍ bloquea la emisión (a diferencia de
+# resolver_persona en el autocompletado, best-effort) ───────────────────────
+
+
+class _FakeConnCliente:
+    """Fake conn que soporta el SELECT de clientes de
+    `_corregir_datos_facturacion_cliente` y captura los UPDATE emitidos
+    (SQL + params) para inspeccionar qué se corrigió."""
+
+    def __init__(self, row):
+        self._row = row
+        self.updates: list[tuple[str, tuple]] = []
+
+    def execute(self, sql, params=None):
+        sql_norm = " ".join(sql.split())
+        if sql_norm.startswith("SELECT"):
+            row = self._row
+
+            class _R:
+                def fetchone(self_inner):
+                    return row
+
+            return _R()
+        self.updates.append((sql_norm, params))
+        return None
+
+
+def _persona_afip(
+    razon_social="Empresa Nueva SA",
+    domicilio="Calle Nueva 123",
+    condicion_iva="responsable_inscripto",
+):
+    return PersonaArca(
+        cuit="30712345678",
+        razon_social=razon_social,
+        nombre="",
+        apellido="",
+        domicilio=domicilio,
+        condicion_iva=condicion_iva,
+        estado_clave="ACTIVO",
+    )
+
+
+def test_verificar_receptor_corrige_solo_lo_que_difiere(monkeypatch):
+    """Si el cliente ya tenía la misma condición IVA guardada pero razón
+    social/domicilio distintos, el UPDATE toca SOLO esos dos — no reescribe
+    lo que ya coincidía."""
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona",
+        lambda cuit, conn: _persona_afip(),
+    )
+    conn = _FakeConnCliente(
+        row={
+            "razon_social": "Empresa Vieja SA",
+            "domicilio_fiscal": "Calle Vieja 1",
+            "perfil_impuestos": "responsable_inscripto",  # ya coincide
+        }
+    )
+
+    persona = verificar_y_actualizar_receptor("30712345678", cliente_id=7, conn=conn)
+
+    assert persona.razon_social == "Empresa Nueva SA"
+    assert len(conn.updates) == 1
+    sql, params = conn.updates[0]
+    assert "razon_social" in sql
+    assert "domicilio_fiscal" in sql
+    assert "perfil_impuestos" not in sql  # no tocado: ya coincidía
+    assert params == ("Empresa Nueva SA", "Calle Nueva 123", 7)
+
+
+def test_verificar_receptor_sin_diferencias_no_actualiza(monkeypatch):
+    """Si todo ya coincide, no se emite ningún UPDATE."""
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona",
+        lambda cuit, conn: _persona_afip(),
+    )
+    conn = _FakeConnCliente(
+        row={
+            "razon_social": "Empresa Nueva SA",
+            "domicilio_fiscal": "Calle Nueva 123",
+            "perfil_impuestos": "responsable_inscripto",
+        }
+    )
+
+    verificar_y_actualizar_receptor("30712345678", cliente_id=7, conn=conn)
+
+    assert conn.updates == []
+
+
+def test_verificar_receptor_nunca_toca_columnas_renaper(monkeypatch):
+    """Regresión explícita: el UPDATE dinámico NUNCA debe poder tocar una
+    columna `*_renaper` (esas son de Didit/KYC, dominio aparte) — solo las
+    3 columnas de facturación explícitamente listadas."""
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona",
+        lambda cuit, conn: _persona_afip(),
+    )
+    conn = _FakeConnCliente(
+        row={"razon_social": "X", "domicilio_fiscal": "Y", "perfil_impuestos": "Z"}
+    )
+
+    verificar_y_actualizar_receptor("30712345678", cliente_id=7, conn=conn)
+
+    for sql, _params in conn.updates:
+        assert "renaper" not in sql
+
+
+def test_verificar_receptor_condicion_iva_vacia_bloquea(monkeypatch):
+    """AFIP encontró la persona pero no pudo clasificar su condición IVA
+    (raro) — ese dato SÍ se le manda a AFIP en el CAE (RG5616), así que
+    bloquea con RuntimeError en vez de facturar con un valor sin confirmar.
+    No se actualiza nada del cliente."""
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona",
+        lambda cuit, conn: _persona_afip(condicion_iva=""),
+    )
+    conn = _FakeConnCliente(row={"razon_social": "X", "domicilio_fiscal": "Y", "perfil_impuestos": "Z"})
+
+    with pytest.raises(RuntimeError, match="condición IVA"):
+        verificar_y_actualizar_receptor("30712345678", cliente_id=7, conn=conn)
+
+    assert conn.updates == []
+
+
+def test_verificar_receptor_propaga_falla_de_resolver_persona(monkeypatch):
+    """Si AFIP no puede confirmar el CUIT en absoluto, `resolver_persona`
+    levanta RuntimeError — `verificar_y_actualizar_receptor` NO lo atrapa,
+    se propaga tal cual para que `emitir_factura` bloquee la emisión."""
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona",
+        lambda cuit, conn: (_ for _ in ()).throw(
+            RuntimeError("No se pudo traer el padrón del CUIT — AFIP caída")
+        ),
+    )
+    conn = _FakeConnCliente(row={"razon_social": "X", "domicilio_fiscal": "Y", "perfil_impuestos": "Z"})
+
+    with pytest.raises(RuntimeError, match="AFIP caída"):
+        verificar_y_actualizar_receptor("30712345678", cliente_id=7, conn=conn)

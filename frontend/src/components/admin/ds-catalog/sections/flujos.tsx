@@ -206,6 +206,7 @@ function CartDrawerDemo() {
         onClose={() => setOpen(false)}
         onExplore={() => setOpen(false)}
         step="carrito"
+        pedidoEnviado={null}
         sessionId="ds-demo-session"
         onVolverAlCarrito={() => {}}
         onCrearPedido={async () => {}}

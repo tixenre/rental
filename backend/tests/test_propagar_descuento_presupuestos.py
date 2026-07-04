@@ -85,16 +85,20 @@ class FakeConn:
         pass
 
 
-def _pedido(id, cliente_id=5, descuento_pct=0, descuento_manual_tipo="pct", descuento_manual_monto=0):
+def _pedido(id, cliente_id=5, descuento_pct=0, descuento_manual_tipo="pct", descuento_manual_monto=0,
+            estado="presupuesto", descuento_cliente_pct=0, descuento_manual_activo=False):
     return {
         "id": id,
         "cliente_id": cliente_id,
         "fecha_desde": "2026-07-01T10:00:00",
         "fecha_hasta": "2026-07-08T10:00:00",  # 7 jornadas
+        "estado": estado,
         "descuento_pct": descuento_pct,
         "descuento_jornadas_pct": 0,
+        "descuento_cliente_pct": descuento_cliente_pct,
         "descuento_manual_tipo": descuento_manual_tipo,
         "descuento_manual_monto": descuento_manual_monto,
+        "descuento_manual_activo": descuento_manual_activo,
     }
 
 
@@ -174,3 +178,23 @@ def test_recalcular_override_monto_fijo_gana_outright_capeado():
     _recalcular_total_pedido(conn, 7)
     # 70.000 − 30.000 = 40.000 neto.
     assert conn.total_updates == [(7, 40000, 20.0, 0.0)]
+
+
+def test_recalcular_confirmado_no_relee_cliente_ni_jornadas_en_vivo():
+    """Bug real (reportado por el dueño): un pedido YA CONFIRMADO no debe
+    recalcular su % de cliente/jornadas en vivo — cualquier guardado
+    (`_apply_pedido_datos`/`_apply_pedido_items`) dispara `_recalcular_total_pedido`,
+    y antes de este guard eso pisaba `descuento_cliente_pct` con el valor
+    ACTUAL del cliente sin mirar el estado. Acá el cliente vale 99% en vivo
+    (`clientes={9: 99}`) y jornadas 20%, pero el pedido confirmado tiene
+    congelado cliente=5%/jornadas=0% — el resultado tiene que seguir esos
+    valores frozen, no los de `clientes={9: 99}`."""
+    rows = {
+        7: _pedido(7, cliente_id=9, descuento_pct=0, estado="confirmado",
+                   descuento_cliente_pct=5.0),
+    }
+    items = {7: [{"id": 70, "equipo_id": 1, "cantidad": 2, "precio_jornada": 5000, "cobro_modo": "jornada"}]}
+    conn = FakeConn([7], rows, items, descuentos_jornada=[(1, 0.0), (7, 20.0)], clientes={9: 99})
+    _recalcular_total_pedido(conn, 7)
+    # 70.000 − 5% (congelado) = 66.500 — NO 700 (que sería con el 99% en vivo).
+    assert conn.total_updates == [(7, 66500, 0.0, 5.0)]

@@ -79,12 +79,17 @@ class _FakeWsfe:
     def consultar(self, pto_vta, cbte_tipo, numero):
         return self.consultar_resp
 
-    def solicitar_cae(self, fecae):
-        self.solicitar_calls.append(fecae)
+    def solicitar_cae(self, comprobante, numero):
         from arca_fe import CaeResult
+        from arca_fe.comprobante import armar_fecae
+
+        # Reconstruye el mismo payload que el `WsfeClient` real arma internamente
+        # (`solicitar_cae` ya no recibe el dict crudo) — así los tests que inspeccionan
+        # el payload mandado a ARCA (`solicitar_calls[0]["FeDetReq"]...`) siguen andando.
+        self.solicitar_calls.append(armar_fecae(comprobante, numero))
         return CaeResult(
             resultado="A", cae="86261839900099", cae_vto=date(2030, 1, 1),
-            numero=fecae["FeDetReq"]["FECAEDetRequest"][0]["CbteDesde"],
+            numero=numero,
         )
 
 
@@ -108,11 +113,12 @@ def _fake_pedido_neto_impar() -> dict:
     """Neto=$1001 (no múltiplo de 100) + receptor RI → IVA 21% da $210,21."""
     return {
         "id": 42,
+        "cliente_id": 42,
         "estado": "confirmado",
         "monto_total": 1001,
         "iva_monto": 210,  # ya viene aproximado en el pedido; el motor recalcula exacto
         "cliente_perfil_impuestos": "responsable_inscripto",
-        "cliente_cuit": "20300000000",
+        "cliente_cuit": "20300000003",
         "cliente_dni": None,
         "cliente_razon_social": "Cliente RI SA",
         "cliente_nombre": "Cliente RI SA",
@@ -144,6 +150,17 @@ def test_emitir_factura_persiste_centavos_exactos_no_trunca(monkeypatch):
     monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
     monkeypatch.setattr(engine, "WsfeClient", lambda **kw: wsfe)
     monkeypatch.setattr(engine, "get_factura_vigente", lambda pedido_id, conn: None)
+
+    from arca_fe.padron import PersonaArca
+
+    monkeypatch.setattr(
+        engine,
+        "verificar_y_actualizar_receptor",
+        lambda cuit, cliente_id, conn: PersonaArca(
+            cuit=cuit, razon_social="Cliente RI SA", nombre="", apellido="",
+            domicilio="", condicion_iva="responsable_inscripto", estado_clave="ACTIVO",
+        ),
+    )
     monkeypatch.setattr(engine, "insert_factura", _fake_insert_factura)
     monkeypatch.setattr(engine, "update_cae", _fake_update_cae)
     monkeypatch.setattr(engine, "update_error", lambda *a, **kw: None)
@@ -153,10 +170,10 @@ def test_emitir_factura_persiste_centavos_exactos_no_trunca(monkeypatch):
             id=500, pedido_id=42, emisor="pablo", ambiente="homologacion",
             cbte_tipo=1, pto_vta=3, cbte_nro=captured_update.get("cbte_nro"),
             cae=captured_update.get("cae"), cae_vto=None,
-            doc_tipo=80, doc_nro="20300000000", condicion_iva_receptor=1,
+            doc_tipo=80, doc_nro="20300000003", condicion_iva_receptor=1,
             concepto=2, imp_neto=captured_insert.get("imp_neto"),
             imp_iva=captured_insert.get("imp_iva"), imp_total=captured_insert.get("imp_total"),
-            moneda="PES", cliente_cuit="20300000000", razon_social="Cliente RI SA",
+            moneda="PES", cliente_cuit="20300000003", razon_social="Cliente RI SA",
             qr_payload=None, pdf_key=None, estado="emitida", nota_credito_de=None,
             raw_request=None, raw_response=None, errores=None, fecha_emision=None,
             created_at=None, created_by=None,
@@ -195,10 +212,10 @@ def test_pdf_muestra_centavos_no_redondea_a_peso_entero(monkeypatch):
     factura = Factura(
         id=500, pedido_id=42, emisor="pablo", ambiente="homologacion",
         cbte_tipo=1, pto_vta=3, cbte_nro=7, cae="86261839900099",
-        cae_vto=date(2030, 1, 1), doc_tipo=80, doc_nro="20300000000",
+        cae_vto=date(2030, 1, 1), doc_tipo=80, doc_nro="20300000003",
         condicion_iva_receptor=1, concepto=2,
         imp_neto=Decimal("1001.00"), imp_iva=Decimal("210.21"), imp_total=Decimal("1211.21"),
-        moneda="PES", cliente_cuit="20300000000", razon_social="Cliente RI SA",
+        moneda="PES", cliente_cuit="20300000003", razon_social="Cliente RI SA",
         qr_payload="https://www.afip.gob.ar/fe/qr/?p=abc", pdf_key=None,
         estado="emitida", nota_credito_de=None, raw_request=None, raw_response=None,
         errores=None, fecha_emision=None, created_at=None, created_by=None,

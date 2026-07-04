@@ -177,10 +177,10 @@ def _slug(s: str) -> str:
 # entre el número de pedido y el nombre del cliente para que, en la vista de
 # adjuntos, se distingan de un vistazo (R-0405_Albaran_..., R-0405_Contrato_...).
 _DOC_LABELS = {
-    "presupuesto": "Presupuesto",
-    "albaran": "Albaran",
+    "presupuesto": "Remito",
+    "albaran": "Detalle-de-seguro",
     "contrato": "Contrato",
-    "packing-list": "Packing-list",
+    "packing-list": "Checklist-de-retiro",
 }
 
 

@@ -329,7 +329,12 @@ def _build_ctx(factura, pedido: dict) -> dict:
             "docLabel": doc_label,
             "docNro": doc_nro,
             "cond": _catalogo(label_condicion_iva_receptor, factura.condicion_iva_receptor),
-            "dom": pedido.get("cliente_domicilio_fiscal") or "—",
+            # `factura.domicilio` queda FIJO al emitir (verificado contra el
+            # padrón de ARCA) — a diferencia de antes, que se leía en vivo de
+            # la ficha del cliente en cada reimpresión y podía "cambiar"
+            # retroactivamente. Facturas emitidas antes de esta columna
+            # (NULL) caen al valor en vivo de siempre (backward-compatible).
+            "dom": factura.domicilio or pedido.get("cliente_domicilio_fiscal") or "—",
             "venta": venta,
         },
         "conceptos": _conceptos(pedido, factura),

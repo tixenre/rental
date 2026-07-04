@@ -241,8 +241,8 @@ class TestCuerpoMailSimple:
         # El saludo es por nombre de pila, no el nombre completo.
         assert "Hola Juan," in body_html
         assert "Juan Pérez" not in body_html
-        assert "Contrato" in body_html and "Cotización" in body_html
-        assert "Contrato, Cotización" in text
+        assert "Contrato" in body_html and "Remito" in body_html
+        assert "Contrato, Remito" in text
 
     def test_sin_nombre_usa_saludo_generico(self):
         _, body_html, _ = _cuerpo_mail_simple(1, "", ["pdf"], None)

@@ -20,10 +20,12 @@ import {
   Fingerprint,
   MoreHorizontal,
   Power,
+  Stethoscope,
+  BookOpen,
 } from "lucide-react";
 
 import { facturacionApi, type EmisorArca } from "@/lib/admin/api";
-import { usePadronLookup } from "@/lib/admin/usePadronLookup";
+import { usePadronLookup, type PadronImpuesto } from "@/lib/admin/usePadronLookup";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { cn } from "@/lib/utils";
 import {
@@ -33,6 +35,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/design-system/ui/dropdown-menu";
+import { Chequeos } from "@/design-system/composites/Chequeos";
 
 export const Route = createLazyFileRoute("/admin/facturacion/emisores")({
   component: EmisoresPage,
@@ -56,6 +59,7 @@ function EmisoresPage() {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [certId, setCertId] = useState<number | null>(null);
+  const [showGuia, setShowGuia] = useState(false);
 
   const emisores = q.data ?? [];
   const editEmisor = editId !== null ? emisores.find((e) => e.id === editId) : null;
@@ -76,17 +80,27 @@ function EmisoresPage() {
             antes de guardarse.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setEditId(null);
-            setShowForm(true);
-          }}
-          className="shrink-0 flex items-center gap-1.5 h-9 px-3 rounded-md bg-ink text-background text-sm font-medium"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Nuevo emisor
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowGuia(true)}
+            className="flex items-center gap-1.5 h-9 px-3 rounded-md border hairline text-sm font-medium text-ink hover:bg-muted/50"
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            Guía de AFIP
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEditId(null);
+              setShowForm(true);
+            }}
+            className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-ink text-background text-sm font-medium"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nuevo emisor
+          </button>
+        </div>
       </header>
 
       {q.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
@@ -136,7 +150,45 @@ function EmisoresPage() {
       {certId !== null && certEmisor && (
         <CertFormModal emisor={certEmisor} onClose={() => setCertId(null)} onSaved={invalidate} />
       )}
+
+      {/* Guía de trámites de AFIP */}
+      {showGuia && <GuiaAfipModal onClose={() => setShowGuia(false)} />}
     </div>
+  );
+}
+
+// ── Guía de trámites de AFIP ───────────────────────────────────────────────────
+
+function GuiaAfipModal({ onClose }: { onClose: () => void }) {
+  const q = useQuery({
+    queryKey: ["admin", "emisores-arca", "guia"],
+    queryFn: () => facturacionApi.getGuiaAfip(),
+  });
+
+  return (
+    <Overlay onClose={onClose}>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-display text-xl text-ink">Guía de trámites de AFIP</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-ink hover:bg-muted"
+        >
+          <XCircle className="h-4 w-4" />
+        </button>
+      </div>
+      {q.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
+      {q.isError && (
+        <div className="text-sm text-destructive">
+          No se pudo cargar la guía. {(q.error as Error)?.message}
+        </div>
+      )}
+      {q.data && (
+        <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-ink bg-surface-elevated rounded-md p-4 border hairline">
+          {q.data.markdown}
+        </pre>
+      )}
+    </Overlay>
   );
 }
 
@@ -172,6 +224,11 @@ function EmisorCard({
 
   const certInfo = useMutation({
     mutationFn: () => facturacionApi.consultarCertInfo(emisor.id),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const diagnostico = useMutation({
+    mutationFn: () => facturacionApi.diagnosticarEmisor(emisor.id),
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -228,6 +285,10 @@ function EmisorCard({
                 {certInfo.isPending ? "Leyendo…" : "Ver cert"}
               </DropdownMenuItem>
             )}
+            <DropdownMenuItem onClick={() => diagnostico.mutate()} disabled={diagnostico.isPending}>
+              <Stethoscope className="mr-2 h-4 w-4" />
+              {diagnostico.isPending ? "Diagnosticando…" : "Diagnosticar"}
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={onCert}>
               <KeyRound className="mr-2 h-4 w-4" />
               {emisor.cert_cargado ? "Renovar cert" : "Cargar cert"}
@@ -262,6 +323,19 @@ function EmisorCard({
             Comparar el Nº de serie contra el "Computador Fiscal" en Administración de Certificados
             Digitales de ARCA.
           </div>
+        </div>
+      )}
+      {diagnostico.data && (
+        <div className="rounded-md border hairline bg-surface-elevated px-3 py-2.5">
+          <div
+            className={cn(
+              "text-2xs font-mono font-medium mb-2",
+              diagnostico.data.listo ? "text-verde-ink" : "text-destructive",
+            )}
+          >
+            {diagnostico.data.listo ? "✓ Listo para facturar" : "✗ Hay algo por resolver"}
+          </div>
+          <Chequeos items={diagnostico.data.chequeos} />
         </div>
       )}
     </div>
@@ -302,11 +376,55 @@ function EmisorFormModal({
   const [cert, setCert] = useState("");
   const [key, setKey] = useState("");
 
+  // Campos que trae AFIP → SIEMPRE de solo-lectura (AFIP es la fuente única,
+  // no se tipean a mano). Si AFIP no trae uno puntual (o falla la consulta
+  // entera), ese campo queda vacío/read-only — nunca un input editable. Cada
+  // uno resuelto se puede desbloquear con "editar" por si AFIP tiene un dato
+  // mal cargado.
+  const [afip, setAfip] = useState<{
+    razon_social: boolean;
+    domicilio: boolean;
+    condicion_iva: boolean;
+  }>({ razon_social: false, domicilio: false, condicion_iva: false });
+
+  // 3 campos nuevos + impuestos — puramente informativos (no se persisten,
+  // no tienen "editar": no hay nada que corregir a mano).
+  const [tipoPersona, setTipoPersona] = useState("");
+  const [categoriaMonotributo, setCategoriaMonotributo] = useState("");
+  const [actividades, setActividades] = useState<string[]>([]);
+  const [impuestos, setImpuestos] = useState<PadronImpuesto[]>([]);
+
   const padron = usePadronLookup((datos) => {
     if (datos.razon_social) setRazonSocial(datos.razon_social);
     if (datos.domicilio) setDomicilio(datos.domicilio);
     if (datos.condicion_iva) setCondicion(datos.condicion_iva);
+    setTipoPersona(datos.tipo_persona);
+    setCategoriaMonotributo(datos.categoria_monotributo);
+    setActividades(datos.actividades);
+    setImpuestos(datos.impuestos);
+    // Bloquea solo lo que AFIP realmente devolvió; lo que no vino queda vacío.
+    setAfip({
+      razon_social: !!datos.razon_social,
+      domicilio: !!datos.domicilio,
+      condicion_iva: !!datos.condicion_iva,
+    });
   });
+
+  // Auto-búsqueda: apenas el CUIT tiene 11 dígitos se consulta AFIP solo
+  // (debounce para no disparar en cada tecla). En "Editar" el CUIT ya viene
+  // cargado → se refresca desde AFIP al abrir. `buscarAfip` es estable
+  // (useCallback en el hook), así el efecto no se re-dispara en cada render.
+  const buscarAfip = padron.buscar;
+  const ultimoBuscadoRef = useRef<string>("");
+  useEffect(() => {
+    const digits = cuit.replace(/\D/g, "");
+    if (digits.length !== 11 || digits === ultimoBuscadoRef.current) return;
+    const t = setTimeout(() => {
+      ultimoBuscadoRef.current = digits;
+      buscarAfip(cuit);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [cuit, buscarAfip]);
 
   const certOk = cert.includes("BEGIN CERTIFICATE");
   const keyOk = key.includes("PRIVATE KEY");
@@ -399,6 +517,7 @@ function EmisorFormModal({
         {emisor ? "Editar emisor" : "Nuevo emisor"}
       </h2>
       <div className="space-y-3">
+        {/* 1. Nombre interno (nuestro, no de AFIP) — primero para identificar el emisor */}
         <Field
           label="Nombre interno"
           hint="Identificador corto para este sistema (no el nombre legal)"
@@ -412,25 +531,13 @@ function EmisorFormModal({
             className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm"
           />
         </Field>
-        <Field label="Razón social" hint="Nombre legal que aparece en el PDF de la factura">
-          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
-          <input
-            type="text"
-            value={razonSocial}
-            onChange={(e) => setRazonSocial(e.target.value)}
-            placeholder="Martín Javier Santini Calarco"
-            className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm"
-          />
-        </Field>
+
+        {/* 2. CUIT — dispara el autocompletado de AFIP solo */}
         <Field
           label="CUIT"
-          hint={
-            !padron.motivo && !padron.inactivo && padron.noEncontrado
-              ? "ARCA no tiene datos para este CUIT — cargá a mano."
-              : undefined
-          }
+          hint="Poné el CUIT y AFIP completa razón social, condición IVA y domicilio."
         >
-          <div className="flex gap-1.5">
+          <div className="flex items-center gap-1.5">
             {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
             <input
               type="text"
@@ -440,22 +547,132 @@ function EmisorFormModal({
               placeholder="20-30000000-0"
               className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm font-mono"
             />
-            <button
-              type="button"
-              onClick={() => padron.buscar(cuit)}
-              disabled={padron.buscando || cuit.replace(/\D/g, "").length !== 11}
-              title="Autocompletar razón social/domicilio/condición IVA desde ARCA"
-              className="shrink-0 h-9 px-3 rounded-md border hairline text-xs text-muted-foreground hover:text-ink flex items-center gap-1.5 disabled:opacity-40"
-            >
-              <Search className="h-3.5 w-3.5" />
-              {padron.buscando ? "Buscando…" : "Buscar"}
-            </button>
+            {padron.buscando ? (
+              <span className="shrink-0 text-xs text-muted-foreground flex items-center gap-1.5">
+                <Search className="h-3.5 w-3.5 animate-pulse" />
+                Consultando AFIP…
+              </span>
+            ) : (
+              cuit.replace(/\D/g, "").length === 11 && (
+                <button
+                  type="button"
+                  onClick={() => padron.buscar(cuit)}
+                  title="Volver a consultar AFIP para este CUIT"
+                  className="shrink-0 h-9 px-3 rounded-md border hairline text-xs text-muted-foreground hover:text-ink flex items-center gap-1.5"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  Actualizar
+                </button>
+              )
+            )}
           </div>
           {padron.motivo && <ErrorBanner>{padron.motivo}</ErrorBanner>}
           {!padron.motivo && padron.inactivo && (
             <ErrorBanner>Este CUIT figura inactivo en AFIP.</ErrorBanner>
           )}
+          {!padron.motivo && !padron.inactivo && padron.noEncontrado && (
+            <p className="text-xs text-muted-foreground/70 mt-1">
+              AFIP no trajo datos para este CUIT — completá los campos a mano.
+            </p>
+          )}
         </Field>
+
+        {/* 3. Datos de AFIP — SIEMPRE de solo lectura, nunca un input editable
+        (el dueño: si podemos traer el dato de AFIP, completarlo a mano no
+        tiene sentido). Mientras la consulta está en vuelo se ve "esperando";
+        si AFIP no lo trajo (falló o no vino ese campo puntual), se ve vacío
+        — nunca editable. El banner de error de `padron.motivo` ya explica
+        el motivo real cuando corresponde. */}
+        <Field label="Razón social" hint="Nombre legal que aparece en el PDF de la factura">
+          {padron.buscando && !afip.razon_social ? (
+            <PendingAfip />
+          ) : afip.razon_social ? (
+            <ReadOnlyAfip
+              value={razonSocial}
+              onEdit={() => setAfip((a) => ({ ...a, razon_social: false }))}
+            />
+          ) : (
+            <VacioAfip />
+          )}
+        </Field>
+        <Field label="Condición IVA del emisor">
+          {padron.buscando && !afip.condicion_iva ? (
+            <PendingAfip />
+          ) : afip.condicion_iva ? (
+            <ReadOnlyAfip
+              value={CONDICIONES.find((c) => c.value === condicion)?.label ?? condicion}
+              onEdit={() => setAfip((a) => ({ ...a, condicion_iva: false }))}
+            />
+          ) : (
+            <VacioAfip />
+          )}
+        </Field>
+        <Field label="Domicilio comercial" hint="Aparece en el PDF de la factura">
+          {padron.buscando && !afip.domicilio ? (
+            <PendingAfip />
+          ) : afip.domicilio ? (
+            <ReadOnlyAfip
+              value={domicilio}
+              onEdit={() => setAfip((a) => ({ ...a, domicilio: false }))}
+            />
+          ) : (
+            <VacioAfip />
+          )}
+        </Field>
+
+        {/* 3b. Datos informativos de AFIP — solo lectura, sin persistir, sin
+        "editar" (no hay nada que corregir a mano). Se completan junto con
+        los 3 de arriba. */}
+        <Field label="Tipo de persona">
+          {padron.buscando && !tipoPersona ? (
+            <PendingAfip />
+          ) : tipoPersona ? (
+            <InfoAfip value={tipoPersona === "FISICA" ? "Física" : "Jurídica"} />
+          ) : (
+            <VacioAfip />
+          )}
+        </Field>
+        <Field label="Categoría de monotributo" hint="Vacío si el emisor es Responsable Inscripto">
+          {padron.buscando && !categoriaMonotributo ? (
+            <PendingAfip />
+          ) : categoriaMonotributo ? (
+            <InfoAfip value={categoriaMonotributo} />
+          ) : (
+            <VacioAfip />
+          )}
+        </Field>
+        <Field label="Actividad económica">
+          {padron.buscando && actividades.length === 0 ? (
+            <PendingAfip />
+          ) : actividades.length > 0 ? (
+            <InfoAfip value={actividades.join(", ")} />
+          ) : (
+            <VacioAfip />
+          )}
+        </Field>
+        <Field
+          label="Impuestos registrados en AFIP"
+          hint="Para ver si la relación de IVA está realmente activa en AFIP, no solo inferirla"
+        >
+          {padron.buscando && impuestos.length === 0 ? (
+            <PendingAfip />
+          ) : impuestos.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {impuestos.map((i) => (
+                <span
+                  key={i.id_impuesto}
+                  className="inline-flex items-center gap-1 text-2xs font-mono font-medium rounded-full px-2 py-0.5 border hairline bg-surface-elevated text-muted-foreground"
+                >
+                  {i.descripcion} ({i.estado})
+                </span>
+              ))}
+            </div>
+          ) : (
+            <VacioAfip />
+          )}
+        </Field>
+
+        {/* 4. Punto de venta (AFIP no lo lista confiable — se carga/consulta) */}
         <Field label="Punto de Venta">
           <div className="flex gap-1.5">
             {/* eslint-disable-next-line no-restricted-syntax -- input nativo type="number"; DS Input no soporta este tipo */}
@@ -510,32 +727,6 @@ function EmisorFormModal({
               )}
             </div>
           )}
-        </Field>
-        <Field label="Condición IVA del emisor">
-          <div className="relative">
-            <select
-              value={condicion}
-              onChange={(e) => setCondicion(e.target.value)}
-              className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm appearance-none pr-8"
-            >
-              {CONDICIONES.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-          </div>
-        </Field>
-        <Field label="Domicilio comercial" hint="Aparece en el PDF de la factura">
-          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
-          <input
-            type="text"
-            value={domicilio}
-            onChange={(e) => setDomicilio(e.target.value)}
-            placeholder="Falucho 4625, Mar del Plata"
-            className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm"
-          />
         </Field>
         <Field
           label="Ingresos Brutos (opcional)"
@@ -626,7 +817,12 @@ function EmisorFormModal({
           type="button"
           onClick={() => save.mutate()}
           disabled={
-            save.isPending || !nombre || !cuit || !ptoVta || (withCert && (!certOk || !keyOk))
+            save.isPending ||
+            !nombre ||
+            !cuit ||
+            !ptoVta ||
+            !razonSocial ||
+            (withCert && (!certOk || !keyOk))
           }
           className="h-9 px-4 rounded-md bg-ink text-background text-sm font-medium disabled:opacity-50"
         >
@@ -846,7 +1042,7 @@ function Overlay({ children, onClose }: { children: React.ReactNode; onClose: ()
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg rounded-2xl bg-background border hairline shadow-xl p-6">
+      <div className="relative z-10 w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl bg-background border hairline shadow-xl p-6">
         {children}
       </div>
     </div>
@@ -880,6 +1076,63 @@ function ErrorBanner({ children }: { children: React.ReactNode }) {
   return (
     <div className="mt-1.5 rounded border border-destructive/20 bg-destructive/5 px-2 py-1.5 text-xs text-destructive">
       {children}
+    </div>
+  );
+}
+
+// Campo traído de AFIP, mostrado de solo-lectura (AFIP es la fuente de verdad,
+// no se tipea a mano). Chip "AFIP" + un "editar" para desbloquearlo por si AFIP
+// se equivocó o hay que ajustarlo — nunca deja al usuario trabado.
+function ReadOnlyAfip({ value, onEdit }: { value: string; onEdit: () => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 min-w-0 h-9 rounded-md border hairline bg-muted/40 px-3 text-sm flex items-center text-ink">
+        <span className="truncate">{value}</span>
+      </div>
+      <span className="shrink-0 inline-flex items-center gap-1 text-2xs font-mono font-medium text-verde-ink">
+        <CheckCircle2 className="h-3 w-3" /> AFIP
+      </span>
+      <button
+        type="button"
+        onClick={onEdit}
+        className="shrink-0 text-xs text-muted-foreground hover:text-ink underline"
+      >
+        editar
+      </button>
+    </div>
+  );
+}
+
+// Estado "consultando AFIP" de un campo que todavía no se resolvió — distinto
+// de un input editable normal, para que no parezca que el campo "se quedó
+// editable para siempre" mientras la consulta a AFIP (que puede tardar unos
+// segundos) sigue en vuelo.
+function PendingAfip() {
+  return (
+    <div className="h-9 rounded-md border hairline bg-muted/20 px-3 text-sm flex items-center gap-1.5 text-muted-foreground">
+      <Search className="h-3.5 w-3.5 animate-pulse" />
+      Esperando a AFIP…
+    </div>
+  );
+}
+
+// Campo de AFIP sin dato — nunca un input editable: si AFIP no lo trajo (no
+// se buscó todavía, no vino ese campo puntual, o la consulta falló — el
+// motivo real ya se ve en el banner de `padron.motivo`), se ve vacío.
+function VacioAfip() {
+  return (
+    <div className="h-9 rounded-md border hairline bg-muted/10 px-3 text-sm flex items-center text-muted-foreground/40">
+      —
+    </div>
+  );
+}
+
+// Dato informativo de AFIP (categoría/actividad/tipo de persona) — de solo
+// lectura, sin "editar": no se persiste, no hay nada que corregir a mano.
+function InfoAfip({ value }: { value: string }) {
+  return (
+    <div className="h-9 rounded-md border hairline bg-muted/40 px-3 text-sm flex items-center text-ink">
+      <span className="truncate">{value}</span>
     </div>
   );
 }

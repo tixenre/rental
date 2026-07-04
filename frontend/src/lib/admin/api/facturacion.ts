@@ -72,6 +72,10 @@ export type PadronResult =
       domicilio: string;
       condicion_iva: string;
       estado_clave: string;
+      tipo_persona: string;
+      categoria_monotributo: string;
+      actividades: string[];
+      impuestos: { id_impuesto: number; descripcion: string; estado: string; periodo: number }[];
     }
   // `motivo` presente = no pudimos ni completar la consulta (WSAA/relación/
   // cert/red) — distinto de "ARCA no tiene datos para este CUIT" (sin motivo).
@@ -147,6 +151,15 @@ export const facturacionApi = {
       vigente_desde: string;
       vigente_hasta: string;
     }>(`/api/admin/emisores-arca/${id}/cert-info`),
+  // Diagnóstico de configuración: capa local (CUIT/cert/punto de venta) +
+  // capa AFIP (wsfe delegado, punto de venta habilitado, padrón delegado) —
+  // solo pega contra AFIP si la capa local no garantiza ya el fracaso.
+  diagnosticarEmisor: (id: number) =>
+    authedJson<{ chequeos: ChequeoPreview[]; listo: boolean }>(
+      `/api/admin/emisores-arca/${id}/diagnostico`,
+    ),
+  // Guía de trámites de AFIP — fuente única, lee arca_fe/TRAMITES_AFIP.md tal cual.
+  getGuiaAfip: () => authedJson<{ markdown: string }>("/api/admin/emisores-arca/guia"),
 
   // Facturas
   previewFactura: (pedidoId: number) =>

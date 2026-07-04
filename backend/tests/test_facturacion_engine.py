@@ -73,10 +73,10 @@ class _FakeWsfe:
         self.consultar_calls.append(numero)
         return self.consultar_resp
 
-    def solicitar_cae(self, fecae):
-        self.solicitar_calls.append(fecae)
+    def solicitar_cae(self, comprobante, numero):
+        self.solicitar_calls.append((comprobante, numero))
         from arca_fe import CaeResult
-        return CaeResult(resultado="A", cae="86261839900001", cae_vto=date(2030, 1, 1), numero=fecae["FeDetReq"]["FECAEDetRequest"][0]["CbteDesde"])
+        return CaeResult(resultado="A", cae="86261839900001", cae_vto=date(2030, 1, 1), numero=numero)
 
 
 def _fake_cred() -> CredARCA:
@@ -85,7 +85,7 @@ def _fake_cred() -> CredARCA:
         emisor="santini",
         condicion_iva="monotributo",
         ambiente="homologacion",
-        cuit=20300000000,
+        cuit=20300000003,
         punto_venta=2,
         cert_pem=b"x",
         key_pem=b"x",
@@ -218,7 +218,7 @@ def _fake_original_factura() -> Factura:
         cliente_cuit=None, razon_social=None, qr_payload=None, pdf_key=None,
         estado="emitida", nota_credito_de=None, raw_request=None,
         raw_response=None, errores=None, fecha_emision=None,
-        created_at=None, created_by=None,
+        created_at=None, created_by=None, domicilio="Falsa 123, CABA",
     )
 
 
@@ -253,7 +253,7 @@ def test_emitir_nota_credito_revierte_anulacion_si_arca_rechaza(monkeypatch):
     wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
     wsfe.ultimo = 1
 
-    def _rechazo(fecae):
+    def _rechazo(comprobante, numero):
         from arca_fe import CaeResult
         return CaeResult(resultado="R", errores=("10: rechazado",))
 
@@ -278,6 +278,35 @@ def test_emitir_nota_credito_revierte_anulacion_si_arca_rechaza(monkeypatch):
     assert order[-1] == "revertir", "ARCA rechazó → la anulación se tiene que revertir"
 
 
+def test_emitir_nota_credito_hereda_domicilio_de_la_original_sin_reverificar(monkeypatch):
+    """La NC NO re-verifica contra el padrón — hereda el `domicilio` ya
+    congelado de la factura original (consistencia original↔NC)."""
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    wsfe.ultimo = 1
+
+    captured_insert = {}
+
+    def _fake_insert_factura(**kw):
+        captured_insert.update(kw)
+        return 200
+
+    monkeypatch.setattr(engine, "get_db", lambda: _FakeConn())
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: _fake_pedido())
+    monkeypatch.setattr(engine, "get_by_id", lambda factura_id, conn: _fake_original_factura())
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: wsfe)
+    monkeypatch.setattr(engine, "marcar_anulada", lambda factura_id, conn: None)
+    monkeypatch.setattr(engine, "insert_factura", _fake_insert_factura)
+    monkeypatch.setattr(engine, "update_cae", lambda *a, **kw: None)
+    monkeypatch.setattr(engine, "update_error", lambda *a, **kw: None)
+    monkeypatch.setattr(engine, "revertir_anulacion", lambda *a, **kw: None)
+
+    engine.emitir_nota_credito(14)
+
+    assert captured_insert["domicilio"] == "Falsa 123, CABA"
+
+
 def test_construir_comprobante_nc_usa_snapshot_no_pedido_en_vivo():
     """El importe de la NC tiene que salir de la factura original persistida,
     no recalcularse del pedido (que puede haber cambiado de precio/descuento)."""
@@ -287,7 +316,7 @@ def test_construir_comprobante_nc_usa_snapshot_no_pedido_en_vivo():
     original = _fake_original_factura()
     # El pedido "en vivo" ahora tiene un monto MUY distinto al facturado.
     pedido_con_precio_cambiado = {**_fake_pedido(), "monto_total": 999999, "iva_monto": 0}
-    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+    emisor_obj = Emisor(cuit=20300000003, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
     cbte_asoc = CbteAsoc(tipo=CbteTipo.FACTURA_C, punto_venta=2, numero=1)
 
     req = construir_comprobante_nc(
@@ -314,7 +343,7 @@ def test_vto_pago_usa_fecha_hasta_si_todavia_no_paso():
     from arca_fe import Emisor, CondicionIva
 
     pedido = {**_fake_pedido(), "fecha_desde": "2026-07-05", "fecha_hasta": "2026-07-10"}
-    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+    emisor_obj = Emisor(cuit=20300000003, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
 
     req = construir_comprobante(
         pedido, emisor_obj, CondicionIva.MONOTRIBUTO, fecha=date(2026, 7, 1),
@@ -330,7 +359,7 @@ def test_vto_pago_cae_a_fecha_del_comprobante_si_el_pedido_ya_termino():
     from arca_fe import Emisor, CondicionIva
 
     pedido = {**_fake_pedido(), "fecha_desde": "2026-06-30", "fecha_hasta": "2026-07-01"}
-    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+    emisor_obj = Emisor(cuit=20300000003, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
 
     req = construir_comprobante(
         pedido, emisor_obj, CondicionIva.MONOTRIBUTO, fecha=date(2026, 7, 15),
@@ -340,17 +369,15 @@ def test_vto_pago_cae_a_fecha_del_comprobante_si_el_pedido_ya_termino():
 
 
 def test_vto_pago_sin_fecha_hasta_usa_fecha_del_comprobante():
-    from services.facturacion.comprobante_pedido import construir_comprobante
-    from arca_fe import Emisor, CondicionIva
+    """`_fecha_vto_pago` cae a la fecha del comprobante cuando no hay `fecha_hasta` — probado
+    directo sobre la función pura, no vía `construir_comprobante`: desde que
+    `ComprobanteRequest.__post_init__` valida que Concepto=SERVICIOS (que `construir_comprobante`
+    usa siempre) exige `fecha_serv_hasta`, un pedido sin `fecha_hasta` en absoluto ya no puede
+    representarse como un `ComprobanteRequest` completo — es un estado que la librería rechaza
+    antes, no algo que este test pueda seguir armando end-to-end."""
+    from services.facturacion.comprobante_pedido import _fecha_vto_pago
 
-    pedido = {**_fake_pedido(), "fecha_hasta": None}
-    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
-
-    req = construir_comprobante(
-        pedido, emisor_obj, CondicionIva.MONOTRIBUTO, fecha=date(2026, 7, 15),
-    )
-
-    assert req.fecha_vto_pago == date(2026, 7, 15)
+    assert _fecha_vto_pago(None, date(2026, 7, 15)) == date(2026, 7, 15)
 
 
 def test_vto_pago_con_fecha_hasta_como_datetime_no_string():
@@ -369,7 +396,7 @@ def test_vto_pago_con_fecha_hasta_como_datetime_no_string():
         "fecha_desde": datetime(2026, 6, 30, 9, 0),
         "fecha_hasta": datetime(2026, 7, 1, 18, 0),
     }
-    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+    emisor_obj = Emisor(cuit=20300000003, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
 
     req = construir_comprobante(
         pedido, emisor_obj, CondicionIva.MONOTRIBUTO, fecha=date(2026, 7, 15),
@@ -386,7 +413,7 @@ def test_vto_pago_de_la_nc_tambien_respeta_la_fecha_del_comprobante():
 
     original = _fake_original_factura()
     pedido = {**_fake_pedido(), "fecha_hasta": "2026-07-01"}
-    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+    emisor_obj = Emisor(cuit=20300000003, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
     cbte_asoc = CbteAsoc(tipo=CbteTipo.FACTURA_C, punto_venta=2, numero=1)
 
     req = construir_comprobante_nc(
@@ -460,6 +487,35 @@ def test_preview_chequeo_cuit_invalido_bloquea(monkeypatch):
     assert result["listo"] is False
 
 
+def test_preview_error_de_construccion_no_relacionado_a_cuit_no_se_rotula_mal(monkeypatch):
+    """Un ValueError de `construir_comprobante` que NO es sobre el CUIT (ej.
+    `punto_venta` del emisor fuera de rango) tiene que dar el chequeo genérico
+    `comprobante_invalido`, NO `cuit_receptor` — rotularlo mal manda a
+    cualquiera que debuguee esto a buscar el problema en el lugar equivocado."""
+    pedido_ri = {**_fake_pedido(), "cliente_perfil_impuestos": "responsable_inscripto"}
+    cred_pto_venta_invalido = CredARCA(
+        emisor_id=1, emisor="santini", condicion_iva="monotributo",
+        ambiente="homologacion", cuit=20300000003, punto_venta=0,  # fuera de rango (1-9999)
+        cert_pem=b"x", key_pem=b"x",
+        endpoint_wsaa="https://wsaahomo.afip.gov.ar/ws/services/LoginCms",
+        endpoint_wsfe="https://wswhomo.afip.gov.ar/wsfev1/service.asmx?WSDL",
+    )
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: cred_pto_venta_invalido)
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    assert result["listo"] is False
+    checks = {c["check"] for c in result["chequeos"]}
+    assert "comprobante_invalido" in checks
+    assert "cuit_receptor" not in checks
+    chequeo = next(c for c in result["chequeos"] if c["check"] == "comprobante_invalido")
+    assert "punto_venta" in chequeo["mensaje"]
+
+
 def test_preview_chequeo_ri_sin_cuit_valido_avisa_pero_no_bloquea(monkeypatch):
     """RI sin CUIT cae a Consumidor Final (comportamiento ya existente) — el
     preview lo muestra como advertencia, no como bloqueo (igual se puede
@@ -530,3 +586,196 @@ def test_preview_arca_business_error_se_propaga_sin_envolver(monkeypatch):
 
     with pytest.raises(ArcaBusinessError, match="600"):
         engine.previsualizar_factura(1, conn=_FakeConn())
+
+
+# ── Receptor verificado contra el padrón de ARCA (emitir_factura bloquea;
+# el preview solo avisa) ─────────────────────────────────────────────────────
+
+_CUIT_VALIDO = "20301234563"  # dígito verificador correcto (verificado con cuil_valido)
+
+
+def _persona_afip(razon_social="Empresa Real SA", domicilio="Calle Real 1", condicion_iva="responsable_inscripto"):
+    from arca_fe.padron import PersonaArca
+
+    return PersonaArca(
+        cuit=_CUIT_VALIDO,
+        razon_social=razon_social,
+        nombre="",
+        apellido="",
+        domicilio=domicilio,
+        condicion_iva=condicion_iva,
+        estado_clave="ACTIVO",
+    )
+
+
+def test_emitir_factura_receptor_con_cuit_se_verifica_y_sobreescribe(monkeypatch):
+    """Receptor con CUIT: `verificar_y_actualizar_receptor` se llama y sus
+    datos (razón social/domicilio/condición IVA) sobreescriben lo que tenía
+    el pedido ANTES de construir el comprobante — la factura sale con lo que
+    dice AFIP, no con el dato interno viejo."""
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    wsfe.ultimo = 0
+    wsfe.consultar_resp = None
+
+    pedido_ri = {
+        **_fake_pedido(),
+        "cliente_id": 7,
+        "cliente_perfil_impuestos": "monotributo",  # dato interno VIEJO
+        "cliente_cuit": _CUIT_VALIDO,
+        "cliente_razon_social": "Nombre Viejo Mal Escrito",
+    }
+    calls = _patch_common(monkeypatch, wsfe)
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+
+    verificaciones = []
+
+    def _fake_verificar(cuit, cliente_id, conn):
+        verificaciones.append((cuit, cliente_id))
+        return _persona_afip()
+
+    monkeypatch.setattr(engine, "verificar_y_actualizar_receptor", _fake_verificar)
+    monkeypatch.setattr(
+        engine, "insert_factura", lambda **kw: (calls.setdefault("insert_factura", kw), 99)[1]
+    )
+
+    engine.emitir_factura(1)
+
+    assert verificaciones == [(_CUIT_VALIDO, 7)]
+    ins = calls["insert_factura"]
+    assert ins["razon_social"] == "Empresa Real SA"
+    # condicion_iva='responsable_inscripto' de AFIP → CondicionIva.RESPONSABLE_INSCRIPTO (=1)
+    assert ins["condicion_iva_receptor"] == 1
+
+
+def test_emitir_factura_resuelve_emisor_con_perfil_ya_corregido_por_afip(monkeypatch):
+    """Bug real encontrado en revisión: `emisor_para` (decide QUÉ emisor
+    factura, según la condición IVA del receptor) tiene que resolverse con el
+    perfil YA CORREGIDO por AFIP, no con el dato interno viejo — si se
+    resuelve antes de la corrección, un pedido con perfil interno
+    desactualizado ('monotributo') pero AFIP confirmando 'responsable_inscripto'
+    elegiría el emisor equivocado (justo el caso que esta verificación existe
+    para prevenir)."""
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    wsfe.ultimo = 0
+    wsfe.consultar_resp = None
+
+    pedido_ri = {
+        **_fake_pedido(),
+        "cliente_id": 7,
+        "cliente_perfil_impuestos": "monotributo",  # dato interno VIEJO
+        "cliente_cuit": _CUIT_VALIDO,
+    }
+    calls = _patch_common(monkeypatch, wsfe)
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+    monkeypatch.setattr(
+        engine, "verificar_y_actualizar_receptor",
+        lambda cuit, cliente_id, conn: _persona_afip(),  # condicion_iva='responsable_inscripto'
+    )
+    monkeypatch.setattr(
+        engine, "insert_factura", lambda **kw: (calls.setdefault("insert_factura", kw), 99)[1]
+    )
+
+    perfiles_recibidos = []
+    monkeypatch.setattr(
+        engine, "emisor_para",
+        lambda perfil, conn: perfiles_recibidos.append(perfil) or "santini",
+    )
+
+    engine.emitir_factura(1)
+
+    assert perfiles_recibidos == ["responsable_inscripto"], (
+        "emisor_para tiene que recibir el perfil YA CORREGIDO por AFIP, no "
+        "'monotributo' (el dato interno viejo del pedido)"
+    )
+
+
+def test_emitir_factura_receptor_no_verificado_bloquea_sin_insertar(monkeypatch):
+    """Si AFIP no puede confirmar el CUIT del receptor, `emitir_factura`
+    propaga el RuntimeError SIN llegar nunca a `insert_factura` — no queda
+    ninguna fila 'pendiente' zombie."""
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    pedido_ri = {
+        **_fake_pedido(),
+        "cliente_id": 7,
+        "cliente_cuit": _CUIT_VALIDO,
+    }
+    calls = _patch_common(monkeypatch, wsfe)
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+
+    def _fake_verificar(cuit, cliente_id, conn):
+        raise RuntimeError("AFIP no pudo traer el padrón del CUIT — sistema caído")
+
+    monkeypatch.setattr(engine, "verificar_y_actualizar_receptor", _fake_verificar)
+    insert_llamado = []
+    monkeypatch.setattr(
+        engine, "insert_factura", lambda **kw: insert_llamado.append(kw) or 99
+    )
+
+    with pytest.raises(RuntimeError, match="sistema caído"):
+        engine.emitir_factura(1)
+
+    assert insert_llamado == []
+
+
+def test_emitir_factura_receptor_sin_cuit_no_consulta_afip(monkeypatch):
+    """Consumidor Final / DNI: no hay CUIT que verificar en un padrón
+    CUIT-céntrico — `verificar_y_actualizar_receptor` NUNCA se llama."""
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    calls = _patch_common(monkeypatch, wsfe)  # _fake_pedido() ya tiene cliente_cuit=None
+
+    def _fake_verificar(cuit, cliente_id, conn):
+        raise AssertionError("no debería consultarse el padrón sin CUIT")
+
+    monkeypatch.setattr(engine, "verificar_y_actualizar_receptor", _fake_verificar)
+
+    engine.emitir_factura(1)  # no debe levantar nada
+
+
+def test_preview_chequeo_receptor_afip_bloquea_sin_romper(monkeypatch):
+    """CUIT con dígito verificador OK pero que AFIP rechaza (o no responde)
+    — el preview lo muestra como chequeo BLOQUEANTE, sin romper el preview
+    en sí (fail-not-fast, mismo criterio que el resto de los chequeos)."""
+    pedido_ri = {
+        **_fake_pedido(),
+        "cliente_perfil_impuestos": "responsable_inscripto",
+        "cliente_cuit": _CUIT_VALIDO,
+    }
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+
+    def _fake_resolver(cuit, conn):
+        raise RuntimeError("AFIP no pudo traer el padrón del CUIT — no existe persona")
+
+    monkeypatch.setattr(engine, "resolver_persona", _fake_resolver)
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    afip_check = next(c for c in result["chequeos"] if c["check"] == "receptor_verificado_afip")
+    assert afip_check["ok"] is False
+    assert afip_check["bloqueante"] is True
+    assert "no existe persona" in afip_check["mensaje"]
+    assert result["listo"] is False
+
+
+def test_preview_chequeo_receptor_afip_no_aparece_si_todo_bien(monkeypatch):
+    """Si AFIP confirma el CUIT sin problemas, no se agrega ningún chequeo
+    extra — mismo criterio que el resto: solo se lista lo que hay que
+    atender."""
+    pedido_ri = {
+        **_fake_pedido(),
+        "cliente_perfil_impuestos": "responsable_inscripto",
+        "cliente_cuit": _CUIT_VALIDO,
+    }
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+    monkeypatch.setattr(engine, "resolver_persona", lambda cuit, conn: _persona_afip())
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    assert not any(c["check"] == "receptor_verificado_afip" for c in result["chequeos"])
