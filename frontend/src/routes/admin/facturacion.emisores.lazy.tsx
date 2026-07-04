@@ -852,12 +852,24 @@ const MOTIVO_LABEL: Record<string, string> = {
 // Distingue "ARCA no tiene NINGÚN punto creado" de "ARCA tiene puntos, pero
 // ninguno sirve para facturar electrónicamente" — antes ambos casos mostraban
 // el mismo mensaje genérico.
-function mensajeSinPuntosVenta(excluidos: { nro: number; motivo: string }[]): string {
+function mensajeSinPuntosVenta(
+  excluidos: { nro: number; motivo: string; raw_emision_tipo?: string | null }[],
+): string {
   if (excluidos.length === 0) {
     return "ARCA no tiene ningún punto de venta registrado para este CUIT — hay que crear uno en el portal de ARCA (Puntos de Venta y Domicilios).";
   }
   const detalle = excluidos
-    .map((e) => `${String(e.nro).padStart(5, "0")} (${MOTIVO_LABEL[e.motivo] ?? e.motivo})`)
+    .map((e) => {
+      const label = MOTIVO_LABEL[e.motivo] ?? e.motivo;
+      // El valor crudo de `EmisionTipo` viaja para "no_electronico" — si ARCA
+      // devuelve un valor inesperado (mismo tipo de quirk que "FchBaja=NULL"),
+      // se ve acá tal cual en vez de un motivo genérico sin poder confirmarlo.
+      const raw =
+        e.motivo === "no_electronico" && e.raw_emision_tipo
+          ? ` [ARCA dice EmisionTipo="${e.raw_emision_tipo}"]`
+          : "";
+      return `${String(e.nro).padStart(5, "0")} (${label}${raw})`;
+    })
     .join(", ");
   return `ARCA tiene ${excluidos.length} punto${excluidos.length === 1 ? "" : "s"} de venta pero ninguno está habilitado para facturar electrónicamente: ${detalle}.`;
 }

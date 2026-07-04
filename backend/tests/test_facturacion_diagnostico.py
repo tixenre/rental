@@ -205,6 +205,44 @@ def test_punto_venta_excluido_muestra_el_motivo_real(monkeypatch):
     assert "bloqueado" in check["mensaje"]
 
 
+def test_punto_venta_no_electronico_muestra_el_emisiontipo_crudo(monkeypatch):
+    """Bug real reproducido en producción: un punto de venta con `Sistema = "Factura
+    Electronica - Web Services"` en el portal de ARCA (confirmado manualmente por el dueño,
+    no dado de baja ni bloqueado) apareció como "no_electronico" en el diagnóstico —
+    `EmisionTipo` no era el literal `"CAE"` esperado. Mismo criterio que el bug de
+    `FchBaja="NULL"`: en vez de asumir por qué, el valor crudo de ARCA se muestra tal cual
+    para poder confirmarlo, no adivinarlo."""
+    _patch_emisor(monkeypatch, _FakeEmisor())
+    _patch_cert_info(monkeypatch, vencido=False)
+    monkeypatch.setattr(
+        "services.facturacion.puntos_venta.consultar_puntos_venta",
+        lambda nombre, conn: {
+            "habilitados": [],
+            "excluidos": [
+                {"nro": 3, "motivo": "no_electronico", "raw_emision_tipo": "CAEA"}
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        "services.facturacion.config.credenciales",
+        lambda nombre, conn: type("C", (), {"ambiente": "homologacion", "cuit": 20301234563})(),
+    )
+    monkeypatch.setattr(
+        "services.facturacion.wsaa_cache.get_ta",
+        lambda nombre, conn, servicio="wsfe": ("tok", "sign"),
+    )
+    monkeypatch.setattr(
+        "arca_fe.padron.PadronClient.get_persona",
+        lambda self, cuit: object(),
+    )
+
+    result = diagnostico.diagnosticar_emisor(1, conn=object())
+
+    check = next(c for c in result["chequeos"] if c["check"] == "punto_venta_habilitado")
+    assert check["ok"] is False
+    assert 'EmisionTipo="CAEA"' in check["mensaje"]
+
+
 def test_padron_falla_no_bloquea_el_listo(monkeypatch):
     """El padrón nunca es crítico para facturar — si falla, se informa pero
     NO impide que `listo=True` si el resto de los chequeos está bien."""
