@@ -18,6 +18,7 @@ import {
   type VerificacionPanelEstado,
 } from "@/components/rental/VerificacionRequeridaPanel";
 import { FacturacionModal } from "@/components/rental/FacturacionModal";
+import { TerminosModal } from "@/components/rental/TerminosModal";
 
 /** El return_to que le pasamos a Didit para que, al volver verificado, el
  *  carrito se reabra directo en ESTE paso (no en la lista de ítems). Espeja
@@ -128,6 +129,7 @@ export function CheckoutResumen({
   // refleja al toque acá, sin esperar a que el caller vuelva a pedir la sesión.
   const [perfilImpuestosLive, setPerfilImpuestosLive] = useState(perfilImpuestos ?? null);
   const [facturacionOpen, setFacturacionOpen] = useState(false);
+  const [terminosOpen, setTerminosOpen] = useState(false);
 
   async function revalidar(nextSessionConfirmed = sessionConfirmed) {
     setCargando(true);
@@ -323,14 +325,13 @@ export function CheckoutResumen({
               te recomendamos contratar un seguro propio para tus producciones. Encontrás el Detalle
               de seguro en la sección de documentos de tu perfil apenas hacés el pedido (es
               provisorio hasta que lo confirmemos). Al confirmar aceptás nuestros{" "}
-              <a
-                href="/terminos"
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => setTerminosOpen(true)}
                 className="underline underline-offset-2 hover:text-ink"
               >
                 Términos y Condiciones
-              </a>
+              </button>
               .
             </p>
           </div>
@@ -466,6 +467,7 @@ export function CheckoutResumen({
           setPerfilImpuestosLive((p.perfil_impuestos ?? null) as PerfilImpuestos | null)
         }
       />
+      <TerminosModal open={terminosOpen} onOpenChange={setTerminosOpen} />
     </div>
   );
 }
