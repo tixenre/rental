@@ -589,18 +589,24 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
 
             estado_inicial = data.estado if data.estado in {"borrador", "presupuesto"} else "presupuesto"
             next_num = _next_numero_pedido(conn)
+            # `fuente`: distingue quién originó el pedido para que el label del admin
+            # ("back-office" vs "portal del cliente") sea confiable — antes esta columna
+            # nunca se escribía acá y todo caía al default 'sistema' de la tabla, así que
+            # un pedido creado por un cliente vía `cliente_crear_pedido` (es_admin=False)
+            # se mostraba igual que uno cargado a mano desde el back-office.
+            fuente = "sistema" if es_admin else "portal"
             # Cabecera primero con totales en 0; los ítems se aplican vía el helper
             # canónico, que recalcula monto_total y descuento_jornadas_pct.
             pedido_id = conn.insert_returning("""
                 INSERT INTO alquileres (cliente_nombre, cliente_email, cliente_telefono,
                                      cliente_id, notas, fecha_desde, fecha_hasta,
                                      monto_total, estado, numero_pedido,
-                                     descuento_pct, descuento_jornadas_pct)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                                     descuento_pct, descuento_jornadas_pct, fuente)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (cliente_nombre, cliente_email, cliente_telefono,
                   data.cliente_id, data.notas, data.fecha_desde or None, data.fecha_hasta or None,
                   0, estado_inicial, next_num,
-                  descuento_pct, 0.0))
+                  descuento_pct, 0.0, fuente))
 
             # Ítems vía la fuente única `_apply_pedido_items` (#805): preserva las
             # líneas personalizadas (equipo_id None → nombre_libre/cobro_modo/orden),

@@ -17,11 +17,15 @@ import {
   computeJornadas,
   deriveEndDate,
   diaAbierto,
+  earliestRetiro,
   franjaParaFecha,
+  laterTime,
+  minTimeForDate,
   timeToMinutes,
   ymd,
 } from "@/lib/rental-dates";
 import { useHorarios } from "@/lib/horarios";
+import { useAntelacionMinimaHoras } from "@/hooks/useSettings";
 import { apiGetDiasBloqueados } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -96,6 +100,16 @@ export function DateRangePickerModal({
   const horarios = respectHorarios ? horariosRaw : null;
   // Estable durante el ciclo de vida del modal — evita recomputar memos por render.
   const today = useMemo(() => startOfDay(new Date()), []);
+  const now = useMemo(() => new Date(), []);
+
+  // ── Piso de retiro: "ahora" + antelación mínima (#1126) ────────────────
+  // Solo aplica al carrito público (`!allowPast`): el admin nunca queda
+  // limitado (carga urgencias/retroactivo a mano), mismo criterio que el
+  // backend (`services/fechas.py`). Recalcula si el setting llega después
+  // del mount (query async con default 0 mientras carga).
+  const leadTimeHorasRaw = useAntelacionMinimaHoras();
+  const leadTimeHoras = allowPast ? 0 : leadTimeHorasRaw;
+  const earliest = useMemo(() => earliestRetiro(now, leadTimeHoras), [now, leadTimeHoras]);
 
   // ── Días bloqueados (sin stock) ──────────────────────────────────────
   const ventanaDesde = ymd(today);
@@ -141,6 +155,13 @@ export function DateRangePickerModal({
     if (franjaRetiro && startTime < franjaRetiro.desde) onStartTimeChange(franjaRetiro.desde);
     else if (franjaRetiro && startTime > franjaRetiro.hasta) onStartTimeChange(franjaRetiro.hasta);
   }, [respectHorarios, franjaRetiro, startTime, onStartTimeChange]);
+  // Clamp por antelación mínima: si el retiro elegido cae antes del piso
+  // (`earliest`, "ahora" + antelación), lo empuja al primer slot válido — así
+  // no queda seleccionada una hora que el backend igual rechazaría.
+  const pisoHoraRetiro = allowPast ? undefined : minTimeForDate(startDate, earliest);
+  useEffect(() => {
+    if (pisoHoraRetiro && startTime < pisoHoraRetiro) onStartTimeChange(pisoHoraRetiro);
+  }, [pisoHoraRetiro, startTime, onStartTimeChange]);
   useEffect(() => {
     if (!respectHorarios) return;
     if (franjaDevolucion && endTime < franjaDevolucion.desde)
@@ -269,7 +290,7 @@ export function DateRangePickerModal({
                     <TimeStepSelect
                       value={startTime}
                       onChange={onStartTimeChange}
-                      min={franjaRetiro?.desde}
+                      min={laterTime(franjaRetiro?.desde, pisoHoraRetiro)}
                       max={franjaRetiro?.hasta}
                       aria-label="Hora de retiro"
                       className="text-sm font-mono tabular-nums text-ink/80 hover:text-ink rounded-md px-2 py-1 bg-background border hairline"
@@ -415,6 +436,15 @@ export function DateRangePickerModal({
                 : "Tocá un día en el calendario para fijar el retiro. La devolución se calcula sola."}
             </p>
           )}
+
+          {/* Antelación mínima (#1126) — informativo, siempre visible si está
+              configurada; el piso real ya lo aplican el calendario y la hora. */}
+          {!allowPast && leadTimeHoras > 0 && (
+            <p className="flex items-center gap-1.5 text-2xs text-muted-foreground/80">
+              <Clock className="h-3 w-3 shrink-0" />
+              Retiro con al menos {leadTimeHoras} h de anticipación.
+            </p>
+          )}
         </div>
 
         {/* ── Calendario ────────────────────────────────────────────── */}
@@ -426,7 +456,8 @@ export function DateRangePickerModal({
             numberOfMonths={isMobile ? 1 : 2}
             locale={es}
             disabled={(date: Date) =>
-              (!allowPast && date < today) || (respectHorarios && !diaAbierto(horarios, date))
+              (!allowPast && date < startOfDay(earliest)) ||
+              (respectHorarios && !diaAbierto(horarios, date))
             }
             modifiers={calModifiers}
             modifiersClassNames={calModifiersClassNames}
