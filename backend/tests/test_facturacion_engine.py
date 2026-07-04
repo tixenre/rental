@@ -620,6 +620,48 @@ def test_emitir_factura_receptor_con_cuit_se_verifica_y_sobreescribe(monkeypatch
     assert ins["condicion_iva_receptor"] == 1
 
 
+def test_emitir_factura_resuelve_emisor_con_perfil_ya_corregido_por_afip(monkeypatch):
+    """Bug real encontrado en revisión: `emisor_para` (decide QUÉ emisor
+    factura, según la condición IVA del receptor) tiene que resolverse con el
+    perfil YA CORREGIDO por AFIP, no con el dato interno viejo — si se
+    resuelve antes de la corrección, un pedido con perfil interno
+    desactualizado ('monotributo') pero AFIP confirmando 'responsable_inscripto'
+    elegiría el emisor equivocado (justo el caso que esta verificación existe
+    para prevenir)."""
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    wsfe.ultimo = 0
+    wsfe.consultar_resp = None
+
+    pedido_ri = {
+        **_fake_pedido(),
+        "cliente_id": 7,
+        "cliente_perfil_impuestos": "monotributo",  # dato interno VIEJO
+        "cliente_cuit": _CUIT_VALIDO,
+    }
+    calls = _patch_common(monkeypatch, wsfe)
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+    monkeypatch.setattr(
+        engine, "verificar_y_actualizar_receptor",
+        lambda cuit, cliente_id, conn: _persona_afip(),  # condicion_iva='responsable_inscripto'
+    )
+    monkeypatch.setattr(
+        engine, "insert_factura", lambda **kw: (calls.setdefault("insert_factura", kw), 99)[1]
+    )
+
+    perfiles_recibidos = []
+    monkeypatch.setattr(
+        engine, "emisor_para",
+        lambda perfil, conn: perfiles_recibidos.append(perfil) or "santini",
+    )
+
+    engine.emitir_factura(1)
+
+    assert perfiles_recibidos == ["responsable_inscripto"], (
+        "emisor_para tiene que recibir el perfil YA CORREGIDO por AFIP, no "
+        "'monotributo' (el dato interno viejo del pedido)"
+    )
+
+
 def test_emitir_factura_receptor_no_verificado_bloquea_sin_insertar(monkeypatch):
     """Si AFIP no puede confirmar el CUIT del receptor, `emitir_factura`
     propaga el RuntimeError SIN llegar nunca a `insert_factura` — no queda

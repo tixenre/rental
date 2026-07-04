@@ -350,30 +350,23 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
                 "solo se puede facturar desde 'confirmado' o posterior"
             )
 
-        perfil_receptor = (pedido.get("cliente_perfil_impuestos") or "").strip().lower()
-        nombre_emisor = emisor_para(perfil_receptor, conn)
-        cred = credenciales(nombre_emisor, conn)
-
-        emisor_obj = Emisor(
-            cuit=cred.cuit,
-            punto_venta=cred.punto_venta,
-            condicion_iva=(
-                CondicionIva.RESPONSABLE_INSCRIPTO
-                if cred.condicion_iva == "responsable_inscripto"
-                else CondicionIva.MONOTRIBUTO
-            ),
-        )
-
-        # Verificar el receptor contra el padrón de ARCA ANTES de construir el
-        # comprobante — sin lock tomado todavía y sin ninguna fila escrita, así
-        # que si AFIP no confirma el CUIT esto es un RuntimeError limpio que
-        # aborta acá (mismo patrón que el ValueError de estado de arriba: nunca
-        # deja una fila 'pendiente' zombie). Solo aplica si el receptor tiene
-        # CUIT — Consumidor Final/DNI no tiene nada que verificar en un padrón
-        # CUIT-céntrico. `verificar_y_actualizar_receptor` (a diferencia del
-        # autocompletado de formularios) SÍ bloquea: la condición IVA del
-        # receptor se le manda a AFIP en el CAE (RG5616), no se factura con un
-        # dato sin confirmar. De paso corrige razón social/domicilio/perfil de
+        # Verificar el receptor contra el padrón de ARCA ANTES de resolver
+        # QUÉ EMISOR factura — `emisor_para` (más abajo) decide el emisor
+        # según `cliente_perfil_impuestos`, así que tiene que leer el valor
+        # YA CORREGIDO por AFIP, no el interno viejo: si el dato guardado
+        # difiere del real (ej. guardado 'monotributo', AFIP dice
+        # 'responsable_inscripto'), resolver el emisor ANTES de corregir
+        # elegía el emisor equivocado — exactamente el caso que esta
+        # verificación existe para prevenir. También va antes del lock/insert
+        # (sin fila escrita todavía), así que si AFIP no confirma el CUIT esto
+        # es un RuntimeError limpio que aborta acá (mismo patrón que el
+        # ValueError de estado de arriba: nunca deja una fila 'pendiente'
+        # zombie). Solo aplica si el receptor tiene CUIT — Consumidor
+        # Final/DNI no tiene nada que verificar en un padrón CUIT-céntrico.
+        # `verificar_y_actualizar_receptor` (a diferencia del autocompletado
+        # de formularios) SÍ bloquea: la condición IVA del receptor se le
+        # manda a AFIP en el CAE (RG5616), no se factura con un dato sin
+        # confirmar. De paso corrige razón social/domicilio/perfil de
         # impuestos del cliente si difieren de lo que AFIP dice.
         cuit_receptor = (pedido.get("cliente_cuit") or "").replace("-", "").strip()
         if cuit_receptor.isdigit() and len(cuit_receptor) == 11:
@@ -387,6 +380,20 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
                 persona.domicilio or pedido.get("cliente_domicilio_fiscal")
             )
             pedido["cliente_perfil_impuestos"] = persona.condicion_iva
+
+        perfil_receptor = (pedido.get("cliente_perfil_impuestos") or "").strip().lower()
+        nombre_emisor = emisor_para(perfil_receptor, conn)
+        cred = credenciales(nombre_emisor, conn)
+
+        emisor_obj = Emisor(
+            cuit=cred.cuit,
+            punto_venta=cred.punto_venta,
+            condicion_iva=(
+                CondicionIva.RESPONSABLE_INSCRIPTO
+                if cred.condicion_iva == "responsable_inscripto"
+                else CondicionIva.MONOTRIBUTO
+            ),
+        )
 
         hoy = now_ar().date()
         req = construir_comprobante(
