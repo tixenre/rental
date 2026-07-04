@@ -146,6 +146,22 @@ el portero pero siempre retornan OK. Para activarlos:
 
 Los comentarios `TODO (#NNNN)` marcan exactamente dónde.
 
+## Preview del contrato (antes de crear el pedido)
+
+`POST /api/checkout/contrato-preview` (`routes/checkout.py::checkout_contrato_preview`)
+arma un `pedido` equivalente **en memoria** desde el carrito de la sesión (mismo
+`_leer_carrito` que usa el portero + `equipos`/`contenido_de_batch`/`clientes`) y llama
+al **mismo `_contrato_html`** (`pdf_templates.py`) que genera el contrato real de un
+pedido ya creado — no persiste nada, no crea el pedido. Deja que el cliente **lea el
+contrato antes de confirmar** (sienta base para la firma digital de #1098 Fase 5).
+
+El HTML vuelve marcado como **SIMULACIÓN** (`_marcar_como_simulacion`: banner fijo +
+marca de agua diagonal) — el documento definitivo recién existe cuando el pedido se
+confirma (queda en el portal del cliente + se manda por mail). El front (`lib/checkout.ts
+::obtenerContratoPreviewHtml` + `components/rental/ContratoPreviewModal.tsx`) lo muestra
+en un iframe sandboxed dentro de un modal, sin salir del checkout (mismo patrón que
+`FacturacionModal`/`TerminosModal`).
+
 ## Archivos clave
 
 ```
@@ -154,8 +170,10 @@ backend/services/checkout/
 ├── validar.py           — el portero (validar_checkout + 10 checks)
 └── tyc.py               — T&C (TYC_VERSION_ACTUAL, ya_acepto, registrar_aceptacion)
 
+backend/routes/checkout.py                     — validar / aceptar-tyc / contrato-preview
 backend/tests/test_checkout_portero.py         — candados unitarios (sin DB real)
 backend/tests/test_checkout_route_robustez.py  — candado del 503 limpio a nivel HTTP
+backend/tests/test_checkout_contrato_preview_db.py — candado del preview (Postgres real)
 backend/database/schema.py               — tabla aceptaciones_tyc (init_db)
 backend/migrations/versions/b1a2c3d4e5f6_checkout_aceptaciones_tyc.py
 ```

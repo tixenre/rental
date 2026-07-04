@@ -110,6 +110,24 @@ export const MODIFICABLE_STATES = new Set(["presupuesto", "confirmado"]);
 // históricos apenas se habilita un doc nuevo (nunca se marcó "visto" antes).
 export const DOC_NOTIFICABLE: DocTipo[] = ["contrato", "albaran", "factura"];
 
+// Copy de los documentos — fuente única (portal + checkout, que muestra la
+// sección "Documentos de tu pedido" antes de confirmar). "remito" no tenía
+// descripción propia porque el portal ya lo identifica por el label solo.
+export const DOC_LABEL: Record<DocTipo, string> = {
+  remito: "Remito",
+  contrato: "Contrato",
+  albaran: "Detalle de seguro",
+  factura: "Factura",
+  "packing-list": "Checklist de retiro",
+};
+export const DOC_DESCRIPTION: Partial<Record<DocTipo, string>> = {
+  remito: "El comprobante de tu pedido: ítems, fechas y precio.",
+  contrato: "Es el documento de alquiler firmado entre vos y nosotros.",
+  albaran: "Te sirve para tener constancia ante tu aseguradora.",
+  factura: "Tu factura electrónica, ya autorizada por ARCA.",
+  "packing-list": "El detalle de equipos para controlar al retirar y al devolver.",
+};
+
 export const TAB_OPTIONS: { value: Filtro; label: string }[] = [
   { value: "todos", label: "Todos" },
   { value: "activos", label: "Activos" },

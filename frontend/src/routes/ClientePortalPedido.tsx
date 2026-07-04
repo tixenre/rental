@@ -69,23 +69,12 @@ import {
   markDocSeen,
   MODIFICABLE_STATES,
 } from "./ClientePortalTypes";
-import type { Pedido, DocTipo } from "./ClientePortalTypes";
+import { DOC_LABEL, DOC_DESCRIPTION, type Pedido, type DocTipo } from "./ClientePortalTypes";
 
 // ── Constantes de docs (solo usadas aquí) ────────────────────────────────────
+// DOC_LABEL/DOC_DESCRIPTION viven en ClientePortalTypes.ts (fuente única,
+// reusada por el checkout); los íconos son propios de esta pantalla.
 
-const DOC_LABEL: Record<DocTipo, string> = {
-  remito: "Remito",
-  contrato: "Contrato",
-  albaran: "Detalle de seguro",
-  factura: "Factura",
-  "packing-list": "Checklist de retiro",
-};
-const DOC_DESCRIPTION: Partial<Record<DocTipo, string>> = {
-  contrato: "Es el documento de alquiler firmado entre vos y nosotros.",
-  albaran: "Te sirve para tener constancia ante tu aseguradora.",
-  factura: "Tu factura electrónica, ya autorizada por ARCA.",
-  "packing-list": "El detalle de equipos para controlar al retirar y al devolver.",
-};
 const DOC_ICONS: Record<DocTipo, string> = {
   remito:
     "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8",

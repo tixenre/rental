@@ -19,6 +19,12 @@ import {
 } from "@/components/rental/VerificacionRequeridaPanel";
 import { FacturacionModal } from "@/components/rental/FacturacionModal";
 import { TerminosModal } from "@/components/rental/TerminosModal";
+import { ContratoPreviewModal } from "@/components/rental/ContratoPreviewModal";
+import { DOC_LABEL, DOC_DESCRIPTION } from "@/routes/ClientePortalTypes";
+
+/** Los 4 docs disponibles desde "presupuesto" (ver `_documentos_disponibles`
+ *  en el backend) — "factura" queda afuera, no existe hasta que se facture. */
+const DOCS_CHECKOUT = ["remito", "contrato", "albaran", "packing-list"] as const;
 
 /** El return_to que le pasamos a Didit para que, al volver verificado, el
  *  carrito se reabra directo en ESTE paso (no en la lista de ítems). Espeja
@@ -130,6 +136,7 @@ export function CheckoutResumen({
   const [perfilImpuestosLive, setPerfilImpuestosLive] = useState(perfilImpuestos ?? null);
   const [facturacionOpen, setFacturacionOpen] = useState(false);
   const [terminosOpen, setTerminosOpen] = useState(false);
+  const [contratoOpen, setContratoOpen] = useState(false);
 
   async function revalidar(nextSessionConfirmed = sessionConfirmed) {
     setCargando(true);
@@ -336,6 +343,39 @@ export function CheckoutResumen({
             </p>
           </div>
 
+          {/* Documentos — qué se va a encontrar en el portal apenas se hace el
+            pedido, para que sepa qué esperar (no solo el disclaimer de
+            seguro). El Contrato además se puede LEER ahora mismo: una
+            simulación del pedido en curso, antes de firmar nada (sienta base
+            para la firma digital de #1098 Fase 5). */}
+          <div className="space-y-1.5 rounded-lg border hairline bg-surface p-3">
+            <div className="mb-0.5 font-mono text-2xs uppercase tracking-widest text-muted-foreground">
+              Documentos de tu pedido
+            </div>
+            <ul className="space-y-1.5">
+              {DOCS_CHECKOUT.map((tipo) => (
+                <li key={tipo} className="flex items-start justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground">
+                    <span className="font-medium text-ink">{DOC_LABEL[tipo]}</span>
+                    {DOC_DESCRIPTION[tipo] && <> · {DOC_DESCRIPTION[tipo]}</>}
+                  </span>
+                  {tipo === "contrato" && (
+                    <button
+                      type="button"
+                      onClick={() => setContratoOpen(true)}
+                      className="shrink-0 text-xs text-muted-foreground underline underline-offset-2 hover:text-ink"
+                    >
+                      Leer
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p className="pt-0.5 text-2xs text-muted-foreground">
+              Los vas a encontrar en tu portal apenas hagas el pedido.
+            </p>
+          </div>
+
           {/* Total — al final, justo arriba del botón de confirmar (en el
             footer fijo, inmediatamente debajo de esta tarjeta). */}
           <div className="space-y-2 rounded-lg border hairline bg-surface p-3">
@@ -468,6 +508,11 @@ export function CheckoutResumen({
         }
       />
       <TerminosModal open={terminosOpen} onOpenChange={setTerminosOpen} />
+      <ContratoPreviewModal
+        open={contratoOpen}
+        onOpenChange={setContratoOpen}
+        sessionId={sessionId}
+      />
     </div>
   );
 }
