@@ -32,8 +32,8 @@ import { iniciarVerificacionIdentidad } from "@/lib/verificacion";
 import { AccessMethods } from "@/components/rental/AccessMethods";
 import { SessionManager } from "@/components/rental/SessionManager";
 import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
-import { invalidateClienteSession } from "@/lib/iva";
-import { cuitValido } from "@/lib/cuit";
+import { invalidateClienteSession, PERFIL_IMPUESTOS_LABEL } from "@/lib/iva";
+import { cuitValido, verificarCuitArca } from "@/lib/cuit";
 import type { Perfil } from "./ClientePortalTypes";
 
 // ── Navegación: sidebar item ──────────────────────────────────────────────────
@@ -566,6 +566,69 @@ export function FacturacionForm({
   // validación, solo evita el viaje al servidor con un número mal tipeado).
   const cuitOk = form.cuit.trim() === "" || cuitValido(form.cuit);
 
+  // Verificación contra el padrón de ARCA: el cliente solo confirma el CUIT
+  // — si ARCA lo encuentra, condición IVA/razón social/domicilio quedan
+  // persistidos por el propio endpoint (no hace falta autocompletarlos a
+  // mano, ARCA los corrige igual al momento de facturar). Si ARCA no puede
+  // confirmarlo, se avisa y se cae al formulario editable de siempre.
+  const [verificando, setVerificando] = useState(false);
+  const [verificado, setVerificado] = useState<{
+    perfil_impuestos: PerfilImpuestos;
+    razon_social: string;
+    domicilio_fiscal: string;
+  } | null>(null);
+  const [motivoNoEncontrado, setMotivoNoEncontrado] = useState<string | null>(null);
+
+  function setCuit(cuit: string) {
+    setForm({ ...form, cuit });
+    // El CUIT cambió — la verificación anterior (si había) ya no aplica.
+    setVerificado(null);
+    setMotivoNoEncontrado(null);
+  }
+
+  async function handleVerificar() {
+    if (verificando || !cuitOk || !form.cuit.trim()) return;
+    setVerificando(true);
+    setMotivoNoEncontrado(null);
+    try {
+      const r = await verificarCuitArca(form.cuit);
+      if (r.encontrado) {
+        setVerificado({
+          perfil_impuestos: r.perfil_impuestos,
+          razon_social: r.razon_social,
+          domicilio_fiscal: r.domicilio_fiscal,
+        });
+        setForm((f) => ({
+          ...f,
+          cuit: r.cuit,
+          perfil_impuestos: r.perfil_impuestos,
+          razon_social: r.razon_social,
+          domicilio_fiscal: r.domicilio_fiscal,
+        }));
+        // El endpoint ya lo persistió — reflejar el cambio al toque, sin
+        // esperar a "Guardar cambios" (mismo criterio que `patchPerfil`).
+        onPerfilChange({
+          ...perfil,
+          cuit: r.cuit,
+          perfil_impuestos: r.perfil_impuestos,
+          razon_social: r.razon_social,
+          domicilio_fiscal: r.domicilio_fiscal,
+        });
+        invalidateClienteSession();
+        toast.success("CUIT verificado con ARCA");
+      } else {
+        setVerificado(null);
+        setMotivoNoEncontrado(r.motivo);
+      }
+    } catch (err) {
+      setMotivoNoEncontrado(
+        err instanceof Error ? err.message : "Error verificando el CUIT con ARCA",
+      );
+    } finally {
+      setVerificando(false);
+    }
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (saving || !cuitOk) return;
@@ -584,80 +647,119 @@ export function FacturacionForm({
   return (
     <form onSubmit={handleSave} className="space-y-5">
       <Field
-        label="Condición frente al IVA"
-        hint="Determina cómo se discrimina el IVA en tus facturas"
-      >
-        <select
-          value={form.perfil_impuestos}
-          onChange={(e) =>
-            setForm({ ...form, perfil_impuestos: e.target.value as PerfilImpuestos })
-          }
-          className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
-        >
-          <option value="consumidor_final">Consumidor final</option>
-          <option value="responsable_inscripto">Responsable inscripto (Factura A)</option>
-          <option value="monotributo">Monotributo</option>
-          <option value="exento">Exento</option>
-        </select>
-      </Field>
-
-      <Field
         label="CUIT / CUIL"
-        hint="Para la factura. Puede diferir del CUIL verificado de tu identidad."
+        hint="Lo verificamos contra ARCA — puede diferir del CUIL de tu identidad."
       >
-        <input
-          type="text"
-          inputMode="numeric"
-          value={form.cuit}
-          onChange={(e) =>
-            setForm({ ...form, cuit: e.target.value.replace(/[^\d-]/g, "").slice(0, 13) })
-          }
-          placeholder="20-12345678-9"
-          aria-invalid={!cuitOk}
-          className={cn(
-            "w-full rounded-md border bg-background px-3 py-2 text-base sm:text-sm text-ink",
-            cuitOk ? "hairline" : "border-destructive",
-          )}
-        />
+        <div className="flex gap-2">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={form.cuit}
+            onChange={(e) => setCuit(e.target.value.replace(/[^\d-]/g, "").slice(0, 13))}
+            placeholder="20-12345678-9"
+            aria-invalid={!cuitOk}
+            className={cn(
+              "w-full rounded-md border bg-background px-3 py-2 text-base sm:text-sm text-ink",
+              cuitOk ? "hairline" : "border-destructive",
+            )}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            className="shrink-0"
+            disabled={verificando || !cuitOk || !form.cuit.trim()}
+            onClick={() => void handleVerificar()}
+          >
+            {verificando ? "Verificando…" : "Verificar"}
+          </Button>
+        </div>
         {!cuitOk && (
           <p className="text-xs text-destructive">CUIT/CUIL inválido — revisá el número.</p>
         )}
       </Field>
 
-      {/* Datos para Factura A — sólo visibles si el cliente es RI */}
-      {form.perfil_impuestos === "responsable_inscripto" && (
-        <div className="rounded-md border border-dashed hairline bg-amber-soft/40 p-4 space-y-3">
-          <div className="text-xs font-semibold text-ink uppercase tracking-wider">
-            Datos para Factura A
+      {verificado ? (
+        <div className="space-y-1 rounded-md border border-verde/40 bg-verde/10 p-4">
+          <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-verde-ink">
+            <BadgeCheck className="h-3.5 w-3.5" />
+            Verificado con ARCA
           </div>
-          <Field label="Razón social" hint="Nombre legal de tu empresa">
-            <input
-              type="text"
-              value={form.razon_social}
-              onChange={(e) => setForm({ ...form, razon_social: e.target.value })}
-              placeholder="Productora SA"
-              className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
-            />
-          </Field>
-          <Field label="Domicilio fiscal" hint="Si difiere del domicilio del DNI">
-            <input
-              type="text"
-              value={form.domicilio_fiscal}
-              onChange={(e) => setForm({ ...form, domicilio_fiscal: e.target.value })}
-              placeholder="Av. Siempre Viva 123, Mar del Plata"
-              className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
-            />
-          </Field>
-          <Field label="Email de facturación" hint="Si querés que la factura llegue a otro email">
-            <input
-              type="email"
-              value={form.email_facturacion}
-              onChange={(e) => setForm({ ...form, email_facturacion: e.target.value })}
-              placeholder="facturacion@empresa.com"
-              className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
-            />
-          </Field>
+          <div className="text-sm font-medium text-ink">
+            {PERFIL_IMPUESTOS_LABEL[verificado.perfil_impuestos]}
+          </div>
+          {verificado.razon_social && (
+            <div className="text-sm text-muted-foreground">{verificado.razon_social}</div>
+          )}
+          {verificado.domicilio_fiscal && (
+            <div className="text-sm text-muted-foreground">{verificado.domicilio_fiscal}</div>
+          )}
         </div>
+      ) : (
+        <>
+          {motivoNoEncontrado && (
+            <p className="text-xs text-muted-foreground">
+              No pudimos verificarlo automáticamente ({motivoNoEncontrado}). Completá los datos a
+              mano:
+            </p>
+          )}
+          <Field
+            label="Condición frente al IVA"
+            hint="Determina cómo se discrimina el IVA en tus facturas"
+          >
+            <select
+              value={form.perfil_impuestos}
+              onChange={(e) =>
+                setForm({ ...form, perfil_impuestos: e.target.value as PerfilImpuestos })
+              }
+              className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
+            >
+              <option value="consumidor_final">Consumidor final</option>
+              <option value="responsable_inscripto">Responsable inscripto (Factura A)</option>
+              <option value="monotributo">Monotributo</option>
+              <option value="exento">Exento</option>
+            </select>
+          </Field>
+
+          {/* Datos para Factura A — sólo visibles si el cliente es RI */}
+          {form.perfil_impuestos === "responsable_inscripto" && (
+            <div className="space-y-3 rounded-md border border-dashed hairline bg-amber-soft/40 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wider text-ink">
+                Datos para Factura A
+              </div>
+              <Field label="Razón social" hint="Nombre legal de tu empresa">
+                <input
+                  type="text"
+                  value={form.razon_social}
+                  onChange={(e) => setForm({ ...form, razon_social: e.target.value })}
+                  placeholder="Productora SA"
+                  className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
+                />
+              </Field>
+              <Field label="Domicilio fiscal" hint="Si difiere del domicilio del DNI">
+                <input
+                  type="text"
+                  value={form.domicilio_fiscal}
+                  onChange={(e) => setForm({ ...form, domicilio_fiscal: e.target.value })}
+                  placeholder="Av. Siempre Viva 123, Mar del Plata"
+                  className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
+                />
+              </Field>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Email de facturación — no lo resuelve ARCA, siempre editable a mano. */}
+      {form.perfil_impuestos === "responsable_inscripto" && (
+        <Field label="Email de facturación" hint="Si querés que la factura llegue a otro email">
+          <input
+            type="email"
+            value={form.email_facturacion}
+            onChange={(e) => setForm({ ...form, email_facturacion: e.target.value })}
+            placeholder="facturacion@empresa.com"
+            className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
+          />
+        </Field>
       )}
 
       <SaveButton saving={saving} disabled={!cuitOk} />

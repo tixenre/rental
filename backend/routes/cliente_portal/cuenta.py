@@ -217,6 +217,55 @@ def cliente_me(request: Request):
         return d
 
 
+class VerificarCuitIn(BaseModel):
+    # Default "" (no obligatorio a nivel Pydantic) para que el candado de
+    # guard (`test_endpoint_cliente_rechaza_sesion_no_cliente`, body {}) llegue
+    # a `require_cliente` — la validación real del CUIT es la de abajo.
+    cuit: str = ""
+
+
+@router.post("/api/cliente/facturacion/verificar-cuit")
+@limiter.limit("10/minute")
+def cliente_verificar_cuit(data: VerificarCuitIn, request: Request):
+    """Verifica el CUIT del cliente contra el padrón de ARCA — mismo criterio
+    que ya usa `emitir_factura` al facturar de verdad (`verificar_y_actualizar_
+    receptor`), pero disparado ACÁ, como Didit con RENAPER: el cliente solo
+    tipea el CUIT, ARCA confirma condición IVA/razón social/domicilio, y esos
+    datos (+ el propio CUIT, ya confirmado) quedan PERSISTIDOS en la cuenta al
+    toque — no hace falta que el cliente los autocomplete a mano (ARCA los
+    corrige igual al momento de facturar, así que pedírselos dos veces es
+    trabajo redundante).
+
+    Best-effort a nivel HTTP (siempre 200, mismo patrón que `/admin/arca/
+    padron/{cuit}`): si ARCA no puede confirmarlo, no se persiste nada — el
+    front cae al formulario editable a mano de siempre."""
+    session = require_cliente(request)
+    cliente_id = session["cliente_id"]
+    cuit = data.cuit.strip()
+    if not cuil_valido(cuit):
+        raise HTTPException(400, "CUIT/CUIL inválido — verificá el número.")
+
+    from services.facturacion.padron import verificar_y_actualizar_receptor
+    with get_db() as conn:
+        try:
+            persona = verificar_y_actualizar_receptor(cuit, cliente_id, conn)
+        except RuntimeError as e:
+            return {"encontrado": False, "motivo": str(e)}
+        # El CUIT en sí no lo toca `verificar_y_actualizar_receptor` (ahí es
+        # el INPUT/receptor, no algo a corregir) — acá SÍ es el dato nuevo que
+        # el cliente acaba de confirmar contra ARCA.
+        conn.execute("UPDATE clientes SET cuit = %s WHERE id = %s", (cuit, cliente_id))
+        conn.commit()
+
+    return {
+        "encontrado": True,
+        "cuit": cuit,
+        "perfil_impuestos": persona.condicion_iva,
+        "razon_social": persona.razon_social,
+        "domicilio_fiscal": persona.domicilio,
+    }
+
+
 class PerfilUpdate(BaseModel):
     nombre:    Optional[str] = None
     apellido:  Optional[str] = None

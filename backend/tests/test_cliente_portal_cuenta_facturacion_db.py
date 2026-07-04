@@ -232,3 +232,98 @@ class TestVistaResueltaParaDisplay:
         assert body["telefono_contacto"] == "+5492235559999"
         # El mail de Google (base, disponible desde el alta) sigue siendo el preferido.
         assert body["email_comunicacion"] == "display-db@test.com"
+
+
+class TestVerificarCuitContraArca:
+    """`POST /api/cliente/facturacion/verificar-cuit` — el cliente solo tipea
+    el CUIT; si ARCA lo confirma, condición IVA/razón social/domicilio (+ el
+    propio CUIT) quedan persistidos al toque, sin que el cliente los
+    autocomplete a mano. Se mockea `verificar_y_actualizar_receptor` (haría
+    una llamada SOAP real a AFIP) — el candado es sobre el route, no sobre el
+    cliente SOAP en sí (eso lo cubre test_facturacion_padron.py)."""
+
+    _CUIT_VALIDO = "27230938607"  # mod-11 OK — ver test_cuit.py/anchor.py
+
+    def test_encontrado_persiste_cuit_y_correcciones(
+        self, cliente_no_verificado_fixture, monkeypatch,
+    ):
+        from fastapi.testclient import TestClient
+        from services.facturacion.padron import PersonaArca
+
+        persona = PersonaArca(
+            cuit=self._CUIT_VALIDO, razon_social="Estudio SRL", nombre="", apellido="",
+            domicilio="Av. Corrientes 1234", condicion_iva="responsable_inscripto",
+            estado_clave="ACTIVO",
+        )
+        monkeypatch.setattr(
+            "services.facturacion.padron.verificar_y_actualizar_receptor",
+            lambda cuit, cliente_id, conn: persona,
+        )
+
+        client = TestClient(main.app)
+        r = client.post(
+            "/api/cliente/facturacion/verificar-cuit",
+            json={"cuit": self._CUIT_VALIDO},
+            headers={"Cookie": _COOKIE_DISPLAY},
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body == {
+            "encontrado": True,
+            "cuit": self._CUIT_VALIDO,
+            "perfil_impuestos": "responsable_inscripto",
+            "razon_social": "Estudio SRL",
+            "domicilio_fiscal": "Av. Corrientes 1234",
+        }
+
+        # El CUIT quedó persistido de verdad (lo escribe el route, no el mock).
+        me = client.get("/api/cliente/me", headers={"Cookie": _COOKIE_DISPLAY})
+        assert me.json()["cuit"] == self._CUIT_VALIDO
+
+    def test_no_encontrado_no_persiste_nada(self, cliente_no_verificado_fixture, monkeypatch):
+        from fastapi.testclient import TestClient
+
+        def _falla(cuit, cliente_id, conn):
+            raise RuntimeError("AFIP no pudo confirmar el CUIT (motivo de prueba)")
+
+        monkeypatch.setattr(
+            "services.facturacion.padron.verificar_y_actualizar_receptor", _falla,
+        )
+
+        client = TestClient(main.app)
+        r = client.post(
+            "/api/cliente/facturacion/verificar-cuit",
+            json={"cuit": self._CUIT_VALIDO},
+            headers={"Cookie": _COOKIE_DISPLAY},
+        )
+        assert r.status_code == 200, r.text  # best-effort: nunca un error HTTP
+        body = r.json()
+        assert body["encontrado"] is False
+        assert "motivo de prueba" in body["motivo"]
+
+        me = client.get("/api/cliente/me", headers={"Cookie": _COOKIE_DISPLAY})
+        assert me.json()["cuit"] is None  # nada se tocó
+
+    def test_cuit_con_formato_invalido_rechazado_sin_llamar_a_arca(
+        self, cliente_no_verificado_fixture, monkeypatch,
+    ):
+        from fastapi.testclient import TestClient
+
+        llamado = {"veces": 0}
+
+        def _no_deberia_llamarse(cuit, cliente_id, conn):
+            llamado["veces"] += 1
+            raise AssertionError("no debería consultar ARCA con un CUIT mal formado")
+
+        monkeypatch.setattr(
+            "services.facturacion.padron.verificar_y_actualizar_receptor", _no_deberia_llamarse,
+        )
+
+        client = TestClient(main.app)
+        r = client.post(
+            "/api/cliente/facturacion/verificar-cuit",
+            json={"cuit": "20304050607"},  # checksum mod-11 incorrecto
+            headers={"Cookie": _COOKIE_DISPLAY},
+        )
+        assert r.status_code == 400, r.text
+        assert llamado["veces"] == 0
