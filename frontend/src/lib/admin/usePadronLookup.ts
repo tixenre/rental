@@ -13,12 +13,23 @@ import { useCallback, useRef, useState } from "react";
 
 import { facturacionApi } from "@/lib/admin/api";
 
+export type PadronImpuesto = {
+  id_impuesto: number;
+  descripcion: string;
+  estado: string;
+  periodo: number;
+};
+
 export type PadronDatos = {
   razon_social: string;
   nombre: string;
   apellido: string;
   domicilio: string;
   condicion_iva: string;
+  tipo_persona: string;
+  categoria_monotributo: string;
+  actividades: string[];
+  impuestos: PadronImpuesto[];
 };
 
 export function usePadronLookup(onFound: (datos: PadronDatos) => void) {
@@ -56,6 +67,10 @@ export function usePadronLookup(onFound: (datos: PadronDatos) => void) {
           apellido: result.apellido,
           domicilio: result.domicilio,
           condicion_iva: result.condicion_iva,
+          tipo_persona: result.tipo_persona,
+          categoria_monotributo: result.categoria_monotributo,
+          actividades: result.actividades,
+          impuestos: result.impuestos,
         });
         setInactivo(!!result.estado_clave && result.estado_clave !== "ACTIVO");
       } else if (result.motivo) {
