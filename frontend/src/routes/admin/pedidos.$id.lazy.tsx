@@ -189,6 +189,10 @@ function PedidoEditorPage() {
     descuentoTipo: draft.datos?.descuento_manual_tipo ?? null,
     descuentoMonto: draft.datos?.descuento_manual_monto ?? null,
     descuentoManualActivo: draft.datos?.descuento_manual_activo ?? null,
+    // Defensa en profundidad (sumado a `key={id}` en `PedidoEditorRoute`,
+    // arriba): aunque este panel ya se remonta al cambiar de pedido, el hook
+    // en sí queda protegido para cualquier otro consumidor que no lo haga.
+    resetKey: pedidoId,
   });
 
   // Modales
