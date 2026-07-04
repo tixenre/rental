@@ -111,13 +111,14 @@ def refrescar_catalogos_arca(request: Request):
 
 @router.get("/admin/arca/padron/{cuit}")
 def consultar_padron(cuit: str, request: Request):
-    """Autocompleta razón social/domicilio/condición IVA desde el padrón de
-    ARCA (ws_sr_constancia_inscripcion) — mismo autocompletado que hace el
-    facturador oficial al tipear un CUIT. Best-effort: nunca un error HTTP —
-    el formulario sigue siendo editable a mano. `resolver_persona` levanta
-    RuntimeError para cualquier cosa que no sea un CUIT encontrado (ya no
-    hay un "sin datos" silencioso) — se muestra tal cual, es más útil para
-    diagnosticar que un genérico "sin datos"."""
+    """Autocompleta datos desde el padrón de ARCA (ws_sr_constancia_inscripcion)
+    — mismo autocompletado que hace el facturador oficial al tipear un CUIT.
+    Best-effort a nivel HTTP: nunca un error HTTP, siempre 200 — el caller
+    decide qué hacer con `encontrado: False` (algunos forms siguen siendo
+    editables a mano, otros no). `resolver_persona` levanta RuntimeError para
+    cualquier cosa que no sea un CUIT encontrado (ya no hay un "sin datos"
+    silencioso) — se muestra tal cual, es más útil para diagnosticar que un
+    genérico "sin datos"."""
     require_admin(request)
 
     from services.facturacion.padron import resolver_persona
@@ -135,6 +136,18 @@ def consultar_padron(cuit: str, request: Request):
         "domicilio": persona.domicilio,
         "condicion_iva": persona.condicion_iva,
         "estado_clave": persona.estado_clave,
+        "tipo_persona": persona.tipo_persona,
+        "categoria_monotributo": persona.categoria_monotributo,
+        "actividades": [a.descripcion for a in persona.actividades],
+        "impuestos": [
+            {
+                "id_impuesto": i.id_impuesto,
+                "descripcion": i.descripcion,
+                "estado": i.estado,
+                "periodo": i.periodo,
+            }
+            for i in persona.impuestos
+        ],
     }
 
 
