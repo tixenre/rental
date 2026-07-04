@@ -98,6 +98,12 @@ class CbteTipo(IntEnum):
 
 
 class Concepto(IntEnum):
+    """Qué se factura (código WSFEv1 `FEDetRequest.Concepto`, tabla `FEParamGetTiposConcepto`).
+
+    Determina qué campos exige AFIP además de los básicos: `SERVICIOS`/`PRODUCTOS_Y_SERVICIOS`
+    requieren `fecha_serv_desde`/`fecha_serv_hasta`/`fecha_vto_pago` en `ComprobanteRequest`
+    (ver `_validar_fechas_servicio` en `comprobante.py`) — `PRODUCTOS` no."""
+
     PRODUCTOS = 1
     SERVICIOS = 2
     PRODUCTOS_Y_SERVICIOS = 3
@@ -111,11 +117,14 @@ class AlicuotaIva:
     pct: Decimal
 
 
-# Tabla canónica de alícuotas (tabla AFIP `FEParamGetTiposIva`).
-IVA_0 = AlicuotaIva(3, Decimal("0"))
-IVA_10_5 = AlicuotaIva(4, Decimal("10.5"))
-IVA_21 = AlicuotaIva(5, Decimal("21"))
-IVA_27 = AlicuotaIva(6, Decimal("27"))
+# Tabla canónica de alícuotas (tabla AFIP `FEParamGetTiposIva`) — el `id` (primer
+# argumento) es el código que WSFEv1 espera en `Iva.AlicIva[].Id`, NO inventado. No hay
+# `WsfeClient.param_tipos_iva()` (a diferencia de tipos_cbte/tipos_doc/etc.) — si hace falta
+# confirmar que un `id` sigue vigente, hay que agregar ese wrapper (no existe todavía).
+IVA_0 = AlicuotaIva(3, Decimal("0"))       # exento/no gravado dentro de un comprobante con IVA discriminado
+IVA_10_5 = AlicuotaIva(4, Decimal("10.5"))  # alícuota reducida
+IVA_21 = AlicuotaIva(5, Decimal("21"))      # alícuota general (el caso común)
+IVA_27 = AlicuotaIva(6, Decimal("27"))      # alícuota incrementada (servicios públicos, etc.)
 
 
 @dataclass(frozen=True)
@@ -312,9 +321,20 @@ class ComprobanteRequest:
 
 @dataclass(frozen=True)
 class CaeResult:
-    """Resultado de FECAESolicitar, ya parseado."""
+    """Resultado de `FECAESolicitar`, ya parseado (`WsfeClient.solicitar_cae`/`solicitar_cae_lote`).
 
-    resultado: str  # 'A' aprobado / 'R' rechazado
+    `resultado`: `'A'` aprobado, `'R'` rechazado, `'P'` parcial (solo posible en un lote — ver
+    `solicitar_cae_lote`, un comprobante individual siempre es 'A' o 'R').
+    `cae`/`cae_vto`/`numero`: solo poblados cuando `resultado == 'A'` — el CAE, su fecha de
+    vencimiento, y el número de comprobante que AFIP autorizó (puede diferir del pedido si hubo
+    un `recuperado` por idempotencia — no aplica acá, eso es responsabilidad del caller).
+    `observaciones`: tupla de strings `"CODIGO: mensaje"` — avisos NO fatales que AFIP adjunta
+    igual con `resultado == 'A'` (ej. un campo opcional que no hacía falta pero no se rechaza).
+    `errores`: tupla de strings `"CODIGO: mensaje"` — motivo del rechazo cuando
+    `resultado == 'R'` (o, para `solicitar_cae` de un comprobante suelto, también puede incluir
+    errores de cabecera del pedido completo)."""
+
+    resultado: str
     cae: Optional[str] = None
     cae_vto: Optional[date] = None
     numero: Optional[int] = None

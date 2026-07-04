@@ -188,6 +188,19 @@ class PersonaArca:
 
 @dataclass
 class PadronClient:
+    """Cliente de alto nivel para el padrón de ARCA (Constancia de Inscripción, WSDL
+    `personaServiceA5`).
+
+    `endpoint`: URL COMPLETA del WSDL, ya resuelta por el caller según ambiente (este cliente no
+    guarda su propia copia de las URLs de homologación/producción).
+    `cuit_representada`: CUIT del emisor cuyo TA se está usando para autenticar (el padrón
+    responde por CUALQUIER CUIT consultado, no hace falta que coincida con este).
+    `token`, `sign`: del TA vigente para el servicio `WSAA_SERVICIO` (`"ws_sr_constancia_inscripcion"`
+    — NO el mismo TA que usa `WsfeClient`, son servicios WSAA distintos).
+    `timeout`: segundos para el fetch del WSDL y la operación SOAP (default 20.0) — configurable
+    por instancia; dos instancias con distinto `timeout` al mismo `endpoint` cachean clientes zeep
+    separados."""
+
     endpoint: str
     cuit_representada: int
     token: str
