@@ -671,7 +671,7 @@ def _albaran_html(pedido):
         f'<div class="meta-sub">Retiro en {html.escape(OWNER_DIRECCION)}</div></div>'
     )
     body = (
-        _membrete(pedido, "Albarán", _ref(pedido), _fmt_date_short(pedido.get("emitido") or datetime.now()))
+        _membrete(pedido, "Certificado de seguro", _ref(pedido), _fmt_date_short(pedido.get("emitido") or datetime.now()))
         + f'<div class="meta">{_cliente_block(pedido)}{entrega}</div>'
         + '<table class="items"><thead><tr><th class="c">#</th><th></th><th>Equipo</th>'
           '<th class="c">Cant.</th><th>N° Serie</th><th class="r">Valor reposición</th></tr></thead>'
@@ -757,7 +757,11 @@ def _contrato_html(pedido):
     clausulas = "".join(f'<p class="clausula"><b>{html.escape(t)}.</b> {b}</p>' for t, b in _CLAUSULAS)
 
     body = (
-        _membrete(pedido, "Contrato", _ref(pedido), fecha_long, estado=False)
+        # estado=True (default, ya no se suprime): el pedido puede seguir en
+        # "Presupuesto" (todavía modificable, sin confirmar) cuando el cliente
+        # ya puede leer/descargar el contrato — el badge de estado es el
+        # disclaimer de que todavía no es definitivo.
+        _membrete(pedido, "Contrato", _ref(pedido), fecha_long)
         + '<div class="meta">'
           '<div class="meta-block"><div class="meta-label">Período de locación</div>'
           f'<div class="meta-val">{_fmt_date_dow(pedido.get("fecha_desde"))} al {_fmt_date_dow(pedido.get("fecha_hasta"))}</div></div>'

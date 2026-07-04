@@ -50,7 +50,7 @@ export const DOCS_PEDIDO: {
 }[] = [
   { kind: "contrato", label: "Contrato", Icon: FileSignature },
   { kind: "pdf", label: "Presupuesto", Icon: FileText },
-  { kind: "albaran", label: "Albarán", Icon: Truck },
+  { kind: "albaran", label: "Certificado de seguro", Icon: Truck },
   { kind: "packing-list", label: "Packing List", Icon: ClipboardList },
 ];
 

@@ -224,13 +224,13 @@ export type DocumentoTipo = keyof DocumentosDisponibles;
 export const DOCUMENTO_LABEL: Record<DocumentoTipo, string> = {
   remito: "Remito",
   contrato: "Contrato",
-  albaran: "Albarán",
+  albaran: "Certificado de seguro",
 };
 
 export const DOCUMENTO_HINT: Record<DocumentoTipo, string> = {
-  remito: "Disponible cuando confirmemos el pedido",
-  contrato: "Disponible cuando confirmemos el pedido",
-  albaran: "Disponible al momento de la entrega",
+  remito: "Disponible apenas se solicita el pedido",
+  contrato: "Disponible apenas se solicita el pedido",
+  albaran: "Disponible apenas se solicita el pedido",
 };
 
 export async function getOrder(id: string) {

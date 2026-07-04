@@ -384,8 +384,11 @@ export function CheckoutResumen({
           )}
         </Button>
         {puedeConfirmar && (
-          <p className="mt-3 text-center text-xs text-muted-foreground leading-tight">
-            Al confirmar aceptás nuestros{" "}
+          <p className="mt-3 text-center text-xs leading-relaxed text-muted-foreground">
+            A partir del retiro, sos responsable por daños evitables, pérdida o robo del equipo — te
+            recomendamos contratar un seguro propio para tus producciones. Encontrás el Certificado
+            de seguro en la sección de documentos de tu perfil apenas hacés el pedido (es provisorio
+            hasta que lo confirmemos). Al confirmar aceptás nuestros{" "}
             <a
               href="/terminos"
               target="_blank"

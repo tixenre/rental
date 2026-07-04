@@ -127,7 +127,7 @@ async def cliente_pedido_remito(id: int, request: Request, format: str = "pdf"):
     with get_db() as conn:
         pedido = _load_pedido_para_pdf(conn, id, session["cliente_id"])
     if not _documentos_disponibles(pedido.get("estado", ""))["remito"]:
-        raise HTTPException(403, "El remito estará disponible cuando confirmemos el pedido.")
+        raise HTTPException(403, "El remito no está disponible para este pedido.")
     return await _doc_response_or_pdf(
         _pedido_html(pedido), _pedido_filename(pedido), format
     )
@@ -141,7 +141,7 @@ async def cliente_pedido_contrato(id: int, request: Request, format: str = "pdf"
     with get_db() as conn:
         pedido = _load_pedido_para_pdf(conn, id, session["cliente_id"])
     if not _documentos_disponibles(pedido.get("estado", ""))["contrato"]:
-        raise HTTPException(403, "El contrato estará disponible cuando confirmemos el pedido.")
+        raise HTTPException(403, "El contrato no está disponible para este pedido.")
     return await _doc_response_or_pdf(
         _contrato_html(pedido), _pedido_filename(pedido, doc="contrato"), format
     )
@@ -155,7 +155,7 @@ async def cliente_pedido_albaran(id: int, request: Request, format: str = "pdf")
     with get_db() as conn:
         pedido = _load_pedido_para_pdf(conn, id, session["cliente_id"])
     if not _documentos_disponibles(pedido.get("estado", ""))["albaran"]:
-        raise HTTPException(403, "El albarán estará disponible al momento de la entrega.")
+        raise HTTPException(403, "El certificado de seguro no está disponible para este pedido.")
     return await _doc_response_or_pdf(
         _albaran_html(pedido), _pedido_filename(pedido, doc="albaran"), format
     )

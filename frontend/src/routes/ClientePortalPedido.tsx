@@ -76,7 +76,7 @@ import type { Pedido, DocTipo } from "./ClientePortalTypes";
 const DOC_LABEL: Record<DocTipo, string> = {
   remito: "Remito",
   contrato: "Contrato",
-  albaran: "Albarán",
+  albaran: "Certificado de seguro",
   factura: "Factura",
 };
 const DOC_DESCRIPTION: Partial<Record<DocTipo, string>> = {
@@ -807,7 +807,7 @@ export function PedidoCard({
                       pedidoId={pedido.id}
                       numero={numero}
                       tipo="albaran"
-                      label="Albarán"
+                      label="Certificado de seguro"
                       description={DOC_DESCRIPTION.albaran}
                     />
                   )}
