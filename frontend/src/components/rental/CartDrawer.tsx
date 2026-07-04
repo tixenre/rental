@@ -212,6 +212,14 @@ export function CartDrawer({
     if (!drawerOpen) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
+        // El paso "resumen" abre modales anidados (Facturación/Términos/
+        // Contrato — Radix Dialog) que ya se cierran solos con Escape. Este
+        // listener vive en `document` independiente del de Radix, así que
+        // sin este guard un solo Escape cerraba AMBOS: el modal chico Y todo
+        // el carrito, tirando al cliente de vuelta al catálogo. Si el foco
+        // está fuera del drawer (adentro del modal anidado, que Radix
+        // enfoca al abrir), dejamos que ese Escape lo resuelva Radix solo.
+        if (!dialogRef.current?.contains(document.activeElement)) return;
         e.stopPropagation();
         setDrawerOpen(false);
         return;

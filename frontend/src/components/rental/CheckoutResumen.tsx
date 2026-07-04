@@ -448,21 +448,29 @@ export function CheckoutResumen({
 
           {/* Cualquier otro faltante (carrito/fechas/stock/precio/contacto/antelación…):
             no tiene una resolución automática acá — el mensaje del backend YA dice
-            qué hacer; ofrecemos volver al carrito. */}
-          {!cargando &&
-            otrosFaltantes.map((f) => (
-              <div
-                key={f.check}
-                role="alert"
-                className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+            qué hacer. Un solo "Volver al carrito" al final (no uno por mensaje: son
+            la misma acción repetida, y con 2+ faltantes simultáneos quedaban varios
+            botones idénticos apilados). */}
+          {!cargando && otrosFaltantes.length > 0 && (
+            <div className="space-y-2">
+              {otrosFaltantes.map((f) => (
+                <div
+                  key={f.check}
+                  role="alert"
+                  className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+                >
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span className="flex-1">{f.mensaje}</span>
+                </div>
+              ))}
+              <button
+                onClick={onBack}
+                className="text-sm font-medium text-destructive underline underline-offset-2"
               >
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span className="flex-1">{f.mensaje}</span>
-                <button onClick={onBack} className="shrink-0 underline underline-offset-2">
-                  Volver
-                </button>
-              </div>
-            ))}
+                Volver al carrito
+              </button>
+            </div>
+          )}
 
           {errorCrear && (
             <div

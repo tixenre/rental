@@ -28,18 +28,30 @@ export function ContratoPreviewModal({
   onOpenChange: (v: boolean) => void;
   sessionId: string;
 }) {
-  const [html, setHtml] = useState<string | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // El fetch puede resolver en 1-2s, pero el documento en sí es pesado
+  // (~1.3MB, fuentes embebidas en base64) — un <iframe srcDoc> tarda 10s+ en
+  // parsear/pintar ese string inline (confirmado con el generador real: un
+  // <iframe src={blobUrl}> navega el mismo contenido como un documento real
+  // en <2s, igual que abrir cualquier otro doc del portal). Sin esto, el
+  // spinner desaparecía apenas volvía el fetch y el cliente se quedaba
+  // mirando una pantalla en blanco que parecía rota.
+  const [iframeReady, setIframeReady] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     let alive = true;
+    let url: string | null = null;
     setCargando(true);
+    setIframeReady(false);
     setError(null);
     obtenerContratoPreviewHtml(sessionId)
       .then((h) => {
-        if (alive) setHtml(h);
+        if (!alive) return;
+        url = URL.createObjectURL(new Blob([h], { type: "text/html" }));
+        setBlobUrl(url);
       })
       .catch((err: unknown) => {
         if (alive) setError(err instanceof Error ? err.message : "No pudimos cargar el contrato.");
@@ -49,8 +61,12 @@ export function ContratoPreviewModal({
       });
     return () => {
       alive = false;
+      setBlobUrl(null);
+      if (url) URL.revokeObjectURL(url);
     };
   }, [open, sessionId]);
+
+  const mostrarSpinner = cargando || (!error && blobUrl && !iframeReady);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -62,9 +78,9 @@ export function ContratoPreviewModal({
             válido: el definitivo queda en tu portal y te lo mandamos por mail al confirmar.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex-1 overflow-hidden bg-white">
-          {cargando && (
-            <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+        <div className="relative flex-1 overflow-hidden bg-white">
+          {mostrarSpinner && (
+            <div className="absolute inset-0 flex items-center justify-center gap-2 bg-white text-sm text-muted-foreground">
               <Spinner size="sm" />
               Armando el preview…
             </div>
@@ -74,12 +90,13 @@ export function ContratoPreviewModal({
               {error}
             </div>
           )}
-          {!cargando && !error && html && (
+          {!cargando && !error && blobUrl && (
             <iframe
-              srcDoc={html}
+              src={blobUrl}
               title="Contrato (vista previa)"
               className="h-full w-full border-0"
               sandbox=""
+              onLoad={() => setIframeReady(true)}
             />
           )}
         </div>

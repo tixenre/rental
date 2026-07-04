@@ -168,6 +168,16 @@ confirma (queda en el portal del cliente + se manda por mail). El front (`lib/ch
 en un iframe sandboxed dentro de un modal, sin salir del checkout (mismo patrón que
 `FacturacionModal`/`TerminosModal`).
 
+**Iframe por Blob URL, no `srcDoc`** — el documento pesa ~1.3MB (fuentes TT Commons/
+Champ Black embebidas en base64, mismo `_fonts_css()` que usan los PDFs reales). Un
+`<iframe srcDoc={html}>` con ese tamaño tarda 10s+ en pintar en un browser real —
+confirmado navegando la app en vivo (Playwright), no solo con curl — y el spinner
+propio del modal ya había desaparecido (el fetch resuelve en 1-2s), dejando una
+pantalla en blanco que parecía rota. `ContratoPreviewModal.tsx` arma un
+`URL.createObjectURL(new Blob([html]))` y lo navega vía `<iframe src={blobUrl}>`
+(igual de lento internamente, pero ahora el spinner queda visible hasta el evento
+`onLoad` del iframe — nunca una pantalla en blanco sin explicación).
+
 **Robustez del armado en memoria** (edge cases reales, con candado en
 `test_checkout_contrato_preview_db.py`): la lectura de `items_json` reusa
 `services.carrito.desde_items_json` (resuelve lista-ya-deserializada vs.
@@ -206,14 +216,24 @@ Tarjetas del resumen, en orden:
 | **Total** | Subtotal, descuento (si aplica), total (+ IVA si `conIva`) | Props (`totalNeto`/`conIva`/etc.) — el front NUNCA calcula plata, solo muestra lo que ya vino resuelto de `/api/cotizar` |
 
 Después de las tarjetas: estados de carga/error, el panel de identidad si falta, y
-cualquier otro faltante (carrito/fechas/stock/precio/contacto/antelación) como alert
-con botón "Volver" — el mensaje ya lo da el backend, no se reinterpreta acá.
+cualquier otro faltante (carrito/fechas/stock/precio/contacto/antelación) como alert.
+Con 2+ faltantes simultáneos hay **un solo botón "Volver al carrito"** al final de
+la lista, no uno por mensaje — son la misma acción repetida; antes cada `alert`
+tenía su propio "Volver" y quedaban varios botones idénticos apilados.
 
 ### Los 3 modales in-place (no navegan fuera del checkout)
 
 Mismo patrón los tres: envuelven contenido existente en un `Dialog` del design
 system, para que el cliente resuelva algo **sin perder el paso del carrito en el
 que estaba** (antes, "Modificar facturación" y "Ver T&C" navegaban a otra pantalla).
+
+**Escape cierra solo el modal, no el carrito entero** — `CartDrawer.tsx` tiene su
+propio listener de `Escape` en `document` (independiente del de Radix, que gestiona
+estos 3 modales) para cerrar el drawer. Sin un guard, un solo Escape cerraba AMBOS:
+el modal chico Y todo el checkout, devolviendo al cliente al catálogo. El guard
+chequea si el foco sigue dentro del drawer (`dialogRef.current.contains(document
+.activeElement)`) — si está en un modal anidado (que Radix enfoca al abrir), ese
+Escape lo resuelve Radix solo.
 
 | Modal | Qué hace | Se cierra solo al guardar |
 |---|---|---|
@@ -267,6 +287,7 @@ backend/tests/test_cliente_portal_cuenta_facturacion_db.py — candado facturaci
 backend/database/schema.py               — tabla aceptaciones_tyc (init_db)
 backend/migrations/versions/b1a2c3d4e5f6_checkout_aceptaciones_tyc.py
 
+frontend/src/components/rental/CartDrawer.tsx          — estado del carrito (paso/Esc/focus-trap)
 frontend/src/components/rental/CheckoutResumen.tsx     — la UI del resumen (fuente única)
 frontend/src/components/rental/FacturacionModal.tsx    — editar perfil fiscal in-place
 frontend/src/components/rental/TerminosModal.tsx       — T&C in-place
