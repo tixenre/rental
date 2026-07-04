@@ -220,7 +220,7 @@ async def _render_pdf(html: str, *, page_size: tuple[int, int | None] | None = N
     Reutiliza un único proceso Chromium; abre y cierra una page por request.
     Por default exporta A4 (documentos de pedido/reportes). `page_size`
     (width_px, height_px) fuerza un tamaño de página propio en vez de A4 —
-    para piezas que no son A4 (p.ej. la factura "celular", pensada para
+    para piezas que no son A4 (p.ej. la factura "simplificada", pensada para
     compartir por WhatsApp). `height_px=None` mide el alto real del
     contenido (`document.body.scrollHeight`) para que la página termine
     justo donde termina el comprobante, sin cortar ni dejar espacio de más.
@@ -250,11 +250,12 @@ async def _render_imagen(
 ) -> bytes:
     """Screenshot del HTML (Playwright `page.screenshot`) — misma infraestructura que
     `_render_pdf` (mismo browser compartido), para compartir un layout como imagen en vez de PDF
-    (ej. el layout "celular" de una factura, pensado para WhatsApp — una imagen se ve inline en el
-    chat, un PDF aparece como ícono de archivo). Disponible para cualquier layout, no solo
-    "celular": mismo contrato de `page_size` que `_render_pdf` — sin especificar, usa el ancho A4
-    (794px) con el alto real del contenido; con `page_size` (width_px, height_px|None), fuerza ese
-    tamaño (celular: 4:5 fijo). `formato`: "png" (default, sin pérdida) o "jpeg".
+    (ej. el layout "simplificada" de una factura, pensado para WhatsApp — una imagen se ve inline
+    en el chat, un PDF aparece como ícono de archivo). Disponible para cualquier layout, no solo
+    "simplificada": mismo contrato de `page_size` que `_render_pdf` — sin especificar, usa el
+    ancho A4 (794px) con el alto real del contenido; con `page_size` (width_px, height_px|None),
+    fuerza ese tamaño (simplificada: 4:5 fijo, mínimo 1080×1350). `formato`: "png" (default, sin
+    pérdida) o "jpeg".
 
     Es un artefacto de nivel "compartir rápido" (como el preview HTML) — no pasa por
     `arca_fe.asegurar_pdf` (esa firma es específica de PDF), no reemplaza al documento

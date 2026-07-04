@@ -1,12 +1,26 @@
-"""arca_fe.pdf — render HTML de comprobantes fiscales (Factura A/B/C, Nota de Crédito). PORTABLE.
+"""arca_fe.render — arma el HTML de comprobantes fiscales (Factura A/B/C, Nota de Crédito).
+PORTABLE. (Se llama `render`, no `pdf`: este módulo nunca generó bytes de PDF — solo HTML; el
+nombre viejo databa de cuando la librería sí lo hacía. Convertir a PDF es responsabilidad del
+consumidor, ver más abajo.)
 
-Tres layouts, un mismo contexto interno (`_build_ctx`): **clásica** (réplica fiel del comprobante
-oficial AFIP/ARCA, A4 imprimible), **celular** (comprobante vertical compacto 4:5, pensado para
-compartir por WhatsApp — el default) y **formal** (A4 con identidad visual moderna, alternativa
-prolija a la clásica). Los tres son agnósticos de marca: usan el logo oficial de ARCA (la agencia,
-no el emisor) y muestran todo lo que AFIP exige (CAE, QR fiscal RG4892, discriminación de IVA,
-leyenda de Transparencia Fiscal al Consumidor Ley 27.743) — nunca dependen de un tema/branding para
-ser válidos.
+Tres layouts, un mismo contexto interno (`_build_ctx`) — cada uno con su `LayoutInfo` (`id`,
+`nombre`, `descripcion`, `advertencia`) en `LAYOUTS_INFO`, para que el consumidor arme un selector
+real con esas mismas descripciones en vez de inventar copy propio:
+
+- **`oficial`**: réplica fiel del comprobante oficial AFIP/ARCA, A4 imprimible. Detalle completo
+  por ítem (cantidad, unidad de medida, precio unitario, bonificación).
+- **`detallada`**: A4 con identidad visual moderna, mismo nivel de detalle que `oficial` — una
+  alternativa prolija, no un resumen.
+- **`simplificada`**: comprobante vertical compacto 4:5, pensado para compartir (WhatsApp/redes) —
+  el default. **No es "la versión para celular" de las otras dos** — es un tipo de comprobante
+  distinto: cada ítem se resume a descripción + importe, SIN cantidad/precio unitario/bonificación.
+  No sirve si la operación necesita mostrar cantidades, precios unitarios o varios productos con su
+  detalle — para eso usar `oficial` o `detallada` (ver la `advertencia` en `LAYOUTS_INFO`).
+
+Los tres son agnósticos de marca: usan el logo oficial de ARCA (la agencia, no el emisor) y
+muestran todo lo que AFIP exige (CAE, QR fiscal RG4892, discriminación de IVA, leyenda de
+Transparencia Fiscal al Consumidor Ley 27.743) — nunca dependen de un tema/branding para ser
+válidos.
 
 Este módulo devuelve HTML (string), no PDF — no carga la dependencia de un motor de render
 (Playwright/Chromium). Convertir a PDF, firmarlo/protegerlo (`arca_fe.seguridad.asegurar_pdf`) y
@@ -16,6 +30,7 @@ from __future__ import annotations
 
 import html as _html
 import os
+from dataclasses import dataclass
 from datetime import date
 from functools import lru_cache
 
@@ -159,27 +174,43 @@ def _arca_logo(width: int) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Layout "celular" — tamaño de página fijo 4:5
+# Layout "simplificada" — tamaño de página fijo 4:5, mínimo 1080×1350
 # ---------------------------------------------------------------------------
 
-# La celular es una TARJETA de esquinas redondeadas flotando sobre un fondo (no un rectángulo a
-# página completa) — el ancho de página incluye el margen visible alrededor de la tarjeta en los 4
-# lados. Proporción 4:5 FIJA (identidad visual): header/CAE/info/emisor-receptor arriba y
+# La simplificada es una TARJETA de esquinas redondeadas flotando sobre un fondo (no un rectángulo
+# a página completa) — el ancho de página incluye el margen visible alrededor de la tarjeta en los
+# 4 lados. Proporción 4:5 FIJA (identidad visual): header/CAE/info/emisor-receptor arriba y
 # QR/total/leyendas abajo quedan anclados en su lugar; lo único que se ajusta con la cantidad de
 # conceptos es el espacio del medio — la tarjeta en sí nunca cambia de alto.
-_MOBILE_CARD_WIDTH = 640
-_MOBILE_CARD_MARGIN = 24
-_MOBILE_PAGE_BG = "#f4f2ef"
-MOBILE_PAGE_WIDTH = _MOBILE_CARD_WIDTH + 2 * _MOBILE_CARD_MARGIN
-MOBILE_PAGE_HEIGHT = round(MOBILE_PAGE_WIDTH * 5 / 4)  # ancho:alto = 4:5
-_MOBILE_CARD_HEIGHT = MOBILE_PAGE_HEIGHT - 2 * _MOBILE_CARD_MARGIN
+#
+# El diseño (fuentes/paddings/radios de acá abajo) está afinado en unidades "nativas" (tarjeta de
+# 640px) — no se re-tocan a mano para exportar más grande. En cambio, `.page` en el HTML de más
+# abajo declara ESTE tamaño nativo pero le suma `zoom:{_SIMPLIFICADA_ZOOM}`: Chromium reescala TODO
+# el árbol (fuentes, radios, el QR, todo) proporcionalmente antes de imprimir/capturar, así el
+# export siempre sale al tamaño mínimo pedido (1080×1350, equivalente a un post vertical de
+# Instagram) sin que el diseño interno tenga que conocer ese número.
+_SIMPLIFICADA_DISENO_ANCHO = 640
+_SIMPLIFICADA_DISENO_MARGEN = 24
+_SIMPLIFICADA_FONDO = "#f4f2ef"
+_SIMPLIFICADA_DISENO_PAGE_ANCHO = _SIMPLIFICADA_DISENO_ANCHO + 2 * _SIMPLIFICADA_DISENO_MARGEN
+_SIMPLIFICADA_DISENO_PAGE_ALTO = round(_SIMPLIFICADA_DISENO_PAGE_ANCHO * 5 / 4)  # ancho:alto = 4:5
+_SIMPLIFICADA_DISENO_CARD_ALTO = _SIMPLIFICADA_DISENO_PAGE_ALTO - 2 * _SIMPLIFICADA_DISENO_MARGEN
+
+# Tamaño MÍNIMO de export pedido por el dueño (equivalente a un post vertical de Instagram) — 4:5
+# exacto (1080:1350). Es lo que se le pide a Playwright como página/viewport; el `zoom` de arriba
+# hace que el diseño nativo (afinado en 640px) llene exactamente este tamaño.
+SIMPLIFICADA_PAGE_WIDTH = 1080
+SIMPLIFICADA_PAGE_HEIGHT = 1350
+_SIMPLIFICADA_ZOOM = SIMPLIFICADA_PAGE_WIDTH / _SIMPLIFICADA_DISENO_PAGE_ANCHO
 
 
 def tamano_pagina_layout(layout: str) -> tuple[int, int | None] | None:
     """Tamaño de página para convertir el HTML a PDF/imagen (ej. `page.pdf(...)`/
-    `page.screenshot(...)` de Playwright). `None` → A4 (default, clásica/formal). Un tuple →
-    tamaño propio en píxeles (celular, proporción 4:5 fija)."""
-    return (MOBILE_PAGE_WIDTH, MOBILE_PAGE_HEIGHT) if layout == "celular" else None
+    `page.screenshot(...)` de Playwright). `None` → A4 (default, `oficial`/`detallada`). Un tuple →
+    tamaño propio en píxeles (`simplificada`: 1080×1350, proporción 4:5 fija)."""
+    return (
+        (SIMPLIFICADA_PAGE_WIDTH, SIMPLIFICADA_PAGE_HEIGHT) if layout == "simplificada" else None
+    )
 
 
 def nombre_fiscal_comprobante(cbte_tipo: CbteTipo, pto_vta: int, numero: int) -> str:
@@ -263,11 +294,11 @@ def _build_ctx(datos: ComprobanteFiscal) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# 1a — Clásica A4 (réplica fiel del comprobante oficial AFIP/ARCA)
+# 1a — Oficial, A4 (réplica fiel del comprobante oficial AFIP/ARCA)
 # ---------------------------------------------------------------------------
 
 
-def _factura_clasica_html(f: dict, fonts_css: str) -> str:
+def _factura_oficial_html(f: dict, fonts_css: str) -> str:
     qr_block = _qr_img(f["qr"]["url"], 112)
 
     iibb_line = (
@@ -408,11 +439,11 @@ def _factura_clasica_html(f: dict, fonts_css: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 1b — Celular (comprobante vertical compacto, para compartir por WhatsApp)
+# 1b — Simplificada (comprobante vertical compacto, para compartir por WhatsApp)
 # ---------------------------------------------------------------------------
 
 
-def _factura_mobile_html(f: dict, fonts_css: str) -> str:
+def _factura_simplificada_html(f: dict, fonts_css: str) -> str:
     tipo_txt = "Nota de crédito" if f["es_nc"] else "Factura"
 
     qr_block = _qr_img(f["qr"]["url"], 165)
@@ -533,18 +564,21 @@ def _factura_mobile_html(f: dict, fonts_css: str) -> str:
 {fonts_css}
 <style>
   * {{ box-sizing:border-box; margin:0; padding:0; }}
-  html,body {{ height:100%; background:{_MOBILE_PAGE_BG}; }}
+  html,body {{ height:100%; background:{_SIMPLIFICADA_FONDO}; }}
   body {{ min-height:100vh; display:flex; align-items:center; justify-content:center;
           font-family:'TT Commons',ui-sans-serif,sans-serif; color:#16202b; }}
-  /* `.page` conserva su tamaño NATURAL en px (Playwright renderiza el PDF a una página de
-     exactamente este tamaño — ahí 100vh/100vw igualan el tamaño natural y el scale() da 1, sin
-     cambiar el PDF) y el `transform: scale()` la ajusta al viewport SOLO cuando se ve como
-     preview en una ventana de otro tamaño — llena el alto/ancho disponible sin perder la
-     proporción 4:5. */
-  .page {{ flex:none; width:{MOBILE_PAGE_WIDTH}px; height:{MOBILE_PAGE_HEIGHT}px;
-           padding:{_MOBILE_CARD_MARGIN}px;
-           transform:scale(min(calc(100vh / {MOBILE_PAGE_HEIGHT}px), calc(100vw / {MOBILE_PAGE_WIDTH}px))); }}
-  .card {{ width:{_MOBILE_CARD_WIDTH}px; height:{_MOBILE_CARD_HEIGHT}px; display:flex; flex-direction:column;
+  /* El diseño está afinado en unidades NATIVAS (tarjeta de {_SIMPLIFICADA_DISENO_ANCHO}px) — acá
+     `.page` declara ese tamaño nativo y le suma `zoom:{_SIMPLIFICADA_ZOOM}`, que Chromium aplica a
+     TODO el árbol (fuentes, radios, el QR) antes de imprimir/capturar: el resultado siempre sale a
+     {SIMPLIFICADA_PAGE_WIDTH}×{SIMPLIFICADA_PAGE_HEIGHT} (el mínimo pedido), sin re-tocar un solo
+     valor de fuente/padding de acá abajo. El `transform: scale()` es un mecanismo APARTE: ajusta la
+     tarjeta YA ampliada al viewport SOLO cuando se ve como preview en una ventana de otro tamaño
+     (ahí 100vh/100vw igualan el tamaño de export exacto y el scale da 1, sin afectar el PDF/imagen
+     final) — llena el alto/ancho disponible sin perder la proporción 4:5. */
+  .page {{ flex:none; width:{_SIMPLIFICADA_DISENO_PAGE_ANCHO}px; height:{_SIMPLIFICADA_DISENO_PAGE_ALTO}px;
+           padding:{_SIMPLIFICADA_DISENO_MARGEN}px; zoom:{_SIMPLIFICADA_ZOOM};
+           transform:scale(min(calc(100vh / {SIMPLIFICADA_PAGE_HEIGHT}px), calc(100vw / {SIMPLIFICADA_PAGE_WIDTH}px))); }}
+  .card {{ width:{_SIMPLIFICADA_DISENO_ANCHO}px; height:{_SIMPLIFICADA_DISENO_CARD_ALTO}px; display:flex; flex-direction:column;
            background:#fff; border-radius:28px; border:1px solid #ecebe8;
            box-shadow:0 1px 3px rgba(22,32,43,0.06); overflow:hidden; }}
 </style>
@@ -555,11 +589,11 @@ def _factura_mobile_html(f: dict, fonts_css: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 1c — A4 formal (identidad de la mobile, alternativa a la clásica)
+# 1c — Detallada, A4 (identidad visual de la simplificada, alternativa a la oficial)
 # ---------------------------------------------------------------------------
 
 
-def _factura_formal_html(f: dict, fonts_css: str) -> str:
+def _factura_detallada_html(f: dict, fonts_css: str) -> str:
     tipo_banner = "Nota de crédito electrónica · Original" if f["es_nc"] else "Factura electrónica · Original"
 
     qr_block = _qr_img(f["qr"]["url"], 150)
@@ -693,28 +727,83 @@ def _factura_formal_html(f: dict, fonts_css: str) -> str:
 # ---------------------------------------------------------------------------
 
 _LAYOUTS = {
-    "clasica": _factura_clasica_html,
-    "celular": _factura_mobile_html,
-    "formal": _factura_formal_html,
+    "oficial": _factura_oficial_html,
+    "detallada": _factura_detallada_html,
+    "simplificada": _factura_simplificada_html,
 }
 
-LAYOUTS_VALIDOS: tuple[str, ...] = tuple(_LAYOUTS.keys())
+
+@dataclass(frozen=True)
+class LayoutInfo:
+    """Metadata de un layout, pensada para que el consumidor arme un selector real (dropdown,
+    radio group) con estas mismas `nombre`/`descripcion` — en vez de inventar copy propio que
+    puede desalinearse de lo que el layout realmente renderiza.
+
+    `id`: el valor que se le pasa a `renderizar_comprobante_html(layout=...)`.
+    `nombre`: label corto para mostrar al usuario.
+    `descripcion`: qué es y para qué sirve, en 1-2 oraciones.
+    `advertencia`: cuándo NO usarlo — vacío si no aplica a este layout."""
+
+    id: str
+    nombre: str
+    descripcion: str
+    advertencia: str = ""
+
+
+# Orden: los dos de detalle completo primero, la simplificada al final — no es "la opción fácil
+# por default", es un formato de comprobante distinto con una limitación real (ver advertencia).
+LAYOUTS_INFO: tuple[LayoutInfo, ...] = (
+    LayoutInfo(
+        id="oficial",
+        nombre="Oficial (réplica AFIP/ARCA)",
+        descripcion=(
+            "Reproduce el formulario oficial de ARCA. Formato A4, con el detalle completo de "
+            "cada ítem: cantidad, unidad de medida, precio unitario y bonificación."
+        ),
+    ),
+    LayoutInfo(
+        id="detallada",
+        nombre="Detallada",
+        descripcion=(
+            "Formato A4 con diseño propio. Mismo nivel de detalle que la Oficial (cantidad, "
+            "precio unitario, bonificación) por ítem, con una presentación visual distinta."
+        ),
+    ),
+    LayoutInfo(
+        id="simplificada",
+        nombre="Simplificada (para compartir)",
+        descripcion=(
+            f"Formato compacto, proporción 4:5 ({SIMPLIFICADA_PAGE_WIDTH}×{SIMPLIFICADA_PAGE_HEIGHT} "
+            "mínimo) pensado para compartir por WhatsApp o redes. Resume cada ítem a su "
+            "descripción e importe, SIN cantidad, precio unitario ni bonificación."
+        ),
+        advertencia=(
+            "No es 'la versión para celular' de las otras dos — es un formato de comprobante "
+            "distinto, pensado para operaciones simples. No la uses si necesitás mostrar "
+            "cantidades, precios unitarios, bonificaciones o el detalle de varios productos: "
+            "elegí Oficial o Detallada."
+        ),
+    ),
+)
+
+LAYOUTS_VALIDOS: tuple[str, ...] = tuple(info.id for info in LAYOUTS_INFO)
 
 
 def normalizar_layout(layout: str) -> str:
     """Valida un `layout` pedido por el caller contra los soportados (`LAYOUTS_VALIDOS`:
-    `"clasica"`/`"celular"`/`"formal"`) — desconocido o vacío cae a `"celular"`. Es el mismo
-    fallback silencioso que ya aplicaba `renderizar_comprobante_html` puertas adentro; exponerlo
-    deja que el caller lo aplique UNA vez y reuse el resultado ya normalizado en todo lo demás que
-    dependa del mismo `layout` en la misma request (nombre de archivo, tamaño de página del PDF) —
-    sin repetir el chequeo `if layout not in (...)` en cada punto de uso."""
-    return layout if layout in _LAYOUTS else "celular"
+    `"oficial"`/`"detallada"`/`"simplificada"`, ver `LAYOUTS_INFO`) — desconocido o vacío cae a
+    `"simplificada"`. Es el mismo fallback silencioso que ya aplicaba `renderizar_comprobante_html`
+    puertas adentro; exponerlo deja que el caller lo aplique UNA vez y reuse el resultado ya
+    normalizado en todo lo demás que dependa del mismo `layout` en la misma request (nombre de
+    archivo, tamaño de página del PDF) — sin repetir el chequeo `if layout not in (...)` en cada
+    punto de uso."""
+    return layout if layout in _LAYOUTS else "simplificada"
 
 
 def renderizar_comprobante_html(
     datos: ComprobanteFiscal,
     *,
-    layout: str = "celular",
+    layout: str = "simplificada",
     fonts_css: str = "",
 ) -> str:
     """Genera el HTML completo de un comprobante (Factura A/B/C o Nota de Crédito) — preview
@@ -722,13 +811,16 @@ def renderizar_comprobante_html(
 
     `datos`: el comprobante ya emitido, con CAE/QR/importes resueltos (`ComprobanteFiscal` valida
     en su construcción que no falte nada imprescindible — acá no se vuelve a chequear).
-    `layout`: `"celular"` (default — vertical compacto 4:5, pensado para compartir), `"clasica"`
-    (réplica A4 del formulario oficial AFIP/ARCA) o `"formal"` (A4, misma identidad visual que la
-    celular). Un valor desconocido cae a `"celular"`.
+    `layout`: `"simplificada"` (default — vertical compacto 4:5, pensado para compartir; NO admite
+    desglose de cantidad/precio unitario, ver `LAYOUTS_INFO`), `"oficial"` (réplica A4 del
+    formulario oficial AFIP/ARCA) o `"detallada"` (A4, misma identidad visual que la simplificada
+    pero con el detalle completo). Un valor desconocido cae a `"simplificada"` — usar
+    `LAYOUTS_INFO` para mostrarle al usuario nombre/descripción/advertencia de cada opción antes de
+    que elija, en vez de hardcodear copy propio.
     `fonts_css`: bloque `<style>@font-face{...}</style>` ya armado, para tipografías propias del
-    caller (la clásica no lo usa — solo celular/formal). Sin este parámetro (default `""`), el
-    HTML sigue siendo válido: cae a los fallbacks de sistema ya declarados en el CSS — la marca
-    nunca es requisito de validez fiscal.
+    caller (la oficial no lo usa — solo detallada/simplificada). Sin este parámetro (default
+    `""`), el HTML sigue siendo válido: cae a los fallbacks de sistema ya declarados en el CSS — la
+    marca nunca es requisito de validez fiscal.
 
     Devuelve el HTML como string; no convierte a PDF (eso es responsabilidad del caller, junto con
     `arca_fe.seguridad.asegurar_pdf` si hace falta el documento certificado)."""

@@ -16,7 +16,7 @@ probada en producción — bajo SemVer, `0.x` señala justamente que puede rompe
 compatibilidad entre versiones menores, la misma libertad que se usó acá.
 """
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 from .modelos import (
     CondicionIva,
@@ -47,11 +47,13 @@ from .modelos import (
 )
 from .comprobante import tipo_comprobante, calcular_importes, armar_fecae, armar_fecae_lote
 from .qr import armar_qr, qr_svg
-from .pdf import (
+from .render import (
     renderizar_comprobante_html,
     nombre_fiscal_comprobante,
     tamano_pagina_layout,
     normalizar_layout,
+    LayoutInfo,
+    LAYOUTS_INFO,
     LAYOUTS_VALIDOS,
 )
 from .seguridad import generar_cert_autofirmado, asegurar_pdf
@@ -121,6 +123,8 @@ __all__ = [
     "nombre_fiscal_comprobante",
     "tamano_pagina_layout",
     "normalizar_layout",
+    "LayoutInfo",
+    "LAYOUTS_INFO",
     "LAYOUTS_VALIDOS",
     "generar_cert_autofirmado",
     "asegurar_pdf",

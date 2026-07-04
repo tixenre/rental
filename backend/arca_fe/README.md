@@ -93,8 +93,12 @@ datos = comprobante_fiscal_desde(
     receptor_nombre="Cliente SA",
 )
 
-# 6. Renderizar el HTML (preview rápido — string, NO un PDF; ver nota abajo).
-html = renderizar_comprobante_html(datos, layout="celular")
+# 6. Renderizar el HTML (preview rápido — string, NO un PDF; ver nota abajo). `layout`:
+#    "simplificada" (default, compacta 4:5, NO admite desglose de cantidad/precio unitario),
+#    "oficial" (réplica AFIP/ARCA, A4) o "detallada" (A4, con el detalle completo). Ver
+#    `LAYOUTS_INFO` para nombre/descripción/advertencia de cada uno, pensados para mostrarse
+#    al usuario que elige.
+html = renderizar_comprobante_html(datos, layout="simplificada")
 
 # 7. Convertir a PDF y protegerlo — arca_fe NO hace el paso HTML→PDF (ver "Qué NO cubre" abajo).
 #    Acá con un motor cualquiera (ej. Playwright); el ejemplo asume que ya tenés los bytes del PDF.

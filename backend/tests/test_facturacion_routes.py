@@ -107,6 +107,7 @@ class _FakeConnConEmail:
         ("GET", "/api/alquileres/1/facturas"),
         ("GET", "/api/admin/facturas"),
         ("GET", "/api/admin/facturacion/estado"),
+        ("GET", "/api/admin/facturacion/layouts"),
         ("POST", "/api/admin/arca/catalogos/refrescar"),
         ("GET", "/api/admin/emisores-arca"),
         ("POST", "/api/admin/emisores-arca"),
@@ -123,6 +124,23 @@ def test_rutas_facturacion_gatean_por_admin(method, path):
     r = _http.request(method, path)
     assert r.status_code != 422, f"{method} {path} no rutea bien (revisar orden de paths)"
     assert r.status_code in (401, 403)
+
+
+def test_listar_layouts_factura_devuelve_los_3_con_metadata(monkeypatch):
+    """El endpoint es un passthrough de `arca_fe.LAYOUTS_INFO` — el front arma el selector con
+    esto, no debería hardcodear nombre/descripción/advertencia por su cuenta."""
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+
+    result = facturacion_routes.listar_layouts_factura(_fake_request())
+
+    assert {item["id"] for item in result} == {"oficial", "detallada", "simplificada"}
+    for item in result:
+        assert item["nombre"]
+        assert item["descripcion"]
+    simplificada = next(item for item in result if item["id"] == "simplificada")
+    assert simplificada["advertencia"]
+    oficial = next(item for item in result if item["id"] == "oficial")
+    assert oficial["advertencia"] == ""
 
 
 # ── facturar_pedido / nota_credito: mapeo de errores del engine ─────────────

@@ -63,14 +63,18 @@ Antes de gastar una consulta de red, `arca_fe` valida el formato y el dígito ve
 localmente — un CUIT mal tipeado se detecta al instante, con o sin guiones ("20-30123456-3" o
 "20301234563" son lo mismo para la librería).
 
-## El comprobante, listo para mostrar — en 3 estilos distintos
+## El comprobante, listo para mostrar — en 3 formatos distintos, con nombre y descripción
 
 Una vez que tenés el CAE, `arca_fe` te arma el HTML completo del comprobante (para convertir a PDF
-con la herramienta que uses, o mostrarlo directo como preview) en **tres estilos**: una réplica
-clásica del formulario oficial de ARCA, un formato compacto pensado para compartir por WhatsApp, y
-un formato más moderno — vos elegís cuál usar, o mostrás los tres. Incluye el QR fiscal oficial
-(el mismo que cualquiera puede escanear para verificar el comprobante contra ARCA) y podés
-inyectarle tu propia tipografía de marca sin tocar el layout.
+con la herramienta que uses, o mostrarlo directo como preview) en **tres formatos**, cada uno con
+su nombre y descripción listos para mostrarle a quien elige (`LAYOUTS_INFO`, para armar un
+selector real sin inventar copy propio): **Oficial** (réplica del formulario de ARCA, A4, con el
+detalle completo de cada ítem), **Detallada** (A4 con diseño propio, mismo nivel de detalle) y
+**Simplificada** (formato vertical compacto, pensado para compartir por WhatsApp o redes —
+**resume cada ítem a descripción e importe, sin cantidad ni precio unitario**: no sirve para una
+operación con varios productos que necesite ese desglose, para eso están las otras dos). Incluye
+el QR fiscal oficial (el mismo que cualquiera puede escanear para verificar el comprobante contra
+ARCA) y podés inyectarle tu propia tipografía de marca sin tocar el layout.
 
 ## Documento protegido — no un PDF cualquiera
 

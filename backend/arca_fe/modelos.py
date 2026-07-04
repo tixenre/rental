@@ -424,7 +424,7 @@ class ItemFactura:
 @dataclass(frozen=True)
 class ComprobanteFiscal:
     """La foto final de un comprobante YA EMITIDO — todo lo que hace falta para renderizar el
-    documento (`arca_fe.pdf.renderizar_comprobante_html`), ya resuelto. Distinto de
+    documento (`arca_fe.render.renderizar_comprobante_html`), ya resuelto. Distinto de
     `ComprobanteRequest` (el pedido, antes del CAE) y de `CaeResult` (resultado transitorio de la
     llamada SOAP) — este es el registro persistido/completo.
 

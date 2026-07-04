@@ -1,9 +1,9 @@
 """Tests de services.facturacion.comprobante_render — el mapeo Factura+pedido → ComprobanteFiscal
 y su delegación a arca_fe. Sin red, sin Playwright.
 
-El contenido/HTML de los 3 layouts (clásica/celular/formal) ya está cubierto en
-`arca_fe/tests/test_pdf.py` (construyendo `ComprobanteFiscal` directo) — acá solo se prueba lo que
-es responsabilidad de ESTE adapter: resolver el emisor (`emisores_arca`), los catálogos ARCA
+El contenido/HTML de los 3 layouts (oficial/detallada/simplificada) ya está cubierto en
+`arca_fe/tests/test_render.py` (construyendo `ComprobanteFiscal` directo) — acá solo se prueba lo
+que es responsabilidad de ESTE adapter: resolver el emisor (`emisores_arca`), los catálogos ARCA
 (`services.facturacion.catalogos`), el nombre de archivo, y la propagación de errores (fail-fast).
 """
 from __future__ import annotations
@@ -109,7 +109,7 @@ def test_emisor_desconocido_usa_sus_propios_datos_no_los_de_otro(monkeypatch):
         },
     )
     f = _factura(emisor="empresa_xyz")
-    html = factura_html(f, _pedido(), layout="clasica")
+    html = factura_html(f, _pedido(), layout="oficial")
 
     assert "Empresa XYZ SRL" in html
     assert "Ruta 88 km 12" in html
@@ -123,7 +123,7 @@ def test_emisor_desconocido_usa_sus_propios_datos_no_los_de_otro(monkeypatch):
 def test_emisor_sin_domicilio_configurado_muestra_guion_no_hueco():
     """`domicilio` siempre se muestra (a diferencia de iibb/inicio, que se omiten) — sin
     configurar cae a "—", nunca a un renglón vacío."""
-    html = factura_html(_factura(emisor="sin_configurar"), _pedido(), layout="clasica")
+    html = factura_html(_factura(emisor="sin_configurar"), _pedido(), layout="oficial")
     assert "Domicilio Comercial:</span> —" in html
 
 
@@ -131,22 +131,22 @@ def test_emisor_no_configurado_en_absoluto_no_rompe_muestra_guion():
     """Emisor que ni siquiera tiene fila en `emisores_arca` (renombrado/borrado después de
     facturar) — el render tiene que degradar a "—", no romper (regresión del bug de diseño donde
     `ComprobanteFiscal.emisor` exigía un CUIT ya validado)."""
-    html = factura_html(_factura(emisor="no-existe-en-la-base"), _pedido(), layout="clasica")
+    html = factura_html(_factura(emisor="no-existe-en-la-base"), _pedido(), layout="oficial")
     assert "CUIT:</span> —" in html
 
 
 # ── factura_filename ─────────────────────────────────────────────────────────
 
 
-def test_filename_celular_es_el_default_de_rambla_sin_sufijo():
+def test_filename_simplificada_es_el_default_de_rambla_sin_sufijo():
     f = _factura()
     assert factura_filename(f) == "Factura-C-00002-00000001.pdf"
-    assert factura_filename(f, layout="celular") == "Factura-C-00002-00000001.pdf"
+    assert factura_filename(f, layout="simplificada") == "Factura-C-00002-00000001.pdf"
 
 
-def test_filename_clasica_explicita_lleva_sufijo():
+def test_filename_oficial_explicita_lleva_sufijo():
     f = _factura()
-    assert factura_filename(f, layout="clasica") == "Factura-C-00002-00000001-clasica.pdf"
+    assert factura_filename(f, layout="oficial") == "Factura-C-00002-00000001-oficial.pdf"
 
 
 def test_filename_nc_usa_prefijo_nc():
@@ -155,10 +155,10 @@ def test_filename_nc_usa_prefijo_nc():
 
 
 # ── factura_html: smoke test de los 3 layouts (el HTML detallado ya está cubierto en
-# arca_fe/tests/test_pdf.py) ─────────────────────────────────────────────────
+# arca_fe/tests/test_render.py) ─────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("layout", ["clasica", "celular", "formal"])
+@pytest.mark.parametrize("layout", ["oficial", "simplificada", "detallada"])
 def test_factura_html_genera_documento_valido(layout):
     html = factura_html(_factura(), _pedido(), layout=layout)
     assert html.startswith("<!DOCTYPE html>")
@@ -166,17 +166,17 @@ def test_factura_html_genera_documento_valido(layout):
     assert "5.700,00" in html  # total formateado es-AR
 
 
-def test_layout_desconocido_cae_al_default_de_rambla_celular():
+def test_layout_desconocido_cae_al_default_de_rambla_simplificada():
     html = factura_html(_factura(), _pedido(), layout="no-existe")
-    html_celular = factura_html(_factura(), _pedido(), layout="celular")
-    assert html == html_celular
+    html_simplificada = factura_html(_factura(), _pedido(), layout="simplificada")
+    assert html == html_simplificada
 
 
 # ── Concepto: default de Rambla = una sola línea "Rambla #N", sin desglose ──
 
 
 def test_concepto_es_marca_mas_numero_de_pedido_sin_desglose():
-    html = factura_html(_factura(), _pedido(numero_pedido="231"), layout="celular")
+    html = factura_html(_factura(), _pedido(numero_pedido="231"), layout="simplificada")
     assert "Rambla #231" in html
 
 
@@ -187,7 +187,7 @@ def test_concepto_ignora_el_desglose_por_equipo_del_pedido():
         {"nombre": "Cámara Sony FX3", "cantidad": 1, "subtotal": 3000},
         {"nombre": "Trípode Manfrotto", "cantidad": 1, "subtotal": 2700},
     ])
-    html = factura_html(_factura(), pedido, layout="celular")
+    html = factura_html(_factura(), pedido, layout="simplificada")
     assert "Rambla #231" in html
     assert "Cámara Sony FX3" not in html
     assert "Trípode Manfrotto" not in html
@@ -200,7 +200,7 @@ def test_concepto_marca_es_configurable(monkeypatch):
     import services.facturacion.comprobante_render as render_mod
     importlib.reload(render_mod)
     try:
-        html = render_mod.factura_html(_factura(), _pedido(numero_pedido="9"), layout="celular")
+        html = render_mod.factura_html(_factura(), _pedido(numero_pedido="9"), layout="simplificada")
         assert "Otro Negocio #9" in html
     finally:
         monkeypatch.delenv("FACTURACION_CONCEPTO_MARCA", raising=False)
@@ -215,14 +215,14 @@ def test_concepto_marca_default_es_rambla():
 # del dueño: mejor un 503 que una factura que "parece" válida sin serlo) ────────────────────────
 
 
-@pytest.mark.parametrize("layout", ["clasica", "celular", "formal"])
+@pytest.mark.parametrize("layout", ["oficial", "simplificada", "detallada"])
 def test_sin_qr_payload_falla_fuerte(layout):
     sin_qr = _factura(qr_payload=None)
     with pytest.raises(ValueError, match="qr_url"):
         factura_html(sin_qr, _pedido(), layout=layout)
 
 
-@pytest.mark.parametrize("layout", ["clasica", "celular", "formal"])
+@pytest.mark.parametrize("layout", ["oficial", "simplificada", "detallada"])
 def test_si_falla_la_generacion_del_qr_propaga_el_error(layout, monkeypatch):
     """Hay payload pero segno/la generación de la imagen falla — tiene que propagar el error (el
     route lo convierte en 503), no devolver un HTML con un hueco donde debería ir el QR exigido
@@ -230,7 +230,7 @@ def test_si_falla_la_generacion_del_qr_propaga_el_error(layout, monkeypatch):
     def _boom(url, size):
         raise RuntimeError("segno no disponible")
 
-    monkeypatch.setattr("arca_fe.pdf.qr_svg", _boom)
+    monkeypatch.setattr("arca_fe.render.qr_svg", _boom)
     with pytest.raises(RuntimeError, match="segno no disponible"):
         factura_html(_factura(), _pedido(), layout=layout)
 

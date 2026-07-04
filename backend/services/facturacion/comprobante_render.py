@@ -1,5 +1,5 @@
 """services.facturacion.comprobante_render — arma un `arca_fe.ComprobanteFiscal` a partir de
-`Factura` + `pedido` y delega el render en `arca_fe.pdf.renderizar_comprobante_html`.
+`Factura` + `pedido` y delega el render en `arca_fe.render.renderizar_comprobante_html`.
 
 Todo lo que es contenido/estructura fiscal (los 3 layouts, el logo de ARCA, la leyenda de
 Transparencia Fiscal, el formato del comprobante) vive en `arca_fe` — este módulo solo resuelve lo
@@ -36,7 +36,7 @@ def _emisor_row(nombre: str, conn) -> dict:
     """Lee los datos legales del emisor desde `emisores_arca` — administrables desde el
     back-office, NUNCA hardcodeados por nombre (un emisor nuevo heredaba en silencio los datos de
     "santini" antes de este fix). Si la fila no existe (emisor mal configurado/renombrado), cae a
-    todo vacío — `arca_fe.pdf` degrada esos campos a "—", nunca rompe el render.
+    todo vacío — `arca_fe.render` degrada esos campos a "—", nunca rompe el render.
 
     Reusa `conn` (no abre su propia conexión) — `_armar_comprobante_fiscal` la comparte con los 3
     lookups de catálogo, una sola conexión por render en vez de 4."""
@@ -55,7 +55,7 @@ def _emisor_row(nombre: str, conn) -> dict:
 
 # ---------------------------------------------------------------------------
 # Fuentes propias (TT Commons + JetBrains Mono, vendoreadas — mismas que usa la web), inyectadas a
-# `arca_fe.pdf.renderizar_comprobante_html(..., fonts_css=...)`. Playwright renderiza con base
+# `arca_fe.render.renderizar_comprobante_html(..., fonts_css=...)`. Playwright renderiza con base
 # `about:blank`: todo va embebido, nada de `<img src="archivo-relativo">`.
 # ---------------------------------------------------------------------------
 
@@ -192,25 +192,27 @@ def _armar_comprobante_fiscal(factura, pedido: dict) -> "arca_fe.ComprobanteFisc
     )
 
 
-def factura_html(factura, pedido: dict, layout: str = "celular") -> str:
+def factura_html(factura, pedido: dict, layout: str = "simplificada") -> str:
     """Genera el HTML completo de la factura (Factura A/B/C o Nota de Crédito).
 
     `factura` es una instancia de `services.facturacion.repo.Factura`. `pedido` viene de
-    `services.facturacion.engine._get_pedido` (items + cliente enriquecidos). `layout`: 'celular'
-    (default de Rambla, compacta 4:5) · 'clasica' (réplica oficial AFIP/ARCA, A4) · 'formal' (A4,
-    identidad de la celular)."""
+    `services.facturacion.engine._get_pedido` (items + cliente enriquecidos). `layout`:
+    'simplificada' (default de Rambla, compacta 4:5, mínimo 1080×1350 — NO admite desglose de
+    cantidad/precio unitario) · 'oficial' (réplica AFIP/ARCA, A4) · 'detallada' (A4, identidad de
+    la simplificada pero con el detalle completo). Ver `arca_fe.LAYOUTS_INFO` para la descripción
+    completa de cada uno, pensada para mostrarse al usuario que elige."""
     datos = _armar_comprobante_fiscal(factura, pedido)
-    return arca_fe.pdf.renderizar_comprobante_html(datos, layout=layout, fonts_css=_fonts_css())
+    return arca_fe.render.renderizar_comprobante_html(datos, layout=layout, fonts_css=_fonts_css())
 
 
-def factura_filename(factura, *, layout: str = "celular") -> str:
+def factura_filename(factura, *, layout: str = "simplificada") -> str:
     """Nombre de archivo canónico del PDF de una factura/NC (admin + portal cliente).
 
-    Sin sufijo para el layout DEFAULT de Rambla (celular, 4:5); los demás layouts (pedidos
+    Sin sufijo para el layout DEFAULT de Rambla (simplificada, 4:5); los demás layouts (pedidos
     explícitamente) llevan su nombre como sufijo."""
     prefijo = "NC" if arca_fe.es_nota_credito(factura.cbte_tipo) else "Factura"
-    sufijo = "" if layout == "celular" else f"-{layout}"
-    nombre_fiscal = arca_fe.pdf.nombre_fiscal_comprobante(
+    sufijo = "" if layout == "simplificada" else f"-{layout}"
+    nombre_fiscal = arca_fe.render.nombre_fiscal_comprobante(
         factura.cbte_tipo, factura.pto_vta, factura.cbte_nro or 0
     )
     return f"{prefijo}-{nombre_fiscal}{sufijo}.pdf"

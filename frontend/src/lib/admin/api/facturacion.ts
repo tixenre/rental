@@ -26,6 +26,15 @@ export type EstadoFacturacion = {
   catalogos_actualizados_at: string | null;
 };
 
+// Formato de renderizado de una factura — ver `arca_fe.LAYOUTS_INFO`. `advertencia` viene vacía
+// ("") cuando no aplica; se muestra solo para "simplificada".
+export type LayoutFactura = {
+  id: "oficial" | "detallada" | "simplificada";
+  nombre: string;
+  descripcion: string;
+  advertencia: string;
+};
+
 export type FacturaEstado = "pendiente" | "emitida" | "error" | "anulada";
 
 export type Factura = {
@@ -101,6 +110,8 @@ export type PreviewFactura = {
 
 export const facturacionApi = {
   getEstado: () => authedJson<EstadoFacturacion>("/api/admin/facturacion/estado"),
+  // Layouts disponibles (nombre/descripción/advertencia) — fuente única, no hardcodear el copy acá.
+  getLayouts: () => authedJson<LayoutFactura[]>("/api/admin/facturacion/layouts"),
 
   // Autocompletar razón social/domicilio/condición IVA desde el padrón ARCA.
   consultarPadron: (cuit: string) =>
@@ -170,8 +181,11 @@ export const facturacionApi = {
     authedJson<Factura[]>(`/api/alquileres/${pedidoId}/facturas`),
   notaCreditoFactura: (facturaId: number) =>
     authedPostJson<Factura>(`/api/facturas/${facturaId}/nota-credito`, {}),
-  enviarMailFactura: (facturaId: number) =>
-    authedPostJson<{ ok: boolean; to: string }>(`/api/facturas/${facturaId}/enviar-mail`, {}),
+  enviarMailFactura: (facturaId: number, layout?: string) =>
+    authedPostJson<{ ok: boolean; to: string }>(
+      `/api/facturas/${facturaId}/enviar-mail${layout ? `?layout=${layout}` : ""}`,
+      {},
+    ),
   listFacturas: (params?: { emisor?: string; estado?: string; desde?: string; hasta?: string }) => {
     const sp = new URLSearchParams();
     if (params?.emisor) sp.set("emisor", params.emisor);

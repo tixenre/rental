@@ -76,6 +76,25 @@ def estado_facturacion(request: Request):
     }
 
 
+@router.get("/admin/facturacion/layouts")
+def listar_layouts_factura(request: Request):
+    """Layouts disponibles para renderizar una factura (`arca_fe.LAYOUTS_INFO`), con
+    nombre/descripción/advertencia para que el front arme un selector real — nunca hardcodear ese
+    copy en el frontend, es la misma fuente que usa `renderizar_comprobante_html` puertas adentro."""
+    require_admin(request)
+    from arca_fe import LAYOUTS_INFO
+
+    return [
+        {
+            "id": info.id,
+            "nombre": info.nombre,
+            "descripcion": info.descripcion,
+            "advertencia": info.advertencia,
+        }
+        for info in LAYOUTS_INFO
+    ]
+
+
 @router.post("/admin/arca/catalogos/refrescar")
 def refrescar_catalogos_arca(request: Request):
     """Actualiza los catálogos de ARCA (doc_tipo/concepto/condición IVA
@@ -528,7 +547,7 @@ def listar_facturas(
 _DOC_NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 
 
-def _factura_html_o_404(factura_id: int, conn, layout: str = "celular"):
+def _factura_html_o_404(factura_id: int, conn, layout: str = "simplificada"):
     """Carga la factura + renderiza su HTML al vuelo. La factura no cambia una
     vez emitida, así que no hace falta guardar el PDF: regenerar da lo mismo."""
     from services.facturacion.repo import get_by_id
@@ -553,17 +572,19 @@ def _factura_html_o_404(factura_id: int, conn, layout: str = "celular"):
 
 @router.get("/facturas/{factura_id}/pdf")
 async def descargar_pdf_factura(
-    factura_id: int, request: Request, format: str = "pdf", layout: str = "celular"
+    factura_id: int, request: Request, format: str = "pdf", layout: str = "simplificada"
 ):
     """PDF (o imagen) de una factura, renderizado on-demand. `format=html` devuelve el preview
     rápido (mismo patrón que Contrato/Presupuesto/Albarán en routes/alquileres/documentos.py);
     `format=imagen` devuelve un PNG del mismo layout — artefacto liviano de "compartir rápido"
     (ej. por WhatsApp), NO firmado/protegido como el PDF, no reemplaza al documento certificado.
-    `layout`: 'celular' (default de Rambla — compacta 4:5) · 'clasica' (réplica oficial AFIP/ARCA,
-    A4) · 'formal' (A4, identidad de la celular)."""
+    `layout`: 'simplificada' (default de Rambla — compacta 4:5, mínimo 1080×1350, NO admite
+    desglose de cantidad/precio unitario) · 'oficial' (réplica AFIP/ARCA, A4) · 'detallada' (A4,
+    identidad de la simplificada, con el detalle completo). Ver `GET /admin/facturacion/layouts`
+    (`arca_fe.LAYOUTS_INFO`) para la descripción completa de cada uno."""
     require_admin(request)
 
-    from arca_fe.pdf import normalizar_layout
+    from arca_fe.render import normalizar_layout
     layout = normalizar_layout(layout)
 
     with get_db() as conn:
@@ -578,7 +599,7 @@ async def descargar_pdf_factura(
         from fastapi.responses import HTMLResponse
         return HTMLResponse(content=html_str, headers=_DOC_NO_CACHE)
 
-    from arca_fe.pdf import tamano_pagina_layout
+    from arca_fe.render import tamano_pagina_layout
     from services.facturacion.comprobante_render import factura_filename
 
     if format == "imagen":
@@ -626,11 +647,11 @@ async def descargar_pdf_factura(
 # Sin @map_pg_errors: es async y el decorator no le hace `await` a la corrutina
 # (mismo motivo por el que `subir_comprobante`, también async, en contabilidad.py
 # no lo lleva) — no hay escritura propensa a UniqueViolation acá de todos modos.
-async def enviar_mail_factura(factura_id: int, request: Request, layout: str = "celular"):
+async def enviar_mail_factura(factura_id: int, request: Request, layout: str = "simplificada"):
     """Envía el PDF de la factura (renderizado on-demand) al email del cliente del pedido."""
     require_admin(request)
 
-    from arca_fe.pdf import normalizar_layout
+    from arca_fe.render import normalizar_layout
     layout = normalizar_layout(layout)
 
     from services.email import send_raw_email, Attachment
@@ -659,7 +680,7 @@ async def enviar_mail_factura(factura_id: int, request: Request, layout: str = "
 
     from pdf import _render_pdf
     from arca_fe import asegurar_pdf
-    from arca_fe.pdf import tamano_pagina_layout
+    from arca_fe.render import tamano_pagina_layout
     from services.facturacion.comprobante_render import factura_filename
     try:
         pdf_bytes = await _render_pdf(html_str, page_size=tamano_pagina_layout(layout))

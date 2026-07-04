@@ -195,15 +195,15 @@ async def cliente_pedido_packing_list(id: int, request: Request, format: str = "
 @router.get("/api/cliente/pedidos/{id}/factura.pdf")
 @router.get("/api/cliente/pedidos/{id}/factura")
 async def cliente_pedido_factura(
-    id: int, request: Request, format: str = "pdf", layout: str = "celular"
+    id: int, request: Request, format: str = "pdf", layout: str = "simplificada"
 ):
     """Factura ARCA del pedido. A diferencia de remito/contrato/albarán, no
     depende del estado del pedido sino de si la factura ya fue emitida —
     aparece como documento recién ahí, no antes (y desaparece si se anula).
-    `layout`: 'celular' (default de Rambla, compacta 4:5) · 'clasica' (réplica
-    oficial AFIP/ARCA, A4) · 'formal'."""
+    `layout`: 'simplificada' (default de Rambla, compacta 4:5, mínimo 1080×1350) · 'oficial'
+    (réplica AFIP/ARCA, A4) · 'detallada' (A4, con el detalle completo)."""
     session = require_cliente(request)
-    from arca_fe.pdf import normalizar_layout
+    from arca_fe.render import normalizar_layout
     layout = normalizar_layout(layout)
     with get_db() as conn:
         row = conn.execute(
@@ -220,7 +220,7 @@ async def cliente_pedido_factura(
 
         from services.facturacion.engine import _get_pedido
         from services.facturacion.comprobante_render import factura_html, factura_filename
-        from arca_fe.pdf import tamano_pagina_layout
+        from arca_fe.render import tamano_pagina_layout
         pedido_data = _get_pedido(conn, id)
         try:
             html_str = factura_html(factura, pedido_data, layout=layout)
