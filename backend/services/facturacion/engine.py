@@ -31,7 +31,6 @@ from arca_fe import (
     CondicionIva,
     DocTipo,
     Emisor,
-    armar_fecae,
     tipo_comprobante,
     calcular_importes,
     armar_qr,
@@ -250,7 +249,47 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
     )
 
     hoy = now_ar().date()
-    req = construir_comprobante(pedido, emisor_obj, emisor_obj.condicion_iva, fecha=hoy)
+    try:
+        req = construir_comprobante(pedido, emisor_obj, emisor_obj.condicion_iva, fecha=hoy)
+    except ValueError as exc:
+        # `ComprobanteRequest`/`Receptor.__post_init__` (arca_fe, iniciativa de robustecimiento)
+        # ahora validan en la CONSTRUCCIÓN misma — no solo el CUIT del receptor, también fechas de
+        # servicio faltantes, punto_venta fuera de rango, importes negativos, etc. (todo lo que
+        # antes recién fallaba al armar el payload SOAP). El preview NO puede crashear por ninguno
+        # de estos casos (a diferencia de `emitir_factura`, que sí puede propagar la excepción):
+        # se distingue el motivo real en vez de etiquetar TODO como "CUIT del receptor inválido"
+        # (rotularía mal, por ejemplo, un `punto_venta` mal configurado del emisor).
+        motivo = str(exc)
+        es_cuit = "Receptor.doc_nro" in motivo or "CUIT" in motivo
+        chequeo = (
+            {
+                "check": "cuit_receptor",
+                "ok": False,
+                "bloqueante": True,
+                "mensaje": f"CUIT del receptor ({pedido.get('cliente_cuit')}) inválido: {motivo}",
+            }
+            if es_cuit
+            else {
+                "check": "comprobante_invalido",
+                "ok": False,
+                "bloqueante": True,
+                "mensaje": f"No se pudo armar el comprobante: {motivo}",
+            }
+        )
+        return {
+            "ambiente": cred.ambiente,
+            "emisor": {
+                "nombre": nombre_emisor,
+                "cuit": cred.cuit,
+                "condicion_iva": cred.condicion_iva,
+            },
+            "receptor": None,
+            "comprobante": None,
+            "importes": None,
+            "fechas": None,
+            "chequeos": [chequeo],
+            "listo": False,
+        }
     cbte_tipo = tipo_comprobante(req)
     importes = calcular_importes(req)
 
@@ -501,8 +540,7 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
 
             cae_result: Optional[CaeResult] = recuperado
             if cae_result is None:
-                fecae_payload = armar_fecae(req, numero_a_emitir)
-                cae_result = wsfe.solicitar_cae(fecae_payload)
+                cae_result = wsfe.solicitar_cae(req, numero_a_emitir)
         except (RuntimeError, ValueError, ArcaError):
             # `ArcaError` (Auth/Network/Response/Business) se deja pasar tal
             # cual — el route elige el status HTTP por subtipo (422/502/503)
@@ -709,8 +747,7 @@ def emitir_nota_credito(
 
             cae_result: Optional[CaeResult] = recuperado
             if cae_result is None:
-                fecae = armar_fecae(req, numero_a_emitir)
-                cae_result = wsfe.solicitar_cae(fecae)
+                cae_result = wsfe.solicitar_cae(req, numero_a_emitir)
         except (RuntimeError, ValueError, ArcaError):
             # `ArcaError` se deja pasar tal cual — ver el mismo comentario en
             # `emitir_factura`.

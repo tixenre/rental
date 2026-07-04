@@ -60,3 +60,19 @@ def test_all_exports_son_importables():
 
     for name in arca_fe.__all__:
         assert hasattr(arca_fe, name), f"'{name}' en __all__ pero no importable"
+
+
+def test_pyproject_version_coincide_con_init():
+    """`pyproject.toml` se sincroniza A MANO con `__init__.__version__` (no hay build tooling
+    que lo haga automático) — este test evita que se desincronicen sin que nadie lo note."""
+    import re as _re
+
+    import arca_fe
+
+    contenido = (_CORE_PKG / "pyproject.toml").read_text()
+    m = _re.search(r'^version\s*=\s*"([^"]+)"', contenido, _re.MULTILINE)
+    assert m is not None, "pyproject.toml no tiene una línea `version = \"X.Y.Z\"`"
+    assert m.group(1) == arca_fe.__version__, (
+        f"pyproject.toml dice version={m.group(1)!r} pero "
+        f"arca_fe.__version__={arca_fe.__version__!r} — desincronizados"
+    )

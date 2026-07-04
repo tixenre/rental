@@ -90,13 +90,13 @@ def test_domicilio_persiste_exacto_sin_truncar(setup):
             cbte_tipo=1,
             pto_vta=3,
             doc_tipo=80,
-            doc_nro="20300000000",
+            doc_nro="20300000003",
             condicion_iva_receptor=1,
             concepto=2,
             imp_neto=Decimal("1001.00"),
             imp_iva=Decimal("210.21"),
             imp_total=Decimal("1211.21"),
-            cliente_cuit="20300000000",
+            cliente_cuit="20300000003",
             razon_social="Cliente RI SA",
             domicilio="Av. Siempre Viva 742, CABA",
         )
@@ -125,13 +125,13 @@ def test_domicilio_null_cae_a_fallback_en_facturas_viejas(setup):
             cbte_tipo=1,
             pto_vta=3,
             doc_tipo=80,
-            doc_nro="20300000000",
+            doc_nro="20300000003",
             condicion_iva_receptor=1,
             concepto=2,
             imp_neto=Decimal("1001.00"),
             imp_iva=Decimal("210.21"),
             imp_total=Decimal("1211.21"),
-            cliente_cuit="20300000000",
+            cliente_cuit="20300000003",
             razon_social="Cliente RI SA",
         )
         conn.commit()
@@ -160,13 +160,13 @@ def test_emitir_nota_credito_hereda_domicilio_en_fila_real(setup, monkeypatch):
             cbte_tipo=1,
             pto_vta=3,
             doc_tipo=80,
-            doc_nro="20300000000",
+            doc_nro="20300000003",
             condicion_iva_receptor=1,
             concepto=2,
             imp_neto=Decimal("1001.00"),
             imp_iva=Decimal("210.21"),
             imp_total=Decimal("1211.21"),
-            cliente_cuit="20300000000",
+            cliente_cuit="20300000003",
             razon_social="Cliente RI SA",
             domicilio="Av. Siempre Viva 742, CABA",
         )
@@ -189,11 +189,11 @@ def test_emitir_nota_credito_hereda_domicilio_en_fila_real(setup, monkeypatch):
         def consultar(self, pto_vta, cbte_tipo, numero):
             return None
 
-        def solicitar_cae(self, fecae):
+        def solicitar_cae(self, comprobante, numero):
             from arca_fe import CaeResult
             return CaeResult(
                 resultado="A", cae="86261839900100", cae_vto=date(2030, 1, 1),
-                numero=fecae["FeDetReq"]["FECAEDetRequest"][0]["CbteDesde"],
+                numero=numero,
             )
 
     def _fake_cred(nombre, conn):

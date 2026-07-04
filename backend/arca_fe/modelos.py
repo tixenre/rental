@@ -2,7 +2,16 @@
 
 No importa nada de `backend.*` ni de frameworks. El consumidor arma estos objetos
 y se los pasa al core.
-"""
+
+**Validación fail-fast en la construcción** (no solo al armar el payload SOAP): los dataclasses de
+acá normalizan/validan lo que la librería puede resolver sola, para que un dato mal formado se
+note al construir el objeto, no tres pasos después contra AFIP. Criterio de ingesta — normalizar
+sin preguntar lo cosmético/no-ambiguo (CUIT con o sin guiones, moneda en minúscula), rechazar con
+`ValueError` explícito lo que es realmente inválido (dígito verificador mal, importe negativo).
+Nunca "adivinar" un dato mal formado. Los campos que dependen de un catálogo VIVO de AFIP (moneda/
+tributos/opcionales/condición IVA del receptor) solo se validan en FORMATO (forma fija del WSDL),
+nunca en vigencia (¿este código existe hoy? — eso requiere consultar `WsfeClient.param_*` en vivo,
+no se puede resolver sin red)."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -10,6 +19,8 @@ from datetime import date
 from decimal import Decimal
 from enum import IntEnum
 from typing import Optional
+
+from .validadores import cuit_valido, normalizar_cuit
 
 
 class CondicionIva(IntEnum):
@@ -155,31 +166,77 @@ class Opcional:
 
 @dataclass(frozen=True)
 class Emisor:
-    """Quién factura. `condicion_iva` decide la letra del comprobante."""
+    """Quién factura. `condicion_iva` decide la letra del comprobante.
+
+    `cuit` acepta guiones/espacios en la entrada (ej. "20-30123456-3") — se normaliza y valida el
+    dígito verificador al construir; queda guardado como `int` sin guiones (lo que espera el
+    payload de AFIP). `ValueError` si no normaliza a 11 dígitos o el dígito verificador da mal."""
 
     cuit: int
     punto_venta: int
     condicion_iva: CondicionIva  # RESPONSABLE_INSCRIPTO o MONOTRIBUTO
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "cuit", _validar_y_normalizar_cuit(self.cuit, campo="Emisor.cuit"))
+        object.__setattr__(self, "condicion_iva", CondicionIva(self.condicion_iva))
+
 
 @dataclass(frozen=True)
 class Receptor:
-    """A quién se factura."""
+    """A quién se factura.
+
+    `doc_nro` acepta guiones/espacios en la entrada cuando `doc_tipo == DocTipo.CUIT` (mismo
+    criterio que `Emisor.cuit`) — DNI/CUIL/Consumidor Final no son CUIT, no se les exige el dígito
+    verificador mod-11 (no aplica)."""
 
     doc_tipo: DocTipo
     doc_nro: int
     condicion_iva: CondicionIva
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "doc_tipo", DocTipo(self.doc_tipo))
+        object.__setattr__(self, "condicion_iva", CondicionIva(self.condicion_iva))
+        if self.doc_tipo == DocTipo.CUIT:
+            object.__setattr__(
+                self, "doc_nro", _validar_y_normalizar_cuit(self.doc_nro, campo="Receptor.doc_nro")
+            )
+        elif self.doc_tipo == DocTipo.CONSUMIDOR_FINAL and int(self.doc_nro) != 0:
+            raise ValueError(
+                "Receptor.doc_nro tiene que ser 0 cuando doc_tipo=CONSUMIDOR_FINAL "
+                f"(recibido: {self.doc_nro})."
+            )
+
 
 @dataclass(frozen=True)
 class CbteAsoc:
-    """Comprobante asociado (para notas de crédito: referencia a la factura origen)."""
+    """Comprobante asociado (para notas de crédito: referencia a la factura origen).
+
+    `cuit`, si se pasa, acepta guiones/espacios (mismo criterio que `Emisor.cuit`)."""
 
     tipo: CbteTipo
     punto_venta: int
     numero: int
     cuit: Optional[int] = None
     fecha: Optional[date] = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "tipo", CbteTipo(self.tipo))
+        if self.cuit is not None:
+            object.__setattr__(
+                self, "cuit", _validar_y_normalizar_cuit(self.cuit, campo="CbteAsoc.cuit")
+            )
+
+
+def _validar_y_normalizar_cuit(raw: int | str, *, campo: str) -> int:
+    """Normaliza (tolera guiones/espacios) y valida el dígito verificador — helper compartido por
+    `Emisor`/`Receptor`/`CbteAsoc`. `ValueError` con el motivo puntual si no normaliza a 11 dígitos
+    o el dígito verificador da mal (nunca un mensaje genérico)."""
+    normalizado = normalizar_cuit(raw)
+    if normalizado is None:
+        raise ValueError(f"{campo}: '{raw}' no normaliza a un CUIT de 11 dígitos.")
+    if not cuit_valido(normalizado):
+        raise ValueError(f"{campo}: '{raw}' tiene el dígito verificador inválido.")
+    return int(normalizado)
 
 
 @dataclass(frozen=True)
@@ -197,8 +254,11 @@ class ComprobanteRequest:
     `moneda`/`cotizacion`: MonId/MonCotiz de WSFEv1 (tabla `FEParamGetTiposMonedas`
     para los códigos válidos). Default "PES"/1 — el caso de Rambla (todo en
     pesos). Un consumidor que factura en moneda extranjera pasa el código ISO/
-    ARCA correspondiente y la cotización del día; el motor NO la valida ni la
-    busca (eso es responsabilidad del consumidor, como el precio).
+    ARCA correspondiente y la cotización del día; el motor valida el FORMATO
+    (`moneda` normalizada a mayúscula, 3 caracteres; `cotizacion` positiva) pero
+    NO la VIGENCIA (¿ese código en particular existe hoy en el catálogo de
+    AFIP? — eso requiere consultar `WsfeClient.param_tipos_monedas()` en vivo,
+    es responsabilidad del consumidor, como el precio).
 
     `alicuota`/`importe_neto` siguen siendo el camino de UNA sola alícuota
     (el caso común, el de Rambla). Para MÁS de una alícuota en el mismo
@@ -235,6 +295,19 @@ class ComprobanteRequest:
     importe_no_gravado: Decimal = Decimal("0")
     importe_exento: Decimal = Decimal("0")
     forzar_cbte_tipo: Optional[CbteTipo] = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "concepto", Concepto(self.concepto))
+        if self.forzar_cbte_tipo is not None:
+            object.__setattr__(self, "forzar_cbte_tipo", CbteTipo(self.forzar_cbte_tipo))
+        object.__setattr__(self, "moneda", self.moneda.strip().upper())
+
+        # Import diferido: `comprobante.py` importa de este módulo — un import a
+        # nivel de módulo acá crearía un ciclo. En tiempo de construcción (no de
+        # definición de clase) el ciclo no existe.
+        from .comprobante import _validar_estructura
+
+        _validar_estructura(self)
 
 
 @dataclass(frozen=True)

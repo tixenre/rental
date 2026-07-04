@@ -54,6 +54,7 @@ from __future__ import annotations
 
 import logging
 import ssl
+import threading
 import urllib3
 from dataclasses import dataclass
 from typing import Any
@@ -68,9 +69,12 @@ from .errores import ArcaBusinessError, ArcaResponseError
 
 WSAA_SERVICIO = "ws_sr_constancia_inscripcion"
 
-_CLIENT_CACHE: dict[str, zeep.Client] = {}
+# Caché de clientes SOAP por (endpoint, timeout), protegida por `_cache_lock` — mismo patrón que
+# `wsfe.py` (thread-safe, no solo "funciona en la práctica").
+_CLIENT_CACHE: dict[tuple[str, float], zeep.Client] = {}
+_cache_lock = threading.Lock()
 
-_TIMEOUT_SECONDS = 20.0
+_TIMEOUT_SECONDS = 20.0  # default de `PadronClient.timeout` — configurable por instancia
 
 _log = logging.getLogger(__name__)
 
@@ -98,21 +102,30 @@ class _AfipSSLAdapter(HTTPAdapter):
         )
 
 
-def _afip_transport() -> zeep.transports.Transport:
+def _afip_transport(timeout: float) -> zeep.transports.Transport:
     session = requests.Session()
     session.mount("https://", _AfipSSLAdapter())
     return zeep.transports.Transport(
-        session=session, timeout=_TIMEOUT_SECONDS, operation_timeout=_TIMEOUT_SECONDS
+        session=session, timeout=timeout, operation_timeout=timeout
     )
 
 
-def _get_client(endpoint: str) -> zeep.Client:
+def _get_client(endpoint: str, timeout: float) -> zeep.Client:
     """`endpoint` es la URL COMPLETA del WSDL, ya resuelta por el caller
-    según ambiente (ver docstring del módulo)."""
+    según ambiente (ver docstring del módulo). Cacheada por `(endpoint, timeout)`."""
     ep = endpoint.rstrip("/")
-    if ep not in _CLIENT_CACHE:
-        _CLIENT_CACHE[ep] = zeep.Client(ep, transport=_afip_transport())
-    return _CLIENT_CACHE[ep]
+    clave = (ep, timeout)
+    with _cache_lock:
+        if clave not in _CLIENT_CACHE:
+            _CLIENT_CACHE[clave] = zeep.Client(ep, transport=_afip_transport(timeout))
+        return _CLIENT_CACHE[clave]
+
+
+def clear_cache() -> None:
+    """Limpia el cache de clientes SOAP — para tests, o para un consumidor multi-tenant que
+    necesite forzar un cliente nuevo (ej. tras rotar un certificado)."""
+    with _cache_lock:
+        _CLIENT_CACHE.clear()
 
 
 @dataclass(frozen=True)
@@ -179,9 +192,10 @@ class PadronClient:
     cuit_representada: int
     token: str
     sign: str
+    timeout: float = _TIMEOUT_SECONDS
 
     def _client(self) -> zeep.Client:
-        return _get_client(self.endpoint)
+        return _get_client(self.endpoint, self.timeout)
 
     def get_persona(self, cuit_buscado: str) -> PersonaArca:
         """Consulta el padrón para `cuit_buscado`. Devuelve la `PersonaArca` si

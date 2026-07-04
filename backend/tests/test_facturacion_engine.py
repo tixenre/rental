@@ -73,10 +73,10 @@ class _FakeWsfe:
         self.consultar_calls.append(numero)
         return self.consultar_resp
 
-    def solicitar_cae(self, fecae):
-        self.solicitar_calls.append(fecae)
+    def solicitar_cae(self, comprobante, numero):
+        self.solicitar_calls.append((comprobante, numero))
         from arca_fe import CaeResult
-        return CaeResult(resultado="A", cae="86261839900001", cae_vto=date(2030, 1, 1), numero=fecae["FeDetReq"]["FECAEDetRequest"][0]["CbteDesde"])
+        return CaeResult(resultado="A", cae="86261839900001", cae_vto=date(2030, 1, 1), numero=numero)
 
 
 def _fake_cred() -> CredARCA:
@@ -85,7 +85,7 @@ def _fake_cred() -> CredARCA:
         emisor="santini",
         condicion_iva="monotributo",
         ambiente="homologacion",
-        cuit=20300000000,
+        cuit=20300000003,
         punto_venta=2,
         cert_pem=b"x",
         key_pem=b"x",
@@ -253,7 +253,7 @@ def test_emitir_nota_credito_revierte_anulacion_si_arca_rechaza(monkeypatch):
     wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
     wsfe.ultimo = 1
 
-    def _rechazo(fecae):
+    def _rechazo(comprobante, numero):
         from arca_fe import CaeResult
         return CaeResult(resultado="R", errores=("10: rechazado",))
 
@@ -316,7 +316,7 @@ def test_construir_comprobante_nc_usa_snapshot_no_pedido_en_vivo():
     original = _fake_original_factura()
     # El pedido "en vivo" ahora tiene un monto MUY distinto al facturado.
     pedido_con_precio_cambiado = {**_fake_pedido(), "monto_total": 999999, "iva_monto": 0}
-    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+    emisor_obj = Emisor(cuit=20300000003, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
     cbte_asoc = CbteAsoc(tipo=CbteTipo.FACTURA_C, punto_venta=2, numero=1)
 
     req = construir_comprobante_nc(
@@ -343,7 +343,7 @@ def test_vto_pago_usa_fecha_hasta_si_todavia_no_paso():
     from arca_fe import Emisor, CondicionIva
 
     pedido = {**_fake_pedido(), "fecha_desde": "2026-07-05", "fecha_hasta": "2026-07-10"}
-    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+    emisor_obj = Emisor(cuit=20300000003, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
 
     req = construir_comprobante(
         pedido, emisor_obj, CondicionIva.MONOTRIBUTO, fecha=date(2026, 7, 1),
@@ -359,7 +359,7 @@ def test_vto_pago_cae_a_fecha_del_comprobante_si_el_pedido_ya_termino():
     from arca_fe import Emisor, CondicionIva
 
     pedido = {**_fake_pedido(), "fecha_desde": "2026-06-30", "fecha_hasta": "2026-07-01"}
-    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+    emisor_obj = Emisor(cuit=20300000003, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
 
     req = construir_comprobante(
         pedido, emisor_obj, CondicionIva.MONOTRIBUTO, fecha=date(2026, 7, 15),
@@ -369,17 +369,15 @@ def test_vto_pago_cae_a_fecha_del_comprobante_si_el_pedido_ya_termino():
 
 
 def test_vto_pago_sin_fecha_hasta_usa_fecha_del_comprobante():
-    from services.facturacion.comprobante_pedido import construir_comprobante
-    from arca_fe import Emisor, CondicionIva
+    """`_fecha_vto_pago` cae a la fecha del comprobante cuando no hay `fecha_hasta` — probado
+    directo sobre la función pura, no vía `construir_comprobante`: desde que
+    `ComprobanteRequest.__post_init__` valida que Concepto=SERVICIOS (que `construir_comprobante`
+    usa siempre) exige `fecha_serv_hasta`, un pedido sin `fecha_hasta` en absoluto ya no puede
+    representarse como un `ComprobanteRequest` completo — es un estado que la librería rechaza
+    antes, no algo que este test pueda seguir armando end-to-end."""
+    from services.facturacion.comprobante_pedido import _fecha_vto_pago
 
-    pedido = {**_fake_pedido(), "fecha_hasta": None}
-    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
-
-    req = construir_comprobante(
-        pedido, emisor_obj, CondicionIva.MONOTRIBUTO, fecha=date(2026, 7, 15),
-    )
-
-    assert req.fecha_vto_pago == date(2026, 7, 15)
+    assert _fecha_vto_pago(None, date(2026, 7, 15)) == date(2026, 7, 15)
 
 
 def test_vto_pago_con_fecha_hasta_como_datetime_no_string():
@@ -398,7 +396,7 @@ def test_vto_pago_con_fecha_hasta_como_datetime_no_string():
         "fecha_desde": datetime(2026, 6, 30, 9, 0),
         "fecha_hasta": datetime(2026, 7, 1, 18, 0),
     }
-    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+    emisor_obj = Emisor(cuit=20300000003, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
 
     req = construir_comprobante(
         pedido, emisor_obj, CondicionIva.MONOTRIBUTO, fecha=date(2026, 7, 15),
@@ -415,7 +413,7 @@ def test_vto_pago_de_la_nc_tambien_respeta_la_fecha_del_comprobante():
 
     original = _fake_original_factura()
     pedido = {**_fake_pedido(), "fecha_hasta": "2026-07-01"}
-    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+    emisor_obj = Emisor(cuit=20300000003, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
     cbte_asoc = CbteAsoc(tipo=CbteTipo.FACTURA_C, punto_venta=2, numero=1)
 
     req = construir_comprobante_nc(
@@ -487,6 +485,35 @@ def test_preview_chequeo_cuit_invalido_bloquea(monkeypatch):
     cuit_check = next(c for c in result["chequeos"] if c["check"] == "cuit_receptor")
     assert cuit_check["ok"] is False
     assert result["listo"] is False
+
+
+def test_preview_error_de_construccion_no_relacionado_a_cuit_no_se_rotula_mal(monkeypatch):
+    """Un ValueError de `construir_comprobante` que NO es sobre el CUIT (ej.
+    `punto_venta` del emisor fuera de rango) tiene que dar el chequeo genérico
+    `comprobante_invalido`, NO `cuit_receptor` — rotularlo mal manda a
+    cualquiera que debuguee esto a buscar el problema en el lugar equivocado."""
+    pedido_ri = {**_fake_pedido(), "cliente_perfil_impuestos": "responsable_inscripto"}
+    cred_pto_venta_invalido = CredARCA(
+        emisor_id=1, emisor="santini", condicion_iva="monotributo",
+        ambiente="homologacion", cuit=20300000003, punto_venta=0,  # fuera de rango (1-9999)
+        cert_pem=b"x", key_pem=b"x",
+        endpoint_wsaa="https://wsaahomo.afip.gov.ar/ws/services/LoginCms",
+        endpoint_wsfe="https://wswhomo.afip.gov.ar/wsfev1/service.asmx?WSDL",
+    )
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: cred_pto_venta_invalido)
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    assert result["listo"] is False
+    checks = {c["check"] for c in result["chequeos"]}
+    assert "comprobante_invalido" in checks
+    assert "cuit_receptor" not in checks
+    chequeo = next(c for c in result["chequeos"] if c["check"] == "comprobante_invalido")
+    assert "punto_venta" in chequeo["mensaje"]
 
 
 def test_preview_chequeo_ri_sin_cuit_valido_avisa_pero_no_bloquea(monkeypatch):
