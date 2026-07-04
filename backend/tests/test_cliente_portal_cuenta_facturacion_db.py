@@ -8,6 +8,9 @@ Solo `nombre`/`apellido`/`direccion` quedan bloqueados post-verificación —
 `perfil_impuestos`/`cuit`/`razon_social`/`domicilio_fiscal`/`email_facturacion`
 tienen que poder actualizarse siempre.
 
+También candado del checksum de CUIT/CUIL (mod-11, `identity.anchor.cuil_valido`)
+que se sumó al mismo endpoint — un CUIT mal formado se rechaza con 400.
+
 Contra Postgres real: `cliente_verificado` hace un SELECT directo a
 `clientes.dni_validado_at`. OPT-IN y SEGURO POR DEFECTO (mismo gating que
 los demás *_db.py): se saltea salvo RESERVAS_DB_TEST=1 + DATABASE_URL con
@@ -86,13 +89,13 @@ class TestFacturacionEditablePostVerificacion:
         client = TestClient(main.app)
         r = _patch(client, {
             "perfil_impuestos": "responsable_inscripto",
-            "cuit": "20304050607",
+            "cuit": "27230938607",  # CUIT válido (mod-11) — ver test_cuit_invalido_rechazado abajo
             "razon_social": "Estudio SRL",
         })
         assert r.status_code == 200, r.text
         body = r.json()
         assert body["perfil_impuestos"] == "responsable_inscripto"
-        assert body["cuit"] == "20304050607"
+        assert body["cuit"] == "27230938607"
         assert body["razon_social"] == "Estudio SRL"
 
     def test_domicilio_fiscal_y_email_facturacion_se_pueden_cambiar_verificado(
@@ -119,3 +122,18 @@ class TestFacturacionEditablePostVerificacion:
         ):
             r = _patch(client, {campo: valor})
             assert r.status_code == 403, f"{campo}: {r.text}"
+
+    def test_cuit_invalido_rechazado(self, cliente_verificado_fixture):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(main.app)
+        r = _patch(client, {"cuit": "20304050607"})  # checksum mod-11 incorrecto
+        assert r.status_code == 400, r.text
+
+    def test_cuit_vacio_limpia_el_campo(self, cliente_verificado_fixture):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(main.app)
+        r = _patch(client, {"cuit": ""})
+        assert r.status_code == 200, r.text
+        assert r.json()["cuit"] is None

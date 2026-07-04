@@ -15,6 +15,7 @@ from itsdangerous import BadSignature, SignatureExpired
 
 from database import get_db, row_to_dict
 from auth.session import signer, _make_session_response
+from identity.anchor import cuil_valido
 from services.precios import es_responsable_inscripto
 from rate_limit import limiter
 from routes.cliente_portal.core import router, require_cliente, cliente_verificado
@@ -260,7 +261,15 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
     if data.direccion is not None:
         sets.append("direccion = %s"); vals.append(data.direccion.strip())
     if data.cuit is not None:
-        sets.append("cuit = %s"); vals.append(data.cuit.strip() or None)
+        cuit_in = data.cuit.strip()
+        # Mismo dígito verificador (mod-11) que ancla el CUIL de identidad
+        # (identity/anchor.py) — el CUIT de facturación es un número distinto,
+        # pero el checksum de 11 dígitos es el mismo algoritmo en Argentina.
+        # No se normaliza el string guardado (se acepta con guiones/espacios,
+        # como ya lo tolera `comprobante_pedido.py` al leerlo para ARCA).
+        if cuit_in and not cuil_valido(cuit_in):
+            raise HTTPException(400, "CUIT/CUIL inválido — verificá el número.")
+        sets.append("cuit = %s"); vals.append(cuit_in or None)
     if data.apodo is not None:
         sets.append("apodo = %s"); vals.append(data.apodo.strip() or None)
     if data.perfil_impuestos is not None:

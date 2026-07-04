@@ -33,6 +33,7 @@ import { AccessMethods } from "@/components/rental/AccessMethods";
 import { SessionManager } from "@/components/rental/SessionManager";
 import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { invalidateClienteSession } from "@/lib/iva";
+import { cuitValido } from "@/lib/cuit";
 import type { Perfil } from "./ClientePortalTypes";
 
 // ── Navegación: sidebar item ──────────────────────────────────────────────────
@@ -556,10 +557,14 @@ export function FacturacionForm({
     domicilio_fiscal: perfil.domicilio_fiscal ?? "",
     email_facturacion: perfil.email_facturacion ?? "",
   });
+  // Feedback inmediato de formato (mismo checksum mod-11 que el backend hace
+  // cumplir de verdad en PATCH /api/cliente/me — esto no reemplaza esa
+  // validación, solo evita el viaje al servidor con un número mal tipeado).
+  const cuitOk = form.cuit.trim() === "" || cuitValido(form.cuit);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (saving) return;
+    if (saving || !cuitOk) return;
     setSaving(true);
     try {
       await patchPerfil(perfil, onPerfilChange, form, { invalidate: true });
@@ -597,11 +602,21 @@ export function FacturacionForm({
       >
         <input
           type="text"
+          inputMode="numeric"
           value={form.cuit}
-          onChange={(e) => setForm({ ...form, cuit: e.target.value })}
+          onChange={(e) =>
+            setForm({ ...form, cuit: e.target.value.replace(/[^\d-]/g, "").slice(0, 13) })
+          }
           placeholder="20-12345678-9"
-          className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
+          aria-invalid={!cuitOk}
+          className={cn(
+            "w-full rounded-md border bg-background px-3 py-2 text-base sm:text-sm text-ink",
+            cuitOk ? "hairline" : "border-destructive",
+          )}
         />
+        {!cuitOk && (
+          <p className="text-xs text-destructive">CUIT/CUIL inválido — revisá el número.</p>
+        )}
       </Field>
 
       {/* Datos para Factura A — sólo visibles si el cliente es RI */}
@@ -640,7 +655,7 @@ export function FacturacionForm({
         </div>
       )}
 
-      <SaveButton saving={saving} />
+      <SaveButton saving={saving} disabled={!cuitOk} />
     </form>
   );
 }
