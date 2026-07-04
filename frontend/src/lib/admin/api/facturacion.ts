@@ -130,8 +130,14 @@ export const facturacionApi = {
   desactivarEmisor: (id: number) =>
     authedJson<void>(`/api/admin/emisores-arca/${id}`, { method: "DELETE" }),
   // Puntos de venta habilitados en ARCA para ESTE emisor (requiere cert cargado).
+  // `excluidos` explica por qué un punto que ARCA sí devolvió no cuenta como
+  // habilitado (bloqueado / dado de baja / no electrónico) — evita el mensaje
+  // genérico "no hay nada" cuando en realidad ARCA tiene puntos, pero ninguno sirve.
   consultarPuntosVenta: (id: number) =>
-    authedJson<{ puntos_venta: { nro: number }[] }>(`/api/admin/emisores-arca/${id}/puntos-venta`),
+    authedJson<{
+      puntos_venta: { nro: number }[];
+      excluidos: { nro: number; motivo: "bloqueado" | "dado_de_baja" | "no_electronico" }[];
+    }>(`/api/admin/emisores-arca/${id}/puntos-venta`),
   // Metadata del cert cargado (subject/serie/vigencia) — para comparar contra
   // el "Computador Fiscal" delegado en el Administrador de Relaciones de ARCA.
   consultarCertInfo: (id: number) =>

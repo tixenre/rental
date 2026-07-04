@@ -321,7 +321,7 @@ def consultar_puntos_venta_emisor(emisor_id: int, request: Request):
         if emisor is None:
             raise HTTPException(404, "Emisor no encontrado")
         try:
-            puntos = consultar_puntos_venta(emisor.nombre, conn)
+            resultado = consultar_puntos_venta(emisor.nombre, conn)
         except ValueError as e:
             raise HTTPException(400, str(e))
         except ArcaError as e:
@@ -329,7 +329,7 @@ def consultar_puntos_venta_emisor(emisor_id: int, request: Request):
         except RuntimeError as e:
             raise HTTPException(503, str(e))
 
-    return {"puntos_venta": puntos}
+    return {"puntos_venta": resultado["habilitados"], "excluidos": resultado["excluidos"]}
 
 
 @router.delete("/admin/emisores-arca/{emisor_id}", status_code=204)

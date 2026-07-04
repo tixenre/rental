@@ -645,11 +645,17 @@ def test_consultar_puntos_venta_devuelve_lista(monkeypatch):
     )
     monkeypatch.setattr(
         "services.facturacion.puntos_venta.consultar_puntos_venta",
-        lambda nombre_emisor, conn: [{"nro": 2}, {"nro": 5}],
+        lambda nombre_emisor, conn: {
+            "habilitados": [{"nro": 2}, {"nro": 5}],
+            "excluidos": [{"nro": 9, "motivo": "bloqueado"}],
+        },
     )
 
     result = facturacion_routes.consultar_puntos_venta_emisor(1, _fake_request())
-    assert result == {"puntos_venta": [{"nro": 2}, {"nro": 5}]}
+    assert result == {
+        "puntos_venta": [{"nro": 2}, {"nro": 5}],
+        "excluidos": [{"nro": 9, "motivo": "bloqueado"}],
+    }
 
 
 def test_consultar_puntos_venta_emisor_no_encontrado_es_404(monkeypatch):

@@ -313,10 +313,7 @@ function EmisorFormModal({
   const withCert = isNew && (cert.length > 0 || key.length > 0);
 
   const puntosVenta = useMutation({
-    mutationFn: async () => {
-      const { puntos_venta } = await facturacionApi.consultarPuntosVenta(emisor!.id);
-      return puntos_venta;
-    },
+    mutationFn: () => facturacionApi.consultarPuntosVenta(emisor!.id),
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -490,12 +487,12 @@ function EmisorFormModal({
           )}
           {puntosVenta.data && (
             <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {puntosVenta.data.length === 0 ? (
+              {puntosVenta.data.puntos_venta.length === 0 ? (
                 <span className="text-xs text-muted-foreground">
-                  ARCA no tiene puntos de venta electrónicos habilitados para este CUIT.
+                  {mensajeSinPuntosVenta(puntosVenta.data.excluidos)}
                 </span>
               ) : (
-                puntosVenta.data.map((p) => (
+                puntosVenta.data.puntos_venta.map((p) => (
                   <button
                     key={p.nro}
                     type="button"
@@ -648,6 +645,27 @@ function EmisorFormModal({
 // varios → se deja la lista para elegir (mismo patrón de botones que ya usaba
 // "Consultar en ARCA" en el campo Punto de Venta).
 
+const MOTIVO_LABEL: Record<string, string> = {
+  bloqueado: "bloqueado",
+  dado_de_baja: "dado de baja",
+  no_electronico: "no es electrónico",
+};
+
+// Fuente única del mensaje cuando la lista de habilitados viene vacía — la
+// usan tanto el bloque inline de Punto de Venta como `PuntoVentaResolver`.
+// Distingue "ARCA no tiene NINGÚN punto creado" de "ARCA tiene puntos, pero
+// ninguno sirve para facturar electrónicamente" — antes ambos casos mostraban
+// el mismo mensaje genérico.
+function mensajeSinPuntosVenta(excluidos: { nro: number; motivo: string }[]): string {
+  if (excluidos.length === 0) {
+    return "ARCA no tiene ningún punto de venta registrado para este CUIT — hay que crear uno en el portal de ARCA (Puntos de Venta y Domicilios).";
+  }
+  const detalle = excluidos
+    .map((e) => `${String(e.nro).padStart(5, "0")} (${MOTIVO_LABEL[e.motivo] ?? e.motivo})`)
+    .join(", ");
+  return `ARCA tiene ${excluidos.length} punto${excluidos.length === 1 ? "" : "s"} de venta pero ninguno está habilitado para facturar electrónicamente: ${detalle}.`;
+}
+
 function PuntoVentaResolver({
   emisorId,
   onResolved,
@@ -657,16 +675,17 @@ function PuntoVentaResolver({
 }) {
   const q = useQuery({
     queryKey: ["admin", "puntos-venta-autodetect", emisorId],
-    queryFn: async () => (await facturacionApi.consultarPuntosVenta(emisorId)).puntos_venta,
+    queryFn: () => facturacionApi.consultarPuntosVenta(emisorId),
   });
   const yaResuelto = useRef(false);
+  const habilitados = q.data?.puntos_venta;
 
   useEffect(() => {
-    if (q.data && q.data.length === 1 && !yaResuelto.current) {
+    if (habilitados && habilitados.length === 1 && !yaResuelto.current) {
       yaResuelto.current = true;
-      onResolved(q.data[0].nro);
+      onResolved(habilitados[0].nro);
     }
-  }, [q.data, onResolved]);
+  }, [habilitados, onResolved]);
 
   if (q.isLoading) {
     return <p className="text-xs text-muted-foreground">Detectando punto de venta en ARCA…</p>;
@@ -679,14 +698,14 @@ function PuntoVentaResolver({
       </ErrorBanner>
     );
   }
-  if (!q.data || q.data.length === 0) {
+  if (!habilitados || habilitados.length === 0) {
     return (
       <p className="text-xs text-muted-foreground">
-        ARCA no tiene puntos de venta electrónicos habilitados para este CUIT — cargalo a mano.
+        {mensajeSinPuntosVenta(q.data?.excluidos ?? [])} Cargalo a mano.
       </p>
     );
   }
-  if (q.data.length === 1) {
+  if (habilitados.length === 1) {
     // Se resuelve solo (useEffect de arriba) — nada que mostrar acá.
     return null;
   }
@@ -696,7 +715,7 @@ function PuntoVentaResolver({
         ARCA tiene varios puntos de venta habilitados — elegí uno:
       </p>
       <div className="flex flex-wrap gap-1.5">
-        {q.data.map((p) => (
+        {habilitados.map((p) => (
           <button
             key={p.nro}
             type="button"
