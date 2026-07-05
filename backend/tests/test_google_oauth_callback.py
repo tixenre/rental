@@ -221,6 +221,36 @@ class TestAdminCallbackHappyPathYRateLimit:
         assert ei.value.status_code == 429
 
 
+class TestAdminCallback2doFactor:
+    """2º factor obligatorio (criterio del dueño): si la cuenta YA tiene una
+    passkey enrolada, Google solo no alcanza — no se mintea sesión, se manda a
+    confirmar con la passkey. Sin passkey todavía, Google sigue alcanzando hoy
+    (el enrolamiento on-the-fly lo fuerza el frontend, `EnrolarPasskeyGate`)."""
+
+    def test_sin_passkey_mintea_sesion_como_hoy(self, monkeypatch):
+        monkeypatch.setattr(g, "OAuth2Client", _FakeOAuth2Client)
+        monkeypatch.setattr("auth.passkey.queries.list_for_owner", lambda *a, **k: [])
+        state = _valid_state()
+        req = _FakeRequest(query={"code": "abc", "state": state}, cookies={"oauth_state": state})
+        r = g.auth_callback(req)
+        assert r.status_code == 200
+        assert any(c.startswith("session=") for c in r.headers.getlist("set-cookie"))
+
+    def test_con_passkey_no_mintea_sesion_y_manda_a_confirmar(self, monkeypatch):
+        monkeypatch.setattr(g, "OAuth2Client", _FakeOAuth2Client)
+        monkeypatch.setattr(
+            "auth.passkey.queries.list_for_owner",
+            lambda *a, **k: [{"id": 1, "device_name": "iPhone"}],
+        )
+        state = _valid_state()
+        req = _FakeRequest(query={"code": "abc", "state": state}, cookies={"oauth_state": state})
+        r = g.auth_callback(req)
+        assert r.status_code == 303
+        assert "/admin/login?paso=passkey" in r.headers["location"]
+        # No hay cookie de sesión — el login discoverable de passkey es quien la mintea de verdad.
+        assert not any(c.startswith("session=") for c in r.headers.getlist("set-cookie"))
+
+
 # ── /cliente/auth/callback ────────────────────────────────────────────────────
 
 class TestClienteCallback:
