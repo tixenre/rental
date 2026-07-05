@@ -25,7 +25,7 @@ import {
   ymd,
 } from "@/lib/rental-dates";
 import { useHorarios } from "@/lib/horarios";
-import { useAntelacionMinimaHoras } from "@/hooks/useSettings";
+import { useAntelacionMinimaHorasQuery } from "@/hooks/useSettings";
 import { apiGetDiasBloqueados } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -105,11 +105,20 @@ export function DateRangePickerModal({
   // ── Piso de retiro: "ahora" + antelación mínima (#1126) ────────────────
   // Solo aplica al carrito público (`!allowPast`): el admin nunca queda
   // limitado (carga urgencias/retroactivo a mano), mismo criterio que el
-  // backend (`services/fechas.py`). Recalcula si el setting llega después
-  // del mount (query async con default 0 mientras carga).
-  const leadTimeHorasRaw = useAntelacionMinimaHoras();
+  // backend (`services/fechas.py`). `earliest` queda `undefined` hasta que el
+  // setting realmente resuelve (`leadTimeReady`) — el 0 con el que arranca la
+  // query mientras carga es indistinguible de "antelación apagada de verdad",
+  // y ya clampeó la hora a "ahora" con ese 0 falso antes de que llegara el
+  // valor real (la fecha se corregía después, pero la hora clampeada de más
+  // quedaba pisada — visto en prod). Mientras no está listo, ningún piso de
+  // antelación se aplica (nada se clampea de más).
+  const { horas: leadTimeHorasRaw, ready: leadTimeReady } = useAntelacionMinimaHorasQuery();
   const leadTimeHoras = allowPast ? 0 : leadTimeHorasRaw;
-  const earliest = useMemo(() => earliestRetiro(now, leadTimeHoras), [now, leadTimeHoras]);
+  const leadTimeKnown = allowPast || leadTimeReady;
+  const earliest = useMemo(
+    () => (leadTimeKnown ? earliestRetiro(now, leadTimeHoras) : undefined),
+    [now, leadTimeHoras, leadTimeKnown],
+  );
 
   // ── Días bloqueados (sin stock) ──────────────────────────────────────
   const ventanaDesde = ymd(today);
@@ -147,6 +156,26 @@ export function DateRangePickerModal({
   // El stock insuficiente es una advertencia — el usuario elige fechas y ve
   // en el carrito qué ítems no están disponibles para ese período.
   const blocked = devolucionCerrada;
+
+  // ── Si el DÍA de retiro quedó entero antes del piso, mover la fecha ─────
+  // `minTimeForDate` no da piso cuando `startDate` es un día ANTERIOR al de
+  // `earliest` (ese día no tiene ninguna hora válida) — por diseño, para no
+  // pisar un día POSTERIOR (que no necesita piso). Pero un carrito con una
+  // fecha vieja persistida (de antes de que la antelación empujara el piso a
+  // otro día, o simplemente porque pasaron las horas) queda mostrando esa
+  // fecha/hora inválida sin corregirse: el clamp de hora de abajo no alcanza
+  // porque no hay NINGUNA hora válida ese día. Se mueve la fecha completa al
+  // primer día válido (preservando la cantidad de jornadas); el clamp de hora
+  // de abajo corre de nuevo en el siguiente render y ajusta la hora.
+  useEffect(() => {
+    if (allowPast || !startDate || !earliest) return;
+    const pisoDia = startOfDay(earliest);
+    if (startOfDay(startDate).getTime() >= pisoDia.getTime()) return;
+    onDatesChange(
+      pisoDia,
+      endDate ? deriveEndDate(pisoDia, jornadas, startTime, endTime) : undefined,
+    );
+  }, [allowPast, startDate, endDate, earliest, jornadas, startTime, endTime, onDatesChange]);
 
   // ── Clamp de la hora de retiro: franja horaria + antelación mínima ──────
   // Los dos pisos/techos se combinan en UN solo efecto que calcula el valor
@@ -466,7 +495,7 @@ export function DateRangePickerModal({
             numberOfMonths={isMobile ? 1 : 2}
             locale={es}
             disabled={(date: Date) =>
-              (!allowPast && date < startOfDay(earliest)) ||
+              (!allowPast && date < (earliest ? startOfDay(earliest) : today)) ||
               (respectHorarios && !diaAbierto(horarios, date))
             }
             modifiers={calModifiers}

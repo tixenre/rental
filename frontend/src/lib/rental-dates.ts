@@ -203,11 +203,15 @@ export function earliestRetiro(now: Date, leadTimeHoras: number): Date {
 
 /**
  * Hora mínima seleccionable ("HH:MM") para `date`, dado el piso `earliest`
- * (ver `earliestRetiro`). `undefined` si `date` es un día posterior al de
- * `earliest` (ese día no tiene piso) o si falta `date`.
+ * (ver `earliestRetiro`). `undefined` si falta `date` o `earliest` (piso aún
+ * desconocido — no clampear en base a un dato incompleto), o si `date` es un
+ * día posterior al de `earliest` (ese día no tiene piso).
  */
-export function minTimeForDate(date: Date | undefined, earliest: Date): string | undefined {
-  if (!date) return undefined;
+export function minTimeForDate(
+  date: Date | undefined,
+  earliest: Date | undefined,
+): string | undefined {
+  if (!date || !earliest) return undefined;
   if (startOfDay(date).getTime() !== startOfDay(earliest).getTime()) return undefined;
   return `${String(earliest.getHours()).padStart(2, "0")}:${String(earliest.getMinutes()).padStart(2, "0")}`;
 }
