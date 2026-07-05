@@ -17,7 +17,7 @@ reservado para cuando el contrato público se declare estable. Un test de portab
 core nunca importe `backend.*`.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from .modelos import (
     CondicionIva,
@@ -47,6 +47,15 @@ from .modelos import (
     comprobante_fiscal_desde,
 )
 from .comprobante import tipo_comprobante, calcular_importes, armar_fecae, armar_fecae_lote
+from .modelos_exportacion import (
+    CbteTipoExportacion,
+    ReceptorExterior,
+    DatosExportacion,
+    CbteAsocExportacion,
+    ComprobanteExportacionRequest,
+    es_nota_credito_exportacion,
+)
+from .comprobante_exportacion import tipo_comprobante_exportacion, armar_fexauthorize
 from .qr import armar_qr, qr_svg
 from .render import (
     renderizar_comprobante_html,
@@ -60,6 +69,7 @@ from .render import (
 from .seguridad import generar_cert_autofirmado, asegurar_pdf
 from .wsaa import construir_tra, firmar_tra, login, login_con_cert, WSFE_WSAA_SERVICIO
 from .wsfe import WsfeClient, parse_fecha_arca, clear_cache as wsfe_clear_cache
+from .wsfex import WsfexClient, WSFEX_WSAA_SERVICIO, clear_cache as wsfex_clear_cache
 from .padron import (
     PadronClient,
     PersonaArca,
@@ -72,6 +82,7 @@ from .validadores import normalizar_cuit, cuit_valido, formatear_cuit
 from .retry import with_retry
 from .asyncio_support import (
     solicitar_cae_async,
+    autorizar_async,
     get_persona_async,
     login_async,
     login_con_cert_async,
@@ -117,6 +128,19 @@ __all__ = [
     "calcular_importes",
     "armar_fecae",
     "armar_fecae_lote",
+    # Factura de Exportación (WSFEXv1) — ver arca_fe/wsfex.py docstring
+    "CbteTipoExportacion",
+    "ReceptorExterior",
+    "DatosExportacion",
+    "CbteAsocExportacion",
+    "ComprobanteExportacionRequest",
+    "es_nota_credito_exportacion",
+    "tipo_comprobante_exportacion",
+    "armar_fexauthorize",
+    "WsfexClient",
+    "WSFEX_WSAA_SERVICIO",
+    "wsfex_clear_cache",
+    "autorizar_async",
     "armar_qr",
     "qr_svg",
     # render de comprobantes (HTML de los 3 layouts + protección del PDF)
