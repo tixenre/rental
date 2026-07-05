@@ -10,6 +10,7 @@ encontrados en producción:
 """
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -969,6 +970,50 @@ def test_preview_receptor_razon_social_prioriza_afip_sobre_lo_guardado(monkeypat
     result = engine.previsualizar_factura(1, conn=_FakeConn())
 
     assert result["receptor"]["razon_social"] == "Nombre Real SA"
+
+
+def test_preview_letra_comprobante_prioriza_condicion_iva_de_afip_sobre_lo_guardado(monkeypatch):
+    """Mismo patrón que la razón social/domicilio, pero para la condición de IVA — que decide
+    la LETRA del comprobante (A/B/C), un dato que se le manda a AFIP en el CAE (RG5616). Si el
+    perfil guardado en la cuenta está desactualizado ('monotributo') pero AFIP ya confirma
+    'responsable_inscripto' para el CUIT, el preview tiene que calcular la letra con el dato de
+    AFIP — la misma corrección que `emitir_factura` ya hacía antes de construir el comprobante
+    (`test_emitir_factura_resuelve_emisor_con_perfil_ya_corregido_por_afip`). Antes, el preview
+    resolvía AFIP recién en `_chequeos_previos`, DESPUÉS de construir el comprobante con el
+    perfil viejo — mostraba una letra distinta a la que `emitir_factura` terminaba emitiendo."""
+    pedido_ri = {
+        **_fake_pedido(),
+        "cliente_perfil_impuestos": "monotributo",  # dato interno VIEJO
+        "cliente_cuit": _CUIT_VALIDO,
+    }
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+    # emisor RI (no monotributo) para que la letra resultante sea "A" y el test verifique
+    # que `condicion_iva` de AFIP llegó de punta a punta hasta `tipo_comprobante`.
+    monkeypatch.setattr(
+        engine, "credenciales",
+        lambda nombre, conn: replace(_fake_cred(), condicion_iva="responsable_inscripto"),
+    )
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+    monkeypatch.setattr(
+        engine, "resolver_persona",
+        lambda cuit, conn: _persona_afip(condicion_iva="responsable_inscripto"),
+    )
+
+    perfiles_recibidos = []
+    monkeypatch.setattr(
+        engine, "emisor_para",
+        lambda perfil, conn: perfiles_recibidos.append(perfil) or "santini",
+    )
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    assert perfiles_recibidos == ["responsable_inscripto"], (
+        "emisor_para (y por lo tanto la letra del comprobante) tiene que resolverse con el "
+        "perfil YA CORREGIDO por AFIP, no 'monotributo' (el dato interno viejo del pedido)"
+    )
+    assert result["receptor"]["condicion_iva"] == "responsable_inscripto"
+    assert result["comprobante"]["letra"] == "A"
 
 
 # ── previsualizar_factura_html: mismo layout que la factura real, SIN CAE ──

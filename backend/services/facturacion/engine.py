@@ -103,27 +103,40 @@ def _get_pedido(conn, pedido_id: int) -> dict:
 
 
 def _chequeos_previos(
-    req, perfil_receptor: str, importes: dict, ambiente: str, numero_a_emitir: int, conn=None
+    req,
+    perfil_receptor: str,
+    importes: dict,
+    ambiente: str,
+    numero_a_emitir: int,
+    *,
+    persona_afip=None,
+    afip_error: Optional[str] = None,
 ) -> tuple[list[dict], Optional[str], Optional[str]]:
     """Chequeos fail-not-fast (todos corren, ninguno frena a los demás — mismo
     patrón que `services/checkout/validar.py`). Lo irreversible es "Confirmar
     y emitir": acá se junta todo lo verificable de antemano para que ese paso
     no tenga sorpresas.
 
-    Devuelve `(chequeos, domicilio_afip, razon_social_afip)` — lo que ARCA devolvió en la
-    consulta de solo lectura (`resolver_persona`, ver más abajo) si tuvo éxito, o `None` cada uno.
-    Antes se descartaba: el chequeo confirmaba el CUIT contra ARCA pero el domicilio/razón social
-    resueltos en esa misma llamada se tiraban, así que el preview podía mostrar "sin confirmar" (o
-    peor: el NOMBRE VIEJO guardado en la cuenta del cliente) aunque ARCA sí hubiera devuelto el
-    dato real — la ficha del cliente (`cliente_razon_social`/`cliente_domicilio_fiscal`) solo se
-    corrige recién al EMITIR de verdad (`verificar_y_actualizar_receptor`), no en el preview de
-    solo lectura. Regla del dueño: si se factura con un CUIT, los datos que van en el comprobante
-    son los que ARCA devuelve PARA ESE CUIT — nunca lo que haya guardado en la cuenta, aunque
-    coincida la mayoría de las veces."""
+    `persona_afip`/`afip_error` ya vienen resueltos por el CALLER (una sola consulta de
+    solo lectura a ARCA, `resolver_persona`, hecha ANTES de construir el comprobante — ver
+    `previsualizar_factura` — para que `condicion_iva` también salga corregida contra AFIP
+    antes de calcular la letra/tipo del comprobante) — esta función no vuelve a pegarle a
+    ARCA, solo arma los chequeos a partir de ese resultado ya conocido.
+
+    Devuelve `(chequeos, domicilio_afip, razon_social_afip)` — lo que ARCA devolvió en esa
+    consulta si tuvo éxito, o `None` cada uno. Antes se descartaba: el chequeo confirmaba el
+    CUIT contra ARCA pero el domicilio/razón social resueltos en esa misma llamada se tiraban,
+    así que el preview podía mostrar "sin confirmar" (o peor: el NOMBRE VIEJO guardado en la
+    cuenta del cliente) aunque ARCA sí hubiera devuelto el dato real — la ficha del cliente
+    (`cliente_razon_social`/`cliente_domicilio_fiscal`) solo se corrige recién al EMITIR de
+    verdad (`verificar_y_actualizar_receptor`), no en el preview de solo lectura. Regla del
+    dueño: si se factura con un CUIT, los datos que van en el comprobante son los que ARCA
+    devuelve PARA ESE CUIT — nunca lo que haya guardado en la cuenta, aunque coincida la
+    mayoría de las veces."""
     from identity.anchor import cuil_valido
 
-    domicilio_afip: Optional[str] = None
-    razon_social_afip: Optional[str] = None
+    domicilio_afip: Optional[str] = persona_afip.domicilio if persona_afip else None
+    razon_social_afip: Optional[str] = persona_afip.razon_social if persona_afip else None
     chequeos = [
         {
             "check": "credenciales_arca",
@@ -150,27 +163,21 @@ def _chequeos_previos(
 
         # `emitir_factura` verifica el receptor contra el padrón de ARCA y
         # bloquea si no puede confirmarlo (ver services.facturacion.padron.
-        # verificar_y_actualizar_receptor) — acá, en el preview, se hace el
-        # MISMO chequeo de solo lectura (`resolver_persona`, sin corregir la
-        # ficha del cliente) para que el admin vea el problema ANTES de
-        # intentar emitir de verdad, en vez de que la emisión real falle sin
-        # aviso previo. Fail-not-fast: si resuelve bien no se agrega nada
-        # (mismo criterio que el resto de los chequeos — solo se lista lo
-        # que hay que atender).
-        if cuit_ok and conn is not None:
-            try:
-                persona = resolver_persona(str(req.receptor.doc_nro), conn)
-                domicilio_afip = persona.domicilio or None
-                razon_social_afip = persona.razon_social or None
-            except RuntimeError as exc:
-                chequeos.append(
-                    {
-                        "check": "receptor_verificado_afip",
-                        "ok": False,
-                        "bloqueante": True,
-                        "mensaje": f"AFIP no pudo confirmar este CUIT: {exc}",
-                    }
-                )
+        # verificar_y_actualizar_receptor) — el preview hace el MISMO chequeo
+        # de solo lectura (resuelto por el caller, sin corregir la ficha del
+        # cliente) para que el admin vea el problema ANTES de intentar emitir
+        # de verdad, en vez de que la emisión real falle sin aviso previo.
+        # Fail-not-fast: si resolvió bien no se agrega nada (mismo criterio
+        # que el resto de los chequeos — solo se lista lo que hay que atender).
+        if cuit_ok and afip_error:
+            chequeos.append(
+                {
+                    "check": "receptor_verificado_afip",
+                    "ok": False,
+                    "bloqueante": True,
+                    "mensaje": f"AFIP no pudo confirmar este CUIT: {afip_error}",
+                }
+            )
 
     ri_degradado = (
         perfil_receptor == "responsable_inscripto"
@@ -272,6 +279,33 @@ def previsualizar_factura(pedido_id: int, conn, *, _incluir_raw: bool = False) -
         )
 
     perfil_receptor = (pedido.get("cliente_perfil_impuestos") or "").strip().lower()
+
+    # Resolución de solo lectura contra el padrón de ARCA — el MISMO chequeo real
+    # que `emitir_factura` hace con `verificar_y_actualizar_receptor` (líneas ~596-608),
+    # pero sin escribir la ficha del cliente. Tiene que correr ANTES de
+    # `construir_comprobante`: `condicion_iva` (que decide la LETRA/tipo del
+    # comprobante, vía `tipo_comprobante`) se le manda a AFIP en el CAE (RG5616), así
+    # que el preview tiene que calcular la letra con la condición de IVA que ARCA
+    # realmente tiene para este CUIT — no con el perfil viejo guardado en la cuenta.
+    # Antes esta resolución corría recién en `_chequeos_previos`, DESPUÉS de construir
+    # el comprobante: el preview podía mostrar una Factura B/C calculada con el perfil
+    # guardado mientras `emitir_factura` terminaba emitiendo una A (o viceversa) tras
+    # corregir contra AFIP — inconsistencia real entre lo que el admin "confirma" y lo
+    # que se emite. Regla del dueño: el dato de AFIP para el CUIT que se factura
+    # siempre tiene prioridad sobre lo guardado en la cuenta.
+    cuit_receptor = (pedido.get("cliente_cuit") or "").replace("-", "").strip()
+    persona_afip = None
+    afip_error: Optional[str] = None
+    if cuit_receptor.isdigit() and len(cuit_receptor) == 11:
+        try:
+            persona_afip = resolver_persona(cuit_receptor, conn)
+        except RuntimeError as exc:
+            afip_error = str(exc)
+        else:
+            if persona_afip.condicion_iva:
+                perfil_receptor = persona_afip.condicion_iva
+                pedido = {**pedido, "cliente_perfil_impuestos": persona_afip.condicion_iva}
+
     nombre_emisor = emisor_para(perfil_receptor, conn)
     cred = credenciales(nombre_emisor, conn)
 
@@ -351,7 +385,13 @@ def previsualizar_factura(pedido_id: int, conn, *, _incluir_raw: bool = False) -
     numero_a_emitir = ultimo + 1
 
     chequeos, domicilio_afip, razon_social_afip = _chequeos_previos(
-        req, perfil_receptor, importes, cred.ambiente, numero_a_emitir, conn=conn
+        req,
+        perfil_receptor,
+        importes,
+        cred.ambiente,
+        numero_a_emitir,
+        persona_afip=persona_afip,
+        afip_error=afip_error,
     )
     listo = all(c["ok"] or not c["bloqueante"] for c in chequeos)
 
