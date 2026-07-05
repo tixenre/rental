@@ -156,7 +156,9 @@ def _init_db_schema(conn):
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_marcas_nombre ON marcas(nombre)")
+    # idx_marcas_nombre (índice plano sobre `nombre`) se retiró: `nombre` ya es
+    # UNIQUE arriba, Postgres ya crea su propio índice de soporte — era 100%
+    # redundante (ver migración q4r5s6t7u8v9_drop_redundant_plain_indexes).
 
     # Migration: agregar columnas visible y orden para admin settings
     conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS visible BOOLEAN NOT NULL DEFAULT TRUE")
@@ -198,7 +200,9 @@ def _init_db_schema(conn):
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS direccion_maps_url TEXT")
     # Migration: link clientes to Supabase Auth users (Phase 1 of unified backend)
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS supabase_uid UUID UNIQUE")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_clientes_supabase_uid ON clientes(supabase_uid)")
+    # idx_clientes_supabase_uid (índice plano) se retiró: `supabase_uid` ya es
+    # UNIQUE arriba, era 100% redundante (ver migración
+    # q4r5s6t7u8v9_drop_redundant_plain_indexes).
     # Cuentas livianas (alta passwordless con passkey): la cuenta NACE sin datos
     # (solo id + passkey); Didit completa identidad/contacto al primer pedido —y los
     # escribe en `*_renaper`, no en estos campos base— así que se relajan los NOT NULL.
@@ -738,10 +742,9 @@ def _init_db_schema(conn):
             UNIQUE (categoria_raiz_id, spec_key)
         )
     """)
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_spec_def_categoria "
-        "ON spec_definitions(categoria_raiz_id, spec_key)"
-    )
+    # idx_spec_def_categoria se retiró: mismas 2 columnas y mismo orden que el
+    # UNIQUE (categoria_raiz_id, spec_key) de arriba — era 100% redundante (ver
+    # migración q4r5s6t7u8v9_drop_redundant_plain_indexes).
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_spec_def_compat "
         "ON spec_definitions(spec_key) WHERE es_compatibilidad"
@@ -2067,10 +2070,9 @@ def _init_db_schema(conn):
         "CREATE INDEX IF NOT EXISTS idx_ediciones_taller_taller "
         "ON ediciones_taller(taller_id)"
     )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_ediciones_taller_slug "
-        "ON ediciones_taller(slug)"
-    )
+    # idx_ediciones_taller_slug se retiró: `slug` ya es UNIQUE en el CREATE
+    # TABLE de arriba — era 100% redundante (ver migración
+    # q4r5s6t7u8v9_drop_redundant_plain_indexes).
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS clases_taller (
