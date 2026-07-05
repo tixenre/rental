@@ -267,6 +267,38 @@ def get_cliente_pedidos(id: int, request: Request):
         return [row_to_dict(r) for r in rows]
 
 
+@router.get("/clientes/{id}/perfiles-fiscales")
+def get_cliente_perfiles_fiscales(id: int, request: Request):
+    """Solo lectura (#1240): perfiles fiscales personales del cliente +
+    productoras a las que está vinculado — para la ficha admin. La gestión
+    real vive en `POST /api/cliente/facturacion/perfiles` (self-service del
+    cliente) y `routes/productoras.py` (admin, membership de productoras)."""
+    require_admin(request)
+    with get_db() as conn:
+        if not conn.execute("SELECT id FROM clientes WHERE id=%s", (id,)).fetchone():
+            raise HTTPException(404, "Cliente no encontrado")
+        perfiles = conn.execute(
+            """SELECT id, cuit, perfil_impuestos, razon_social, domicilio_fiscal,
+                      etiqueta, es_default
+               FROM cliente_perfiles_fiscales
+               WHERE cliente_id = %s
+               ORDER BY es_default DESC, created_at ASC""",
+            (id,),
+        ).fetchall()
+        productoras = conn.execute(
+            """SELECT p.id, p.cuit, p.perfil_impuestos, p.razon_social
+               FROM productoras p
+               JOIN productora_miembros pm ON pm.productora_id = p.id
+               WHERE pm.cliente_id = %s
+               ORDER BY p.razon_social NULLS LAST, p.id""",
+            (id,),
+        ).fetchall()
+    return {
+        "perfiles": [row_to_dict(r) for r in perfiles],
+        "productoras": [row_to_dict(r) for r in productoras],
+    }
+
+
 @router.post("/clientes", status_code=201)
 def create_cliente(data: ClienteCreate, request: Request):
     require_admin(request)
