@@ -1,7 +1,7 @@
 /**
  * API de facturación electrónica ARCA (#1139).
  */
-import { authedJson, authedPostJson } from "@/lib/authedFetch";
+import { authedFetch, authedJson, authedPostJson } from "@/lib/authedFetch";
 
 export type EmisorArca = {
   id: number;
@@ -193,6 +193,24 @@ export const facturacionApi = {
   // Facturas
   previewFactura: (pedidoId: number) =>
     authedJson<PreviewFactura>(`/api/alquileres/${pedidoId}/facturar/preview`),
+  // HTML completo del documento (mismo layout real, CAE/QR placeholder) — se embebe en un
+  // <iframe src={blobUrl}>, mismo patrón que ContratoPreviewModal (obtenerContratoPreviewHtml).
+  previewFacturaHtml: async (pedidoId: number, layout: string): Promise<string> => {
+    const res = await authedFetch(
+      `/api/alquileres/${pedidoId}/facturar/preview-html?layout=${encodeURIComponent(layout)}`,
+    );
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      let message = "";
+      try {
+        message = JSON.parse(text)?.detail ?? "";
+      } catch {
+        /* no era JSON */
+      }
+      throw new Error(message || "No pudimos generar el preview de la factura.");
+    }
+    return res.text();
+  },
   facturarPedido: (pedidoId: number) =>
     authedPostJson<Factura>(`/api/alquileres/${pedidoId}/facturar`, {}),
   listFacturasPedido: (pedidoId: number) =>
