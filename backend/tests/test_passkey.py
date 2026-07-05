@@ -302,7 +302,8 @@ class TestSignup:
                     raise psycopg.errors.UniqueViolation
                 return self
 
-        monkeypatch.setattr("auth.passkey.routes.get_db", lambda: _Conn())
+        # El insert vive en auth.passkey.commands.crear_cuenta_liviana_con_passkey.
+        monkeypatch.setattr("auth.passkey.commands.get_db", lambda: _Conn())
         return captured
 
     def test_begin_setea_cookie_con_flag_signup(self):

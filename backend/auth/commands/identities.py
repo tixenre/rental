@@ -5,6 +5,8 @@ Ver `auth/queries/identities.py` para las lecturas.
 """
 from typing import Optional
 
+import psycopg.errors
+
 from database import get_db, now_ar
 from auth.queries.identities import find_cliente_by_identity
 
@@ -17,29 +19,36 @@ def link_identity(
       · 'linked'         — se creó la llave.
       · 'already_yours'  — ya era de esta cuenta (idempotente; refresca el `email`).
       · 'taken_by_other' — la llave es de OTRA cuenta (el caller responde 409).
-    SELECT + INSERT en una transacción; el UNIQUE(method, identifier) es la red final.
-    `email` es solo display (el mail del Google linkeado); el ancla es `identifier`."""
-    with get_db() as conn:
-        with conn.transaction():
-            existing = conn.execute(
-                "SELECT cliente_id FROM login_identities WHERE method = %s AND identifier = %s",
-                (method, identifier),
-            ).fetchone()
-            if existing:
-                if existing["cliente_id"] != cliente_id:
-                    return "taken_by_other"
-                if email:  # refresca el mail de display si cambió
-                    conn.execute(
-                        "UPDATE login_identities SET email = %s "
-                        "WHERE method = %s AND identifier = %s",
-                        (email, method, identifier),
-                    )
-                return "already_yours"
-            conn.execute(
-                """INSERT INTO login_identities (cliente_id, method, identifier, email, verified_at)
-                   VALUES (%s, %s, %s, %s, %s)""",
-                (cliente_id, method, identifier, email, now_ar() if verified else None),
-            )
+    SELECT + INSERT en una transacción; el UNIQUE(method, identifier) es la red final —
+    dos requests concurrentes (doble-click, reintento de red) pueden pasar el SELECT
+    los dos y competir en el INSERT: se atrapa el `UniqueViolation` de esa carrera acá
+    (no en cada caller) y se resuelve re-consultando quién ganó, así el resultado sigue
+    siendo siempre uno de los 3 strings — nunca una excepción cruda de Postgres."""
+    try:
+        with get_db() as conn:
+            with conn.transaction():
+                existing = conn.execute(
+                    "SELECT cliente_id FROM login_identities WHERE method = %s AND identifier = %s",
+                    (method, identifier),
+                ).fetchone()
+                if existing:
+                    if existing["cliente_id"] != cliente_id:
+                        return "taken_by_other"
+                    if email:  # refresca el mail de display si cambió
+                        conn.execute(
+                            "UPDATE login_identities SET email = %s "
+                            "WHERE method = %s AND identifier = %s",
+                            (email, method, identifier),
+                        )
+                    return "already_yours"
+                conn.execute(
+                    """INSERT INTO login_identities (cliente_id, method, identifier, email, verified_at)
+                       VALUES (%s, %s, %s, %s, %s)""",
+                    (cliente_id, method, identifier, email, now_ar() if verified else None),
+                )
+    except psycopg.errors.UniqueViolation:
+        ganador = find_cliente_by_identity(method, identifier)
+        return "already_yours" if ganador == cliente_id else "taken_by_other"
     return "linked"
 
 

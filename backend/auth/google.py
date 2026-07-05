@@ -78,6 +78,20 @@ def _oauth_client() -> OAuth2Client:
     )
 
 
+def _oauth_client_cliente() -> OAuth2Client:
+    """Mismo helper que `_oauth_client()` pero para el flujo de CLIENTE (otro
+    `redirect_uri`). Antes se repetía inline en `cliente_auth_google`,
+    `cliente_auth_google_link` y `cliente_auth_callback` — única fuente ahora."""
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise HTTPException(503, "Google OAuth no configurado en el servidor.")
+    return OAuth2Client(
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        redirect_uri=CLIENTE_REDIRECT_URI,
+        scope="openid email profile",
+    )
+
+
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("/auth/me")
@@ -270,14 +284,7 @@ def cliente_auth_google(request: Request):
     login en vez de mandar siempre a /cliente/portal. Solo aceptamos paths
     internos (validación en `_safe_next_path` — no open-redirect).
     """
-    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        raise HTTPException(503, "Google OAuth no configurado en el servidor.")
-    client = OAuth2Client(
-        client_id=GOOGLE_CLIENT_ID,
-        client_secret=GOOGLE_CLIENT_SECRET,
-        redirect_uri=CLIENTE_REDIRECT_URI,
-        scope="openid email profile",
-    )
+    client = _oauth_client_cliente()
     state = signer.dumps({"nonce": secrets.token_urlsafe(16)})
     uri, _ = client.create_authorization_url(
         GOOGLE_AUTH_URL,
@@ -306,14 +313,7 @@ def cliente_auth_google_link(request: Request):
     sess = get_session(request)
     if not sess or sess.get("role") != "cliente":
         raise HTTPException(401, "Sesión de cliente requerida.")
-    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        raise HTTPException(503, "Google OAuth no configurado en el servidor.")
-    client = OAuth2Client(
-        client_id=GOOGLE_CLIENT_ID,
-        client_secret=GOOGLE_CLIENT_SECRET,
-        redirect_uri=CLIENTE_REDIRECT_URI,
-        scope="openid email profile",
-    )
+    client = _oauth_client_cliente()
     state = signer.dumps({"nonce": secrets.token_urlsafe(16), "link_cliente_id": sess["cliente_id"]})
     uri, _ = client.create_authorization_url(
         GOOGLE_AUTH_URL, state=state, access_type="online", prompt="select_account",
@@ -441,12 +441,7 @@ def cliente_auth_callback(request: Request):
         _record_fail(ip)
         return RedirectResponse(f"{FRONTEND_BASE}/cliente/login?error=state_mismatch", status_code=303)
 
-    client = OAuth2Client(
-        client_id=GOOGLE_CLIENT_ID,
-        client_secret=GOOGLE_CLIENT_SECRET,
-        redirect_uri=CLIENTE_REDIRECT_URI,
-        scope="openid email profile",
-    )
+    client = _oauth_client_cliente()
     try:
         client.fetch_token(GOOGLE_TOKEN_URL, code=code)
     except Exception as e:
