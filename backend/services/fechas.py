@@ -250,27 +250,29 @@ def dia_fin_de_semana_reducido(horarios: dict | None, fecha: datetime.date) -> b
 
 
 def disclaimers_retiro(conn, fecha_desde: str | None, fecha_hasta: str | None) -> list[dict]:
-    """Avisos relevantes para la fecha/hora que el cliente tiene elegida (o
-    para cuando todavía no eligió nada) en el picker público. Contextual — no
-    devuelve avisos que no aplican a la selección actual, para no llenar el
-    picker de notas permanentes."""
+    """Avisos del picker público. No todos son contextuales de la misma
+    forma — cada uno tiene su propio criterio de "¿corresponde?":
+
+    - `antelacion`: regla PERMANENTE del catálogo (aplica a cualquier
+      reserva online, no solo a la fecha puntual que estés mirando ahora
+      mismo) — se muestra siempre que esté configurada, elijas la fecha que
+      elijas. No depende de `fecha_desde`.
+    - `horarios_finde`: sí es contextual a la selección — solo aplica si la
+      fecha elegida realmente cae en un día reducido.
+
+    Pueden coexistir los dos a la vez (lista, no un solo mensaje) — no es
+    "el más relevante gana", el front los muestra todos."""
     avisos: list[dict] = []
 
     horas = antelacion_minima_horas(conn)
     if horas > 0:
-        inicio = to_datetime(fecha_desde) if fecha_desde else None
-        # Sin fecha elegida todavía: sigue siendo relevante (por eso los
-        # primeros días/horas del calendario van a aparecer deshabilitados).
-        # Con fecha elegida: solo si esa elección quedó dentro/cerca de la
-        # ventana (ahí es donde el aviso explica algo que el usuario ve).
-        if inicio is None or dentro_de_ventana_horas(inicio, horas):
-            avisos.append({
-                "check": "antelacion",
-                "mensaje": (
-                    f"Reservás online con al menos {horas} h de anticipación "
-                    "— por eso no ves horas más cercanas a ahora."
-                ),
-            })
+        avisos.append({
+            "check": "antelacion",
+            "mensaje": (
+                f"Reservás online con al menos {horas} h de anticipación "
+                "— por eso no ves horas más cercanas a ahora."
+            ),
+        })
 
     horarios = horarios_habilitados(conn)
     if horarios:

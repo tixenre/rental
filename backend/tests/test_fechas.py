@@ -308,13 +308,17 @@ def test_disclaimers_antelacion_sin_fecha_elegida():
     assert "12 h" in avisos[0]["mensaje"]
 
 
-def test_disclaimers_antelacion_fecha_lejana_no_avisa():
+def test_disclaimers_antelacion_avisa_aunque_la_fecha_elegida_este_lejos():
+    # Regla PERMANENTE del catálogo (no de la fecha puntual elegida) — sigue
+    # avisando aunque el retiro elegido esté a 30 días, para no desaparecer
+    # justo cuando coincide con otro aviso contextual (ej. horarios_finde).
     conn = _FakeConnByKey({"antelacion_minima_horas": "12"})
     lejos = (now_ar() + datetime.timedelta(days=30)).strftime("%Y-%m-%dT%H:%M")
-    assert disclaimers_retiro(conn, lejos, None) == []
+    avisos = disclaimers_retiro(conn, lejos, None)
+    assert [a["check"] for a in avisos] == ["antelacion"]
 
 
-def test_disclaimers_antelacion_fecha_dentro_de_ventana_avisa():
+def test_disclaimers_antelacion_avisa_con_fecha_cercana():
     conn = _FakeConnByKey({"antelacion_minima_horas": "12"})
     pronto = (now_ar() + datetime.timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M")
     avisos = disclaimers_retiro(conn, pronto, None)
