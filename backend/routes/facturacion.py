@@ -123,6 +123,55 @@ def refrescar_catalogos_arca(request: Request):
     }
 
 
+@router.post("/admin/arca/catalogos-exportacion/refrescar")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
+def refrescar_catalogos_arca_exportacion(request: Request):
+    """Actualiza los catálogos de WSFEXv1 (países destino/Incoterms/monedas) que pueblan los
+    selects del formulario de Factura de Exportación en el admin."""
+    require_admin(request)
+
+    from services.facturacion.catalogos_exportacion import refrescar_catalogos_exportacion
+
+    with get_db() as conn:
+        try:
+            resultado = refrescar_catalogos_exportacion(conn)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        except ArcaError as e:
+            raise HTTPException(_status_for_arca_error(e), str(e))
+        except RuntimeError as e:
+            raise HTTPException(503, str(e))
+        conn.commit()
+
+    return {
+        "ok": True,
+        "paises_destino": len(resultado["paises_destino"]),
+        "incoterms": len(resultado["incoterms"]),
+        "monedas": len(resultado["monedas"]),
+    }
+
+
+@router.get("/admin/arca/catalogos-exportacion")
+def obtener_catalogos_exportacion(request: Request):
+    """Devuelve los catálogos de WSFEXv1 ya cacheados (países destino/Incoterms/monedas) para
+    poblar los selects del formulario admin — 503 si nunca se refrescaron."""
+    require_admin(request)
+
+    from services.facturacion import catalogos_exportacion as cat
+
+    with get_db() as conn:
+        try:
+            return {
+                "paises_destino": cat.paises_destino(conn),
+                "incoterms": cat.incoterms(conn),
+                "monedas": cat.monedas(conn),
+                "ultimo_refresco": cat.ultimo_refresco(conn),
+            }
+        except RuntimeError as e:
+            raise HTTPException(503, str(e))
+
+
 # ---------------------------------------------------------------------------
 # GET /admin/arca/padron/{cuit} — autocompletar razón social/domicilio/IVA
 # ---------------------------------------------------------------------------
