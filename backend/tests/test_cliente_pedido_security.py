@@ -30,16 +30,20 @@ class FakeRow(dict):
 
 
 class FakeConn:
-    """Conn fake que devuelve precios desde un mapa {equipo_id: precio}."""
+    """Conn fake que devuelve precios desde un mapa {equipo_id: precio}. El gate de
+    visibilidad y el precio se resuelven en LOTE (`= ANY(%s)` + `fetchall`,
+    `services/carrito/readiness.py::_equipos_visibles_catalogo`/
+    `services/precios.py::precios_efectivos_batch` — batch para evitar N+1, ver
+    `docs/SISTEMA_FINANZAS_FLUJO.md` hallazgo #12), así que este double simula esas
+    dos queries en lote en vez de una por equipo_id."""
     def __init__(self, precios_catalogo: dict[int, int]):
         self._precios = precios_catalogo
-        self._pending_eq_id: int | None = None
         self._pending_query: str = ""
+        self._pending_params: tuple = ()
 
     def execute(self, sql, params=()):
         self._pending_query = sql
-        if "FROM equipos WHERE id" in sql:
-            self._pending_eq_id = params[0] if params else None
+        self._pending_params = params
         return self
 
     def fetchone(self):
@@ -47,16 +51,20 @@ class FakeConn:
         # Verificación de existencia del cliente (SELECT id FROM clientes).
         if "FROM clientes" in sql and "WHERE id" in sql:
             return FakeRow(id=42)
-        eq_id = self._pending_eq_id
-        self._pending_eq_id = None
-        if eq_id is None or eq_id not in self._precios:
-            return None
-        # `tipo` lo lee `precio_jornada_efectivo` (resuelve combo vs. precio propio).
-        # Equipo simple → toma su `precio_jornada` tal cual (el del catálogo).
-        return FakeRow(precio_jornada=self._precios[eq_id], tipo="simple")
+        return None
 
     def fetchall(self):
-        return []
+        sql = self._pending_query
+        ids = self._pending_params[0] if self._pending_params else []
+        if "id = ANY(%s)" not in sql:
+            return []
+        vivos = [i for i in ids if i in self._precios]
+        if "SELECT id, precio_jornada, tipo" in sql:
+            # `tipo` lo lee `precios_efectivos_batch` (resuelve combo vs. precio
+            # propio). Equipo simple → toma su `precio_jornada` tal cual.
+            return [FakeRow(id=i, precio_jornada=self._precios[i], tipo="simple") for i in vivos]
+        # Gate de visibilidad en lote (`SELECT id FROM equipos WHERE id = ANY(%s) ...`).
+        return [FakeRow(id=i) for i in vivos]
 
     def __enter__(self):
         return self
