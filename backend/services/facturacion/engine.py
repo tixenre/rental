@@ -450,11 +450,13 @@ def previsualizar_factura_html(pedido_id: int, conn, layout: str = "simplificada
     real (`arca_fe.renderizar_comprobante_html`), para que el admin vea el documento completo
     (no solo el resumen de chequeos) antes de comprometerse a pedir un CAE real.
 
-    CAE/Vto./QR son PLACEHOLDER ("(pendiente)") porque todavía no existen — nada de esto se pide
-    a ARCA más allá de lo que ya hace `previsualizar_factura` (número de comprobante de solo
-    lectura). Es el mismo nivel "preview rápido" que ya expone `arca_fe` — HTML crudo, informal,
-    NUNCA el documento certificado (eso sigue siendo exclusivo de `asegurar_pdf` tras emitir de
-    verdad, con la firma PAdES real).
+    CAE/QR son PLACEHOLDER a propósito NO-numérico ("SIN EMITIR — NO VÁLIDO", nunca algo que se
+    pueda confundir con un CAE real) porque todavía no existen — nada de esto se pide a ARCA más
+    allá de lo que ya hace `previsualizar_factura` (número de comprobante de solo lectura). Es el
+    mismo nivel "preview rápido" que ya expone `arca_fe` — HTML crudo, informal, NUNCA el
+    documento certificado (eso sigue siendo exclusivo de `asegurar_pdf` tras emitir de verdad, con
+    la firma PAdES real). Además del banner y la marca de agua diagonal (ver más abajo), esto es
+    a propósito: un preview de factura NUNCA puede parecer válido.
 
     Raises:
         ValueError: pedido en estado inválido, o el comprobante no se pudo armar.
@@ -474,7 +476,7 @@ def previsualizar_factura_html(pedido_id: int, conn, layout: str = "simplificada
         pto_vta=raw["emisor_obj"].punto_venta,
         numero=raw["numero_a_emitir"],
         fecha_emision=raw["fecha_emision"],
-        cae="(pendiente)",
+        cae="SIN EMITIR — NO VÁLIDO",
         cae_vto=raw["fecha_emision"],
         qr_url="https://www.arca.gob.ar/fe/qr/",
         emisor_razon_social=em_row["razon_social"] or "—",
@@ -499,17 +501,32 @@ def previsualizar_factura_html(pedido_id: int, conn, layout: str = "simplificada
         vencimiento_pago=req.fecha_vto_pago,
     )
     html = arca_fe.renderizar_comprobante_html(datos, layout=layout, fonts_css=_fonts_css())
-    # Banner de "BORRADOR" imposible de confundir con un comprobante real (CAE/QR placeholder no
-    # alcanza solo — esto es lo primero que se ve al abrir la pestaña, no algo que haya que leer
-    # con atención para notar). Los 3 layouts arrancan el body igual (`<body>` sin atributos, ver
-    # arca_fe/render.py) — reemplazo simple, sin tocar la librería portable (esto es una decisión
-    # de UX de Rambla, no algo que arca_fe deba saber).
+    # Un preview de factura NUNCA puede parecer válido — dos capas, ninguna opcional:
+    # (1) banner sticky arriba de todo, imposible de scrollear fuera de vista;
+    # (2) marca de agua diagonal REPETIDA sobre el documento entero (`position:fixed`, así se ve
+    # encima del contenido tenga el largo que tenga — A4 real vs. el viewport del iframe — y
+    # sigue ahí si se scrollea, se imprime o se saca captura). Los 3 layouts arrancan el body
+    # igual (`<body>` sin atributos, ver arca_fe/render.py) — reemplazo simple de texto, sin
+    # tocar la librería portable (esto es una decisión de UX de Rambla, no algo que arca_fe deba
+    # saber). `pointer-events:none` para no tapar ningún link/QR clickeable de abajo.
     _banner = (
         '<div style="position:sticky;top:0;z-index:999;background:#111;color:#fff;'
         'font:700 13px/1.4 monospace;text-align:center;padding:8px 12px;letter-spacing:.05em;">'
         "BORRADOR — sin emitir, CAE/QR no son reales, no tiene validez fiscal</div>"
     )
-    return html.replace("<body>", f"<body>{_banner}", 1)
+    _watermark_texto = "NO VÁLIDO — PREVIEW"
+    _watermark = (
+        '<div style="position:fixed;inset:0;z-index:998;pointer-events:none;overflow:hidden;'
+        'display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;">'
+        + "".join(
+            '<div style="transform:rotate(-25deg);white-space:nowrap;'
+            'font:900 42px/1 monospace;color:rgba(200,30,30,0.16);letter-spacing:.1em;">'
+            f"{_watermark_texto}&nbsp;&nbsp;&nbsp;{_watermark_texto}&nbsp;&nbsp;&nbsp;{_watermark_texto}</div>"
+            for _ in range(6)
+        )
+        + "</div>"
+    )
+    return html.replace("<body>", f"<body>{_banner}{_watermark}", 1)
 
 
 # ---------------------------------------------------------------------------
