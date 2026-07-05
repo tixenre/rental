@@ -127,6 +127,19 @@ function EquiposPage() {
     } as never);
   }
 
+  // Input de búsqueda: texto local + debounce antes de tocar la URL (y disparar
+  // el refetch fuzzy contra el backend). Sin esto, cada letra tipeada navegaba
+  // y re-consultaba — con el texto local, sólo se dispara 300ms después de que
+  // el admin deja de tipear.
+  const [searchInput, setSearchInput] = useState(q);
+  useEffect(() => setSearchInput(q), [q]);
+  useEffect(() => {
+    if (searchInput === q) return;
+    const t = setTimeout(() => updateFilters({ q: searchInput }), 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce: solo re-dispara por texto tipeado, no por q/updateFilters
+  }, [searchInput]);
+
   const setQ = (v: string) => updateFilters({ q: v });
   const setCategoria = (v: string) => updateFilters({ categoria: v });
   const setMarca = (v: string) => updateFilters({ marca: v });
@@ -142,7 +155,7 @@ function EquiposPage() {
   const [openDashboard, setOpenDashboard] = useState(false);
   const [openComboBuilder, setOpenComboBuilder] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [tab, setTab] = useState<"todos" | "combos" | "sin-foto">("todos");
+  const [tab, setTab] = useState<"todos" | "combos" | "kits" | "ocultos" | "sin-foto">("todos");
 
   const equiposQ = useQuery({
     queryKey: ["admin", "equipos", { q, categoria, marca, soloIncompletos, vistaPapelera, falta }],
@@ -273,18 +286,25 @@ function EquiposPage() {
   // viven en su propio tab. El resto de los tabs operan sobre el inventario FÍSICO
   // (equipos + kits), sin combos.
   const esCombo = (eq: Equipo) => eq.tipo === "combo";
+  const esKit = (eq: Equipo) => eq.tipo === "kit";
   const fisicos = allItems.filter((e) => !esCombo(e));
   const tabCounts = {
     todos: fisicos.length,
     combos: allItems.filter(esCombo).length,
+    kits: fisicos.filter(esKit).length,
+    ocultos: fisicos.filter((e) => !e.visible_catalogo).length,
     "sin-foto": fisicos.filter((e) => !e.foto_url).length,
   };
   const items =
     tab === "combos"
       ? allItems.filter(esCombo)
-      : tab === "sin-foto"
-        ? fisicos.filter((e) => !e.foto_url)
-        : fisicos;
+      : tab === "kits"
+        ? fisicos.filter(esKit)
+        : tab === "ocultos"
+          ? fisicos.filter((e) => !e.visible_catalogo)
+          : tab === "sin-foto"
+            ? fisicos.filter((e) => !e.foto_url)
+            : fisicos;
 
   /** Categorías raíz para el dropdown (no incluye hijos). El backend acepta
    *  el nombre de la raíz y matchea descendientes vía CTE recursiva. */
@@ -362,8 +382,8 @@ function EquiposPage() {
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Buscar (nombre, marca, modelo, serie, specs, keywords…)"
               className="pl-9 text-base sm:text-sm"
             />
@@ -602,6 +622,8 @@ function EquiposPage() {
             [
               ["todos", "Todos"],
               ["combos", "Combos"],
+              ["kits", "Kits"],
+              ["ocultos", "Ocultos"],
               ["sin-foto", "Sin foto"],
             ] as const
           ).map(([id, label]) => (
