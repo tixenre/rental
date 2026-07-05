@@ -2928,3 +2928,37 @@ cancel-in-progress` ya cancela corridas viejas.
   cualquier recompute de plata para auditoría/reconciliación que arme el dict del pedido con un SELECT
   parcial en vez de pasar por el mismo armado completo que usa el resto del sistema (`_get_alquiler_items`/
   `_enriquecer_pedido_con_total`).
+
+### 2026-07-05 — Regla: facturación siempre usa el dato de AFIP verificado para el CUIT usado, nunca lo guardado en la cuenta
+
+- **Contexto.** El dueño reportó, con captura de una factura preview real, que el nombre mostrado para el
+  receptor no coincidía con lo que ARCA ya había confirmado para el CUIT usado — parecía que el dato
+  guardado en la cuenta del cliente ("Agustín", desactualizado) se estaba mostrando en vez del que devuelve
+  el padrón de ARCA para ese CUIT puntual.
+- **Hallazgo.** `PersonaArca.razon_social` (`arca_fe/padron.py::_parsear_persona`) ya arma correctamente la
+  razón social combinando `nombre`+`apellido` cuando ARCA no devuelve `razonSocial` separada para una
+  persona física — no era un bug de parseo de AFIP. El bug real: `previsualizar_factura`'s receptor dict
+  (`services/facturacion/engine.py`) nunca consultaba la persona YA RESUELTA vía `resolver_persona()` para
+  la razón social (solo la usaba para `domicilio_afip`, de un fix anterior) — siempre priorizaba
+  `pedido.get("cliente_razon_social") or pedido.get("cliente_nombre")` (dato guardado en la cuenta).
+  `emitir_factura` (la emisión real, ya existente) SÍ tenía el orden correcto
+  (`persona.razon_social or pedido.get("cliente_razon_social")` — AFIP gana si respondió) — el preview
+  estaba inconsistente con la emisión real del mismo dato.
+- **Regla explícita del dueño** (verbatim, dos veces en la misma sesión): "los datos de la factura deben
+  ser lo de la busqueda de afip!!! no me importa si en la cuenta esta otro nombre, si se factura con el
+  cuit que se pone, los datos deben pertenercer a ese cuit, auqnque coincidan coon los de la cienta, se usa
+  el fetch de afip entendido?" / "arca fe y facturacion deberia usar datos de afip chequeados, es una
+  regla. lo que manda par afip es el cuil". El CUIT/CUIL que se factura es la fuente de identidad para ESE
+  comprobante — no la cuenta del cliente, aunque coincidan la mayoría de las veces.
+- **Fix.** `_chequeos_previos()` pasa a devolver una 3-tupla (`chequeos, domicilio_afip,
+  razon_social_afip`) — captura `razon_social_afip = persona.razon_social or None` del mismo
+  `resolver_persona()` que ya se llamaba (antes solo se aprovechaba para el domicilio). En
+  `previsualizar_factura`, tanto `razon_social` como `domicilio` del receptor invierten su precedencia:
+  el dato de AFIP ahora es preferente (no un fallback-si-falta), igual que ya hacía `emitir_factura`.
+- **Consecuencias.** Test renombrado `test_preview_receptor_domicilio_prioriza_afip_sobre_lo_guardado`
+  (antes afirmaba que ganaba el dato guardado; ahora afirma que gana AFIP, con mocks de domicilio
+  distinto entre cuenta y AFIP). Test nuevo `test_preview_receptor_razon_social_prioriza_afip_sobre_lo_guardado`
+  (mismo patrón, para razón social). `pytest tests/test_facturacion_engine.py` → 37 passed. El supervisor
+  marca cualquier construcción de datos del receptor de una factura (nombre/domicilio) que use el dato
+  guardado en la cuenta como preferente sobre el resuelto vía `resolver_persona`/
+  `verificar_y_actualizar_receptor` para el CUIT que se está facturando.

@@ -104,22 +104,26 @@ def _get_pedido(conn, pedido_id: int) -> dict:
 
 def _chequeos_previos(
     req, perfil_receptor: str, importes: dict, ambiente: str, numero_a_emitir: int, conn=None
-) -> tuple[list[dict], Optional[str]]:
+) -> tuple[list[dict], Optional[str], Optional[str]]:
     """Chequeos fail-not-fast (todos corren, ninguno frena a los demás — mismo
     patrón que `services/checkout/validar.py`). Lo irreversible es "Confirmar
     y emitir": acá se junta todo lo verificable de antemano para que ese paso
     no tenga sorpresas.
 
-    Devuelve `(chequeos, domicilio_afip)` — `domicilio_afip` es el domicilio que ARCA devolvió
-    en la consulta de solo lectura (`resolver_persona`, ver más abajo) si tuvo éxito, o `None`.
-    Antes se descartaba: el chequeo confirmaba el CUIT contra ARCA pero el domicilio resuelto en
-    esa misma llamada se tiraba, así que el preview mostraba "sin confirmar" aunque ARCA sí lo
-    hubiera devuelto — el domicilio persistido en la ficha del cliente (`cliente_domicilio_fiscal`)
-    solo se actualiza recién al EMITIR de verdad (`verificar_y_actualizar_receptor`), no en el
-    preview de solo lectura."""
+    Devuelve `(chequeos, domicilio_afip, razon_social_afip)` — lo que ARCA devolvió en la
+    consulta de solo lectura (`resolver_persona`, ver más abajo) si tuvo éxito, o `None` cada uno.
+    Antes se descartaba: el chequeo confirmaba el CUIT contra ARCA pero el domicilio/razón social
+    resueltos en esa misma llamada se tiraban, así que el preview podía mostrar "sin confirmar" (o
+    peor: el NOMBRE VIEJO guardado en la cuenta del cliente) aunque ARCA sí hubiera devuelto el
+    dato real — la ficha del cliente (`cliente_razon_social`/`cliente_domicilio_fiscal`) solo se
+    corrige recién al EMITIR de verdad (`verificar_y_actualizar_receptor`), no en el preview de
+    solo lectura. Regla del dueño: si se factura con un CUIT, los datos que van en el comprobante
+    son los que ARCA devuelve PARA ESE CUIT — nunca lo que haya guardado en la cuenta, aunque
+    coincida la mayoría de las veces."""
     from identity.anchor import cuil_valido
 
     domicilio_afip: Optional[str] = None
+    razon_social_afip: Optional[str] = None
     chequeos = [
         {
             "check": "credenciales_arca",
@@ -157,6 +161,7 @@ def _chequeos_previos(
             try:
                 persona = resolver_persona(str(req.receptor.doc_nro), conn)
                 domicilio_afip = persona.domicilio or None
+                razon_social_afip = persona.razon_social or None
             except RuntimeError as exc:
                 chequeos.append(
                     {
@@ -241,7 +246,7 @@ def _chequeos_previos(
         }
     )
 
-    return chequeos, domicilio_afip
+    return chequeos, domicilio_afip, razon_social_afip
 
 
 def previsualizar_factura(pedido_id: int, conn, *, _incluir_raw: bool = False) -> dict:
@@ -345,7 +350,7 @@ def previsualizar_factura(pedido_id: int, conn, *, _incluir_raw: bool = False) -
     ultimo = wsfe.ultimo_autorizado(emisor_obj.punto_venta, int(cbte_tipo))
     numero_a_emitir = ultimo + 1
 
-    chequeos, domicilio_afip = _chequeos_previos(
+    chequeos, domicilio_afip, razon_social_afip = _chequeos_previos(
         req, perfil_receptor, importes, cred.ambiente, numero_a_emitir, conn=conn
     )
     listo = all(c["ok"] or not c["bloqueante"] for c in chequeos)
@@ -397,10 +402,18 @@ def previsualizar_factura(pedido_id: int, conn, *, _incluir_raw: bool = False) -
             "doc_nro": str(req.receptor.doc_nro),
             "condicion_iva": req.receptor.condicion_iva.name.lower(),
             "condicion_iva_label": condicion_iva_receptor_label,
-            "razon_social": pedido.get("cliente_razon_social")
+            # Regla del dueño: si se factura con un CUIT, el nombre/domicilio son los que ARCA
+            # devuelve PARA ESE CUIT — nunca lo que haya guardado en la cuenta (aunque coincida la
+            # mayoría de las veces), así que el dato fresco de AFIP tiene PRIORIDAD, no es un
+            # fallback-si-falta. Mismo orden de precedencia que ya usa `emitir_factura` de verdad
+            # (`persona.razon_social or pedido.get(...)`, línea ~595) — antes el preview usaba el
+            # orden invertido para ambos campos, mostrando el nombre viejo de la cuenta aunque ARCA
+            # ya hubiera confirmado uno distinto para este CUIT puntual.
+            "razon_social": razon_social_afip
+            or pedido.get("cliente_razon_social")
             or pedido.get("cliente_nombre")
             or "",
-            "domicilio": pedido.get("cliente_domicilio_fiscal") or domicilio_afip or "",
+            "domicilio": domicilio_afip or pedido.get("cliente_domicilio_fiscal") or "",
         },
         "comprobante": {
             "letra": letra,

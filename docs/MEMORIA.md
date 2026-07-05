@@ -961,6 +961,20 @@ vez de todas las columnas que `desglose_de_pedido`/`calcular_total` necesitan. R
 `test_reconciliacion_no_marca_falso_positivo_con_descuento_de_cliente` (Postgres real; confirmado que
 falla contra el código viejo).
 
+### 2026-07-05 — Regla: facturación siempre usa el dato de AFIP verificado para el CUIT usado, nunca lo guardado en la cuenta
+
+Regla explícita del dueño: si un comprobante se factura con un CUIT, **el nombre/razón social/domicilio
+que van en la factura son los que ARCA devuelve PARA ESE CUIT** — no lo que esté guardado en la cuenta
+del cliente, aunque coincida la mayoría de las veces. Lo que manda para ARCA es el CUIL/CUIT, no la
+identidad interna de la cuenta. `emitir_factura` ya lo hacía bien (`persona.razon_social or
+pedido.get(...)` — AFIP gana si respondió algo); el preview (`previsualizar_factura`) tenía el orden
+invertido (lo guardado ganaba, AFIP solo si faltaba) — bug real: mostraba el nombre viejo de la cuenta
+pese a que ARCA ya había confirmado uno distinto para el CUIT puntual de esa factura. Corregido para que
+preview y emisión usen el mismo criterio: **el dato fresco de AFIP tiene prioridad, no es un
+fallback-si-falta**. El supervisor marca cualquier construcción de datos del receptor de una factura
+(nombre/domicilio) que use el dato guardado en la cuenta como preferente sobre el resuelto vía
+`resolver_persona`/`verificar_y_actualizar_receptor` para el CUIT que se está facturando.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

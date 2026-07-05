@@ -877,10 +877,12 @@ def test_preview_perfil_con_cuit_verificado_no_bloquea(monkeypatch):
     assert check["ok"] is True
 
 
-def test_preview_receptor_incluye_domicilio_fiscal(monkeypatch):
-    """El preview tiene que mostrar el domicilio ANTES de confirmar — si no
-    está, el admin lo tiene que ver acá, no descubrirlo en la factura ya
-    emitida (bug real: una factura salió con el domicilio vacío)."""
+def test_preview_receptor_domicilio_prioriza_afip_sobre_lo_guardado(monkeypatch):
+    """Regla del dueño: si se factura con un CUIT, los datos que van en el comprobante son los
+    que ARCA devuelve PARA ESE CUIT — nunca lo guardado en la cuenta, aunque coincidan la
+    mayoría de las veces. El domicilio fresco de AFIP tiene que GANARLE al guardado, no ser
+    un fallback-si-falta (antes era al revés: se mostraba "Calle Ficticia 123" — la cuenta —
+    pese a que ARCA ya había confirmado "Calle Real 1" para este CUIT puntual)."""
     pedido_ri = {
         **_fake_pedido(),
         "cliente_perfil_impuestos": "responsable_inscripto",
@@ -892,11 +894,13 @@ def test_preview_receptor_incluye_domicilio_fiscal(monkeypatch):
     monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
     monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
     monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
-    monkeypatch.setattr(engine, "resolver_persona", lambda cuit, conn: _persona_afip())
+    monkeypatch.setattr(
+        engine, "resolver_persona", lambda cuit, conn: _persona_afip(domicilio="Calle Real 1")
+    )
 
     result = engine.previsualizar_factura(1, conn=_FakeConn())
 
-    assert result["receptor"]["domicilio"] == "Calle Ficticia 123"
+    assert result["receptor"]["domicilio"] == "Calle Real 1"
 
 
 def test_preview_receptor_domicilio_vacio_si_falta(monkeypatch):
@@ -916,8 +920,7 @@ def test_preview_receptor_usa_domicilio_de_afip_si_no_esta_guardado(monkeypatch)
     chequeo `receptor_verificado_afip` (llama a `resolver_persona`, de solo lectura) ya había
     confirmado el CUIT contra ARCA con éxito — se descartaba el domicilio que esa misma
     respuesta traía, en vez de usarlo, porque `cliente_domicilio_fiscal` todavía no estaba
-    persistido (recién se persiste al EMITIR de verdad, no en el preview). El preview ahora
-    usa el domicilio de ARCA como fallback cuando no hay uno ya guardado."""
+    persistido (recién se persiste al EMITIR de verdad, no en el preview)."""
     pedido_ri = {
         **_fake_pedido(),
         "cliente_perfil_impuestos": "responsable_inscripto",
@@ -939,6 +942,33 @@ def test_preview_receptor_usa_domicilio_de_afip_si_no_esta_guardado(monkeypatch)
 
     assert result["receptor"]["domicilio"] == "Domicilio Ficticio 456"
     assert not any(c["check"] == "receptor_verificado_afip" for c in result["chequeos"])
+
+
+def test_preview_receptor_razon_social_prioriza_afip_sobre_lo_guardado(monkeypatch):
+    """Bug real reportado por el dueño (screenshot): el preview mostraba el nombre GUARDADO EN
+    LA CUENTA del cliente aunque ARCA ya hubiera confirmado un nombre distinto para el CUIT que
+    se está usando para facturar — regla del dueño: "si se factura con el CUIT que se pone, los
+    datos deben pertenecer a ese CUIT... se usa el fetch de AFIP", sin importar qué diga la
+    cuenta. Mismo criterio que ya aplica `emitir_factura` de verdad (persona.razon_social gana),
+    ahora también en el preview."""
+    pedido_ri = {
+        **_fake_pedido(),
+        "cliente_perfil_impuestos": "responsable_inscripto",
+        "cliente_cuit": _CUIT_VALIDO,
+        "cliente_razon_social": "Nombre Viejo Ficticio SA",
+    }
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+    monkeypatch.setattr(
+        engine, "resolver_persona", lambda cuit, conn: _persona_afip(razon_social="Nombre Real SA")
+    )
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    assert result["receptor"]["razon_social"] == "Nombre Real SA"
 
 
 # ── previsualizar_factura_html: mismo layout que la factura real, SIN CAE ──
