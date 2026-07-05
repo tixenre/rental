@@ -6,7 +6,7 @@
  * vincula/desvincula cuentas de cliente — sin roles ni invitaciones, el
  * admin es el único que gestiona la membresía.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, RefreshCw, Trash2, Users } from "lucide-react";
@@ -36,14 +36,17 @@ export function ProductorasSection() {
 
   const [cuit, setCuit] = useState("");
   const [notas, setNotas] = useState("");
+  const [nombre, setNombre] = useState("");
   const cuitOk = cuit.trim() === "" || cuitValido(cuit);
 
   const crearMut = useMutation({
-    mutationFn: () => productorasApi.crear(cuit.trim(), notas.trim() || undefined),
+    mutationFn: () =>
+      productorasApi.crear(cuit.trim(), notas.trim() || undefined, nombre.trim() || undefined),
     onSuccess: (p) => {
-      toast.success(`Productora "${p.razon_social || p.cuit}" verificada y creada`);
+      toast.success(`Productora "${p.nombre || p.razon_social || p.cuit}" verificada y creada`);
       setCuit("");
       setNotas("");
+      setNombre("");
       void qc.invalidateQueries({ queryKey: ["admin", "productoras"] });
       setSelectedId(p.id);
     },
@@ -57,6 +60,15 @@ export function ProductorasSection() {
     queryFn: () => productorasApi.obtener(selectedId!),
     enabled: selectedId != null,
   });
+
+  // Nombre/redes sociales — manuales, se editan sin reverificar contra ARCA
+  // (#1251 Fase 2, a diferencia de razón social/domicilio/condición IVA).
+  const [editNombre, setEditNombre] = useState("");
+  const [editRedes, setEditRedes] = useState("");
+  useEffect(() => {
+    setEditNombre(detalleQ.data?.nombre ?? "");
+    setEditRedes(detalleQ.data?.redes_sociales ?? "");
+  }, [detalleQ.data]);
 
   const reverificarMut = useMutation({
     mutationFn: (id: number) => productorasApi.reverificar(id),
@@ -89,6 +101,19 @@ export function ProductorasSection() {
     onError: () => toast.error("No se pudo quitar el vínculo"),
   });
 
+  const actualizarMut = useMutation({
+    mutationFn: (id: number) =>
+      productorasApi.actualizar(id, {
+        nombre: editNombre.trim() || undefined,
+        redes_sociales: editRedes.trim() || undefined,
+      }),
+    onSuccess: () => {
+      toast.success("Datos actualizados");
+      void qc.invalidateQueries({ queryKey: ["admin", "productoras"] });
+    },
+    onError: () => toast.error("No se pudo actualizar"),
+  });
+
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
       <div className="space-y-4">
@@ -110,6 +135,16 @@ export function ProductorasSection() {
               placeholder="30-12345678-9"
               aria-invalid={!cuitOk}
               className={cn(!cuitOk && "border-destructive")}
+            />
+          </div>
+          <div className="flex-1 min-w-[180px]">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              Nombre (opcional)
+            </label>
+            <Input
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Label amigable — útil si ARCA no da razón social"
             />
           </div>
           <div className="flex-1 min-w-[180px]">
@@ -154,7 +189,9 @@ export function ProductorasSection() {
               )}
             >
               <div>
-                <div className="text-sm font-medium text-ink">{p.razon_social || p.cuit}</div>
+                <div className="text-sm font-medium text-ink">
+                  {p.nombre || p.razon_social || p.cuit}
+                </div>
                 <div className="text-xs text-muted-foreground">
                   {p.cuit} · {PERFIL_IMPUESTOS_LABEL[p.perfil_impuestos]}
                 </div>
@@ -176,14 +213,33 @@ export function ProductorasSection() {
           <div className="space-y-4">
             <div>
               <div className="text-sm font-semibold text-ink">
-                {detalleQ.data.razon_social || detalleQ.data.cuit}
+                {detalleQ.data.nombre || detalleQ.data.razon_social || detalleQ.data.cuit}
               </div>
+              {detalleQ.data.nombre && detalleQ.data.razon_social && (
+                <div className="text-xs text-muted-foreground">{detalleQ.data.razon_social}</div>
+              )}
               <div className="text-xs text-muted-foreground">
                 {detalleQ.data.cuit} · {PERFIL_IMPUESTOS_LABEL[detalleQ.data.perfil_impuestos]}
               </div>
               {detalleQ.data.domicilio_fiscal && (
                 <div className="text-xs text-muted-foreground">
                   {detalleQ.data.domicilio_fiscal}
+                </div>
+              )}
+              {detalleQ.data.redes_sociales && (
+                <div className="text-xs text-muted-foreground">
+                  {detalleQ.data.redes_sociales.startsWith("http") ? (
+                    <a
+                      href={detalleQ.data.redes_sociales}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline hover:text-ink"
+                    >
+                      {detalleQ.data.redes_sociales}
+                    </a>
+                  ) : (
+                    detalleQ.data.redes_sociales
+                  )}
                 </div>
               )}
               {detalleQ.data.notas && (
@@ -200,6 +256,30 @@ export function ProductorasSection() {
               >
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
                 Reverificar contra ARCA
+              </Button>
+            </div>
+
+            <div className="space-y-2 border-t hairline pt-3">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Nombre / redes sociales
+              </div>
+              <Input
+                value={editNombre}
+                onChange={(e) => setEditNombre(e.target.value)}
+                placeholder="Label amigable"
+              />
+              <Input
+                value={editRedes}
+                onChange={(e) => setEditRedes(e.target.value)}
+                placeholder="Instagram, sitio web, etc."
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={actualizarMut.isPending}
+                onClick={() => actualizarMut.mutate(detalleQ.data.id)}
+              >
+                {actualizarMut.isPending ? "Guardando…" : "Guardar"}
               </Button>
             </div>
 

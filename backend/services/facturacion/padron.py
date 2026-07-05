@@ -278,7 +278,13 @@ def verificar_y_crear_perfil_fiscal(
     return persona
 
 
-def verificar_y_crear_productora(cuit: str, conn, notas: str | None = None):
+def verificar_y_crear_productora(
+    cuit: str,
+    conn,
+    notas: str | None = None,
+    nombre: str | None = None,
+    redes_sociales: str | None = None,
+):
     """Da de alta (o refresca) una PRODUCTORA — entidad fiscal compartida entre
     varias cuentas de cliente, `productoras`/`productora_miembros` (#1240).
     A diferencia de los perfiles personales, la crea/edita el ADMIN (sin
@@ -287,8 +293,9 @@ def verificar_y_crear_productora(cuit: str, conn, notas: str | None = None):
     condición IVA) que el resto del módulo, sin reimplementar la consulta.
 
     Upsert por `cuit` (UNIQUE) — reverificar refresca razón social/domicilio/
-    condición IVA sin duplicar la fila; `notas` se preserva si no se manda una
-    nueva (no se pisa con NULL en un re-verify)."""
+    condición IVA sin duplicar la fila; `notas`/`nombre`/`redes_sociales` (los
+    3 campos que el admin carga a mano, no vienen de AFIP) se preservan si no
+    se manda uno nuevo (no se pisan con NULL en un re-verify, #1251 Fase 2)."""
     persona = resolver_persona(cuit, conn)
     if not persona.condicion_iva:
         raise RuntimeError(
@@ -297,16 +304,22 @@ def verificar_y_crear_productora(cuit: str, conn, notas: str | None = None):
         )
     conn.execute(
         """
-        INSERT INTO productoras (cuit, perfil_impuestos, razon_social, domicilio_fiscal, notas)
-        VALUES (%s, %s, %s, %s, %s)
+        INSERT INTO productoras
+            (cuit, perfil_impuestos, razon_social, domicilio_fiscal, notas, nombre, redes_sociales)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (cuit) DO UPDATE SET
             perfil_impuestos = EXCLUDED.perfil_impuestos,
             razon_social     = EXCLUDED.razon_social,
             domicilio_fiscal = EXCLUDED.domicilio_fiscal,
             notas            = COALESCE(EXCLUDED.notas, productoras.notas),
+            nombre           = COALESCE(EXCLUDED.nombre, productoras.nombre),
+            redes_sociales   = COALESCE(EXCLUDED.redes_sociales, productoras.redes_sociales),
             verificado_at    = now(),
             updated_at       = now()
         """,
-        (cuit, persona.condicion_iva, persona.razon_social or None, persona.domicilio or None, notas),
+        (
+            cuit, persona.condicion_iva, persona.razon_social or None, persona.domicilio or None,
+            notas, nombre, redes_sociales,
+        ),
     )
     return persona

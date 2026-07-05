@@ -68,6 +68,9 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { title: "Pedidos", url: "/admin/pedidos", icon: ClipboardList },
       { title: "Carritos activos", url: "/admin/carritos", icon: ShoppingCart },
       { title: "Clientes", url: "/admin/clientes", icon: Users },
+      // Al lado de Clientes (#1251 Fase 2) — antes en Finanzas, desconectada:
+      // el dueño no la encontraba al buscar dónde gestionar cuentas/entidades.
+      { title: "Productoras", url: "/admin/productoras", icon: Building2 },
     ],
   },
   {
@@ -107,7 +110,6 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { title: "Estadísticas", url: "/admin/estadisticas", icon: TrendingUp },
       { title: "Facturas ARCA", url: "/admin/facturas", icon: ClipboardList },
       { title: "Emisores ARCA", url: "/admin/facturacion/emisores", icon: Settings },
-      { title: "Productoras", url: "/admin/productoras", icon: Users },
       { title: "Glosario", url: "/admin/contabilidad/glosario", icon: BookOpen },
     ],
   },

@@ -28,7 +28,7 @@ router = APIRouter(tags=["productoras"])
 
 _CAMPOS_PRODUCTORA = (
     "id, cuit, perfil_impuestos, razon_social, domicilio_fiscal, "
-    "email_facturacion, notas, verificado_at, created_at, updated_at"
+    "email_facturacion, notas, nombre, redes_sociales, verificado_at, created_at, updated_at"
 )
 
 
@@ -56,6 +56,10 @@ def listar_productoras(request: Request, q: Optional[str] = None):
 class ProductoraCreate(BaseModel):
     cuit: str
     notas: Optional[str] = None
+    # Manuales, no vienen de AFIP (#1251 Fase 2) — razon_social puede quedar
+    # vacía para ciertos CUIT, "nombre" es el label amigable que siempre queda.
+    nombre: Optional[str] = None
+    redes_sociales: Optional[str] = None
 
 
 @router.post("/admin/productoras", status_code=201)
@@ -72,7 +76,9 @@ def crear_productora(request: Request, body: ProductoraCreate):
     from services.facturacion.padron import verificar_y_crear_productora
     with get_db() as conn:
         try:
-            verificar_y_crear_productora(cuit, conn, notas=body.notas)
+            verificar_y_crear_productora(
+                cuit, conn, notas=body.notas, nombre=body.nombre, redes_sociales=body.redes_sociales
+            )
         except RuntimeError as e:
             conn.rollback()
             raise HTTPException(422, f"AFIP no pudo confirmar este CUIT: {e}")
@@ -111,6 +117,10 @@ class ProductoraUpdate(BaseModel):
     # IVA) — no se edita a mano, mismo criterio "AFIP siempre gana" del resto.
     reverificar: bool = False
     notas: Optional[str] = None
+    # Manuales, no vienen de AFIP (#1251 Fase 2) — se pueden editar con o sin
+    # reverificar (a diferencia de razon_social/domicilio_fiscal/perfil_impuestos).
+    nombre: Optional[str] = None
+    redes_sociales: Optional[str] = None
 
 
 @router.patch("/admin/productoras/{productora_id}")
@@ -129,15 +139,28 @@ def actualizar_productora(productora_id: int, request: Request, body: Productora
         if body.reverificar:
             from services.facturacion.padron import verificar_y_crear_productora
             try:
-                verificar_y_crear_productora(cuit, conn, notas=body.notas)
+                verificar_y_crear_productora(
+                    cuit, conn, notas=body.notas, nombre=body.nombre, redes_sociales=body.redes_sociales
+                )
             except RuntimeError as e:
                 conn.rollback()
                 raise HTTPException(422, f"AFIP no pudo confirmar este CUIT: {e}")
-        elif body.notas is not None:
-            conn.execute(
-                "UPDATE productoras SET notas = %s, updated_at = now() WHERE id = %s",
-                (body.notas, productora_id),
-            )
+        else:
+            updates = {
+                k: v
+                for k, v in {
+                    "notas": body.notas,
+                    "nombre": body.nombre,
+                    "redes_sociales": body.redes_sociales,
+                }.items()
+                if v is not None
+            }
+            if updates:
+                set_clause = ", ".join(f"{k}=%s" for k in updates) + ", updated_at=now()"
+                conn.execute(
+                    f"UPDATE productoras SET {set_clause} WHERE id = %s",
+                    list(updates.values()) + [productora_id],
+                )
         conn.commit()
         result = conn.execute(
             f"SELECT {_CAMPOS_PRODUCTORA} FROM productoras WHERE id = %s", (productora_id,)
