@@ -467,8 +467,11 @@ function PedidoEditorPage() {
                 </button>
               </div>
             ) : (
-              // Sin ficha: buscar una, o cargar el contacto a mano abajo.
-              <div className="mb-3">
+              // Sin ficha: buscar una, o cargar el contacto a mano abajo. Estos
+              // 3 inputs son SOLO para este caso — con ficha vinculada, editarlos
+              // acá no servía de nada: el contacto es en vivo (2026-06-06) y la
+              // próxima lectura los pisaba en silencio con los datos del cliente.
+              <div>
                 <ClienteAutocomplete
                   placeholder="Buscar cliente por nombre, email o teléfono…"
                   onPick={(c) =>
@@ -493,29 +496,35 @@ function PedidoEditorPage() {
                 <p className="mt-1.5 font-mono text-xs text-muted-foreground">
                   O cargá el contacto a mano abajo (pedido sin ficha vinculada).
                 </p>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <FieldLabel label="Nombre">
+                    <Input
+                      value={datos.cliente_nombre}
+                      onChange={(e) =>
+                        setDatos((d) => d && { ...d, cliente_nombre: e.target.value })
+                      }
+                    />
+                  </FieldLabel>
+                  <FieldLabel label="Teléfono">
+                    <Input
+                      value={datos.cliente_telefono}
+                      onChange={(e) =>
+                        setDatos((d) => d && { ...d, cliente_telefono: e.target.value })
+                      }
+                    />
+                  </FieldLabel>
+                  <FieldLabel label="Email" className="sm:col-span-2">
+                    <Input
+                      value={datos.cliente_email}
+                      placeholder="—"
+                      onChange={(e) =>
+                        setDatos((d) => d && { ...d, cliente_email: e.target.value })
+                      }
+                    />
+                  </FieldLabel>
+                </div>
               </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <FieldLabel label="Nombre">
-                <Input
-                  value={datos.cliente_nombre}
-                  onChange={(e) => setDatos((d) => d && { ...d, cliente_nombre: e.target.value })}
-                />
-              </FieldLabel>
-              <FieldLabel label="Teléfono">
-                <Input
-                  value={datos.cliente_telefono}
-                  onChange={(e) => setDatos((d) => d && { ...d, cliente_telefono: e.target.value })}
-                />
-              </FieldLabel>
-              <FieldLabel label="Email" className="sm:col-span-2">
-                <Input
-                  value={datos.cliente_email}
-                  placeholder="—"
-                  onChange={(e) => setDatos((d) => d && { ...d, cliente_email: e.target.value })}
-                />
-              </FieldLabel>
-            </div>
           </Section>
 
           {/* Fechas — editables con re-validación de stock */}
