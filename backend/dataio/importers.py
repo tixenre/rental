@@ -66,12 +66,20 @@ def import_marcas(
                 orden = EXCLUDED.orden,
                 destacada = EXCLUDED.destacada,
                 updated_at = CURRENT_TIMESTAMP
+            WHERE (marcas.logo_url, marcas.visible, marcas.orden, marcas.destacada)
+               IS DISTINCT FROM (EXCLUDED.logo_url, EXCLUDED.visible, EXCLUDED.orden, EXCLUDED.destacada)
             RETURNING (xmax = 0) AS inserted
             """,
             (m.nombre, m.logo_url, m.visible, m.orden, m.destacada),
         )
         row = cur.fetchone()
-        if row and row["inserted"]:
+        # row es None cuando el WHERE de arriba no matcheó (fila ya idéntica):
+        # el import re-corre el JSON entero cada vez (export→import de
+        # staging/prod), así que sin este guard cada re-import reescribía las
+        # 66 marcas aunque no hubieran cambiado.
+        if row is None:
+            stats["skipped"] += 1
+        elif row["inserted"]:
             stats["inserted"] += 1
         else:
             stats["updated"] += 1
@@ -367,6 +375,23 @@ def import_equipos(
                 nombre_publico_revisado = EXCLUDED.nombre_publico_revisado,
                 relevancia_manual = EXCLUDED.relevancia_manual,
                 updated_at = CURRENT_TIMESTAMP
+            WHERE (
+                equipos.nombre, equipos.modelo, equipos.brand_id, equipos.cantidad,
+                equipos.precio_jornada, equipos.precio_jornada_manual, equipos.precio_usd,
+                equipos.roi_pct, equipos.valor_reposicion, equipos.foto_url,
+                equipos.fecha_compra, equipos.serie, equipos.bh_url, equipos.dueno,
+                equipos.visible_catalogo, equipos.estado, equipos.ficha_completa,
+                equipos.eliminado_at, equipos.nombre_publico_override,
+                equipos.nombre_publico_revisado, equipos.relevancia_manual
+            ) IS DISTINCT FROM (
+                EXCLUDED.nombre, EXCLUDED.modelo, EXCLUDED.brand_id, EXCLUDED.cantidad,
+                EXCLUDED.precio_jornada, EXCLUDED.precio_jornada_manual, EXCLUDED.precio_usd,
+                EXCLUDED.roi_pct, EXCLUDED.valor_reposicion, EXCLUDED.foto_url,
+                EXCLUDED.fecha_compra, EXCLUDED.serie, EXCLUDED.bh_url, EXCLUDED.dueno,
+                EXCLUDED.visible_catalogo, EXCLUDED.estado, EXCLUDED.ficha_completa,
+                EXCLUDED.eliminado_at, EXCLUDED.nombre_publico_override,
+                EXCLUDED.nombre_publico_revisado, EXCLUDED.relevancia_manual
+            )
             RETURNING id, (xmax = 0) AS inserted
             """,
             (
@@ -379,11 +404,19 @@ def import_equipos(
             ),
         )
         row = cur.fetchone()
-        equipo_id = row["id"]
-        if row["inserted"]:
-            stats["inserted"] += 1
+        # row es None cuando el WHERE de arriba no matcheó (fila ya idéntica
+        # — el import re-corre el JSON entero cada vez, ver import_marcas):
+        # el equipo YA existía antes de este batch, así que su id ya está en
+        # el cache lazy del resolver (cargado desde la DB al primer acceso).
+        if row is None:
+            equipo_id = resolver.equipo_id(eq.slug)
+            stats["skipped"] += 1
         else:
-            stats["updated"] += 1
+            equipo_id = row["id"]
+            if row["inserted"]:
+                stats["inserted"] += 1
+            else:
+                stats["updated"] += 1
 
         # Refresh equipo cache para el resto del batch
         if resolver._equipos is not None:
