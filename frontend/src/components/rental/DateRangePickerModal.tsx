@@ -489,12 +489,15 @@ export function DateRangePickerModal({
               explica cuando realmente aplica (dentro de la caja de Devolución,
               arriba) — no como advertencia permanente aunque todo esté bien. */}
           {rangoCruzaBloqueado ? (
-            /* WARN: sin stock en el rango — no bloquea Aplicar, advierte para revisar el carrito */
-            <p className="flex items-start gap-1.5 rounded-md bg-amber/10 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
-              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber" />
+            /* WARN: sin stock en el rango — no bloquea Aplicar, advierte para revisar el carrito.
+               Naranja (`--color-naranja`, status "Aviso"), no amber — el amber es el color de
+               marca y se usa en toda la chrome del picker (botones, jornadas, calendario), así
+               que un aviso real en amber se pierde contra el fondo. */
+            <p className="flex items-start gap-1.5 rounded-md bg-naranja/12 border border-naranja/45 px-2.5 py-2 text-sm text-ink">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-naranja" />
               <span>
                 Algunos equipos del carrito no tienen stock en estas fechas —{" "}
-                <strong>revisá el carrito</strong> antes de solicitar.
+                <strong className="font-semibold">revisá el carrito</strong> antes de solicitar.
               </span>
             </p>
           ) : !hasStart ? (
@@ -510,14 +513,26 @@ export function DateRangePickerModal({
               (ej. antelación + horarios de finde a la vez), con un único CTA
               de WhatsApp al pie en vez de repetirlo por aviso. */}
           {disclaimers.length > 0 && (
-            <div className="rounded-md bg-amber/10 border border-amber/40 px-2.5 py-1.5 text-xs text-ink space-y-1">
-              {disclaimers.map((d) => (
-                <p key={d.check} className="flex items-start gap-1.5">
-                  <Clock className="h-3.5 w-3.5 shrink-0 text-amber mt-0.5" />
-                  <span>{d.mensaje}</span>
-                </p>
-              ))}
-              <p className="pl-5">
+            /* Naranja (`--color-naranja`, status "Aviso"), no amber — mismo criterio que
+               el aviso de stock de arriba: el amber es color de marca (chrome del picker),
+               un aviso real necesita un color que no compita con eso. El backend manda el
+               mensaje completo (fuente de la REGLA, #1237); acá solo separamos la cláusula
+               antes del guión largo para resaltarla en negrita — presentación, no criterio. */
+            <div className="rounded-md bg-naranja/12 border border-naranja/45 px-2.5 py-2 text-sm text-ink space-y-1.5">
+              {disclaimers.map((d) => {
+                const [headline, ...restParts] = d.mensaje.split(" — ");
+                const rest = restParts.join(" — ");
+                return (
+                  <p key={d.check} className="flex items-start gap-1.5">
+                    <Clock className="h-4 w-4 shrink-0 text-naranja mt-0.5" />
+                    <span>
+                      <strong className="font-semibold">{headline}</strong>
+                      {rest && <> — {rest}</>}
+                    </span>
+                  </p>
+                );
+              })}
+              <p className="pl-[22px]">
                 {urgenciaWhatsappUrl ? (
                   <>
                     ¿Urgencia o necesitás otro horario?{" "}
@@ -525,7 +540,7 @@ export function DateRangePickerModal({
                       href={urgenciaWhatsappUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-semibold underline underline-offset-2 hover:text-amber"
+                      className="font-semibold underline underline-offset-2 hover:text-naranja"
                     >
                       Escribinos por WhatsApp
                     </a>
