@@ -64,6 +64,7 @@ import {
   StockInline,
   RoiInline,
   PrecioJornadaInline,
+  CategoriaInline,
   KpiCard,
   FaltaBanner,
 } from "@/components/admin/equipos-mgmt/EquiposTableHelpers";
@@ -699,8 +700,12 @@ function EquiposPage() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                    {eq.categorias?.[0]?.nombre ?? "—"}
+                  <TableCell className="hidden lg:table-cell w-40">
+                    <CategoriaInline
+                      equipo={eq}
+                      categorias={categoriasQ.data ?? []}
+                      onSaved={invalidate}
+                    />
                   </TableCell>
                   <TableCell>
                     {eq.visible_catalogo ? (
