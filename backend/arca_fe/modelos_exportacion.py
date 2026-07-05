@@ -172,6 +172,12 @@ class ComprobanteExportacionRequest:
                 "que referenciar al menos un comprobante asociado (cbtes_asoc)."
             )
 
+        # Import diferido: `comprobante_exportacion.py` importa de este módulo — un import a nivel
+        # de módulo acá crearía un ciclo (mismo motivo que `modelos.py` con `comprobante.py`).
+        from .comprobante_exportacion import _validar_estructura_exportacion
+
+        _validar_estructura_exportacion(self)
+
 
 __all__ = [
     "CbteTipoExportacion",
