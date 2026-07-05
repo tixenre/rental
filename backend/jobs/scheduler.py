@@ -57,11 +57,13 @@ def _loop() -> None:
     from jobs.cleanup_livianas import purgar_cuentas_livianas_stale
     from jobs.reconciliacion import chequear_reconciliacion_y_alertar
     from jobs.recheck_didit_pendientes import recheck_verificaciones_pendientes
+    from jobs.purgar_auth import purgar_sesiones_y_challenges_expirados
 
     ultima_fecha = None       # recordatorios de retiro
     ultima_limpieza = None    # cleanup de cuentas livianas (independiente)
     ultima_reconciliacion = None  # alerta de reconciliación de plata (independiente)
     ultimo_recheck_didit = None  # recheck de verificaciones pendientes (por intervalo, no por día)
+    ultima_purga_auth = None  # housekeeping de auth_sessions/auth_challenges (independiente)
     while True:
         ahora = now_ar()
         try:
@@ -103,6 +105,15 @@ def _loop() -> None:
                 recheck_verificaciones_pendientes()
         except Exception:
             logger.exception("Falló el recheck de verificaciones Didit pendientes")
+        try:
+            # Housekeeping de auth: 1×/día, independiente de los demás. Las filas
+            # vencidas ya eran inertes (is_active/peek/consumir filtran por
+            # expires_at/revoked_at/used_at) — esto solo evita que crezcan sin límite.
+            if ahora.date() != ultima_purga_auth:
+                ultima_purga_auth = ahora.date()
+                purgar_sesiones_y_challenges_expirados()
+        except Exception:
+            logger.exception("Falló el housekeeping de auth_sessions/auth_challenges")
         time.sleep(_CHECK_EVERY_S)
 
 

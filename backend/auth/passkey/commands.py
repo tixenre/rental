@@ -14,6 +14,38 @@ from typing import Optional
 from database import get_db, now_ar
 
 
+def crear_cuenta_liviana_con_passkey(
+    *,
+    credential_id: str,
+    public_key: str,
+    sign_count: int,
+    transports: Optional[str],
+    aaguid: Optional[str],
+    device_name: str,
+    user_handle: str,
+) -> int:
+    """Alta passwordless (#1098 Fase 4): crea la cuenta-cliente **liviana** (sin
+    nombre/mail/datos) y su passkey en UNA transacción atómica — si el insert de
+    la credencial falla, no queda una cuenta huérfana. `owner_email=""` (la cuenta
+    no tiene mail todavía; la columna es NOT NULL). Devuelve el `cliente_id`
+    recién creado. Deja propagar `psycopg.errors.UniqueViolation` (credential_id
+    ya registrado) — el caller (route) la traduce al 409 con su propio mensaje."""
+    with get_db() as conn:
+        with conn.transaction():
+            cliente_id = conn.insert_returning(
+                "INSERT INTO clientes (cuenta_estado) VALUES (%s)", ("liviana",)
+            )
+            conn.execute(
+                """INSERT INTO passkey_credentials
+                       (owner_type, owner_email, cliente_id, credential_id, public_key,
+                        sign_count, transports, aaguid, device_name, user_handle)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                ("cliente", "", cliente_id, credential_id, public_key,
+                 sign_count, transports, aaguid, device_name, user_handle),
+            )
+    return cliente_id
+
+
 def insert_credential(
     *,
     owner_type: str,

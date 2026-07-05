@@ -74,3 +74,18 @@ def consumir(token: str, *, purpose: str, conn=None) -> dict | None:
     finally:
         if own:
             conn.close()
+
+
+def purge_expired() -> int:
+    """Borra filas muertas de `auth_challenges` (housekeeping): ya usadas (`used_at`
+    seteado — no sirven más) o vencidas sin usar (`expires_at` pasado). Nunca toca un
+    link todavía válido. Espeja `sessions.purge_expired`; sin esto la tabla crece sin
+    límite (un row por invitación/recuperación creada). Devuelve cuántas borró."""
+    with get_db() as conn:
+        with conn.transaction():
+            rows = conn.execute(
+                "DELETE FROM auth_challenges "
+                "WHERE used_at IS NOT NULL OR expires_at <= %s RETURNING id",
+                (now_ar(),),
+            ).fetchall()
+    return len(rows)

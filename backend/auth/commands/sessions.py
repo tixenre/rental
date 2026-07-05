@@ -114,9 +114,10 @@ def revoke_one_for_owner(
 
 
 def purge_expired() -> int:
-    """Borra filas vencidas (housekeeping). NO agendado en v1 — las filas muertas
-    son inertes (is_active/list ya filtran por expires_at/revoked_at). Queda lista
-    para un job futuro si la tabla crece. Devuelve cuántas borró."""
+    """Borra filas vencidas (housekeeping). Corre 1×/día desde `jobs.purgar_auth`
+    (mismo thread del scheduler, junto a `magic.purge_expired`) — las filas muertas
+    eran inertes (is_active/list ya filtran por expires_at/revoked_at) pero crecían
+    sin límite. Devuelve cuántas borró."""
     with get_db() as conn:
         with conn.transaction():
             rows = conn.execute(

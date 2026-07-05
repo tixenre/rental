@@ -188,24 +188,12 @@ def signup_complete(body: RegisterCompleteIn, request: Request):
         logger.warning("passkey signup verify falló: %s", e)
         raise HTTPException(400, "No se pudo verificar la passkey.")
     device_name = (body.device_name or "").strip() or "Passkey"
-    # Cuenta liviana + passkey en UNA transacción: si el insert de la credencial
-    # falla, no queda una cuenta huérfana (atómico). owner_email="" (la cuenta no
-    # tiene mail todavía; la columna es NOT NULL → string vacío).
     try:
-        with get_db() as conn:
-            with conn.transaction():
-                cliente_id = conn.insert_returning(
-                    "INSERT INTO clientes (cuenta_estado) VALUES (%s)", ("liviana",)
-                )
-                conn.execute(
-                    """INSERT INTO passkey_credentials
-                           (owner_type, owner_email, cliente_id, credential_id, public_key,
-                            sign_count, transports, aaguid, device_name, user_handle)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                    ("cliente", "", cliente_id, reg["credential_id"], reg["public_key"],
-                     reg["sign_count"], _extract_transports(body.credential), reg["aaguid"],
-                     device_name, data["uh"]),
-                )
+        cliente_id = passkey_commands.crear_cuenta_liviana_con_passkey(
+            credential_id=reg["credential_id"], public_key=reg["public_key"],
+            sign_count=reg["sign_count"], transports=_extract_transports(body.credential),
+            aaguid=reg["aaguid"], device_name=device_name, user_handle=data["uh"],
+        )
     except psycopg.errors.UniqueViolation:
         # credential_id UNIQUE: esa passkey ya existe → no recreamos cuenta. Entrá con ella.
         raise HTTPException(409, "Esa passkey ya está registrada. Entrá con ella.")

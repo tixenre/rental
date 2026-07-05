@@ -94,3 +94,84 @@ def test_login_identities_store_y_resolve_google():
             with conn.transaction():
                 for cid in created:
                     conn.execute("DELETE FROM clientes WHERE id = %s", (cid,))
+
+
+def test_link_identity_carrera_unique_no_revienta():
+    """Dos requests concurrentes vinculando la MISMA (method, identifier) —doble-click,
+    reintento de red— compiten en el INSERT bajo el UNIQUE. Confirma contra Postgres
+    real (no un mock) que `link_identity` atrapa el `UniqueViolation` de esa carrera y
+    resuelve el status correcto, en vez de propagar la excepción cruda."""
+    import threading
+
+    from database import init_db, get_db
+    from auth.commands import identities as commands
+
+    init_db()
+    identifier = "race-google-sub-real"
+    email_a, email_b = "race_a@test.local", "race_b@test.local"
+    created: list[int] = []
+    ganador_listo = threading.Event()
+    liberar_ganador = threading.Event()
+    resultado: dict = {}
+
+    def _ganador(cid_a):
+        """Simula la request que gana la carrera: inserta y NO commitea hasta que
+        se le avisa — deja a la otra conexión bloqueada en su propio INSERT
+        (comportamiento real de Postgres ante un conflicto de índice único
+        todavía no resuelto), no en el SELECT."""
+        conn = get_db()
+        try:
+            with conn.transaction():
+                conn.execute(
+                    """INSERT INTO login_identities (cliente_id, method, identifier, verified_at)
+                       VALUES (%s, 'google', %s, NOW())""",
+                    (cid_a, identifier),
+                )
+                ganador_listo.set()
+                liberar_ganador.wait(timeout=5)
+        finally:
+            conn.close()
+
+    def _perdedor(cid_b):
+        resultado["status"] = commands.link_identity(
+            cliente_id=cid_b, method="google", identifier=identifier
+        )
+
+    try:
+        with get_db() as conn:
+            with conn.transaction():
+                conn.execute("DELETE FROM login_identities WHERE identifier = %s", (identifier,))
+                conn.execute("DELETE FROM clientes WHERE email IN (%s, %s)", (email_a, email_b))
+                cid_a = _crear_cliente(conn, email_a)
+                cid_b = _crear_cliente(conn, email_b)
+        created = [cid_a, cid_b]
+
+        t_ganador = threading.Thread(target=_ganador, args=(cid_a,))
+        t_ganador.start()
+        assert ganador_listo.wait(timeout=5), "el hilo ganador no llegó a insertar"
+
+        t_perdedor = threading.Thread(target=_perdedor, args=(cid_b,))
+        t_perdedor.start()
+        # `_perdedor` queda bloqueado en su propio INSERT (el índice único todavía
+        # no puede resolver el conflicto mientras el ganador no commitea/rollbackea).
+        t_perdedor.join(timeout=0.3)
+        assert t_perdedor.is_alive(), "el perdedor debería seguir bloqueado en el INSERT"
+
+        liberar_ganador.set()
+        t_ganador.join(timeout=5)
+        t_perdedor.join(timeout=5)
+        assert not t_ganador.is_alive() and not t_perdedor.is_alive(), "deadlock: algún hilo no terminó"
+
+        # Nunca propagó la excepción — resolvió el status correcto re-consultando al ganador.
+        assert resultado.get("status") == "taken_by_other"
+        with get_db() as conn:
+            fila = conn.execute(
+                "SELECT cliente_id FROM login_identities WHERE identifier = %s", (identifier,)
+            ).fetchone()
+        assert fila["cliente_id"] == cid_a  # el ganador real quedó persistido, sin duplicar
+    finally:
+        with get_db() as conn:
+            with conn.transaction():
+                conn.execute("DELETE FROM login_identities WHERE identifier = %s", (identifier,))
+                for cid in created:
+                    conn.execute("DELETE FROM clientes WHERE id = %s", (cid,))
