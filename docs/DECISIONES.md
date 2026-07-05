@@ -2103,16 +2103,23 @@ cancel-in-progress` ya cancela corridas viejas.
   la creación/edición de pedidos, y un trace end-to-end de un pedido + estado del semáforo de
   reconciliación. Se verificó cada hallazgo contra el código real antes de documentarlo (grep directo,
   no solo confiar en el reporte del agente) — así se descubrió el hallazgo crítico de abajo.
-- **Descubrimiento crítico (de proceso, no de código nuevo).** El **PR #1181** — el fix ORIGINAL del bug
-  #405 (el editor de pedidos admin recotizaba contra el precio de catálogo de hoy en vez del precio de
-  línea ya persistido/congelado, mostrando "100% pagado" mientras la reconciliación mensual marcaba
-  "sobrepagado") — **nunca se mergeó a `dev` ni a `main`**. Sigue abierto (`state: open, merged: false`,
-  `mergeable_state: clean`). Confirmado con `git grep respetar_precio_item` sobre `origin/dev`/`origin/main`
-  y el checkout actual: cero resultados en todos — el símbolo solo existe en la rama del PR sin mergear
-  (`claude/payment-registration-issue-3mi8fk`). La entrada de `MEMORIA.md`/`DECISIONES.md` de la sesión
-  anterior lo registraba como ya shippeado ("PR #1181 (merged branch history...)") — era un error de
-  registro, no un revert; probablemente una confusión entre "el commit existe en una rama" y "esa rama está
-  mergeada". **Consecuencia: el bug #405 está potencialmente activo en producción hoy.** Prioridad
+- **Descubrimiento crítico (de proceso, no de código nuevo) — EN EL MOMENTO de esta auditoría.** El
+  **PR #1181** — el fix ORIGINAL del bug #405 (el editor de pedidos admin recotizaba contra el precio
+  de catálogo de hoy en vez del precio de línea ya persistido/congelado, mostrando "100% pagado"
+  mientras la reconciliación mensual marcaba "sobrepagado") — **no estaba mergeado a `dev` ni a `main`**
+  al momento de este chequeo. Confirmado con `git grep respetar_precio_item` sobre `origin/dev`/
+  `origin/main` y el checkout actual de ese momento: cero resultados en todos — el símbolo solo existía
+  en la rama del PR sin mergear (`claude/payment-registration-issue-3mi8fk`). La entrada de
+  `MEMORIA.md`/`DECISIONES.md` de la sesión anterior lo registraba como ya shippeado ("PR #1181 (merged
+  branch history...)") — era un error de registro, no un revert; probablemente una confusión entre "el
+  commit existe en una rama" y "esa rama está mergeada".
+  **Corrección (2026-07-05, verificado directo contra el repo):** el PR #1181 SÍ se mergeó a `dev` ese
+  mismo día, horas después de esta auditoría (`commit 9cc4924`, mergeado por el dueño a las 19:41 -03) —
+  `respetar_precio_item` está presente y activo hoy en `backend/routes/alquileres/cotizacion.py` en
+  `dev`. **El bug #405 está resuelto, no "potencialmente activo".** La lección de proceso sigue siendo
+  válida (siempre confirmar merge real con la API/git, no asumir por menciones en commits/PRs), pero la
+  consecuencia concreta de esta entrada quedó obsoleta apenas unas horas después de escribirse — prueba
+  de que un hallazgo de auditoría es una foto de un momento, no una verdad permanente. Prioridad
   recomendada: mergear #1181 antes que cualquier otro hallazgo de esta auditoría.
 - **Decisión — nuevo manual `docs/SISTEMA_PLATA.md`.** Cruza los ~6 motores de plata (precios, reservas,
   `alquiler_pagos`, `reportes/liquidacion`, `contabilidad`, `facturacion`) con una tabla "fuente única de

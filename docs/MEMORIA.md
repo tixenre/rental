@@ -691,10 +691,13 @@ A pedido del dueño, tras la auditoría de `contabilidad/`, ante el miedo de "dr
 motores tocando dinero sin un mapa único. 6 auditorías paralelas sobre `services/precios`,
 `reportes/liquidacion`+`comisiones`+`cierres`+`reconciliacion`, `services/facturacion`, el camino de
 congelamiento de precio en pedidos, y un trace end-to-end + estado del semáforo de reconciliación.
-**Hallazgo crítico de proceso:** el PR #1181 (fix original del bug #405 — editor de pedidos admin
-cotizando con precio de catálogo en vez del precio de línea congelado) **nunca se mergeó** a `dev`/`main`
-— `respetar_precio_item` no existe en ningún branch real, solo en la rama del PR sin mergear. La sesión
-anterior lo había registrado como shippeado por error. **El bug #405 sigue potencialmente activo hoy.**
+**Hallazgo crítico de proceso (en el momento de esta auditoría):** el PR #1181 (fix original del bug
+#405 — editor de pedidos admin cotizando con precio de catálogo en vez del precio de línea congelado)
+**no estaba mergeado** a `dev`/`main` — `respetar_precio_item` no existía en ningún branch real, solo
+en la rama del PR sin mergear. La sesión anterior lo había registrado como shippeado por error.
+**Corrección (2026-07-05):** el PR #1181 SÍ se mergeó a `dev` ese mismo día, horas después de esta
+auditoría (commit `9cc4924`) — `respetar_precio_item` está presente y activo en
+`backend/routes/alquileres/cotizacion.py` en `dev` hoy. **El bug #405 está resuelto, no activo.**
 Nuevo manual **`docs/SISTEMA_PLATA.md`** (fuente única de cada número de plata + el semáforo de
 reconciliación, cruzado entre motores) — no repite invariantes de cada `CLAUDE.md`/`SISTEMA_*.md` local,
 los referencia. Hallazgos priorizados (14 ítems + el PR sin mergear) documentados ahí, no acá — evita
