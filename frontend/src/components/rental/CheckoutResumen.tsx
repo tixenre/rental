@@ -9,6 +9,12 @@ import { Spinner } from "@/design-system/ui/spinner";
 import { formatARS } from "@/lib/format";
 import { descuentoLabel, type DescuentoOrigen } from "@/lib/cotizacion";
 import { PERFIL_IMPUESTOS_LABEL, facturaTipoLabel, type PerfilImpuestos } from "@/lib/iva";
+import {
+  listarPerfilesFiscales,
+  listarProductoras,
+  type PerfilFiscal,
+  type Productora,
+} from "@/lib/cuit";
 import { useBusinessContact } from "@/hooks/useBusinessContact";
 import { aceptarTyc, validarCheckout, type FaltanItem } from "@/lib/checkout";
 import { chequearEstadoVerificacion, iniciarVerificacionIdentidad } from "@/lib/verificacion";
@@ -31,6 +37,10 @@ const DOCS_CHECKOUT = ["remito", "contrato", "albaran", "packing-list"] as const
  *  `?openCarrito=1` (RESUME_FLAG de verificacion.ts) sumando el paso. */
 export const RESUME_STEP_PARAM = "carritoPaso";
 export const RESUME_STEP_VALUE = "resumen";
+
+/** #1240: a nombre de quién se factura ESTE pedido puntual — mutuamente
+ *  excluyentes, `{}` = perfil default de la cuenta (comportamiento de siempre). */
+export type FacturacionTarget = { perfilFiscalId?: number; productoraId?: number };
 
 /** Forma mínima de un ítem para el resumen — compacta (sin steppers ni foto,
  *  eso vive en el paso "carrito"): solo lo necesario para confirmar QUÉ se
@@ -113,8 +123,9 @@ export function CheckoutResumen({
   onBack: () => void;
   /** Crea el pedido de verdad (createOrder) — cada superficie decide qué pasa
    *  después (desktop: toast + redirect al portal; mobile: banner inline). Si
-   *  tira, este componente lo muestra como error inline sin perder el estado. */
-  onCrearPedido: (sessionConfirmed: boolean) => Promise<void>;
+   *  tira, este componente lo muestra como error inline sin perder el estado.
+   *  `target` (#1240): a nombre de quién factura ESTE pedido, elegido acá. */
+  onCrearPedido: (sessionConfirmed: boolean, target: FacturacionTarget) => Promise<void>;
 }) {
   const itemCount = items.reduce((acc, it) => acc + it.cantidad, 0);
   const [cargando, setCargando] = useState(true);
@@ -137,6 +148,13 @@ export function CheckoutResumen({
   const [facturacionOpen, setFacturacionOpen] = useState(false);
   const [terminosOpen, setTerminosOpen] = useState(false);
   const [contratoOpen, setContratoOpen] = useState(false);
+  // #1240: a nombre de quién facturar ESTE pedido — perfiles personales
+  // propios + productoras vinculadas (admin-managed), solo lectura acá (se
+  // gestionan desde `FacturacionModal`/el portal). `{}` = default de la
+  // cuenta, sin elegir nada.
+  const [perfilesFiscales, setPerfilesFiscales] = useState<PerfilFiscal[] | null>(null);
+  const [productorasFiscales, setProductorasFiscales] = useState<Productora[] | null>(null);
+  const [facturacionTarget, setFacturacionTarget] = useState<FacturacionTarget>({});
 
   async function revalidar(nextSessionConfirmed = sessionConfirmed) {
     setCargando(true);
@@ -215,7 +233,7 @@ export function CheckoutResumen({
         setErrorCrear(faltanAhora.map((f) => f.mensaje).join(" • "));
         return;
       }
-      await onCrearPedido(confirmado);
+      await onCrearPedido(confirmado, facturacionTarget);
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? passkeyErrorMessage(err) : "No pudimos enviar el pedido, reintentá.";
@@ -234,6 +252,31 @@ export function CheckoutResumen({
   // antes de eso el perfil fiscal puede ni estar cargado, y no es un dato
   // que valga la pena mostrar mientras el pedido puede no prosperar.
   const mostrarFacturacion = !cargando && !faltaIdentidad && !!perfilImpuestosLive;
+
+  // #1240: recién cuando corresponde mostrar facturación (identidad resuelta)
+  // se trae la lista de perfiles/productoras — evita el viaje si el pedido
+  // ni siquiera va a llegar hasta ahí.
+  useEffect(() => {
+    if (!mostrarFacturacion) return;
+    let alive = true;
+    Promise.all([listarPerfilesFiscales(), listarProductoras()])
+      .then(([p, pr]) => {
+        if (!alive) return;
+        setPerfilesFiscales(p);
+        setProductorasFiscales(pr);
+      })
+      .catch(() => {
+        if (alive) {
+          setPerfilesFiscales([]);
+          setProductorasFiscales([]);
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, [mostrarFacturacion]);
+
+  const hayEleccionFiscal = !!(perfilesFiscales?.length || productorasFiscales?.length);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -316,6 +359,55 @@ export function CheckoutResumen({
                   >
                     Modificar
                   </button>
+                </div>
+              )}
+
+              {/* #1240: elegir a nombre de quién facturar ESTE pedido — solo si
+                hay algo entre qué elegir (más de un CUIT propio y/o una
+                productora vinculada); si no, el default de la cuenta de
+                arriba es la única opción y no hace falta el selector. */}
+              {mostrarFacturacion && hayEleccionFiscal && (
+                <div className="mt-2 space-y-1.5 border-t hairline pt-2">
+                  <div className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
+                    Facturar a nombre de
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-ink">
+                    <input
+                      type="radio"
+                      name="facturacion-target"
+                      checked={!facturacionTarget.perfilFiscalId && !facturacionTarget.productoraId}
+                      onChange={() => setFacturacionTarget({})}
+                    />
+                    Mi cuenta (default)
+                  </label>
+                  {perfilesFiscales?.map((p) => (
+                    <label
+                      key={`perfil-${p.id}`}
+                      className="flex items-center gap-2 text-sm text-ink"
+                    >
+                      <input
+                        type="radio"
+                        name="facturacion-target"
+                        checked={facturacionTarget.perfilFiscalId === p.id}
+                        onChange={() => setFacturacionTarget({ perfilFiscalId: p.id })}
+                      />
+                      {p.etiqueta || p.razon_social || p.cuit}
+                    </label>
+                  ))}
+                  {productorasFiscales?.map((pr) => (
+                    <label
+                      key={`productora-${pr.id}`}
+                      className="flex items-center gap-2 text-sm text-ink"
+                    >
+                      <input
+                        type="radio"
+                        name="facturacion-target"
+                        checked={facturacionTarget.productoraId === pr.id}
+                        onChange={() => setFacturacionTarget({ productoraId: pr.id })}
+                      />
+                      {pr.razon_social || pr.cuit}
+                    </label>
+                  ))}
                 </div>
               )}
             </div>
