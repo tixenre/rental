@@ -288,10 +288,6 @@ class PedidoDatos(BaseModel):
     # "monto" (usa `descuento_manual_monto`, pesos fijos).
     descuento_manual_tipo:  Optional[str]   = None
     descuento_manual_monto: Optional[float] = None
-    # Fase C-4 (#1231): fuerza el override manual a ganar OUTRIGHT aunque su
-    # valor sea 0 — única forma de forzar "0% en ESTE pedido puntual" cuando
-    # cliente/jornadas ganarían por fallback. Ver `descuentos/queries/decision.py`.
-    descuento_manual_activo: Optional[bool] = None
 
     @field_validator("fecha_desde", "fecha_hasta")
     @classmethod
@@ -747,7 +743,6 @@ def _recalcular_total_pedido(conn, id: int) -> None:
         descuento_manual_pct=p["descuento_pct"] or 0,
         descuento_manual_tipo=p["descuento_manual_tipo"] or "pct",
         descuento_manual_monto=p["descuento_manual_monto"] or 0,
-        descuento_manual_activo=bool(p["descuento_manual_activo"]),
         perfil_impuestos=None,  # persiste NETO; IVA es derivado al mostrar.
     )
     # `descuento_cliente_pct` se persiste como SNAPSHOT (igual que jornadas) —
@@ -859,7 +854,6 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos", es_admin: bool = Fal
         or "descuento_pct" in payload
         or "descuento_manual_tipo" in payload
         or "descuento_manual_monto" in payload
-        or "descuento_manual_activo" in payload
         or cliente_cambio
     ):
         _recalcular_total_pedido(conn, id)
@@ -955,7 +949,6 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
         descuento_manual_pct=p["descuento_pct"] or 0,
         descuento_manual_tipo=p["descuento_manual_tipo"] or "pct",
         descuento_manual_monto=p["descuento_manual_monto"] or 0,
-        descuento_manual_activo=bool(p["descuento_manual_activo"]),
         perfil_impuestos=None,  # persiste NETO; IVA derivado al mostrar.
     )
     monto_total = total_desglose["neto"]

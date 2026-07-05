@@ -86,7 +86,7 @@ class FakeConn:
 
 
 def _pedido(id, cliente_id=5, descuento_pct=0, descuento_manual_tipo="pct", descuento_manual_monto=0,
-            estado="presupuesto", descuento_cliente_pct=0, descuento_manual_activo=False):
+            estado="presupuesto", descuento_cliente_pct=0):
     return {
         "id": id,
         "cliente_id": cliente_id,
@@ -98,7 +98,6 @@ def _pedido(id, cliente_id=5, descuento_pct=0, descuento_manual_tipo="pct", desc
         "descuento_cliente_pct": descuento_cliente_pct,
         "descuento_manual_tipo": descuento_manual_tipo,
         "descuento_manual_monto": descuento_manual_monto,
-        "descuento_manual_activo": descuento_manual_activo,
     }
 
 

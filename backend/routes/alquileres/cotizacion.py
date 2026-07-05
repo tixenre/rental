@@ -51,10 +51,6 @@ class CotizarRequest(BaseModel):
     # para que el preview coincida con lo que se va a persistir.
     descuento_manual_tipo: Optional[str] = None
     descuento_manual_monto: Optional[float] = None
-    # Fase C-4 (#1231): fuerza el override manual a ganar aunque valga 0 — el
-    # builder lo edita en vivo para que el preview coincida con lo que
-    # persiste `_apply_pedido_datos`/`_recalcular_total_pedido` al guardar.
-    descuento_manual_activo: Optional[bool] = None
     # Solo lo honra una sesión admin: respeta el `precio_jornada` que manda cada
     # ítem de catálogo (el snapshot congelado del pedido que se está editando)
     # en vez de re-buscarlo en `equipos`. Sin esto, el editor de pedidos admin
@@ -194,7 +190,6 @@ def cotizar(data: CotizarRequest, request: Request):
         descuento_manual_pct = 0.0
         descuento_manual_tipo = "pct"
         descuento_manual_monto = 0.0
-        descuento_manual_activo = False
         if tiene_fechas:
             # ¿Para qué cliente se cotiza?
             #   - Admin (back-office): SIEMPRE el cliente del pedido (`data.cliente_id`),
@@ -233,8 +228,6 @@ def cotizar(data: CotizarRequest, request: Request):
                 descuento_manual_tipo = data.descuento_manual_tipo
             if es_admin and data.descuento_manual_monto:
                 descuento_manual_monto = data.descuento_manual_monto
-            if es_admin:
-                descuento_manual_activo = bool(data.descuento_manual_activo)
             descuento_jornadas_pct = obtener_descuento_jornadas(conn, jornadas)
 
         desglose = calcular_total(
@@ -245,7 +238,6 @@ def cotizar(data: CotizarRequest, request: Request):
             descuento_manual_pct=descuento_manual_pct,
             descuento_manual_tipo=descuento_manual_tipo,
             descuento_manual_monto=descuento_manual_monto,
-            descuento_manual_activo=descuento_manual_activo,
             perfil_impuestos=perfil,
         )
 
@@ -253,7 +245,7 @@ def cotizar(data: CotizarRequest, request: Request):
         # decidió el pct en `calcular_total`, así nunca puede divergir.
         descuento_origen = resolver_origen_pedido_monto(
             descuento_manual_tipo, descuento_manual_pct, descuento_manual_monto,
-            descuento_cliente_pct, descuento_jornadas_pct, descuento_manual_activo,
+            descuento_cliente_pct, descuento_jornadas_pct,
         )
 
         # Desglose POR LÍNEA para que el front MUESTRE (no calcule) el detalle por

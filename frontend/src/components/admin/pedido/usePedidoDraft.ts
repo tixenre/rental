@@ -67,9 +67,6 @@ export type DraftDatos = {
    *  ($ fijo), mismo campo de la UI con un selector al lado. */
   descuento_manual_tipo: "pct" | "monto";
   descuento_manual_monto: number;
-  /** Fase C-4 (#1231): fuerza el override manual a ganar aunque valga 0 —
-   *  única forma de forzar 0% en un pedido puntual. */
-  descuento_manual_activo: boolean;
 };
 
 export type PedidoMode = "admin" | "cliente";
@@ -92,7 +89,6 @@ function pedidoToDatos(p: Pedido, keepDateTime = false): DraftDatos {
     descuento_pct: p.descuento_pct ?? 0,
     descuento_manual_tipo: p.descuento_manual_tipo ?? "pct",
     descuento_manual_monto: p.descuento_manual_monto ?? 0,
-    descuento_manual_activo: p.descuento_manual_activo ?? false,
   };
 }
 
@@ -124,8 +120,7 @@ function shallowDatosEq(a: DraftDatos, b: DraftDatos): boolean {
     a.notas === b.notas &&
     a.descuento_pct === b.descuento_pct &&
     a.descuento_manual_tipo === b.descuento_manual_tipo &&
-    a.descuento_manual_monto === b.descuento_manual_monto &&
-    a.descuento_manual_activo === b.descuento_manual_activo
+    a.descuento_manual_monto === b.descuento_manual_monto
   );
 }
 
@@ -210,7 +205,6 @@ export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftO
         descuento_pct: d.descuento_pct || 0,
         descuento_manual_tipo: d.descuento_manual_tipo,
         descuento_manual_monto: d.descuento_manual_monto || 0,
-        descuento_manual_activo: d.descuento_manual_activo,
       }),
     onSuccess: (p) => {
       qc.setQueryData(["admin", "pedido", p.id], p);

@@ -94,7 +94,6 @@ def test_apply_items_preserva_descuento_jornadas(monkeypatch):
         "descuento_cliente_pct": 0,
         "descuento_manual_tipo": "pct",
         "descuento_manual_monto": 0,
-        "descuento_manual_activo": False,
     }
     # Descuentos por jornadas: a 7 jornadas → 10%.
     puntos = [(1, 0.0), (7, 10.0)]

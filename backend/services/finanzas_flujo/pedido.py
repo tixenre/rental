@@ -37,9 +37,6 @@ def desglose_de_pedido(conn, pedido: dict) -> dict:
     ("pct"/"monto") + `pedido["descuento_manual_monto"]` son columnas directas
     del pedido (no un snapshot aparte — el override ES el valor persistido,
     igual que `descuento_pct`), leídas tal cual están en la fila.
-    `pedido["descuento_manual_activo"]` (Fase C-4, #1231) fuerza ese override
-    a ganar outright aunque valga 0 — única forma de forzar 0% en un pedido
-    puntual.
 
     Combos no acumulables (Fase C-3, #1219): `es_combo` por línea sale de
     `equipo_tipo` EN VIVO (join con `equipos.tipo` al armar `pedido["items"]`,
@@ -85,7 +82,6 @@ def desglose_de_pedido(conn, pedido: dict) -> dict:
     descuento_manual_pct = pedido.get("descuento_pct") or 0
     descuento_manual_tipo = pedido.get("descuento_manual_tipo") or "pct"
     descuento_manual_monto = pedido.get("descuento_manual_monto") or 0
-    descuento_manual_activo = bool(pedido.get("descuento_manual_activo"))
     desglose = calcular_total(
         items=items_para_total,
         jornadas=jornadas,
@@ -94,7 +90,6 @@ def desglose_de_pedido(conn, pedido: dict) -> dict:
         descuento_manual_pct=descuento_manual_pct,
         descuento_manual_tipo=descuento_manual_tipo,
         descuento_manual_monto=descuento_manual_monto,
-        descuento_manual_activo=descuento_manual_activo,
         perfil_impuestos=perfil,
     )
 
@@ -110,6 +105,6 @@ def desglose_de_pedido(conn, pedido: dict) -> dict:
     from descuentos.queries.decision import resolver_origen_pedido_monto
     pedido["descuento_origen"] = resolver_origen_pedido_monto(
         descuento_manual_tipo, descuento_manual_pct, descuento_manual_monto,
-        descuento_cliente_pct, descuento_jornadas_pct, descuento_manual_activo,
+        descuento_cliente_pct, descuento_jornadas_pct,
     )
     return pedido

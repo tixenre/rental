@@ -1386,11 +1386,14 @@ def _init_db_schema(conn):
             END IF;
         END $$;
     """)
-    # Fase C-4 (#1231): fuerza el override manual a ganar OUTRIGHT aunque su
-    # valor sea 0 — sin esto, `descuento_pct=0`/`descuento_manual_monto=0` es
-    # indistinguible de "sin override" y no hay forma de expresar "quiero 0%
-    # en ESTE pedido puntual" cuando cliente/jornadas ganarían por fallback
-    # (ver `descuentos/queries/decision.py::resolver_descuento_pedido`).
+    # ⏰ LEGACY: columna HUÉRFANA — el feature "forzar 0%" (Fase C-4, #1231, el
+    # toggle "Forzar este valor") se removió porque el override manual ya gana
+    # outright cuando está puesto y no hay descuentos fijos por cliente, así que
+    # forzar 0% nunca hacía falta. La columna se DEJA (nada la lee/escribe, queda
+    # en su default FALSE) en vez de droparla en el mismo release: las migraciones
+    # corren al startup y el contenedor viejo podría leer una columna ya borrada
+    # durante el solapamiento del deploy. Droppear en una migración futura, una vez
+    # que esta remoción esté 100% en prod.
     conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_manual_activo BOOLEAN NOT NULL DEFAULT FALSE")
 
     # email infra (migración a4e8c2b9d710)
