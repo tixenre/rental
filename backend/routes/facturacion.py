@@ -568,6 +568,156 @@ def listar_facturas(
 
 
 # ---------------------------------------------------------------------------
+# Factura de Exportación (WSFEXv1) — flujo NUEVO, sin pedido de por medio
+# ---------------------------------------------------------------------------
+
+
+def _comprobante_exportacion_desde_body(body: dict):
+    """Arma un `ComprobanteExportacionRequest` desde el body crudo del POST — mismo criterio de
+    validación fail-fast que el resto del módulo (`ValueError` con motivo claro, nunca un 500
+    críptico por un campo mal tipado)."""
+    from datetime import date as _date
+    from decimal import Decimal, InvalidOperation
+
+    from arca_fe import CondicionIva, Concepto, Emisor
+    from arca_fe.modelos_exportacion import (
+        CbteAsocExportacion,
+        CbteTipoExportacion,
+        ComprobanteExportacionRequest,
+        DatosExportacion,
+        ReceptorExterior,
+    )
+
+    emisor_body = body.get("emisor") or {}
+    receptor_body = body.get("receptor") or {}
+    exportacion_body = body.get("exportacion") or {}
+
+    _CONDICION_IVA_POR_NOMBRE = {
+        "responsable_inscripto": CondicionIva.RESPONSABLE_INSCRIPTO,
+        "monotributo": CondicionIva.MONOTRIBUTO,
+    }
+    try:
+        condicion_iva_raw = str(emisor_body.get("condicion_iva", "")).strip().lower()
+        if condicion_iva_raw not in _CONDICION_IVA_POR_NOMBRE:
+            raise ValueError(
+                f"emisor.condicion_iva inválida: '{condicion_iva_raw}' "
+                "(solo responsable_inscripto o monotributo facturan exportación)"
+            )
+        emisor = Emisor(
+            cuit=emisor_body.get("cuit"),
+            punto_venta=int(emisor_body.get("punto_venta")),
+            condicion_iva=_CONDICION_IVA_POR_NOMBRE[condicion_iva_raw],
+        )
+        receptor = ReceptorExterior(
+            razon_social=receptor_body.get("razon_social", ""),
+            pais_destino_id=int(receptor_body.get("pais_destino_id")),
+            domicilio=receptor_body.get("domicilio") or "",
+            id_impositivo=receptor_body.get("id_impositivo") or "",
+        )
+        exportacion = DatosExportacion(
+            incoterm=exportacion_body.get("incoterm", ""),
+            permiso_embarque=exportacion_body.get("permiso_embarque") or "",
+            permiso_existente=bool(exportacion_body.get("permiso_existente", True)),
+        )
+        cbtes_asoc = tuple(
+            CbteAsocExportacion(
+                tipo=CbteTipoExportacion(a["tipo"]), punto_venta=a["punto_venta"], numero=a["numero"],
+            )
+            for a in (body.get("cbtes_asoc") or [])
+        )
+        return ComprobanteExportacionRequest(
+            emisor=emisor,
+            receptor=receptor,
+            exportacion=exportacion,
+            concepto=Concepto(int(body.get("concepto", Concepto.PRODUCTOS))),
+            importe_neto=Decimal(str(body.get("importe_neto", "0"))),
+            fecha=_date.fromisoformat(body["fecha"]) if body.get("fecha") else _date.today(),
+            moneda=body.get("moneda", ""),
+            cotizacion=Decimal(str(body.get("cotizacion", "1"))),
+            es_nota_credito=bool(body.get("es_nota_credito", False)),
+            cbtes_asoc=cbtes_asoc,
+        )
+    except (TypeError, KeyError, InvalidOperation, ValueError) as e:
+        raise HTTPException(400, f"Datos de exportación inválidos: {e}")
+
+
+@router.post("/admin/facturacion/exportacion")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
+def crear_factura_exportacion(request: Request, body: dict):
+    """Emite una Factura de Exportación (WSFEXv1) — flujo NUEVO sin pedido de por medio: el body
+    trae todos los datos de la operación (emisor, receptor exterior, exportación, importe)."""
+    require_admin(request)
+    nombre_emisor = (body.get("nombre_emisor") or "").strip()
+    if not nombre_emisor:
+        raise HTTPException(400, "nombre_emisor es obligatorio")
+
+    comprobante = _comprobante_exportacion_desde_body(body)
+
+    try:
+        from services.facturacion.engine_exportacion import emitir_factura_exportacion
+        session = getattr(request.state, "session", None)
+        emitido_por = (session or {}).get("email") if session else None
+        factura = emitir_factura_exportacion(nombre_emisor, comprobante, emitido_por=emitido_por)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except ArcaError as e:
+        raise HTTPException(_status_for_arca_error(e), str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+    return _factura_exportacion_to_dict(factura)
+
+
+@router.post("/admin/facturacion/exportacion/{factura_id}/nota-credito")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
+def nota_credito_exportacion(factura_id: int, request: Request, body: dict):
+    """Emite una Nota de Crédito de exportación que anula `factura_id`."""
+    require_admin(request)
+    comprobante_nc = _comprobante_exportacion_desde_body({**body, "es_nota_credito": True})
+
+    try:
+        from services.facturacion.engine_exportacion import emitir_nota_credito_exportacion
+        session = getattr(request.state, "session", None)
+        emitido_por = (session or {}).get("email") if session else None
+        nc = emitir_nota_credito_exportacion(factura_id, comprobante_nc, emitido_por=emitido_por)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except ArcaError as e:
+        raise HTTPException(_status_for_arca_error(e), str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+    return _factura_exportacion_to_dict(nc)
+
+
+@router.get("/admin/facturacion/exportacion")
+def listar_facturas_exportacion(
+    request: Request,
+    emisor: Optional[str] = Query(None),
+    estado: Optional[str] = Query(None),
+    desde: Optional[str] = Query(None),
+    hasta: Optional[str] = Query(None),
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    """Listado global de Facturas de Exportación con filtros. Requiere sesión de admin."""
+    require_admin(request)
+
+    from services.facturacion.repo_exportacion import list_facturas_exportacion
+    with get_db() as conn:
+        facturas = list_facturas_exportacion(
+            conn, emisor=emisor or None, estado=estado or None,
+            desde=desde or None, hasta=hasta or None, limit=limit, offset=offset,
+        )
+    return {
+        "facturas": [_factura_exportacion_to_dict(f) for f in facturas],
+        "count": len(facturas),
+    }
+
+
+# ---------------------------------------------------------------------------
 # GET /facturas/{id}/pdf — siempre on-demand (no se guarda ni se cachea)
 # ---------------------------------------------------------------------------
 
@@ -780,6 +930,36 @@ def _factura_to_dict(f) -> dict:
         "razon_social": f.razon_social,
         "qr_payload": f.qr_payload,
         "pdf_key": f.pdf_key,
+        "estado": f.estado,
+        "nota_credito_de": f.nota_credito_de,
+        "errores": f.errores,
+        "fecha_emision": f.fecha_emision.isoformat() if f.fecha_emision else None,
+        "created_at": f.created_at.isoformat() if f.created_at else None,
+        "created_by": f.created_by,
+    }
+
+
+def _factura_exportacion_to_dict(f) -> dict:
+    if f is None:
+        return {}
+    return {
+        "id": f.id,
+        "emisor": f.emisor,
+        "ambiente": f.ambiente,
+        "cbte_tipo": f.cbte_tipo,
+        "pto_vta": f.pto_vta,
+        "cbte_nro": f.cbte_nro,
+        "cae": f.cae,
+        "cae_vto": str(f.cae_vto) if f.cae_vto else None,
+        "receptor_razon_social": f.receptor_razon_social,
+        "receptor_pais_destino": f.receptor_pais_destino,
+        "receptor_domicilio": f.receptor_domicilio,
+        "receptor_id_impositivo": f.receptor_id_impositivo,
+        "incoterm": f.incoterm,
+        "permiso_embarque": f.permiso_embarque,
+        "moneda": f.moneda,
+        "cotizacion": f.cotizacion,
+        "imp_total": f.imp_total,
         "estado": f.estado,
         "nota_credito_de": f.nota_credito_de,
         "errores": f.errores,
