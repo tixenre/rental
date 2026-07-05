@@ -75,10 +75,19 @@ todo.
 | Certificado rechazado / `cms.sign.invalid` | Cert vencido, o de homologación usado contra producción (o viceversa) | Paso 2 |
 | `FECAESolicitar` rechaza con "punto de venta inexistente" | Punto de venta no habilitado | Paso 4 |
 
-## Validador automático de estos trámites — **backlog, no implementado**
+## Validador automático de estos trámites — patrón ya resuelto (en el consumidor, no en la librería)
 
-Sería valioso poder CONSULTAR desde código si un certificado/relación está bien configurado antes
-de intentar facturar de verdad (hoy solo se descubre al fallar una llamada real). Todavía no está
-claro cómo implementarlo — AFIP no expone un endpoint directo de "¿tengo la relación X delegada?"
-que se pueda consultar sin intentar la operación real. Queda como idea a explorar, no como
-funcionalidad de esta versión.
+AFIP no expone un endpoint directo de "¿tengo la relación X delegada?" — la única forma de saberlo es
+PROBAR la operación real y traducir el resultado/excepción a un chequeo legible. `arca_fe` se
+mantiene sin estado (no sabe de tu base de datos ni de tus emisores guardados) a propósito, así que
+este validador vive del lado de quien la consume — en Rambla,
+`services/facturacion/diagnostico.py::diagnosticar_emisor`, construido enteramente sobre piezas
+portables de acá:
+
+- **Capa 1** (local, sin red, corta temprano si ya garantiza el fracaso): `cuit_valido`, certificado
+  cargado/vigente, punto de venta asignado.
+- **Capa 2** (contra AFIP, solo si la capa 1 pasó): `WsfeClient.param_puntos_venta()` — ¿"wsfe" está
+  delegado y el punto de venta habilitado?; `PadronClient.get_persona()` sobre el propio CUIT del
+  emisor — ¿la relación de padrón está delegada?
+
+Si vas a construir tu propio validador sobre `arca_fe`, este es el patrón: probar, nunca adivinar.
