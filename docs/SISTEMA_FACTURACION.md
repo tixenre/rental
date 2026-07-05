@@ -377,3 +377,92 @@ lectura de perfiles/productoras en la ficha de cliente (`clientes.lazy.tsx`). Ve
 
 El supervisor marca cualquier violación de estas reglas, incluida la reintroducción de un
 `int(round(...))` sobre `imp_neto`/`imp_iva`/`imp_total`. Tracking: issue #1139, #1209, #1242.
+
+---
+
+## 12. Factura de Exportación (WSFEXv1)
+
+Webservice de AFIP/ARCA **distinto** de WSFEv1 (todo lo de §1-11) — RG 2758, operación
+`FEXAuthorize`, tipos de comprobante 19 (Factura E) / 20 (ND E) / 21 (NC E). Flujo **nuevo, sin
+`pedido_id`**: venta al exterior, carga manual en el admin (confirmado con el dueño — no cuelga del
+motor de reservas/alquileres). Ver `docs/DECISIONES.md` (2026-07-05, "Versionar arca_fe + Factura de
+Exportación") para el porqué de cada decisión de diseño; acá solo el cómo.
+
+### Núcleo portable (`backend/arca_fe/`)
+
+- `modelos_exportacion.py` — `CbteTipoExportacion` (enum PROPIO, 19/20/21 — deliberadamente
+  separado de `modelos.CbteTipo` para no contaminar ramas que asumen A/B/C/M/FCE),
+  `ReceptorExterior` (país destino en vez de CUIT/DocTipo), `DatosExportacion` (Incoterm/permiso de
+  embarque), `CbteAsocExportacion`, `ComprobanteExportacionRequest` (el pedido, `__post_init__`
+  fail-fast) y `ComprobanteFiscalExportacion` (la foto ya emitida, para renderizar). Reusa de
+  `modelos.py` lo genuinamente compartido: `Emisor`, `Concepto`, `CaeResult`, `ItemFactura`.
+- `comprobante_exportacion.py` — `armar_fexauthorize` (arma el payload SOAP).
+- `wsfex.py` — `WsfexClient` (espeja `wsfe.py` en arquitectura: cache de clientes zeep propio,
+  comando `autorizar`, queries `ultimo_autorizado`/`consultar`, catálogos
+  `param_paises_destino`/`param_incoterms`/`param_monedas`/`param_unidades_medida`/
+  `param_cotizacion`). `WSFEX_WSAA_SERVICIO = "wsfex"` — un TA propio, NO comparte el de "wsfe"
+  (`wsaa_cache.get_ta(emisor, conn, servicio=WSFEX_WSAA_SERVICIO)`, ya genérico, sin cambios).
+- `render_exportacion.py` — `renderizar_factura_exportacion_html`: **un solo layout** A4 (no 3 como
+  WSFEv1 — decisión explícita, es un documento fiscal distinto, no una variante visual), sin
+  discriminación de IVA (exenta), con país destino/Incoterm/permiso de embarque/moneda/cotización en
+  vez de condición IVA receptor/condición de venta.
+- **Advertencia viva**: los nombres de operación/campo SOAP (`FEXAuthorize`, `FEXGetLast_CMP`,
+  catálogos `FEXGetPARAM_*`) son la mejor referencia sin acceso al WSDL real de homologación — se
+  confirman/ajustan contra AFIP antes de producción (ver docstrings de `wsfex.py`/
+  `comprobante_exportacion.py`). El QR fiscal usa la convención tentativa `doc_tipo_rec=99`/
+  `doc_nro_rec=0` para el receptor exterior sin CUIT (sin un DocTipo real de AFIP para este caso).
+
+### Adapter (`backend/services/facturacion/`)
+
+- **Tabla separada `facturas_exportacion`** (no extiende `facturas` — el receptor de exportación no
+  tiene `doc_tipo`/`doc_nro`/`condicion_iva_receptor` argentinos NOT NULL). Sin `pedido_id`. Columnas
+  fiscales: `cbte_tipo`/`pto_vta`/`cbte_nro`/`cae`/`cae_vto`/`qr_payload`; receptor:
+  `receptor_razon_social`/`receptor_pais_destino`/`receptor_domicilio`/`receptor_id_impositivo`;
+  exportación: `incoterm`/`permiso_embarque`/`moneda`/`cotizacion NUMERIC(12,4)`;
+  `imp_total NUMERIC(12,2)` (mismo criterio de precisión que §11.5); `nota_credito_de` (self-ref).
+- **`emisores_arca.habilitado_exportacion`** (`BOOLEAN DEFAULT false`) — un emisor necesita una
+  relación de servicio AFIP separada para WSFEXv1; sin el flag, `engine_exportacion.py` falla
+  temprano con mensaje claro en vez de un `ArcaAuthError` opaco de AFIP.
+- `engine_exportacion.py` — `emitir_factura_exportacion`/`emitir_nota_credito_exportacion`: mismo
+  esqueleto robusto que `engine.emitir_factura` (advisory lock namespace propio `0xFA0D0000` —
+  distinto de `engine._LOCK_NS`; idempotencia post-timeout vía `FEXGetLast_CMP`/`FEXGetCMP`, mismo
+  criterio "consultar el PRÓXIMO número, no el último autorizado"; INSERT pendiente antes del SOAP;
+  nunca 500). **Sin verificación de padrón** (§4) — el receptor no es argentino, no hay CUIT que
+  verificar. Arma y persiste el QR fiscal (`arca_fe.armar_qr`) al confirmar el CAE.
+- `repo_exportacion.py` — DAL paralelo a `repo.py`, dataclass propia `FacturaExportacion`.
+- `catalogos_exportacion.py` — mismo patrón que `catalogos.py`: refresco explícito (acción del
+  admin) de países destino/Incoterms/monedas en `app_settings`, lectura falla fuerte si nunca se
+  refrescó. Requiere un emisor activo+cert+`habilitado_exportacion` para autenticar la consulta.
+- `comprobante_render_exportacion.py` — arma el `ComprobanteFiscalExportacion` (resuelve el label de
+  país destino contra el catálogo cacheado, arma el ítem único de la factura) y delega el render en
+  `arca_fe`. Mismo criterio que `comprobante_render.py`.
+
+### Rutas
+
+- `POST /admin/facturacion/exportacion` — crea y emite.
+- `POST /admin/facturacion/exportacion/{id}/nota-credito` — anula con NC.
+- `GET /admin/facturacion/exportacion` — listado con filtros.
+- `GET /facturas-exportacion/{id}/pdf` (`format=html|pdf`) — igual patrón que `GET /facturas/{id}/pdf`,
+  sin selector de layout (uno solo).
+- `POST /admin/arca/catalogos-exportacion/refrescar` / `GET /admin/arca/catalogos-exportacion`.
+
+Todas con `@limiter.limit(ADMIN_WRITE_LIMIT)` + `@map_pg_errors` en las de escritura (mismo criterio
+que §11 exige para el resto del módulo).
+
+### Frontend
+
+`/admin/facturacion/exportacion` (`facturacion.exportacion.lazy.tsx`) — alta + listado + NC, mismo
+patrón visual que `/admin/facturas`. El form de emisores (`facturacion.emisores.lazy.tsx`) gana el
+checkbox `habilitado_exportacion`.
+
+### Reglas invariantes propias
+
+1. **`CbteTipoExportacion` nunca se mezcla con `CbteTipo`** — enums separados a propósito (§ arriba).
+2. **Sin `pedido_id`** — no acoplar este flujo al motor de reservas/alquileres.
+3. **Un solo layout de render** — no multiplicar variantes visuales sin evidencia de que hacen falta.
+4. **`habilitado_exportacion` se chequea ANTES de llamar a AFIP** — nunca dejar que el error opaco de
+   ARCA sea el primer síntoma de un emisor mal configurado.
+
+El supervisor marca: código de exportación que reutilice `CbteTipo` doméstico, un consumidor que
+intente colgar la Factura de Exportación de un pedido, o un layout nuevo agregado sin justificar por
+qué el único existente no alcanza. Tracking: issue de la iniciativa WSFEXv1.
