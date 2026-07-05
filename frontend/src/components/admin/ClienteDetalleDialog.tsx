@@ -21,7 +21,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
-import { Check, ChevronDown, Copy, Plus, Search, ShieldAlert, ShieldCheck } from "lucide-react";
+import {
+  BadgeCheck,
+  Check,
+  ChevronDown,
+  Copy,
+  Plus,
+  Search,
+  ShieldAlert,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 
 import {
   Dialog,
@@ -54,6 +64,7 @@ import { adminApi, ESTADO_LABEL, type Cliente, type ClienteInput } from "@/lib/a
 import { usePadronLookup } from "@/lib/admin/usePadronLookup";
 import { AuthedHttpError } from "@/lib/authedFetch";
 import { fmtArs, formatFechaDisplay } from "@/lib/format";
+import { PERFIL_IMPUESTOS_LABEL, type PerfilImpuestos } from "@/lib/iva";
 
 type Props = {
   open: boolean;
@@ -380,40 +391,59 @@ export function ClienteDetalleDialog({ open, onOpenChange, cliente, onSaved }: P
 
           {/* #1240: perfiles fiscales personales + productoras vinculadas — solo
               lectura (la gestión real vive en el self-service del cliente y en
-              /admin/productoras). */}
+              /admin/productoras). Misma tarjeta que el portal
+              (ClientePortalHelpers.tsx::FacturacionForm) — BadgeCheck + pill
+              default + condición IVA + domicilio, no una lista pelada. */}
           {!!(
             perfilesFiscalesQ.data?.perfiles.length || perfilesFiscalesQ.data?.productoras.length
           ) && (
-            <div className="space-y-2 rounded-lg border hairline p-3 text-sm">
+            <div className="space-y-4">
               {!!perfilesFiscalesQ.data?.perfiles.length && (
-                <div>
-                  <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Perfiles fiscales personales
                   </div>
-                  <ul className="space-y-0.5">
-                    {perfilesFiscalesQ.data.perfiles.map((p) => (
-                      <li key={p.id} className="text-ink">
-                        {p.etiqueta || p.razon_social || p.cuit} · {p.cuit}
+                  {perfilesFiscalesQ.data.perfiles.map((p) => (
+                    <div key={p.id} className="rounded-md border hairline p-3">
+                      <div className="flex items-center gap-1.5 text-sm font-medium text-ink">
+                        <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-verde-ink" />
+                        {p.etiqueta || p.razon_social || p.cuit}
                         {p.es_default && (
-                          <span className="ml-1.5 text-xs text-muted-foreground">(default)</span>
+                          <span className="rounded-full bg-verde/15 px-2 py-0.5 text-3xs font-semibold uppercase tracking-wider text-verde-ink">
+                            Default
+                          </span>
                         )}
-                      </li>
-                    ))}
-                  </ul>
+                      </div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {p.cuit} ·{" "}
+                        {PERFIL_IMPUESTOS_LABEL[p.perfil_impuestos as PerfilImpuestos] ??
+                          p.perfil_impuestos}
+                      </div>
+                      {p.domicilio_fiscal && (
+                        <div className="text-xs text-muted-foreground">{p.domicilio_fiscal}</div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
               {!!perfilesFiscalesQ.data?.productoras.length && (
-                <div>
-                  <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Productoras vinculadas
                   </div>
-                  <ul className="space-y-0.5">
-                    {perfilesFiscalesQ.data.productoras.map((pr) => (
-                      <li key={pr.id} className="text-ink">
-                        {pr.razon_social || pr.cuit} · {pr.cuit}
-                      </li>
-                    ))}
-                  </ul>
+                  {perfilesFiscalesQ.data.productoras.map((pr) => (
+                    <div key={pr.id} className="rounded-md border hairline p-3">
+                      <div className="flex items-center gap-1.5 text-sm font-medium text-ink">
+                        <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        {pr.razon_social || pr.cuit}
+                      </div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {pr.cuit} ·{" "}
+                        {PERFIL_IMPUESTOS_LABEL[pr.perfil_impuestos as PerfilImpuestos] ??
+                          pr.perfil_impuestos}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
