@@ -43,6 +43,23 @@ def test_wsfex_wsaa_servicio_constante():
     assert WSFEX_WSAA_SERVICIO == "wsfex"
 
 
+def test_construir_tra_con_servicio_wsfex():
+    """`wsaa.construir_tra` es genérico por `servicio` (sin cambios de código, ver
+    `wsaa.py::construir_tra` docstring) — confirma que WSFEX_WSAA_SERVICIO produce un TRA válido
+    con ese servicio, mismo patrón que `test_wsaa_firma.py::test_tra_contiene_servicio` para
+    `"wsfe"`."""
+    import xml.etree.ElementTree as ET
+
+    from arca_fe.wsaa import construir_tra
+    from arca_fe.wsfex import WSFEX_WSAA_SERVICIO
+
+    tra = construir_tra(WSFEX_WSAA_SERVICIO)
+    root = ET.fromstring(tra)
+    service_el = root.find("service")
+    assert service_el is not None
+    assert service_el.text == "wsfex"
+
+
 class TestUltimoAutorizado:
     def test_devuelve_el_numero(self):
         from arca_fe.wsfex import WsfexClient
