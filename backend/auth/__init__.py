@@ -14,9 +14,9 @@ Submódulos:
 - `google`     → rutas OAuth de Google (admin + cliente) + el `router` compartido.
 - `staging`    → dev-login / staging-login (registran sobre el router de google).
 - `passkey`    → motor WebAuthn + rutas.
-- `sessions_store` / `sessions_routes` → allowlist de sesiones + revocación (logout
-  real, "cerrar mis otras sesiones"). La cookie firmada lleva un `jti`; el store
-  decide si sigue viva.
+- `queries.sessions` / `commands.sessions` / `sessions_routes` → allowlist de
+  sesiones + revocación (logout real, "cerrar mis otras sesiones"). La cookie
+  firmada lleva un `jti`; la tabla decide si sigue viva.
 
 La superficie pública (símbolos + routers) se ensambla al final de este módulo.
 """

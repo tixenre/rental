@@ -1,6 +1,6 @@
 """Tests de la revocación de sesión server-side (allowlist `auth_sessions`).
 
-Cubre las dos mitades sin DB ni cripto real (mockeando el store `sessions_store`):
+Cubre las dos mitades sin DB ni cripto real (mockeando `auth.queries.sessions`/`auth.commands.sessions`):
   · `get_session` exige que la sesión esté viva en la allowlist (toda sesión válida
     lleva `jti`; una cookie sin jti se rechaza y ni siquiera consulta el store);
   · los endpoints de gestión (listar / revoke-all / revoke-one) van scopeados al
@@ -37,25 +37,25 @@ class TestGetSessionRevocacion:
             llamados["n"] += 1
             return None
 
-        monkeypatch.setattr("auth.sessions_store.is_active", _spy)
+        monkeypatch.setattr("auth.queries.sessions.is_active", _spy)
         token = signer.dumps({"email": "a@b.com", "name": "A"})
         assert session_mod.get_session(_Req({"session": token})) is None
         assert llamados["n"] == 0  # cortó antes de tocar el store
 
     def test_jti_revocado_devuelve_none(self, monkeypatch):
-        monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: None)
+        monkeypatch.setattr("auth.queries.sessions.is_active", lambda jti: None)
         token = signer.dumps({"email": "a@b.com", "name": "A", "jti": "x"})
         assert session_mod.get_session(_Req({"session": token})) is None
 
     def test_jti_activo_devuelve_la_sesion(self, monkeypatch):
-        monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
+        monkeypatch.setattr("auth.queries.sessions.is_active", lambda jti: {"jti": jti})
         token = signer.dumps({"email": "a@b.com", "name": "A", "jti": "x"})
         sess = session_mod.get_session(_Req({"session": token}))
         assert sess["email"] == "a@b.com" and sess["jti"] == "x"
 
     def test_firma_invalida_devuelve_none(self, monkeypatch):
         # Tampering: aunque haya jti, una firma rota nunca llega al store.
-        monkeypatch.setattr("auth.sessions_store.is_active",
+        monkeypatch.setattr("auth.queries.sessions.is_active",
                             lambda jti: pytest.fail("no debió consultar el store"))
         token = signer.dumps({"email": "a@b.com", "name": "A", "jti": "x"})
         assert session_mod.get_session(_Req({"session": token + "tamper"})) is None
@@ -83,10 +83,10 @@ class TestSessionsRoutes:
     def _auth_ok(self, monkeypatch):
         # is_active activo → las cookies con jti pasan el guard de sesión. Cada test
         # mockea además la función del store que ejercita.
-        monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
+        monkeypatch.setattr("auth.queries.sessions.is_active", lambda jti: {"jti": jti})
 
     def test_admin_list_marca_la_actual(self, monkeypatch):
-        monkeypatch.setattr("auth.sessions_store.list_for_owner", lambda *a, **k: [
+        monkeypatch.setattr("auth.queries.sessions.list_for_owner", lambda *a, **k: [
             {"jti": "cur-admin", "user_agent": "Mac", "created_at": None, "expires_at": None},
             {"jti": "otra", "user_agent": "iPhone", "created_at": None, "expires_at": None},
         ])
@@ -107,7 +107,7 @@ class TestSessionsRoutes:
                             cliente_id=cliente_id, except_jti=except_jti)
             return 3
 
-        monkeypatch.setattr("auth.sessions_store.revoke_all_for_owner", _fake)
+        monkeypatch.setattr("auth.commands.sessions.revoke_all_for_owner", _fake)
         c = _client()
         c.cookies.set("session", _admin_cookie("cur-admin"))
         r = c.post("/auth/sessions/revoke-all")
@@ -118,7 +118,7 @@ class TestSessionsRoutes:
         assert captured["owner_email"] == "admin@test.com"
 
     def test_admin_revoke_one_404_si_no_es_suya(self, monkeypatch):
-        monkeypatch.setattr("auth.sessions_store.revoke_one_for_owner", lambda *a, **k: False)
+        monkeypatch.setattr("auth.commands.sessions.revoke_one_for_owner", lambda *a, **k: False)
         c = _client()
         c.cookies.set("session", _admin_cookie())
         assert c.delete("/auth/sessions/ajena").status_code == 404
@@ -130,7 +130,7 @@ class TestSessionsRoutes:
             captured.update(jti=jti, owner_type=owner_type, cliente_id=cliente_id)
             return True
 
-        monkeypatch.setattr("auth.sessions_store.revoke_one_for_owner", _fake)
+        monkeypatch.setattr("auth.commands.sessions.revoke_one_for_owner", _fake)
         c = _client()
         c.cookies.set("session", _cliente_cookie(cliente_id=42))
         r = c.delete("/cliente/auth/sessions/otra-jti")
@@ -145,7 +145,7 @@ class TestSessionsRoutes:
             captured.update(owner_type=owner_type, cliente_id=cliente_id, except_jti=except_jti)
             return 1
 
-        monkeypatch.setattr("auth.sessions_store.revoke_all_for_owner", _fake)
+        monkeypatch.setattr("auth.commands.sessions.revoke_all_for_owner", _fake)
         c = _client()
         c.cookies.set("session", _cliente_cookie(cliente_id=42, jti="cur-cli"))
         r = c.post("/cliente/auth/sessions/revoke-all")

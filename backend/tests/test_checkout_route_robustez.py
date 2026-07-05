@@ -23,7 +23,7 @@ _COOKIE_CLIENTE = f"session={signer.dumps({'email': 'checkout-robustez@test.com'
 
 @pytest.fixture(autouse=True)
 def _sessions_active(monkeypatch):
-    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
+    monkeypatch.setattr("auth.queries.sessions.is_active", lambda jti: {"jti": jti})
 
 
 def test_checkout_validar_error_inesperado_devuelve_503_limpio(monkeypatch):

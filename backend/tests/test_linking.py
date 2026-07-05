@@ -16,9 +16,9 @@ pytestmark = pytest.mark.unit
 
 
 @pytest.fixture(autouse=True)
-def _stub_sessions_store(monkeypatch):
+def _stub_sessions(monkeypatch):
     # get_session valida la firma Y que el jti siga vivo (allowlist) → lo damos por activo.
-    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti} if jti else None)
+    monkeypatch.setattr("auth.queries.sessions.is_active", lambda jti: {"jti": jti} if jti else None)
 
 
 def _client() -> TestClient:

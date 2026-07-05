@@ -106,8 +106,8 @@ def _revoke_current_session(request: Request) -> None:
     session = get_session(request)
     jti = session.get("jti") if session else None
     if jti:
-        from auth import sessions_store  # perezoso: rompe el ciclo con auth/__init__
-        sessions_store.revoke(jti)
+        from auth.commands import sessions as sessions_commands  # perezoso: rompe el ciclo con auth/__init__
+        sessions_commands.revoke(jti)
 
 
 @router.get("/auth/logout")

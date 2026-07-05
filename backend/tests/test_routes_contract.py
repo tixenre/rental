@@ -58,7 +58,7 @@ def _sessions_active(monkeypatch):
     y llega al routing/guard (que es lo que estos tests verifican). Sin esto,
     `get_session` las cortaría en el middleware (401) y `test_endpoint_existe` no
     distinguiría una ruta dropeada de una viva."""
-    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
+    monkeypatch.setattr("auth.queries.sessions.is_active", lambda jti: {"jti": jti})
 
 
 # ── Inventario ───────────────────────────────────────────────────────────────

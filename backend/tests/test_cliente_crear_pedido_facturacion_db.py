@@ -48,7 +48,7 @@ _BODY_BASE = {
 
 @pytest.fixture(autouse=True)
 def _sessions_active(monkeypatch):
-    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
+    monkeypatch.setattr("auth.queries.sessions.is_active", lambda jti: {"jti": jti})
 
 
 @pytest.fixture

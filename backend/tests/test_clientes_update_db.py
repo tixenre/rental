@@ -52,7 +52,7 @@ def admin_cookie(monkeypatch):
     test_routes_admin_guard_db.py — mismo truco)."""
     from auth.session import signer
 
-    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
+    monkeypatch.setattr("auth.queries.sessions.is_active", lambda jti: {"jti": jti})
     payload = {"email": "admin@test.com", "role": "admin", "jti": "clientes-update-db"}
     return {"session": signer.dumps(payload)}
 

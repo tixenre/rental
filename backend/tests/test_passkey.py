@@ -22,13 +22,13 @@ pytestmark = pytest.mark.unit
 
 
 @pytest.fixture(autouse=True)
-def _stub_sessions_store(monkeypatch):
+def _stub_sessions(monkeypatch):
     """El login con passkey mintea la sesión vía `_make_session_response` (registra
     fila server-side) y ahora pasa por el rate-limit por IP. Stubbeamos el store de
     sesiones (sin DB) y limpiamos el contador de rate-limit entre tests (estado
     global compartido con OAuth/staging)."""
-    monkeypatch.setattr("auth.sessions_store.create_session", lambda **kw: "stub-jti")
-    monkeypatch.setattr("auth.sessions_store.is_active",
+    monkeypatch.setattr("auth.commands.sessions.create_session", lambda **kw: "stub-jti")
+    monkeypatch.setattr("auth.queries.sessions.is_active",
                         lambda jti: {"jti": jti} if jti else None)
     _rl_failures.clear()
 
