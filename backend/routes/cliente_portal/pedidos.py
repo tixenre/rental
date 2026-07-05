@@ -62,6 +62,10 @@ class PedidoClienteCreate(BaseModel):
     # sin passkey. La firma fuerte es la cookie `stepup` (passkey / on-the-fly), que el
     # server lee aparte (no viaja en el body). Ver el gate más abajo.
     session_confirmed: bool = False
+    # #1240: a nombre de quién se factura ESTE pedido — mutuamente excluyentes,
+    # NULL/NULL = perfil default de la cuenta (comportamiento de siempre).
+    perfil_fiscal_id: Optional[int] = None
+    productora_id: Optional[int] = None
 
     @field_validator("fecha_desde", "fecha_hasta")
     @classmethod
@@ -123,6 +127,26 @@ def cliente_crear_pedido(
         if faltan:
             raise HTTPException(422, detail={"faltan": faltan})
 
+    # #1240: a nombre de quién se factura este pedido — mutuamente excluyentes,
+    # y cada uno se valida como propio del cliente autenticado (nunca el de otro).
+    if data.perfil_fiscal_id and data.productora_id:
+        raise HTTPException(400, "Elegí un perfil personal O una productora, no los dos")
+    with get_db() as _conn:
+        if data.perfil_fiscal_id:
+            propio = _conn.execute(
+                "SELECT 1 FROM cliente_perfiles_fiscales WHERE id = %s AND cliente_id = %s",
+                (data.perfil_fiscal_id, cliente_id),
+            ).fetchone()
+            if not propio:
+                raise HTTPException(404, "Perfil fiscal no encontrado")
+        if data.productora_id:
+            vinculado = _conn.execute(
+                "SELECT 1 FROM productora_miembros WHERE productora_id = %s AND cliente_id = %s",
+                (data.productora_id, cliente_id),
+            ).fetchone()
+            if not vinculado:
+                raise HTTPException(404, "Productora no encontrada")
+
     # Reusamos la lógica de creación del back-office para mantener una sola fuente.
     from routes.alquileres import create_pedido_retry, PedidoCreate, PedidoItem
     from services.carrito import precios_catalogo_para_reserva
@@ -141,6 +165,8 @@ def cliente_crear_pedido(
         fecha_hasta=data.fecha_hasta,
         notas=data.notas,
         estado="presupuesto",
+        perfil_fiscal_id=data.perfil_fiscal_id,
+        productora_id=data.productora_id,
         items=[
             PedidoItem(
                 equipo_id=i.equipo_id,
