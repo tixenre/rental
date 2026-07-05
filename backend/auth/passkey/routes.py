@@ -23,7 +23,7 @@ from auth.guards import is_admin_email, require_admin
 from database import get_db
 from auth.session import COOKIE_SECURE, _make_session_response
 from auth.guards import require_cliente
-from auth.passkey import ceremonies, store
+from auth.passkey import ceremonies, commands as passkey_commands, queries as passkey_queries
 from auth.ratelimit import _check_rate, _record_event, _record_fail
 from auth.stepup import mark_stepup
 from net_utils import get_client_ip
@@ -78,7 +78,7 @@ def _extract_transports(credential: dict) -> str | None:
 def _register_begin(*, owner_type: str, owner_email: str, cliente_id, display_name: str):
     owner_key = owner_email.lower() if owner_type == "admin" else str(cliente_id)
     uh = ceremonies.user_handle_for(owner_type, owner_key)
-    exclude = store.credential_ids_for_owner(
+    exclude = passkey_queries.credential_ids_for_owner(
         owner_type, owner_email=owner_email, cliente_id=cliente_id
     )
     options, challenge_b64 = ceremonies.build_registration_options(
@@ -103,7 +103,7 @@ def _register_complete(request: Request, body: RegisterCompleteIn, *, owner_type
         raise HTTPException(400, "No se pudo verificar la passkey.")
     device_name = (body.device_name or "").strip() or "Passkey"
     try:
-        new_id = store.insert_credential(
+        new_id = passkey_commands.insert_credential(
             owner_type=owner_type, owner_email=owner_email, cliente_id=cliente_id,
             credential_id=reg["credential_id"], public_key=reg["public_key"],
             sign_count=reg["sign_count"], transports=_extract_transports(body.credential),
@@ -241,7 +241,7 @@ def login_complete(body: LoginCompleteIn, request: Request):
     if not cred_id:
         _record_fail(ip)
         raise HTTPException(400, "Credencial inválida.")
-    row = store.get_by_credential_id(cred_id)
+    row = passkey_queries.get_by_credential_id(cred_id)
     if not row:
         _record_fail(ip)
         raise HTTPException(401, "Passkey no reconocida.")
@@ -259,7 +259,7 @@ def login_complete(body: LoginCompleteIn, request: Request):
         logger.warning("passkey replay/clonación id=%s stored=%s new=%s",
                        row["id"], row["sign_count"], new_count)
         raise HTTPException(401, "Passkey rechazada (contador inválido).")
-    store.update_sign_count(row["id"], new_count)
+    passkey_commands.update_sign_count(row["id"], new_count)
     res = _mint_session_for_owner(row, request)
     res.delete_cookie(_AUTH_COOKIE)
     return res
@@ -289,7 +289,7 @@ def cliente_stepup_complete(body: LoginCompleteIn, request: Request):
         _record_fail(ip)
         raise HTTPException(400, "Challenge inválido o expirado. Reintentá.")
     cred_id = body.credential.get("id") or body.credential.get("rawId")
-    row = store.get_by_credential_id(cred_id) if cred_id else None
+    row = passkey_queries.get_by_credential_id(cred_id) if cred_id else None
     # La passkey TIENE que ser de esta cuenta (no vale la de otro) → step-up scopeado.
     if not row or row["owner_type"] != "cliente" or row["cliente_id"] != sess["cliente_id"]:
         _record_fail(ip)
@@ -306,7 +306,7 @@ def cliente_stepup_complete(body: LoginCompleteIn, request: Request):
     if ceremonies.es_replay(row["sign_count"], new_count):
         _record_fail(ip)
         raise HTTPException(401, "Passkey rechazada (contador inválido).")
-    store.update_sign_count(row["id"], new_count)
+    passkey_commands.update_sign_count(row["id"], new_count)
     res = JSONResponse({"ok": True})
     res.delete_cookie(_STEPUP_COOKIE)
     mark_stepup(res, sess["cliente_id"])  # deja la marca de step-up reciente
@@ -344,13 +344,13 @@ def _mint_session_for_owner(row: dict, request: Request):
 @router.get("/auth/passkey/credentials")
 def admin_list(request: Request):
     email, _ = _admin_identity(require_admin(request))
-    return {"credentials": store.list_for_owner("admin", owner_email=email)}
+    return {"credentials": passkey_queries.list_for_owner("admin", owner_email=email)}
 
 
 @router.delete("/auth/passkey/credentials/{cred_id}")
 def admin_delete(cred_id: int, request: Request):
     email, _ = _admin_identity(require_admin(request))
-    if not store.delete_for_owner(cred_id, "admin", owner_email=email):
+    if not passkey_commands.delete_for_owner(cred_id, "admin", owner_email=email):
         raise HTTPException(404, "Passkey no encontrada.")
     return {"ok": True}
 
@@ -361,7 +361,7 @@ def admin_rename(cred_id: int, body: RenameIn, request: Request):
     name = body.device_name.strip()
     if not name:
         raise HTTPException(400, "Nombre vacío.")
-    if not store.rename_for_owner(cred_id, name, "admin", owner_email=email):
+    if not passkey_commands.rename_for_owner(cred_id, name, "admin", owner_email=email):
         raise HTTPException(404, "Passkey no encontrada.")
     return {"ok": True}
 
@@ -369,13 +369,13 @@ def admin_rename(cred_id: int, body: RenameIn, request: Request):
 @router.get("/cliente/auth/passkey/credentials")
 def cliente_list(request: Request):
     sess = require_cliente(request)
-    return {"credentials": store.list_for_owner("cliente", cliente_id=sess["cliente_id"])}
+    return {"credentials": passkey_queries.list_for_owner("cliente", cliente_id=sess["cliente_id"])}
 
 
 @router.delete("/cliente/auth/passkey/credentials/{cred_id}")
 def cliente_delete(cred_id: int, request: Request):
     sess = require_cliente(request)
-    if not store.delete_for_owner(cred_id, "cliente", cliente_id=sess["cliente_id"]):
+    if not passkey_commands.delete_for_owner(cred_id, "cliente", cliente_id=sess["cliente_id"]):
         raise HTTPException(404, "Passkey no encontrada.")
     return {"ok": True}
 
@@ -386,6 +386,6 @@ def cliente_rename(cred_id: int, body: RenameIn, request: Request):
     name = body.device_name.strip()
     if not name:
         raise HTTPException(400, "Nombre vacío.")
-    if not store.rename_for_owner(cred_id, name, "cliente", cliente_id=sess["cliente_id"]):
+    if not passkey_commands.rename_for_owner(cred_id, name, "cliente", cliente_id=sess["cliente_id"]):
         raise HTTPException(404, "Passkey no encontrada.")
     return {"ok": True}

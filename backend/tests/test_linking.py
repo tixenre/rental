@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from auth.session import signer
 from auth import auth_linking_router
 from auth import identities_store
-from auth.passkey import store as passkey_store
+from auth.passkey import commands as passkey_commands, queries as passkey_queries
 
 pytestmark = pytest.mark.unit
 
@@ -52,7 +52,7 @@ class TestListKeys:
         assert _client().get("/cliente/auth/keys").status_code == 401
 
     def test_une_passkeys_e_identidades(self, monkeypatch):
-        monkeypatch.setattr(passkey_store, "list_for_owner", lambda *a, **k: [
+        monkeypatch.setattr(passkey_queries, "list_for_owner", lambda *a, **k: [
             {"id": 1, "device_name": "iPhone", "transports": "internal",
              "created_at": "2026-01-01", "last_used_at": None}])
         monkeypatch.setattr(identities_store, "list_for_cliente", lambda cid: [
@@ -73,7 +73,7 @@ class TestListKeys:
 
 class TestRemoveKey:
     def _stub_counts(self, monkeypatch, *, passkeys: int, identities: int):
-        monkeypatch.setattr(passkey_store, "list_for_owner",
+        monkeypatch.setattr(passkey_queries, "list_for_owner",
                             lambda *a, **k: [{"id": i} for i in range(passkeys)])
         monkeypatch.setattr(identities_store, "count_for_cliente", lambda cid: identities)
 
@@ -96,7 +96,7 @@ class TestRemoveKey:
             captured.update(key_id=key_id, owner_type=owner_type, cliente_id=cliente_id)
             return True
 
-        monkeypatch.setattr(passkey_store, "delete_for_owner", fake_del)
+        monkeypatch.setattr(passkey_commands, "delete_for_owner", fake_del)
         r = _client_con_stepup(42).delete("/cliente/auth/keys/passkey/1")
         assert r.status_code == 200
         # pasa el cliente_id de la SESIÓN (42), no algo del request → anti-IDOR
@@ -117,7 +117,7 @@ class TestRemoveKey:
 
     def test_no_encontrada_404(self, monkeypatch):
         self._stub_counts(monkeypatch, passkeys=2, identities=0)
-        monkeypatch.setattr(passkey_store, "delete_for_owner", lambda *a, **k: False)
+        monkeypatch.setattr(passkey_commands, "delete_for_owner", lambda *a, **k: False)
         assert _client_con_stepup().delete("/cliente/auth/keys/passkey/99").status_code == 404
 
 
