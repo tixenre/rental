@@ -46,7 +46,17 @@ except ImportError:
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # `disable_existing_loggers=False`: el default de `fileConfig` (True) apaga
+    # (`.disabled = True`) TODO logger ya creado en el proceso que no esté
+    # explícito en `alembic.ini` — y `alembic upgrade` corre en el mismo
+    # proceso que la app (`main.py::_run_alembic_migrations`, en un thread de
+    # background en cada arranque), después de que TODOS los módulos ya
+    # importaron y crearon su `logger = logging.getLogger(__name__)`. Sin este
+    # flag, cada arranque apagaba el logging de casi todo el backend en
+    # silencio apenas terminaba la migración — visto también en tests (rompía
+    # `caplog` en cualquier test que corriera después de uno que llamara
+    # `init_db()`/alembic). Mismo flag que ya usa `logging_config.py`.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # DATABASE_URL del entorno tiene prioridad. Si no, fallback a localhost (dev).
 db_url = os.getenv("DATABASE_URL") or "postgresql://postgres:postgres@localhost/rambla_rental"
