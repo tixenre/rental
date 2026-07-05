@@ -475,13 +475,18 @@ export function DateRangePickerModal({
                 {jornadas - 1} {jornadas - 1 === 1 ? "jornada" : "jornadas"}.
               </span>
             </p>
+          ) : hasStart ? (
+            /* INFO: regla general de jornada — mismo tratamiento visual que la
+               antelación mínima de abajo (amber, no un hint apagado). */
+            <p className="flex items-center gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
+              <Clock className="h-3.5 w-3.5 shrink-0 text-amber" />
+              Devolver más tarde que la hora de retiro suma una jornada.
+            </p>
           ) : (
-            /* HINT: info contextual — cambia según si hay fecha o no */
+            /* HINT: sin fecha elegida aún */
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
-              {hasStart
-                ? "Horarios cada 30 min — sujeto a confirmación. Devolver más tarde que la hora de retiro suma una jornada."
-                : "Tocá un día en el calendario para fijar el retiro. La devolución se calcula sola."}
+              Tocá un día en el calendario para fijar el retiro. La devolución se calcula sola.
             </p>
           )}
 
