@@ -47,6 +47,7 @@ const AdminIndexLazyRouteImport = createFileRoute('/admin/')()
 const AdminUnidadesLazyRouteImport = createFileRoute('/admin/unidades')()
 const AdminSolicitudesLazyRouteImport = createFileRoute('/admin/solicitudes')()
 const AdminSettingsLazyRouteImport = createFileRoute('/admin/settings')()
+const AdminProductorasLazyRouteImport = createFileRoute('/admin/productoras')()
 const AdminPagosLazyRouteImport = createFileRoute('/admin/pagos')()
 const AdminMediaLazyRouteImport = createFileRoute('/admin/media')()
 const AdminMarcaLazyRouteImport = createFileRoute('/admin/marca')()
@@ -216,6 +217,13 @@ const AdminSettingsLazyRoute = AdminSettingsLazyRouteImport.update({
   getParentRoute: () => AdminRoute,
 } as any).lazy(() =>
   import('./routes/admin/settings.lazy').then((d) => d.Route),
+)
+const AdminProductorasLazyRoute = AdminProductorasLazyRouteImport.update({
+  id: '/productoras',
+  path: '/productoras',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/productoras.lazy').then((d) => d.Route),
 )
 const AdminPagosLazyRoute = AdminPagosLazyRouteImport.update({
   id: '/pagos',
@@ -561,6 +569,7 @@ export interface FileRoutesByFullPath {
   '/admin/marca': typeof AdminMarcaLazyRoute
   '/admin/media': typeof AdminMediaLazyRoute
   '/admin/pagos': typeof AdminPagosLazyRoute
+  '/admin/productoras': typeof AdminProductorasLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
   '/admin/unidades': typeof AdminUnidadesLazyRoute
@@ -623,6 +632,7 @@ export interface FileRoutesByTo {
   '/admin/marca': typeof AdminMarcaLazyRoute
   '/admin/media': typeof AdminMediaLazyRoute
   '/admin/pagos': typeof AdminPagosLazyRoute
+  '/admin/productoras': typeof AdminProductorasLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
   '/admin/unidades': typeof AdminUnidadesLazyRoute
@@ -693,6 +703,7 @@ export interface FileRoutesById {
   '/admin/marca': typeof AdminMarcaLazyRoute
   '/admin/media': typeof AdminMediaLazyRoute
   '/admin/pagos': typeof AdminPagosLazyRoute
+  '/admin/productoras': typeof AdminProductorasLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
   '/admin/unidades': typeof AdminUnidadesLazyRoute
@@ -764,6 +775,7 @@ export interface FileRouteTypes {
     | '/admin/marca'
     | '/admin/media'
     | '/admin/pagos'
+    | '/admin/productoras'
     | '/admin/settings'
     | '/admin/solicitudes'
     | '/admin/unidades'
@@ -826,6 +838,7 @@ export interface FileRouteTypes {
     | '/admin/marca'
     | '/admin/media'
     | '/admin/pagos'
+    | '/admin/productoras'
     | '/admin/settings'
     | '/admin/solicitudes'
     | '/admin/unidades'
@@ -895,6 +908,7 @@ export interface FileRouteTypes {
     | '/admin/marca'
     | '/admin/media'
     | '/admin/pagos'
+    | '/admin/productoras'
     | '/admin/settings'
     | '/admin/solicitudes'
     | '/admin/unidades'
@@ -1077,6 +1091,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/admin/settings'
       preLoaderRoute: typeof AdminSettingsLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/productoras': {
+      id: '/admin/productoras'
+      path: '/productoras'
+      fullPath: '/admin/productoras'
+      preLoaderRoute: typeof AdminProductorasLazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/pagos': {
@@ -1483,6 +1504,7 @@ interface AdminRouteChildren {
   AdminMarcaLazyRoute: typeof AdminMarcaLazyRoute
   AdminMediaLazyRoute: typeof AdminMediaLazyRoute
   AdminPagosLazyRoute: typeof AdminPagosLazyRoute
+  AdminProductorasLazyRoute: typeof AdminProductorasLazyRoute
   AdminSettingsLazyRoute: typeof AdminSettingsLazyRoute
   AdminSolicitudesLazyRoute: typeof AdminSolicitudesLazyRoute
   AdminUnidadesLazyRoute: typeof AdminUnidadesLazyRoute
@@ -1518,6 +1540,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminMarcaLazyRoute: AdminMarcaLazyRoute,
   AdminMediaLazyRoute: AdminMediaLazyRoute,
   AdminPagosLazyRoute: AdminPagosLazyRoute,
+  AdminProductorasLazyRoute: AdminProductorasLazyRoute,
   AdminSettingsLazyRoute: AdminSettingsLazyRoute,
   AdminSolicitudesLazyRoute: AdminSolicitudesLazyRoute,
   AdminUnidadesLazyRoute: AdminUnidadesLazyRoute,
