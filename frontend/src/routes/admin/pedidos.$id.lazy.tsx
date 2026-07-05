@@ -1318,18 +1318,46 @@ function FacturacionRailSection({
       )}
 
       <AlertDialog open={showPreview} onOpenChange={setShowPreview}>
-        <AlertDialogContent className="flex h-[85vh] w-full max-w-3xl flex-col overflow-hidden p-0">
-          <AlertDialogHeader className="border-b hairline px-6 py-4">
-            <AlertDialogTitle>Confirmar factura</AlertDialogTitle>
-            <AlertDialogDescription>
-              Revisá el documento antes de emitir — una vez que ARCA da el CAE, solo se puede
-              corregir con una Nota de Crédito.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+        <AlertDialogContent className="flex h-[94vh] w-[96vw] max-w-none flex-row overflow-hidden p-0">
+          {/* Columna izquierda: info + chequeos + acciones. Columna derecha: la factura a pantalla
+              completa de alto — el documento es lo que hay que mirar más de cerca, así que se le
+              da todo el espacio vertical posible en vez de compartirlo con un resumen en texto. */}
+          <div className="flex w-[360px] shrink-0 flex-col overflow-y-auto border-r hairline">
+            <AlertDialogHeader className="px-5 py-4 text-left">
+              <AlertDialogTitle>Confirmar factura</AlertDialogTitle>
+              <AlertDialogDescription>
+                Revisá el documento antes de emitir — una vez que ARCA da el CAE, solo se puede
+                corregir con una Nota de Crédito.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
 
-          <div className="relative flex-1 overflow-hidden bg-white">
+            <div className="flex-1 px-5">
+              {preview.isPending && (
+                <div className="py-2 text-sm text-muted-foreground">Chequeando…</div>
+              )}
+              {preview.isError && (
+                <div className="py-2 text-sm text-destructive">
+                  {(preview.error as Error).message}
+                </div>
+              )}
+              {preview.data && <Chequeos items={preview.data.chequeos} />}
+            </div>
+
+            <AlertDialogFooter className="flex-col gap-2 border-t hairline px-5 py-4 sm:flex-col">
+              <AlertDialogAction
+                disabled={!preview.data?.listo || facturar.isPending}
+                onClick={() => facturar.mutate()}
+                className="w-full"
+              >
+                {facturar.isPending ? "Emitiendo…" : "Confirmar y emitir"}
+              </AlertDialogAction>
+              <AlertDialogCancel className="w-full">Cancelar</AlertDialogCancel>
+            </AlertDialogFooter>
+          </div>
+
+          <div className="relative flex-1 overflow-hidden bg-[#e5e5e5]">
             {!facturaHtmlError && (!facturaBlobUrl || !facturaIframeReady) && (
-              <div className="absolute inset-0 flex items-center justify-center gap-2 bg-white text-sm text-muted-foreground">
+              <div className="absolute inset-0 flex items-center justify-center gap-2 bg-[#e5e5e5] text-sm text-muted-foreground">
                 <Spinner size="sm" />
                 Armando la factura…
               </div>
@@ -1349,30 +1377,6 @@ function FacturacionRailSection({
               />
             )}
           </div>
-
-          {preview.isPending && (
-            <div className="px-6 py-2 text-sm text-muted-foreground">Chequeando…</div>
-          )}
-          {preview.isError && (
-            <div className="px-6 py-2 text-sm text-destructive">
-              {(preview.error as Error).message}
-            </div>
-          )}
-          {preview.data && (
-            <div className="border-t hairline px-6 py-3">
-              <Chequeos items={preview.data.chequeos} />
-            </div>
-          )}
-
-          <AlertDialogFooter className="border-t hairline px-6 py-4">
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={!preview.data?.listo || facturar.isPending}
-              onClick={() => facturar.mutate()}
-            >
-              {facturar.isPending ? "Emitiendo…" : "Confirmar y emitir"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </RailSection>
