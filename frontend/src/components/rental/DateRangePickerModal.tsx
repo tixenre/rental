@@ -517,17 +517,17 @@ export function DateRangePickerModal({
                el aviso de stock de arriba: el amber es color de marca (chrome del picker),
                un aviso real necesita un color que no compita con eso. El backend manda el
                mensaje completo (fuente de la REGLA, #1237); acá solo separamos la cláusula
-               antes del guión largo para resaltarla en negrita — presentación, no criterio. */
+               antes de la primera coma para resaltarla en negrita — presentación, no criterio. */
             <div className="rounded-md bg-naranja/12 border border-naranja/45 px-2.5 py-2 text-sm text-ink space-y-1.5">
               {disclaimers.map((d) => {
-                const [headline, ...restParts] = d.mensaje.split(" — ");
-                const rest = restParts.join(" — ");
+                const [headline, ...restParts] = d.mensaje.split(", ");
+                const rest = restParts.join(", ");
                 return (
                   <p key={d.check} className="flex items-start gap-1.5">
                     <Clock className="h-4 w-4 shrink-0 text-naranja mt-0.5" />
                     <span>
                       <strong className="font-semibold">{headline}</strong>
-                      {rest && <> — {rest}</>}
+                      {rest && <>, {rest}</>}
                     </span>
                   </p>
                 );

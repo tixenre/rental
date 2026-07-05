@@ -269,8 +269,8 @@ def disclaimers_retiro(conn, fecha_desde: str | None, fecha_hasta: str | None) -
         avisos.append({
             "check": "antelacion",
             "mensaje": (
-                f"Reservás online con al menos {horas} h de anticipación "
-                "— por eso no ves horas más cercanas a ahora."
+                f"Reservás online con al menos {horas} h de anticipación, "
+                "por eso no ves horas más cercanas a ahora."
             ),
         })
 
