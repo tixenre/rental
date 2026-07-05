@@ -11,7 +11,10 @@ Si reaparece un `?` SQL (típico: un PR que ramificó antes de la migración y r
 un `%s`), este test falla y obliga a volver a `%s`.
 
 Excluye: `database/core.py` (el wrapper, que documenta el patrón), `tests/`, y
-`migrations/` (Alembic corre SQL aparte).
+`migrations/` (Alembic corre SQL aparte). También `.venv/`/`venv/` — sin esto, un
+`.venv` local dentro de `backend/` hace que el walk parsee paquetes de terceros
+instalados y dispare falsos positivos (nunca pasa en CI, que instala las deps
+globales sin un venv anidado ahí).
 """
 import ast
 import os
@@ -28,7 +31,7 @@ _SQL_QMARK = re.compile(
 )
 
 _BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_SKIP = ("/tests/", "/migrations/", "database/core.py")
+_SKIP = ("/tests/", "/migrations/", "database/core.py", "/.venv/", "/venv/")
 
 
 def _literal_texts(node):
