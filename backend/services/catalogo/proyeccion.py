@@ -34,6 +34,7 @@ from reservas.disponibilidad import _derivar_compuestos
 from reservas.semantics import componentes_de
 from services.contenido import contenido_de
 from services.categorias import listar_categorias_flat
+from services.specs import get_equipo_specs_rows
 
 
 # ── Constantes de ordenamiento (espejo de routes/equipos/core.py) ─────────────
@@ -178,8 +179,13 @@ def proyectar_lista(
     equipos = attach_kit(conn, equipos)
     equipos = attach_categorias(conn, equipos)
     equipos = attach_ficha(conn, equipos)
-    equipos = attach_specs_estructuradas(conn, equipos)
-    equipos = attach_specs_destacados(conn, equipos)
+    # Un solo query para las dos: attach_specs_estructuradas y
+    # attach_specs_destacados piden el mismo JOIN (equipo_specs+spec_definitions+
+    # categoria_spec_templates) para el mismo lote de ids — pedirlo acá evita
+    # ejecutarlo dos veces en cada carga de catálogo.
+    specs_rows = get_equipo_specs_rows(conn, [e["id"] for e in equipos])
+    equipos = attach_specs_estructuradas(conn, equipos, rows_by_equipo=specs_rows)
+    equipos = attach_specs_destacados(conn, equipos, rows_by_equipo=specs_rows)
 
     # Combos: precio efectivo (derivado de componentes), no el crudo de la tabla.
     combo_ids = [e["id"] for e in equipos if e.get("tipo") == "combo"]

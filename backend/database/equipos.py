@@ -88,16 +88,21 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
     return equipos
 
 
-def attach_specs_destacados(conn, equipos: list[dict]) -> list[dict]:
+def attach_specs_destacados(conn, equipos: list[dict], rows_by_equipo: dict | None = None) -> list[dict]:
     """Agrega `specs_destacados` a cada equipo: lista [{label, value}] de las
-    specs con sd.favorito=true en spec_definitions."""
+    specs con sd.favorito=true en spec_definitions.
+
+    `rows_by_equipo`: resultado ya calculado de `get_equipo_specs_rows` (mismo
+    JOIN que pide `attach_specs_estructuradas`) — pasalo si ya lo pediste vos,
+    para no ejecutar el mismo query dos veces en la misma carga de catálogo."""
     if not equipos:
         return equipos
     from services.spec_render import render_spec_value
     from services.specs import get_equipo_specs_rows
 
     ids = [e["id"] for e in equipos]
-    rows_by_equipo = get_equipo_specs_rows(conn, ids)
+    if rows_by_equipo is None:
+        rows_by_equipo = get_equipo_specs_rows(conn, ids)
 
     dest_map: dict[int, list[dict]] = {e["id"]: [] for e in equipos}
     for eid in ids:
@@ -134,7 +139,7 @@ def attach_specs_destacados(conn, equipos: list[dict]) -> list[dict]:
     return equipos
 
 
-def attach_specs_estructuradas(conn, equipos: list[dict]) -> list[dict]:
+def attach_specs_estructuradas(conn, equipos: list[dict], rows_by_equipo: dict | None = None) -> list[dict]:
     """Agrega `specs` (dict) a cada equipo con TODAS las specs estructuradas
     desde equipo_specs JOIN spec_definitions JOIN categoria_spec_templates.
 
@@ -145,6 +150,10 @@ def attach_specs_estructuradas(conn, equipos: list[dict]) -> list[dict]:
     Solo incluye specs cuyo `spec_def` esté asignado al template de
     alguna categoría del equipo (descartando orfanos cross-cat).
     Flags y prioridad vienen de spec_definitions (sd), no de categoria_spec_templates.
+
+    `rows_by_equipo`: resultado ya calculado de `get_equipo_specs_rows` (mismo
+    JOIN que pide `attach_specs_destacados`) — pasalo si ya lo pediste vos,
+    para no ejecutar el mismo query dos veces en la misma carga de catálogo.
     """
     if not equipos:
         return equipos
@@ -152,7 +161,8 @@ def attach_specs_estructuradas(conn, equipos: list[dict]) -> list[dict]:
     from services.specs import get_equipo_specs_rows
 
     ids = [e["id"] for e in equipos]
-    rows_by_equipo = get_equipo_specs_rows(conn, ids)
+    if rows_by_equipo is None:
+        rows_by_equipo = get_equipo_specs_rows(conn, ids)
 
     _BOOL_FALSE = frozenset({"false", "no", "0", "n", "falso", "off", "disabled"})
 
