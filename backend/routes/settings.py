@@ -159,6 +159,11 @@ ALLOWED_SETTINGS_KEYS = {
     "buffer_horas_alquiler",  # Horas de prep/revisión exigidas entre alquileres. Int >= 0.
     "antelacion_minima_horas",  # Lead-time: horas mín. de antelación para reservar online (#1126). Int >= 0. 0 = apagado.
     "horarios_retiro",   # Horas habilitadas de retiro/devolución por día de semana. JSON.
+    # ── Texto de los disclaimers del picker público (services/fechas.py::disclaimers_retiro) ──
+    # Editable para que el dueño ajuste la redacción sin pedir un cambio de código.
+    # Vacío → cae al default hardcodeado (ver DEFAULT_* en services/fechas.py).
+    "disclaimer_antelacion_texto",       # Admite el placeholder literal "{horas}".
+    "disclaimer_horarios_finde_texto",
     "faq_json",          # Preguntas frecuentes editables. JSON [{title, items:[{q,a}]}].
     "hero_taglines",     # Taglines del hero del catálogo. JSON [[línea1, línea2], ...].
     # ── Datos del negocio (editables desde "Diseño y marca") ─────────
@@ -221,6 +226,8 @@ CLEARABLE_SETTINGS_KEYS = {
     "business_email",
     "business_instagram",
     "ga4_measurement_id",  # Vaciarlo apaga Google Analytics.
+    "disclaimer_antelacion_texto",       # Vaciarlo vuelve al texto default.
+    "disclaimer_horarios_finde_texto",
 }
 
 # Formato de un Measurement ID de GA4: 'G-' seguido de alfanuméricos.
@@ -368,6 +375,8 @@ def update_setting(key: str, payload: dict, request: Request):
                 "Measurement ID inválido. Tiene que ser como 'G-XXXXXXXXXX' "
                 "(lo sacás de Google Analytics → Admin → Flujos de datos → Web).",
             )
+    if key in ("disclaimer_antelacion_texto", "disclaimer_horarios_finde_texto") and len(value) > 300:
+        raise HTTPException(400, "Texto demasiado largo (máx. 300 caracteres)")
     if key == "horarios_retiro":
         value = _validar_horarios(value)
     if key == "faq_json":

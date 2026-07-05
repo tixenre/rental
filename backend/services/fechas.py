@@ -247,6 +247,28 @@ def dia_fin_de_semana_reducido(horarios: dict | None, fecha: datetime.date) -> b
 # muestra `mensaje` — mismo shape `{check, mensaje}` que el portero del
 # checkout (`services/checkout/validar.py::_falta`, sin el campo `accion`
 # porque acá no hay una ruta a la que mandar al usuario, solo información).
+#
+# El TEXTO también es editable desde el back-office (`app_settings`, no solo
+# la REGLA) — antes era un string hardcodeado acá, así que ajustar la
+# redacción (una coma, una palabra) exigía un cambio de código. Default =
+# lo que se mostraba antes; `{horas}` en el texto de antelación se reemplaza
+# por el valor configurado (placeholder literal, no `.format()` — un texto
+# libre con `{`/`}` sueltos no debe poder romper el render).
+
+DEFAULT_MSG_ANTELACION = (
+    "Reservás online con al menos {horas} h de anticipación, "
+    "por eso no ves horas más cercanas a ahora."
+)
+DEFAULT_MSG_HORARIOS_FINDE = "Sábados y domingos tenemos horarios reducidos."
+
+
+def _texto_setting(conn, key: str, default: str) -> str:
+    """Lee un setting de TEXTO libre de `app_settings` con fallback. Fail-open:
+    ausente/vacío → `default`. Fuente única para los textos editables de los
+    disclaimers del picker (antes duplicado ad-hoc)."""
+    row = conn.execute("SELECT value FROM app_settings WHERE key = %s", (key,)).fetchone()
+    value = row["value"] if row else None
+    return value.strip() if value and value.strip() else default
 
 
 def disclaimers_retiro(conn, fecha_desde: str | None, fecha_hasta: str | None) -> list[dict]:
@@ -266,12 +288,10 @@ def disclaimers_retiro(conn, fecha_desde: str | None, fecha_hasta: str | None) -
 
     horas = antelacion_minima_horas(conn)
     if horas > 0:
+        texto = _texto_setting(conn, "disclaimer_antelacion_texto", DEFAULT_MSG_ANTELACION)
         avisos.append({
             "check": "antelacion",
-            "mensaje": (
-                f"Reservás online con al menos {horas} h de anticipación, "
-                "por eso no ves horas más cercanas a ahora."
-            ),
+            "mensaje": texto.replace("{horas}", str(horas)),
         })
 
     horarios = horarios_habilitados(conn)
@@ -280,7 +300,9 @@ def disclaimers_retiro(conn, fecha_desde: str | None, fecha_hasta: str | None) -
         if any(dia_fin_de_semana_reducido(horarios, d.date()) for d in fechas):
             avisos.append({
                 "check": "horarios_finde",
-                "mensaje": "Sábados y domingos tenemos horarios reducidos.",
+                "mensaje": _texto_setting(
+                    conn, "disclaimer_horarios_finde_texto", DEFAULT_MSG_HORARIOS_FINDE
+                ),
             })
 
     return avisos

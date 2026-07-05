@@ -1,11 +1,88 @@
+/**
+ * HorariosSection — todo lo que controla el picker de fechas público, en una
+ * sola card: antelación mínima (ex-`LeadTimeSection`, fusionada acá porque
+ * las dos cosas alimentan el mismo picker y antes vivían en secciones
+ * separadas sin relación visible), horarios habilitados por día, y el TEXTO
+ * de los dos avisos que arma `services/fechas.py::disclaimers_retiro` (#1237)
+ * — antes hardcodeado en Python, ahora editable para no tener que pedir un
+ * cambio de código por una coma.
+ */
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
+import { Textarea } from "@/design-system/ui/textarea";
+import { Spinner } from "@/design-system/ui/spinner";
 
 import { adminApi } from "@/lib/admin/api";
+
+// ── Antelación mínima (lead-time, #1126) ────────────────────────────────────
+
+function LeadTimeBlock() {
+  const qc = useQueryClient();
+  const [valor, setValor] = useState("");
+
+  const settingQ = useQuery({
+    queryKey: ["settings", "antelacion_minima_horas"],
+    queryFn: () => adminApi.getSetting("antelacion_minima_horas"),
+    staleTime: 0,
+  });
+
+  useEffect(() => {
+    if (settingQ.data && valor === "") setValor(settingQ.data.value ?? "0");
+  }, [settingQ.data, valor]);
+
+  const updateMut = useMutation({
+    mutationFn: (v: string) => adminApi.updateSetting("antelacion_minima_horas", v),
+    onSuccess: () => {
+      toast.success("Antelación mínima actualizada");
+      qc.invalidateQueries({ queryKey: ["settings"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const actual = settingQ.data?.value ?? "0";
+  const dirty = valor.trim() !== actual && valor.trim() !== "";
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <h3 className="text-sm font-semibold text-ink">Antelación mínima</h3>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Horas mínimas entre el pedido y el retiro para reservar online. Dentro de esa ventana el
+          cliente no puede confirmar por la web (ve el aviso de abajo). Poné 0 para desactivarlo. El
+          admin nunca queda limitado.
+        </p>
+      </div>
+      <div className="flex items-end gap-2">
+        <div className="space-y-1">
+          <div className="text-2xs uppercase tracking-wide text-muted-foreground">
+            Horas de antelación
+          </div>
+          <Input
+            type="number"
+            min={0}
+            className="w-28"
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+          />
+        </div>
+        <Button
+          size="sm"
+          onClick={() => updateMut.mutate(String(Math.max(0, Math.floor(Number(valor) || 0))))}
+          disabled={!dirty || updateMut.isPending}
+        >
+          {updateMut.isPending ? "Guardando…" : "Guardar"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Horarios habilitados por día ─────────────────────────────────────────────
 
 const DIAS_ORDEN: Array<[string, string]> = [
   ["lun", "Lunes"],
@@ -19,7 +96,7 @@ const DIAS_ORDEN: Array<[string, string]> = [
 type DiaCfg = { abierto: boolean; desde: string; hasta: string };
 const DEFAULT_DIA: DiaCfg = { abierto: true, desde: "09:00", hasta: "18:00" };
 
-export function HorariosSection() {
+function HorariosGridBlock() {
   const qc = useQueryClient();
   const [cfg, setCfg] = useState<Record<string, DiaCfg> | null>(null);
 
@@ -87,16 +164,16 @@ export function HorariosSection() {
   };
 
   return (
-    <section className="rounded-lg border hairline bg-background p-4 space-y-3">
+    <div className="space-y-2">
       <div>
-        <h2 className="font-display text-lg text-ink">Horarios de retiro y devolución</h2>
+        <h3 className="text-sm font-semibold text-ink">Horarios de retiro y devolución</h3>
         <p className="text-xs text-muted-foreground mt-0.5">
           Franja horaria habilitada por día para que el cliente elija retiro y devolución (misma
           franja para ambos). Los días cerrados no se pueden seleccionar. Aplica al checkout del
           cliente — los pedidos cargados a mano en el back-office no se restringen.
         </p>
       </div>
-      <div className="border-t hairline pt-3 space-y-2">
+      <div className="space-y-2">
         {cfg &&
           DIAS_ORDEN.map(([key, label]) => {
             const d = cfg[key];
@@ -141,6 +218,125 @@ export function HorariosSection() {
           <Button size="sm" onClick={save} disabled={!cfg || updateMut.isPending}>
             {updateMut.isPending ? "Guardando…" : "Guardar horarios"}
           </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Texto de los avisos del picker (#1237) ───────────────────────────────────
+// Antes hardcodeado en `services/fechas.py::disclaimers_retiro` — ahora
+// editable acá (vacío = vuelve al texto por defecto, misma convención que
+// `ContactoSection`). El backend sigue siendo dueño de la REGLA (¿corresponde
+// avisar?); esto solo cambia la redacción.
+
+type DisclaimerField = {
+  key: "disclaimer_antelacion_texto" | "disclaimer_horarios_finde_texto";
+  label: string;
+  placeholder: string;
+  helper: string;
+};
+
+const DISCLAIMER_FIELDS: DisclaimerField[] = [
+  {
+    key: "disclaimer_antelacion_texto",
+    label: "Aviso de antelación mínima",
+    placeholder:
+      "Reservás online con al menos {horas} h de anticipación, por eso no ves horas más cercanas a ahora.",
+    helper:
+      "Aparece cuando la antelación mínima de arriba está prendida. Usá {horas} para insertar el número configurado.",
+  },
+  {
+    key: "disclaimer_horarios_finde_texto",
+    label: "Aviso de horarios de fin de semana",
+    placeholder: "Sábados y domingos tenemos horarios reducidos.",
+    helper:
+      "Aparece solo si el cliente elige un sábado o domingo con horario más corto que un día de semana.",
+  },
+];
+
+function DisclaimerFieldRow({ field }: { field: DisclaimerField }) {
+  const qc = useQueryClient();
+  const settingQ = useQuery({
+    queryKey: ["settings", field.key],
+    queryFn: () => adminApi.getSetting(field.key),
+    retry: false,
+    staleTime: 0,
+  });
+  const [value, setValue] = useState("");
+  useEffect(() => {
+    if (settingQ.isFetched && value === "") setValue(settingQ.data?.value ?? "");
+  }, [settingQ.isFetched, settingQ.data, value]);
+
+  const mut = useMutation({
+    mutationFn: (v: string) => adminApi.updateSetting(field.key, v),
+    onSuccess: (data) => {
+      toast.success(`${field.label} guardado`);
+      qc.setQueryData(["settings", field.key], data);
+      qc.invalidateQueries({ queryKey: ["settings"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const trimmed = value.trim();
+  const saved = (settingQ.data?.value ?? "").trim();
+  const changed = trimmed !== saved;
+
+  return (
+    <div className="space-y-1.5">
+      <div className="text-xs font-medium text-ink">{field.label}</div>
+      <Textarea
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={field.placeholder}
+        rows={3}
+        className="text-sm"
+      />
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">{field.helper}</p>
+        <Button
+          type="button"
+          size="sm"
+          disabled={!changed || mut.isPending}
+          onClick={() => mut.mutate(trimmed)}
+        >
+          {mut.isPending ? <Spinner size="sm" /> : <Check className="h-4 w-4" />}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Section ──────────────────────────────────────────────────────────────────
+
+export function HorariosSection() {
+  return (
+    <section className="rounded-lg border hairline bg-background p-4 space-y-5">
+      <div>
+        <h2 className="font-display text-lg text-ink">Horarios y avisos del picker</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Todo lo que controla el selector de fechas del catálogo público: cuánta antelación pedís,
+          qué horarios habilitás por día, y qué texto ve el cliente en los avisos.
+        </p>
+      </div>
+
+      <LeadTimeBlock />
+
+      <div className="border-t hairline pt-4">
+        <HorariosGridBlock />
+      </div>
+
+      <div className="border-t hairline pt-4 space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-ink">Texto de los avisos</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Editá la redacción que ve el cliente en el picker. Vacío = vuelve al texto por defecto.
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          {DISCLAIMER_FIELDS.map((f) => (
+            <DisclaimerFieldRow key={f.key} field={f} />
+          ))}
         </div>
       </div>
     </section>

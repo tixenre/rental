@@ -358,3 +358,33 @@ def test_disclaimers_ambos_a_la_vez():
     fecha = f"{proximo_finde.isoformat()}T10:00"
     avisos = disclaimers_retiro(conn, fecha, None)
     assert {a["check"] for a in avisos} == {"antelacion", "horarios_finde"}
+
+
+# ── Texto editable de los disclaimers (app_settings) ────────────────────────
+
+
+def test_disclaimers_antelacion_usa_texto_custom_con_placeholder():
+    conn = _FakeConnByKey({
+        "antelacion_minima_horas": "12",
+        "disclaimer_antelacion_texto": "Ojo: pedimos {horas}hs mínimo de antelación.",
+    })
+    avisos = disclaimers_retiro(conn, None, None)
+    assert avisos[0]["mensaje"] == "Ojo: pedimos 12hs mínimo de antelación."
+
+
+def test_disclaimers_antelacion_texto_vacio_cae_al_default():
+    conn = _FakeConnByKey({
+        "antelacion_minima_horas": "12",
+        "disclaimer_antelacion_texto": "   ",
+    })
+    avisos = disclaimers_retiro(conn, None, None)
+    assert "12 h" in avisos[0]["mensaje"]
+
+
+def test_disclaimers_horarios_finde_usa_texto_custom():
+    conn = _FakeConnByKey({
+        "horarios_retiro": json.dumps(_HORARIOS_REDUCIDOS),
+        "disclaimer_horarios_finde_texto": "Finde: horario acotado.",
+    })
+    avisos = disclaimers_retiro(conn, "2026-07-04T10:00", None)  # sábado
+    assert avisos == [{"check": "horarios_finde", "mensaje": "Finde: horario acotado."}]
