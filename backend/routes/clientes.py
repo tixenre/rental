@@ -21,6 +21,7 @@ from clientes.queries import fiscal as queries_fiscal
 from clientes.queries import historial as queries_historial
 from clientes.commands import cliente as commands_cliente
 from routes.contabilidad import map_pg_errors
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
 
 router = APIRouter()
 
@@ -111,7 +112,8 @@ class MergeClientesIn(BaseModel):
 
 
 @router.post("/clientes/merge")
-def merge_clientes(body: MergeClientesIn, request: Request):
+@limiter.limit(ADMIN_WRITE_LIMIT)
+def merge_clientes(request: Request, body: MergeClientesIn):
     """Fusiona dos clientes que son la MISMA persona: mueve pedidos / datos / llaves /
     bitácora de `source` a `target` y borra `source`. **Destructivo e irreversible** →
     require_admin + las guardas del motor (rehúsa perder una identidad verificada o unir
@@ -133,7 +135,8 @@ class InvitarClienteIn(BaseModel):
 
 
 @router.post("/clientes/invitar")
-def invitar_cliente(body: InvitarClienteIn, request: Request):
+@limiter.limit(ADMIN_WRITE_LIMIT)
+def invitar_cliente(request: Request, body: InvitarClienteIn):
     """Crea (o reusa) una cuenta por email y devuelve un LINK de invitación single-use
     para que el cliente la reclame (active la cuenta + registre su passkey). El admin lo
     manda por donde quiera — mismo patrón que el link de verificación (no se manda mail
@@ -209,8 +212,9 @@ def get_cliente_perfiles_fiscales(id: int, request: Request):
 
 
 @router.post("/clientes", status_code=201)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 @map_pg_errors
-def create_cliente(data: ClienteCreate, request: Request):
+def create_cliente(request: Request, data: ClienteCreate):
     require_admin(request)
     with get_db() as conn:
         try:
@@ -221,8 +225,9 @@ def create_cliente(data: ClienteCreate, request: Request):
 
 
 @router.patch("/clientes/{id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 @map_pg_errors
-def update_cliente(id: int, data: ClienteUpdate, request: Request):
+def update_cliente(request: Request, id: int, data: ClienteUpdate):
     require_admin(request)
     with get_db() as conn:
         try:
@@ -240,8 +245,9 @@ def update_cliente(id: int, data: ClienteUpdate, request: Request):
 
 
 @router.delete("/clientes/{id}", status_code=204)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 @map_pg_errors
-def delete_cliente(id: int, request: Request):
+def delete_cliente(request: Request, id: int):
     require_admin(request)
     with get_db() as conn:
         try:
