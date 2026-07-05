@@ -177,7 +177,11 @@ export default tseslint.config(
   {
     // Tier 4 (marca de terceros): el componente es enteramente la identidad de
     // WhatsApp (verde de WhatsApp). Ver docs/DESIGN_SYSTEM.md → Tiers de color.
-    files: ["src/components/admin/WhatsAppButton.tsx"],
+    // WhatsAppLinkButton = mismo botón sin plantillas (contextos sin pedido en foco).
+    files: [
+      "src/components/admin/WhatsAppButton.tsx",
+      "src/components/admin/WhatsAppLinkButton.tsx",
+    ],
     rules: { "no-restricted-syntax": "off" },
   },
   {

@@ -21,7 +21,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
-import { Check, Copy, Search, ShieldAlert, ShieldCheck } from "lucide-react";
+import {
+  BadgeCheck,
+  Check,
+  ChevronDown,
+  Copy,
+  Plus,
+  Search,
+  ShieldAlert,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 
 import {
   Dialog,
@@ -41,12 +51,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/design-system/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/design-system/ui/dropdown-menu";
 import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
+import { WhatsAppLinkButton } from "@/components/admin/WhatsAppLinkButton";
 
 import { adminApi, ESTADO_LABEL, type Cliente, type ClienteInput } from "@/lib/admin/api";
 import { usePadronLookup } from "@/lib/admin/usePadronLookup";
 import { AuthedHttpError } from "@/lib/authedFetch";
 import { fmtArs, formatFechaDisplay } from "@/lib/format";
+import { PERFIL_IMPUESTOS_LABEL, type PerfilImpuestos } from "@/lib/iva";
 
 type Props = {
   open: boolean;
@@ -200,10 +218,34 @@ export function ClienteDetalleDialog({ open, onOpenChange, cliente, onSaved }: P
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {editing ? cliente!.nombre_legal || "Cliente" : "Nuevo cliente"}
-          </DialogTitle>
-          <DialogDescription>Datos de contacto y condiciones fiscales.</DialogDescription>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <DialogTitle>
+                {editing ? cliente!.nombre_legal || "Cliente" : "Nuevo cliente"}
+              </DialogTitle>
+              <DialogDescription>Datos de contacto y condiciones fiscales.</DialogDescription>
+            </div>
+            {editing && (
+              <div className="flex shrink-0 gap-1.5 pr-6">
+                <WhatsAppLinkButton phone={cliente!.telefono} />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() =>
+                    navigate({
+                      to: "/admin/pedidos/nuevo",
+                      search: { cliente_id: cliente!.id } as never,
+                    })
+                  }
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Nuevo pedido
+                </Button>
+              </div>
+            )}
+          </div>
         </DialogHeader>
 
         <form onSubmit={submit} className="space-y-4">
@@ -349,40 +391,59 @@ export function ClienteDetalleDialog({ open, onOpenChange, cliente, onSaved }: P
 
           {/* #1240: perfiles fiscales personales + productoras vinculadas — solo
               lectura (la gestión real vive en el self-service del cliente y en
-              /admin/productoras). */}
+              /admin/productoras). Misma tarjeta que el portal
+              (ClientePortalHelpers.tsx::FacturacionForm) — BadgeCheck + pill
+              default + condición IVA + domicilio, no una lista pelada. */}
           {!!(
             perfilesFiscalesQ.data?.perfiles.length || perfilesFiscalesQ.data?.productoras.length
           ) && (
-            <div className="space-y-2 rounded-lg border hairline p-3 text-sm">
+            <div className="space-y-4">
               {!!perfilesFiscalesQ.data?.perfiles.length && (
-                <div>
-                  <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Perfiles fiscales personales
                   </div>
-                  <ul className="space-y-0.5">
-                    {perfilesFiscalesQ.data.perfiles.map((p) => (
-                      <li key={p.id} className="text-ink">
-                        {p.etiqueta || p.razon_social || p.cuit} · {p.cuit}
+                  {perfilesFiscalesQ.data.perfiles.map((p) => (
+                    <div key={p.id} className="rounded-md border hairline p-3">
+                      <div className="flex items-center gap-1.5 text-sm font-medium text-ink">
+                        <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-verde-ink" />
+                        {p.etiqueta || p.razon_social || p.cuit}
                         {p.es_default && (
-                          <span className="ml-1.5 text-xs text-muted-foreground">(default)</span>
+                          <span className="rounded-full bg-verde/15 px-2 py-0.5 text-3xs font-semibold uppercase tracking-wider text-verde-ink">
+                            Default
+                          </span>
                         )}
-                      </li>
-                    ))}
-                  </ul>
+                      </div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {p.cuit} ·{" "}
+                        {PERFIL_IMPUESTOS_LABEL[p.perfil_impuestos as PerfilImpuestos] ??
+                          p.perfil_impuestos}
+                      </div>
+                      {p.domicilio_fiscal && (
+                        <div className="text-xs text-muted-foreground">{p.domicilio_fiscal}</div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
               {!!perfilesFiscalesQ.data?.productoras.length && (
-                <div>
-                  <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Productoras vinculadas
                   </div>
-                  <ul className="space-y-0.5">
-                    {perfilesFiscalesQ.data.productoras.map((pr) => (
-                      <li key={pr.id} className="text-ink">
-                        {pr.razon_social || pr.cuit} · {pr.cuit}
-                      </li>
-                    ))}
-                  </ul>
+                  {perfilesFiscalesQ.data.productoras.map((pr) => (
+                    <div key={pr.id} className="rounded-md border hairline p-3">
+                      <div className="flex items-center gap-1.5 text-sm font-medium text-ink">
+                        <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        {pr.razon_social || pr.cuit}
+                      </div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {pr.cuit} ·{" "}
+                        {PERFIL_IMPUESTOS_LABEL[pr.perfil_impuestos as PerfilImpuestos] ??
+                          pr.perfil_impuestos}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -459,11 +520,31 @@ function ReadOnlyField({
   value: string | null | undefined;
   className?: string;
 }) {
+  const [copiado, setCopiado] = useState(false);
   return (
     <div className={`space-y-1 ${className}`}>
       <Label className="text-muted-foreground">{label}</Label>
-      <div className="rounded-md border border-border/50 bg-muted/40 px-3 py-2 text-sm text-ink">
-        {value || "—"}
+      <div className="flex items-center gap-2 rounded-md border border-border/50 bg-muted/40 px-3 py-2 text-sm text-ink">
+        <span className="flex-1 truncate">{value || "—"}</span>
+        {value && (
+          <button
+            type="button"
+            aria-label={`Copiar ${label.toLowerCase()}`}
+            title={`Copiar ${label.toLowerCase()}`}
+            onClick={() => {
+              navigator.clipboard.writeText(value);
+              setCopiado(true);
+              setTimeout(() => setCopiado(false), 2000);
+            }}
+            className="shrink-0 text-muted-foreground transition-colors hover:text-ink"
+          >
+            {copiado ? (
+              <Check className="h-3.5 w-3.5 text-verde-ink" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -578,56 +659,69 @@ function IdentidadSinVerificar({
 }) {
   return (
     <div className="rounded-lg border hairline px-3 py-2.5 space-y-2.5">
-      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-        <ShieldAlert className="h-4 w-4 shrink-0" />
-        Identidad sin verificar
-        {cliente.dni_verificacion_estado === "rechazado" && " — rechazada por Didit"}
-        {cliente.dni_verificacion_estado === "en_revision" && " — en revisión en Didit"}
-      </div>
-      {cliente.dni_verificacion_motivo && (
-        <p className="text-xs text-muted-foreground">{cliente.dni_verificacion_motivo}</p>
-      )}
-      <div className="space-y-1">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={rechequeando}
-          onClick={() => onRechequear()}
-        >
-          <ShieldCheck className="h-3.5 w-3.5" />
-          {rechequeando ? "Consultando a Didit…" : "Re-chequear con Didit"}
-        </Button>
-        <p className="text-2xs text-muted-foreground">
-          Le vuelve a preguntar a Didit — revisa todo el historial de intentos del cliente, no solo
-          el último, así encuentra la sesión aprobada aunque haya reintentado después. Si nunca
-          inició una verificación, no hace nada.
-        </p>
-        <details className="text-2xs">
-          <summary className="cursor-pointer text-muted-foreground select-none">
-            ¿Sabés el session_id exacto? Consultalo directo
-          </summary>
-          <div className="mt-1.5 flex items-center gap-2">
-            <Input
-              value={sessionIdManual}
-              onChange={(e) => onSessionIdManualChange(e.target.value)}
-              placeholder="session_id de Didit (ej. de una sesión sin historial acá)"
-              className="flex-1 font-mono text-xs"
-            />
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <ShieldAlert className="h-4 w-4 shrink-0" />
+          Identidad sin verificar
+          {cliente.dni_verificacion_estado === "rechazado" && " — rechazada por Didit"}
+          {cliente.dni_verificacion_estado === "en_revision" && " — en revisión en Didit"}
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              disabled={rechequeando || !sessionIdManual.trim()}
-              onClick={() => onRechequear(sessionIdManual.trim())}
+              disabled={rechequeando || generando}
               className="shrink-0"
             >
-              Consultar
+              Acciones
+              <ChevronDown className="h-3.5 w-3.5" />
             </Button>
-          </div>
-        </details>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              disabled={rechequeando}
+              onClick={() => onRechequear()}
+              title="Le vuelve a preguntar a Didit — revisa todo el historial de intentos del cliente, no solo el último."
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              {rechequeando ? "Consultando a Didit…" : "Re-chequear con Didit"}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={generando} onClick={onGenerarLink}>
+              <ShieldCheck className="h-3.5 w-3.5" />
+              {generando ? "Generando…" : "Generar link de verificación"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-      {linkVerif ? (
+      {cliente.dni_verificacion_motivo && (
+        <p className="text-xs text-muted-foreground">{cliente.dni_verificacion_motivo}</p>
+      )}
+      <details className="text-2xs">
+        <summary className="cursor-pointer text-muted-foreground select-none">
+          ¿Sabés el session_id exacto de Didit? Consultalo directo
+        </summary>
+        <div className="mt-1.5 flex items-center gap-2">
+          <Input
+            value={sessionIdManual}
+            onChange={(e) => onSessionIdManualChange(e.target.value)}
+            placeholder="session_id de Didit (ej. de una sesión sin historial acá)"
+            className="flex-1 font-mono text-xs"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={rechequeando || !sessionIdManual.trim()}
+            onClick={() => onRechequear(sessionIdManual.trim())}
+            className="shrink-0"
+          >
+            Consultar
+          </Button>
+        </div>
+      </details>
+      {linkVerif && (
         <div className="space-y-1.5">
           <p className="text-xs text-muted-foreground">
             Mandále este link al cliente (WhatsApp, mail, etc.):
@@ -654,17 +748,6 @@ function IdentidadSinVerificar({
             </Button>
           </div>
         </div>
-      ) : (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={generando}
-          onClick={onGenerarLink}
-        >
-          <ShieldCheck className="h-3.5 w-3.5" />
-          {generando ? "Generando…" : "Generar link de verificación"}
-        </Button>
       )}
     </div>
   );
