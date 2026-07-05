@@ -26,7 +26,10 @@ def account_is_absorbable(cliente_id: int) -> bool:
     #1240: una cuenta liviana SÍ puede crear un perfil fiscal (`POST /api/cliente/
     facturacion/perfiles` no exige `dni_validado_at`) antes de verificarse — si tuviera uno,
     ya no es "sin datos que perder" (`merge_accounts` acá no reasigna, solo mueve llaves),
-    así que se suma al chequeo."""
+    así que se suma al chequeo. Mismo motivo para `productora_miembros`: un admin puede
+    vincular una cuenta liviana a una productora (`agregar_miembro` tampoco exige
+    verificación) — sin este chequeo, absorber esa cuenta borraba el vínculo en silencio
+    (`ON DELETE CASCADE`, `merge_accounts` no lo reasigna)."""
     with get_db() as conn:
         r = conn.execute(
             "SELECT cuenta_estado, dni_validado_at FROM clientes WHERE id = %s", (cliente_id,)
@@ -42,7 +45,13 @@ def account_is_absorbable(cliente_id: int) -> bool:
             "SELECT 1 FROM cliente_perfiles_fiscales WHERE cliente_id = %s LIMIT 1",
             (cliente_id,),
         ).fetchone()
-    return tiene_perfil_fiscal is None
+        if tiene_perfil_fiscal is not None:
+            return False
+        tiene_productora = conn.execute(
+            "SELECT 1 FROM productora_miembros WHERE cliente_id = %s LIMIT 1",
+            (cliente_id,),
+        ).fetchone()
+    return tiene_productora is None
 
 
 def merge_accounts(*, source: int, target: int) -> None:

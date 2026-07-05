@@ -331,7 +331,8 @@ def cliente_pedido_detalle(id: int, request: Request):
         pedido = conn.execute("""
             SELECT id, numero_pedido, estado, fecha_desde, fecha_hasta,
                    monto_total, monto_pagado, descuento_pct,
-                   descuento_jornadas_pct, cliente_id, notas, created_at
+                   descuento_jornadas_pct, cliente_id, notas, created_at,
+                   perfil_fiscal_id, productora_id
             FROM alquileres
             WHERE id = %s AND cliente_id = %s
         """, (id, cliente_id)).fetchone()

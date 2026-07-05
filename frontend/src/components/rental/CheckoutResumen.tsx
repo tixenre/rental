@@ -617,6 +617,7 @@ export function CheckoutResumen({
         open={contratoOpen}
         onOpenChange={setContratoOpen}
         sessionId={sessionId}
+        facturacionTarget={facturacionTarget}
       />
     </div>
   );

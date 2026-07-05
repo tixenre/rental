@@ -539,6 +539,13 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
     que tiene su propio `require_cliente`."""
     if not data.items and data.estado != "borrador":
         raise HTTPException(400, "El pedido debe tener al menos un ítem")
+    # Defense-in-depth (#1240, hallazgo de revisión): `cliente_crear_pedido` ya
+    # valida esto antes de llamar acá, pero esta es la ÚNICA puerta real de
+    # creación — sin este chequeo acá, cualquier caller futuro que sete ambos
+    # campos rompería el `CHECK chk_alquileres_facturacion_target` sin capturar
+    # (el único except de abajo es `DeadlockDetected`) → 500 crudo en vez de 400.
+    if data.perfil_fiscal_id and data.productora_id:
+        raise HTTPException(400, "Un pedido no puede facturar a un perfil personal y a una productora a la vez.")
 
     cliente_nombre   = data.cliente_nombre
     cliente_email    = data.cliente_email

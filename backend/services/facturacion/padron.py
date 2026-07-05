@@ -44,6 +44,16 @@ from arca_fe.padron import PadronClient, PersonaArca, WSAA_SERVICIO
 _PADRON_HOMO = "https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA5?wsdl"
 _PADRON_PROD = "https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5?wsdl"
 
+# Namespace de `pg_advisory_xact_lock` para serializar el alta del PRIMER perfil
+# fiscal de un cliente (#1240, hallazgo de revisión) — sin esto, dos requests
+# concurrentes dando de alta el primer perfil con CUITs DISTINTOS ven ambos
+# "todavía no tiene ninguno" y computan `es_default=True` los dos; el segundo
+# INSERT viola `uq_cliente_perfiles_fiscales_default` sin capturar → 500 crudo.
+# Mismo patrón que `_ADVISORY_NS_PEDIDO` (routes/alquileres/core.py, 5390412),
+# `_ADVISORY_NS_ESTUDIO` (5390413), `_ADVISORY_NS_CONTAB_MES` (5390420) y
+# `_ADVISORY_NS_REPORTES_MES` (5390421); siguiente número libre.
+_ADVISORY_NS_PERFIL_FISCAL = 5390422
+
 
 def resolver_persona(cuit_buscado: str, conn) -> PersonaArca:
     """Consulta el padrón para `cuit_buscado`, probando con cada emisor activo
@@ -222,6 +232,12 @@ def verificar_y_crear_perfil_fiscal(
     # sync a `clientes.*` de abajo se saltaba, dejando el "perfil default" que
     # leen los call sites viejos con razón social/domicilio desactualizados
     # tras una reverificación real. Se resuelve mirando ESTE cuit puntual.
+    #
+    # Lock por cliente (namespace propio, ver arriba) ANTES de decidir
+    # `es_default` — serializa dos altas concurrentes del primer perfil con
+    # CUITs distintos para el mismo cliente (después de la consulta a AFIP,
+    # que es lo lento; no hace falta tenerla adentro del lock).
+    conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (_ADVISORY_NS_PERFIL_FISCAL, cliente_id))
     perfil_existente = conn.execute(
         "SELECT es_default FROM cliente_perfiles_fiscales WHERE cliente_id = %s AND cuit = %s",
         (cliente_id, cuit),

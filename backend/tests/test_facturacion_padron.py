@@ -455,6 +455,8 @@ class _FakeConnPerfiles:
             def fetchone(self_inner):
                 return self_inner._row
 
+        if sql_norm.startswith("SELECT pg_advisory_xact_lock"):
+            return _R(None)
         if sql_norm.startswith("SELECT es_default FROM cliente_perfiles_fiscales"):
             return _R(self.perfil_existente_row)
         if sql_norm.startswith("SELECT 1 FROM cliente_perfiles_fiscales"):

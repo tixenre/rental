@@ -92,4 +92,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """No-op: revertir borraría perfiles fiscales/productoras ya cargados a ciegas."""
     pass

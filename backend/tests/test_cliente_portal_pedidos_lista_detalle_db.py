@@ -148,3 +148,40 @@ def test_gana_el_descuento_de_jornadas_no_el_del_cliente(client_con_db, setup):
     assert d["descuento_monto"] == 600
     assert d["monto_neto"] == 2400
     assert d["cantidad_jornadas"] == 3
+
+
+PRODUCTORA_ID = 9_320_301
+PRODUCTORA_CUIT = "30500002235"
+
+
+def test_detalle_resuelve_iva_de_la_productora_elegida_no_del_default(client_con_db, setup):
+    """#1240, hallazgo de revisión: el SELECT de `cliente_pedido_detalle` no
+    traía `perfil_fiscal_id`/`productora_id` — a diferencia de la LISTA (que sí
+    los resuelve), el DETALLE de un pedido facturado a nombre de una productora
+    con OTRA condición de IVA que el default de la cuenta mostraba el `con_iva`
+    equivocado. El cliente por defecto (sin perfil_impuestos) no es RI; la
+    productora acá SÍ lo es — el detalle tiene que reflejarla."""
+    from database import get_db
+
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM productoras WHERE id = %s", (PRODUCTORA_ID,))
+        conn.execute(
+            """INSERT INTO productoras (id, cuit, perfil_impuestos, razon_social)
+               VALUES (%s, %s, 'responsable_inscripto', 'Productora Detalle SA')""",
+            (PRODUCTORA_ID, PRODUCTORA_CUIT),
+        )
+        conn.execute(
+            "UPDATE alquileres SET productora_id = %s WHERE id = %s",
+            (PRODUCTORA_ID, PEDIDO_ID),
+        )
+        conn.commit()
+
+        r_detalle = client_con_db.get(f"/api/cliente/pedidos/{PEDIDO_ID}", headers={"Cookie": _COOKIE})
+        assert r_detalle.status_code == 200, r_detalle.text
+        assert r_detalle.json()["con_iva"] is True
+    finally:
+        conn.execute("UPDATE alquileres SET productora_id = NULL WHERE id = %s", (PEDIDO_ID,))
+        conn.execute("DELETE FROM productoras WHERE id = %s", (PRODUCTORA_ID,))
+        conn.commit()
+        conn.close()
