@@ -2411,6 +2411,46 @@ def _init_db_schema(conn):
         END $$;
     """)
 
+    # ── Factura de Exportación — WSFEXv1 (#tracking pendiente) ───────────────
+    # Tabla SEPARADA de `facturas` (no extenderla): el receptor de exportación no tiene
+    # doc_tipo/doc_nro/condicion_iva_receptor argentinos (NOT NULL en `facturas`) — forzar dos
+    # modelos incompatibles en una sola tabla arriesga romper invariantes ya probados
+    # (uq_factura_vigente_por_pedido, etc.). Flujo NUEVO sin pedido de `alquileres` de por medio
+    # (confirmado con el dueño) — venta al exterior, carga manual en el admin.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS facturas_exportacion (
+            id                      SERIAL PRIMARY KEY,
+            emisor                  TEXT NOT NULL,
+            ambiente                TEXT NOT NULL,
+            cbte_tipo               INTEGER NOT NULL,
+            pto_vta                 INTEGER NOT NULL,
+            cbte_nro                INTEGER,
+            cae                     TEXT,
+            cae_vto                 DATE,
+            receptor_razon_social   TEXT NOT NULL,
+            receptor_pais_destino   INTEGER NOT NULL,
+            receptor_domicilio      TEXT,
+            receptor_id_impositivo  TEXT,
+            incoterm                TEXT NOT NULL,
+            permiso_embarque        TEXT,
+            moneda                  TEXT NOT NULL,
+            cotizacion              NUMERIC(12,4) NOT NULL,
+            imp_total               NUMERIC(12,2) NOT NULL,
+            estado                  TEXT NOT NULL DEFAULT 'pendiente',
+            nota_credito_de         INTEGER REFERENCES facturas_exportacion(id),
+            raw_request             JSONB,
+            raw_response            JSONB,
+            errores                 JSONB,
+            fecha_emision           TIMESTAMPTZ,
+            created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+            created_by              TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_facturas_exportacion_estado
+        ON facturas_exportacion (estado)
+    """)
+
     # ── Estudio: trabajos / producciones (galería "en acción") ───────────────
     conn.execute("""
         CREATE TABLE IF NOT EXISTS estudio_trabajos (
