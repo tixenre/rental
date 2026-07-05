@@ -45,6 +45,48 @@ def attach_categorias(conn, equipos: list[dict]) -> list[dict]:
     return equipos
 
 
+_FICHA_KEYS = (
+    "descripcion", "notas",
+    "keywords_json", "nombre_publico_template",
+    "conectividad_json", "compatible_con_json",
+    "video_url", "precio_bh_usd", "fuente_url", "fuente_titulo",
+    "enriquecido_at", "enriquecido_fuente",
+    "contenido_incluido_json",
+)
+
+
+def query_ficha_batch(equipo_ids: list[int]) -> tuple[str, tuple] | None:
+    """SQL + params de `attach_ficha` — separado de la ejecución para que un
+    caller que ya corre OTRAS queries independientes (ej. el pipeline de
+    `services.catalogo.proyeccion.proyectar_lista`, #1240) pueda incluir esta
+    en el mismo lote. `None` si `equipo_ids` está vacío."""
+    if not equipo_ids:
+        return None
+    placeholders = ",".join(["%s"] * len(equipo_ids))
+    sql = f"""
+        SELECT equipo_id, descripcion, notas,
+               keywords_json, nombre_publico_template,
+               conectividad_json, compatible_con_json,
+               video_url, precio_bh_usd, fuente_url, fuente_titulo,
+               enriquecido_at, enriquecido_fuente,
+               contenido_incluido_json
+        FROM equipo_fichas
+        WHERE equipo_id IN ({placeholders})
+    """
+    return sql, tuple(equipo_ids)
+
+
+def shape_ficha_rows(rows, equipo_ids: list[int]) -> dict[int, dict]:
+    """Da forma `{equipo_id: ficha_dict}` a filas YA obtenidas de
+    `query_ficha_batch`. Un equipo sin ficha propia aparece con todos los
+    campos en `None` (mismo default que `attach_ficha` siempre dio)."""
+    f_map: dict[int, dict] = {}
+    for r in rows:
+        f_map[r["equipo_id"]] = {k: r[k] for k in _FICHA_KEYS}
+    _empty = {k: None for k in _FICHA_KEYS}
+    return {eid: f_map.get(eid) or dict(_empty) for eid in equipo_ids}
+
+
 def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
     """Agrega la ficha textual (descripcion, notas, keywords, enriquecimiento
     extra). Las specs estructuradas viven en `equipo_specs` y se atachan
@@ -57,34 +99,13 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
     if not equipos:
         return equipos
     ids = [e["id"] for e in equipos]
-    placeholders = ",".join(["%s"] * len(ids))
+    query = query_ficha_batch(ids)
     cur = conn.cursor()
-    cur.execute(f"""
-        SELECT equipo_id, descripcion, notas,
-               keywords_json, nombre_publico_template,
-               conectividad_json, compatible_con_json,
-               video_url, precio_bh_usd, fuente_url, fuente_titulo,
-               enriquecido_at, enriquecido_fuente,
-               contenido_incluido_json
-        FROM equipo_fichas
-        WHERE equipo_id IN ({placeholders})
-    """, ids)
-    rows = cur.fetchall()
-    _ficha_keys = (
-        "descripcion", "notas",
-        "keywords_json", "nombre_publico_template",
-        "conectividad_json", "compatible_con_json",
-        "video_url", "precio_bh_usd", "fuente_url", "fuente_titulo",
-        "enriquecido_at", "enriquecido_fuente",
-        "contenido_incluido_json",
-    )
-    f_map: dict[int, dict] = {}
-    for r in rows:
-        f_map[r["equipo_id"]] = {k: r[k] for k in _ficha_keys}
-    _empty = {k: None for k in _ficha_keys}
-    for e in equipos:
-        e["ficha"] = f_map.get(e["id"]) or dict(_empty)
+    cur.execute(*query)
+    ficha_map = shape_ficha_rows(cur.fetchall(), ids)
     cur.close()
+    for e in equipos:
+        e["ficha"] = ficha_map.get(e["id"])
     return equipos
 
 
