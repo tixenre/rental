@@ -1,5 +1,5 @@
 import { createLazyFileRoute, useNavigate, useParams, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft,
@@ -47,6 +47,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 
 import { Chequeos } from "@/design-system/composites/Chequeos";
+import { Spinner } from "@/design-system/ui/spinner";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 import { Switch } from "@/design-system/ui/switch";
@@ -98,7 +99,7 @@ import { es } from "date-fns/locale";
 import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
 import { SegmentedControl } from "@/design-system/ui/segmented-control";
 import { useDocumentTitle } from "@/lib/use-document-title";
-import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
+import { fmtArs } from "@/lib/format";
 import { nombreCliente } from "@/lib/cliente-nombre";
 import { EquipoComboSearch } from "@/components/admin/pedido/EquipoComboSearch";
 import { EnviarDocsDialog, DOCS_PEDIDO } from "@/components/admin/pedido/EnviarDocsDialog";
@@ -1094,6 +1095,41 @@ function FacturacionRailSection({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Factura completa (mismo layout real, CAE/QR placeholder) embebida en el propio modal — pedido
+  // del dueño de ir directo a la vista real en vez de un resumen en texto + un link aparte. Mismo
+  // patrón que ContratoPreviewModal (blob URL + <iframe src>, no srcDoc: un documento con fuentes
+  // embebidas en base64 tarda mucho más en pintar vía srcDoc que navegado como blob real).
+  const [facturaBlobUrl, setFacturaBlobUrl] = useState<string | null>(null);
+  const [facturaHtmlError, setFacturaHtmlError] = useState<string | null>(null);
+  const [facturaIframeReady, setFacturaIframeReady] = useState(false);
+
+  useEffect(() => {
+    if (!showPreview) return;
+    let alive = true;
+    let url: string | null = null;
+    setFacturaIframeReady(false);
+    setFacturaHtmlError(null);
+    facturacionApi
+      .previewFacturaHtml(pedidoId, layout)
+      .then((html) => {
+        if (!alive) return;
+        url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+        setFacturaBlobUrl(url);
+      })
+      .catch((err: unknown) => {
+        if (alive) {
+          setFacturaHtmlError(
+            err instanceof Error ? err.message : "No pudimos generar el preview de la factura.",
+          );
+        }
+      });
+    return () => {
+      alive = false;
+      setFacturaBlobUrl(null);
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [showPreview, pedidoId, layout]);
+
   const facturar = useMutation({
     mutationFn: () => facturacionApi.facturarPedido(pedidoId),
     onSuccess: () => {
@@ -1282,120 +1318,53 @@ function FacturacionRailSection({
       )}
 
       <AlertDialog open={showPreview} onOpenChange={setShowPreview}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
+        <AlertDialogContent className="flex h-[85vh] w-full max-w-3xl flex-col overflow-hidden p-0">
+          <AlertDialogHeader className="border-b hairline px-6 py-4">
             <AlertDialogTitle>Confirmar factura</AlertDialogTitle>
             <AlertDialogDescription>
-              Revisá los datos antes de emitir — una vez que ARCA da el CAE, solo se puede corregir
-              con una Nota de Crédito.
+              Revisá el documento antes de emitir — una vez que ARCA da el CAE, solo se puede
+              corregir con una Nota de Crédito.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
+          <div className="relative flex-1 overflow-hidden bg-white">
+            {!facturaHtmlError && (!facturaBlobUrl || !facturaIframeReady) && (
+              <div className="absolute inset-0 flex items-center justify-center gap-2 bg-white text-sm text-muted-foreground">
+                <Spinner size="sm" />
+                Armando la factura…
+              </div>
+            )}
+            {facturaHtmlError && (
+              <div className="flex h-full items-center justify-center px-6 text-center text-sm text-destructive">
+                {facturaHtmlError}
+              </div>
+            )}
+            {!facturaHtmlError && facturaBlobUrl && (
+              <iframe
+                src={facturaBlobUrl}
+                title="Factura (borrador, sin CAE)"
+                className="h-full w-full border-0"
+                sandbox=""
+                onLoad={() => setFacturaIframeReady(true)}
+              />
+            )}
+          </div>
+
           {preview.isPending && (
-            <div className="text-sm text-muted-foreground py-2">Calculando…</div>
+            <div className="px-6 py-2 text-sm text-muted-foreground">Chequeando…</div>
           )}
           {preview.isError && (
-            <div className="text-sm text-destructive py-2">{(preview.error as Error).message}</div>
+            <div className="px-6 py-2 text-sm text-destructive">
+              {(preview.error as Error).message}
+            </div>
           )}
           {preview.data && (
-            <div className="rounded-lg border hairline p-3 space-y-2 text-sm">
-              {preview.data.ambiente === "homologacion" && (
-                // eslint-disable-next-line no-restricted-syntax -- amber: paleta categórica homologación (Tier 3), ya usada en esta pantalla
-                <div className="font-mono text-2xs text-amber-600 border border-amber-400/50 rounded px-1.5 py-0.5 inline-block">
-                  TEST · homologación
-                </div>
-              )}
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Comprobante</span>
-                <span className="font-mono">
-                  Factura {preview.data.comprobante.letra}{" "}
-                  {String(preview.data.comprobante.pto_vta).padStart(5, "0")}-
-                  {String(preview.data.comprobante.numero_a_emitir).padStart(8, "0")}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Concepto</span>
-                <span>{preview.data.comprobante.concepto}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Condición de venta</span>
-                <span>{preview.data.comprobante.condicion_venta}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Emisor</span>
-                <span className="text-right">
-                  {preview.data.emisor.nombre}
-                  <span className="text-muted-foreground">
-                    {" "}
-                    ({preview.data.emisor.condicion_iva_label})
-                  </span>
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Receptor</span>
-                <span className="text-right">
-                  {preview.data.receptor.razon_social || "Consumidor final"}
-                  {preview.data.receptor.doc_tipo !== "CONSUMIDOR_FINAL" && (
-                    <span className="text-muted-foreground">
-                      {" "}
-                      ({preview.data.receptor.doc_tipo} {preview.data.receptor.doc_nro})
-                    </span>
-                  )}
-                </span>
-              </div>
-              {preview.data.receptor.doc_tipo !== "CONSUMIDOR_FINAL" && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Condición IVA</span>
-                  <span>{preview.data.receptor.condicion_iva_label}</span>
-                </div>
-              )}
-              {preview.data.receptor.doc_tipo !== "CONSUMIDOR_FINAL" && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Domicilio</span>
-                  <span className="text-right">
-                    {preview.data.receptor.domicilio || (
-                      <span className="text-destructive">sin confirmar</span>
-                    )}
-                  </span>
-                </div>
-              )}
-              <div className="flex items-center justify-between border-t hairline pt-2">
-                <span className="text-muted-foreground">Neto</span>
-                <span className="font-mono">{formatARS(preview.data.importes.neto)}</span>
-              </div>
-              {preview.data.importes.iva > 0 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">IVA</span>
-                  <span className="font-mono">{formatARS(preview.data.importes.iva)}</span>
-                </div>
-              )}
-              <div className="flex items-center justify-between font-medium">
-                <span>Total</span>
-                <span className="font-mono">{formatARS(preview.data.importes.total)}</span>
-              </div>
-              {preview.data.fechas.vto_pago && (
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Vencimiento de pago</span>
-                  <span>{formatFechaCorta(preview.data.fechas.vto_pago)}</span>
-                </div>
-              )}
+            <div className="border-t hairline px-6 py-3">
+              <Chequeos items={preview.data.chequeos} />
             </div>
           )}
 
-          {preview.data && <Chequeos items={preview.data.chequeos} />}
-
-          {preview.data && (
-            <a
-              href={`/api/alquileres/${pedidoId}/facturar/preview-html?layout=${layout}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30 w-fit"
-            >
-              <Eye className="h-3 w-3" /> Ver factura completa (borrador, sin CAE)
-            </a>
-          )}
-
-          <AlertDialogFooter>
+          <AlertDialogFooter className="border-t hairline px-6 py-4">
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               disabled={!preview.data?.listo || facturar.isPending}
