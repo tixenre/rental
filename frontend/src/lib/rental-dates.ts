@@ -170,27 +170,6 @@ export function diaAbierto(
   return !!horarios[diaKey(date)];
 }
 
-/**
- * ¿El fin de semana (sáb y/o dom) tiene menos horas habilitadas que un día de
- * semana de referencia (lunes), o está directamente cerrado? Para avisar en
- * el picker sin hardcodear un texto que puede quedar desactualizado si el
- * admin cambia `horarios_retiro` — se deriva del setting real, no se declara
- * a mano. Sin config (`horarios=null`) o sin franja de referencia → false
- * (no hay base para comparar, mejor no afirmar nada).
- */
-export function finDeSemanaReducido(horarios: HorariosSemana | null): boolean {
-  if (!horarios) return false;
-  const referencia = horarios["lun"];
-  if (!referencia) return false;
-  const duracionRef = timeToMinutes(referencia.hasta) - timeToMinutes(referencia.desde);
-  const duracion = (f: FranjaHoraria | null) =>
-    f ? timeToMinutes(f.hasta) - timeToMinutes(f.desde) : 0;
-  return (
-    duracion(horarios["sab"] ?? null) < duracionRef ||
-    duracion(horarios["dom"] ?? null) < duracionRef
-  );
-}
-
 /** Slots de 30 min dentro de [desde, hasta] inclusive. */
 export function slotsEntre(desde: string, hasta: string): string[] {
   const out: string[] = [];

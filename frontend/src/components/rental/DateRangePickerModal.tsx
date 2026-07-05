@@ -18,18 +18,18 @@ import {
   deriveEndDate,
   diaAbierto,
   earliestRetiro,
-  finDeSemanaReducido,
   franjaParaFecha,
   laterTime,
   minTimeForDate,
   timeToMinutes,
+  toLocalISO,
   ymd,
 } from "@/lib/rental-dates";
 import { useHorarios } from "@/lib/horarios";
 import { useAntelacionMinimaHorasQuery } from "@/hooks/useSettings";
 import { useBusinessPhone } from "@/lib/business";
 import { whatsappLink } from "@/lib/whatsapp";
-import { apiGetDiasBloqueados } from "@/lib/api";
+import { apiGetDiasBloqueados, apiGetDisclaimersRetiro } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { TimeStepSelect } from "./TimeStepSelect";
@@ -101,9 +101,6 @@ export function DateRangePickerModal({
   // si respectHorarios. En modo admin pasamos null efectivo abajo.
   const horariosRaw = useHorarios();
   const horarios = respectHorarios ? horariosRaw : null;
-  // Derivado del setting real (`horarios_retiro`), no un texto fijo — si el
-  // admin cambia los horarios de fin de semana, el aviso se ajusta solo.
-  const finDeSemana = !allowPast && finDeSemanaReducido(horarios);
   // Estable durante el ciclo de vida del modal — evita recomputar memos por render.
   const today = useMemo(() => startOfDay(new Date()), []);
   const now = useMemo(() => new Date(), []);
@@ -132,6 +129,20 @@ export function DateRangePickerModal({
     phone: businessPhone,
     message: "¡Hola! Necesito reservar con menos anticipación de la mínima. ¿Me pueden ayudar?",
   });
+
+  // ── Avisos del picker (antelación / horarios reducidos de fin de semana) ─
+  // La regla ("¿corresponde avisar?") y el texto viven en el backend
+  // (`services.fechas.disclaimers_retiro`, #1237) — acá solo se pide con la
+  // selección actual y se muestra `mensaje`, nada se decide en TS.
+  const fechaDesdeISO = !allowPast && startDate ? toLocalISO(startDate, startTime) : undefined;
+  const fechaHastaISO = !allowPast && endDate ? toLocalISO(endDate, endTime) : undefined;
+  const disclaimersQ = useQuery({
+    queryKey: ["rental-disclaimers", fechaDesdeISO, fechaHastaISO],
+    queryFn: () => apiGetDisclaimersRetiro(fechaDesdeISO, fechaHastaISO),
+    enabled: open && !allowPast,
+    staleTime: 30_000,
+  });
+  const disclaimers = allowPast ? [] : (disclaimersQ.data?.disclaimers ?? []);
 
   // ── Días bloqueados (sin stock) ──────────────────────────────────────
   const ventanaDesde = ymd(today);
@@ -494,20 +505,22 @@ export function DateRangePickerModal({
             </p>
           ) : null}
 
-          {/* Antelación mínima (#1126) — siempre visible si está configurada (el
-              piso real ya lo aplican el calendario y la hora); mismo tratamiento
-              visual que las demás advertencias no bloqueantes, para que no pase
-              desapercibido por qué faltan horas cercanas a "ahora". */}
-          {!allowPast && leadTimeHoras > 0 && (
-            <p className="flex items-center gap-1.5 rounded-md bg-amber/10 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
-              <Clock className="h-3.5 w-3.5 shrink-0 text-amber" />
-              <span>
-                Reservás online con al menos <strong>{leadTimeHoras} h de anticipación</strong> —
-                por eso no ves horas más cercanas a ahora.{" "}
-                {finDeSemana && "Sábados y domingos además tenemos horarios reducidos. "}
+          {/* Avisos del backend (#1237) — contextuales a la fecha elegida; ver
+              `disclaimersQ` arriba. Un solo box aunque vengan varios avisos
+              (ej. antelación + horarios de finde a la vez), con un único CTA
+              de WhatsApp al pie en vez de repetirlo por aviso. */}
+          {disclaimers.length > 0 && (
+            <div className="rounded-md bg-amber/10 border border-amber/40 px-2.5 py-1.5 text-xs text-ink space-y-1">
+              {disclaimers.map((d) => (
+                <p key={d.check} className="flex items-start gap-1.5">
+                  <Clock className="h-3.5 w-3.5 shrink-0 text-amber mt-0.5" />
+                  <span>{d.mensaje}</span>
+                </p>
+              ))}
+              <p className="pl-5">
                 {urgenciaWhatsappUrl ? (
                   <>
-                    ¿Urgencia{finDeSemana && " o necesitás otro horario"}?{" "}
+                    ¿Urgencia o necesitás otro horario?{" "}
                     <a
                       href={urgenciaWhatsappUrl}
                       target="_blank"
@@ -519,10 +532,10 @@ export function DateRangePickerModal({
                     .
                   </>
                 ) : (
-                  "¿Urgencia? Escribinos para coordinar."
+                  "¿Urgencia o necesitás otro horario? Escribinos para coordinar."
                 )}
-              </span>
-            </p>
+              </p>
+            </div>
           )}
         </div>
 

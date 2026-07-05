@@ -185,6 +185,33 @@ ALLOWED_SETTINGS_KEYS = {
     "recordatorios_dias_antes",   # Días de anticipación. Int 1-14.
 }
 
+# Subset de ALLOWED_SETTINGS_KEYS que el catálogo ANÓNIMO (sin sesión) puede
+# leer — cada una tiene un consumidor real fuera de /admin (grep confirmado):
+# Logo (wordmark_svg), hero del catálogo (hero_taglines), FAQ (faq_json), meta
+# OG (og_image_url), favicons (favicon_url/apple_touch_icon_url), Footer +
+# CheckoutResumen (business_*), WhatsApp CTA (whatsapp_phone), el date picker
+# (antelacion_minima_horas/horarios_retiro). El resto de ALLOWED_SETTINGS_KEYS
+# (comisiones_modelo, recordatorios_*, email_*, roi/usd/shipping — solo admin)
+# se queda atrás del guard de sesión: `middleware.py` usa este set para
+# eximir SOLO estas keys del chequeo de auth en `/api/settings/{key}` y en la
+# lista `/api/settings` (filtrada acá abajo para el caso sin sesión).
+PUBLIC_SETTINGS_KEYS = {
+    "wordmark_svg",
+    "og_image_url",
+    "favicon_url",
+    "apple_touch_icon_url",
+    "hero_taglines",
+    "faq_json",
+    "whatsapp_phone",
+    "antelacion_minima_horas",
+    "horarios_retiro",
+    "business_address",
+    "business_maps_url",
+    "business_phone_display",
+    "business_email",
+    "business_instagram",
+}
+
 # Keys cuyo valor puede borrarse (volver al default) desde la UI. El resto
 # rechaza string vacía para no romper cálculos / settings críticas.
 CLEARABLE_SETTINGS_KEYS = {
@@ -243,12 +270,21 @@ def get_setting(key: str):
 
 
 @router.get("/settings")
-def list_settings():
-    """Lista todas las settings públicas. Útil para el panel admin."""
+def list_settings(request: Request):
+    """Lista settings. Con sesión (panel admin): todas las de
+    `ALLOWED_SETTINGS_KEYS`. Sin sesión (catálogo anónimo, ej.
+    `useBusinessContact`): solo `PUBLIC_SETTINGS_KEYS` — la ruta la deja
+    pasar sin auth (`middleware.py`), así que acá se filtra explícitamente
+    para no dumpear settings internas (comisiones, recordatorios, etc.) a
+    cualquiera."""
+    from auth.session import get_session
+
+    tiene_sesion = get_session(request) is not None
     with get_db() as conn:
         rows = conn.execute(
             "SELECT key, value, updated_at, updated_by FROM app_settings ORDER BY key"
         ).fetchall()
+        permitidas = ALLOWED_SETTINGS_KEYS if tiene_sesion else PUBLIC_SETTINGS_KEYS
         return {
             "items": [
                 {
@@ -258,7 +294,7 @@ def list_settings():
                     "updated_by": r["updated_by"],
                 }
                 for r in rows
-                if r["key"] in ALLOWED_SETTINGS_KEYS
+                if r["key"] in permitidas
             ]
         }
 

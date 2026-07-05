@@ -9,6 +9,9 @@ los caminos usen los mismos valores y reglas (no más copias divergentes):
   - `antelacion_minima_horas(conn)` → horas de lead-time configuradas (app_settings)
   - `antelacion_insuficiente(conn, inicio)` → horas si viola el lead-time | None
   - `inicio_desde_fecha_hora(fecha, hora)` → combina fecha + hora en un datetime
+  - `disclaimers_retiro(conn, fecha_desde, fecha_hasta)` → avisos del picker público
+    ({check, mensaje}, mismo shape que el portero del checkout) — el FRONT ya no
+    decide "¿corresponde avisar? ¿qué dice?", solo pide y muestra (#1237)
 
 Antes el criterio de rango estaba duplicado byte-por-byte en 4 lugares
 (`create_pedido`, `_apply_pedido_datos`, `_validar_fechas_propuestas`, el cap de
@@ -162,11 +165,11 @@ def mes_actual_ar() -> str:
 _DIAS_HORARIO = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"]
 
 
-def validar_horarios_habilitados(conn, fecha_desde, fecha_hasta) -> str | None:
-    """Valida que retiro/devolución caigan en días/horas habilitados (setting
-    `horarios_retiro`). Sin config → no restringe. Pensado para el flujo del
-    cliente, que manda hora real (el admin carga date-only y no se restringe).
-    Devuelve un mensaje de error (retiro primero) o None; el route levanta el HTTP."""
+def horarios_habilitados(conn) -> dict | None:
+    """Parsea `app_settings.horarios_retiro` (JSON `{"lun": {"desde","hasta"}
+    | null, ...}`, 3 letras por día). `None` = sin config → no restringe.
+    Fuente única del parseo — antes vivía inline solo en
+    `validar_horarios_habilitados`; `disclaimers_retiro` también lo necesita."""
     row = conn.execute(
         "SELECT value FROM app_settings WHERE key = %s", ("horarios_retiro",)
     ).fetchone()
@@ -177,6 +180,17 @@ def validar_horarios_habilitados(conn, fecha_desde, fecha_hasta) -> str | None:
     except (ValueError, TypeError):
         return None
     if not isinstance(horarios, dict) or not horarios:
+        return None
+    return horarios
+
+
+def validar_horarios_habilitados(conn, fecha_desde, fecha_hasta) -> str | None:
+    """Valida que retiro/devolución caigan en días/horas habilitados (setting
+    `horarios_retiro`). Sin config → no restringe. Pensado para el flujo del
+    cliente, que manda hora real (el admin carga date-only y no se restringe).
+    Devuelve un mensaje de error (retiro primero) o None; el route levanta el HTTP."""
+    horarios = horarios_habilitados(conn)
+    if not horarios:
         return None
 
     def _check(dt_raw, etiqueta: str) -> str | None:
@@ -195,3 +209,76 @@ def validar_horarios_habilitados(conn, fecha_desde, fecha_hasta) -> str | None:
         return None
 
     return _check(fecha_desde, "retiro") or _check(fecha_hasta, "devolución")
+
+
+def _franja_minutos(franja: dict | None) -> int:
+    """Duración en minutos de una franja `{desde,hasta}` HH:MM. 0 si cerrada/ausente."""
+    if not franja:
+        return 0
+    try:
+        dh, mh = franja["hasta"].split(":")
+        dd, md = franja["desde"].split(":")
+        return max(0, (int(dh) * 60 + int(mh)) - (int(dd) * 60 + int(md)))
+    except (KeyError, ValueError, AttributeError):
+        return 0
+
+
+def dia_fin_de_semana_reducido(horarios: dict | None, fecha: datetime.date) -> bool:
+    """¿`fecha` cae sábado o domingo Y ese día tiene menos minutos habilitados
+    (o está cerrado) que un lunes de referencia? Compara contra lunes en vez
+    de declarar "el finde es más corto" a mano — si el admin iguala los
+    horarios, esto se apaga solo. Espejo semántico de
+    `frontend/src/lib/rental-dates.ts::finDeSemanaReducido`, pero evaluado
+    para una fecha puntual (la elegida en el picker) en vez de en abstracto."""
+    if not horarios:
+        return False
+    dia = _DIAS_HORARIO[fecha.weekday()]
+    if dia not in ("sab", "dom"):
+        return False
+    referencia = horarios.get("lun")
+    if not referencia:
+        return False
+    return _franja_minutos(horarios.get(dia)) < _franja_minutos(referencia)
+
+
+# ── Disclaimers del picker público (#1237) ───────────────────────────────────
+# El front (DateRangePickerModal) antes decidía "¿corresponde avisar? ¿qué
+# dice?" en TS, reimplementando estas mismas reglas. Ahora solo pide acá y
+# muestra `mensaje` — mismo shape `{check, mensaje}` que el portero del
+# checkout (`services/checkout/validar.py::_falta`, sin el campo `accion`
+# porque acá no hay una ruta a la que mandar al usuario, solo información).
+
+
+def disclaimers_retiro(conn, fecha_desde: str | None, fecha_hasta: str | None) -> list[dict]:
+    """Avisos relevantes para la fecha/hora que el cliente tiene elegida (o
+    para cuando todavía no eligió nada) en el picker público. Contextual — no
+    devuelve avisos que no aplican a la selección actual, para no llenar el
+    picker de notas permanentes."""
+    avisos: list[dict] = []
+
+    horas = antelacion_minima_horas(conn)
+    if horas > 0:
+        inicio = to_datetime(fecha_desde) if fecha_desde else None
+        # Sin fecha elegida todavía: sigue siendo relevante (por eso los
+        # primeros días/horas del calendario van a aparecer deshabilitados).
+        # Con fecha elegida: solo si esa elección quedó dentro/cerca de la
+        # ventana (ahí es donde el aviso explica algo que el usuario ve).
+        if inicio is None or dentro_de_ventana_horas(inicio, horas):
+            avisos.append({
+                "check": "antelacion",
+                "mensaje": (
+                    f"Reservás online con al menos {horas} h de anticipación "
+                    "— por eso no ves horas más cercanas a ahora."
+                ),
+            })
+
+    horarios = horarios_habilitados(conn)
+    if horarios:
+        fechas = [d for d in (to_datetime(fecha_desde), to_datetime(fecha_hasta)) if d]
+        if any(dia_fin_de_semana_reducido(horarios, d.date()) for d in fechas):
+            avisos.append({
+                "check": "horarios_finde",
+                "mensaje": "Sábados y domingos tenemos horarios reducidos.",
+            })
+
+    return avisos
