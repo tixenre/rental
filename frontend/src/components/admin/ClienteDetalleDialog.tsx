@@ -21,7 +21,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
-import { Check, ChevronDown, Copy, Search, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Check, ChevronDown, Copy, Plus, Search, ShieldAlert, ShieldCheck } from "lucide-react";
 
 import {
   Dialog,
@@ -48,6 +48,7 @@ import {
   DropdownMenuTrigger,
 } from "@/design-system/ui/dropdown-menu";
 import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
+import { WhatsAppLinkButton } from "@/components/admin/WhatsAppLinkButton";
 
 import { adminApi, ESTADO_LABEL, type Cliente, type ClienteInput } from "@/lib/admin/api";
 import { usePadronLookup } from "@/lib/admin/usePadronLookup";
@@ -206,10 +207,34 @@ export function ClienteDetalleDialog({ open, onOpenChange, cliente, onSaved }: P
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {editing ? cliente!.nombre_legal || "Cliente" : "Nuevo cliente"}
-          </DialogTitle>
-          <DialogDescription>Datos de contacto y condiciones fiscales.</DialogDescription>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <DialogTitle>
+                {editing ? cliente!.nombre_legal || "Cliente" : "Nuevo cliente"}
+              </DialogTitle>
+              <DialogDescription>Datos de contacto y condiciones fiscales.</DialogDescription>
+            </div>
+            {editing && (
+              <div className="flex shrink-0 gap-1.5 pr-6">
+                <WhatsAppLinkButton phone={cliente!.telefono} />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() =>
+                    navigate({
+                      to: "/admin/pedidos/nuevo",
+                      search: { cliente_id: cliente!.id } as never,
+                    })
+                  }
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Nuevo pedido
+                </Button>
+              </div>
+            )}
+          </div>
         </DialogHeader>
 
         <form onSubmit={submit} className="space-y-4">
