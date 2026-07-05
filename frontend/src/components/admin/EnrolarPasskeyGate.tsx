@@ -16,7 +16,7 @@ import { KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
-import { Logo } from "@/components/rental/Logo";
+import { BackOfficeAuthCard } from "@/components/admin/BackOfficeAuthCard";
 import {
   listPasskeys,
   passkeyErrorMessage,
@@ -54,46 +54,31 @@ export function EnrolarPasskeyGate({ children }: { children: React.ReactNode }) 
 
   if (estado === "falta-enrolar") {
     return (
-      <div className="min-h-dvh bg-background flex flex-col">
-        <header className="border-b hairline px-4 py-3 md:px-6 flex items-center">
-          <Logo size="md" linkTo="/" />
-        </header>
-        <div className="flex-1 grid place-items-center px-4 py-12">
-          <div className="w-full max-w-sm rounded-2xl border hairline bg-surface p-8 shadow-sm space-y-6">
-            <div>
-              <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                Back-office
-              </div>
-              <h1 className="mt-1 font-display text-2xl text-ink">Registrá tu clave de acceso</h1>
-              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                Como segundo factor, tu cuenta de admin necesita una clave de acceso (huella, rostro
-                o PIN de este dispositivo). Se registra una sola vez — de ahí en más la vas a usar
-                para confirmar cada login con Google.
-              </p>
-            </div>
-            <Button
-              type="button"
-              className="w-full"
-              loading={busy}
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  await registerPasskey("admin");
-                  toast.success("Clave de acceso registrada");
-                  setEstado("listo");
-                } catch (e) {
-                  toast.error(passkeyErrorMessage(e));
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              <KeyRound /> {busy ? "Registrando…" : "Registrar clave de acceso"}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <BackOfficeAuthCard
+        title="Registrá tu clave de acceso"
+        description="Como segundo factor, tu cuenta de admin necesita una clave de acceso (huella, rostro o PIN de este dispositivo). Se registra una sola vez — de ahí en más la vas a usar para confirmar cada login con Google."
+      >
+        <Button
+          type="button"
+          className="w-full"
+          loading={busy}
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await registerPasskey("admin");
+              toast.success("Clave de acceso registrada");
+              setEstado("listo");
+            } catch (e) {
+              toast.error(passkeyErrorMessage(e));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <KeyRound /> {busy ? "Registrando…" : "Registrar clave de acceso"}
+        </Button>
+      </BackOfficeAuthCard>
     );
   }
 
