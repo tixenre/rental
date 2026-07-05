@@ -21,7 +21,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
-import { Check, Copy, Search, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Check, ChevronDown, Copy, Search, ShieldAlert, ShieldCheck } from "lucide-react";
 
 import {
   Dialog,
@@ -41,6 +41,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/design-system/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/design-system/ui/dropdown-menu";
 import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
 
 import { adminApi, ESTADO_LABEL, type Cliente, type ClienteInput } from "@/lib/admin/api";
@@ -459,11 +465,31 @@ function ReadOnlyField({
   value: string | null | undefined;
   className?: string;
 }) {
+  const [copiado, setCopiado] = useState(false);
   return (
     <div className={`space-y-1 ${className}`}>
       <Label className="text-muted-foreground">{label}</Label>
-      <div className="rounded-md border border-border/50 bg-muted/40 px-3 py-2 text-sm text-ink">
-        {value || "—"}
+      <div className="flex items-center gap-2 rounded-md border border-border/50 bg-muted/40 px-3 py-2 text-sm text-ink">
+        <span className="flex-1 truncate">{value || "—"}</span>
+        {value && (
+          <button
+            type="button"
+            aria-label={`Copiar ${label.toLowerCase()}`}
+            title={`Copiar ${label.toLowerCase()}`}
+            onClick={() => {
+              navigator.clipboard.writeText(value);
+              setCopiado(true);
+              setTimeout(() => setCopiado(false), 2000);
+            }}
+            className="shrink-0 text-muted-foreground transition-colors hover:text-ink"
+          >
+            {copiado ? (
+              <Check className="h-3.5 w-3.5 text-verde-ink" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -578,56 +604,69 @@ function IdentidadSinVerificar({
 }) {
   return (
     <div className="rounded-lg border hairline px-3 py-2.5 space-y-2.5">
-      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-        <ShieldAlert className="h-4 w-4 shrink-0" />
-        Identidad sin verificar
-        {cliente.dni_verificacion_estado === "rechazado" && " — rechazada por Didit"}
-        {cliente.dni_verificacion_estado === "en_revision" && " — en revisión en Didit"}
-      </div>
-      {cliente.dni_verificacion_motivo && (
-        <p className="text-xs text-muted-foreground">{cliente.dni_verificacion_motivo}</p>
-      )}
-      <div className="space-y-1">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={rechequeando}
-          onClick={() => onRechequear()}
-        >
-          <ShieldCheck className="h-3.5 w-3.5" />
-          {rechequeando ? "Consultando a Didit…" : "Re-chequear con Didit"}
-        </Button>
-        <p className="text-2xs text-muted-foreground">
-          Le vuelve a preguntar a Didit — revisa todo el historial de intentos del cliente, no solo
-          el último, así encuentra la sesión aprobada aunque haya reintentado después. Si nunca
-          inició una verificación, no hace nada.
-        </p>
-        <details className="text-2xs">
-          <summary className="cursor-pointer text-muted-foreground select-none">
-            ¿Sabés el session_id exacto? Consultalo directo
-          </summary>
-          <div className="mt-1.5 flex items-center gap-2">
-            <Input
-              value={sessionIdManual}
-              onChange={(e) => onSessionIdManualChange(e.target.value)}
-              placeholder="session_id de Didit (ej. de una sesión sin historial acá)"
-              className="flex-1 font-mono text-xs"
-            />
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <ShieldAlert className="h-4 w-4 shrink-0" />
+          Identidad sin verificar
+          {cliente.dni_verificacion_estado === "rechazado" && " — rechazada por Didit"}
+          {cliente.dni_verificacion_estado === "en_revision" && " — en revisión en Didit"}
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              disabled={rechequeando || !sessionIdManual.trim()}
-              onClick={() => onRechequear(sessionIdManual.trim())}
+              disabled={rechequeando || generando}
               className="shrink-0"
             >
-              Consultar
+              Acciones
+              <ChevronDown className="h-3.5 w-3.5" />
             </Button>
-          </div>
-        </details>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              disabled={rechequeando}
+              onClick={() => onRechequear()}
+              title="Le vuelve a preguntar a Didit — revisa todo el historial de intentos del cliente, no solo el último."
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              {rechequeando ? "Consultando a Didit…" : "Re-chequear con Didit"}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={generando} onClick={onGenerarLink}>
+              <ShieldCheck className="h-3.5 w-3.5" />
+              {generando ? "Generando…" : "Generar link de verificación"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-      {linkVerif ? (
+      {cliente.dni_verificacion_motivo && (
+        <p className="text-xs text-muted-foreground">{cliente.dni_verificacion_motivo}</p>
+      )}
+      <details className="text-2xs">
+        <summary className="cursor-pointer text-muted-foreground select-none">
+          ¿Sabés el session_id exacto de Didit? Consultalo directo
+        </summary>
+        <div className="mt-1.5 flex items-center gap-2">
+          <Input
+            value={sessionIdManual}
+            onChange={(e) => onSessionIdManualChange(e.target.value)}
+            placeholder="session_id de Didit (ej. de una sesión sin historial acá)"
+            className="flex-1 font-mono text-xs"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={rechequeando || !sessionIdManual.trim()}
+            onClick={() => onRechequear(sessionIdManual.trim())}
+            className="shrink-0"
+          >
+            Consultar
+          </Button>
+        </div>
+      </details>
+      {linkVerif && (
         <div className="space-y-1.5">
           <p className="text-xs text-muted-foreground">
             Mandále este link al cliente (WhatsApp, mail, etc.):
@@ -654,17 +693,6 @@ function IdentidadSinVerificar({
             </Button>
           </div>
         </div>
-      ) : (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={generando}
-          onClick={onGenerarLink}
-        >
-          <ShieldCheck className="h-3.5 w-3.5" />
-          {generando ? "Generando…" : "Generar link de verificación"}
-        </Button>
       )}
     </div>
   );
