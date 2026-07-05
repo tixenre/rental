@@ -40,5 +40,8 @@ def actualizar(conn, cliente_id: int, actual: dict, updates: dict) -> dict:
 
 
 def eliminar(conn, cliente_id: int) -> None:
-    conn.execute("DELETE FROM clientes WHERE id=%s", (cliente_id,))
+    """Soft delete (#1251 Fase 2) — antes era un DELETE físico. Mismo patrón
+    que equipos (#206): `eliminado_at` marca la baja, no se borra la fila
+    (preserva el historial de pedidos que la referencian)."""
+    conn.execute("UPDATE clientes SET eliminado_at = CURRENT_TIMESTAMP WHERE id=%s", (cliente_id,))
     conn.commit()

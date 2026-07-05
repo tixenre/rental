@@ -211,6 +211,19 @@ def get_cliente_perfiles_fiscales(id: int, request: Request):
         return queries_fiscal.resumen_fiscal(conn, id)
 
 
+@router.get("/clientes/{id}/duplicados")
+def get_cliente_duplicados(id: int, request: Request):
+    """El grupo de duplicados (mismo CUIL verificado) que incluye a este
+    cliente, si existe — sugerencia de fusión desde su propia ficha (#1251
+    Fase 2). `null` si no hay ninguno. Mismo motor que `GET /clientes/duplicados`
+    (la vista global), acá filtrado a uno solo."""
+    require_admin(request)
+    with get_db() as conn:
+        if not conn.execute("SELECT id FROM clientes WHERE id=%s", (id,)).fetchone():
+            raise HTTPException(404, "Cliente no encontrado")
+        return queries_cliente.duplicados_de(conn, id)
+
+
 @router.post("/clientes", status_code=201)
 @limiter.limit(ADMIN_WRITE_LIMIT)
 @map_pg_errors

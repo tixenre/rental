@@ -28,7 +28,10 @@ def _enriquecer(d: dict) -> dict:
 
 def listar(conn, q: str | None, page: int, per_page: int) -> dict:
     offset = (page - 1) * per_page
-    where = "WHERE 1=1"
+    # Soft delete (#1251 Fase 2): la lista oculta los eliminados por default,
+    # mismo criterio que equipos (#206) — `obtener` (fetch por id) SÍ los
+    # muestra (un pedido viejo puede seguir apuntando a un cliente borrado).
+    where = "WHERE c.eliminado_at IS NULL"
     params: list = []
 
     # Búsqueda fuzzy unificada (backend/busqueda): sin tildes, sin guiones,
@@ -68,23 +71,40 @@ def obtener(conn, cliente_id: int) -> dict | None:
     return _enriquecer(row_to_dict(row))
 
 
+def _enriquecer_grupo_duplicado(conn, cuil: str, ids: list[int]) -> dict:
+    clientes = []
+    for cid in ids:
+        row = conn.execute(
+            """SELECT c.id, c.nombre, c.apellido, c.email, c.telefono,
+                      c.nombre_completo_renaper, c.dni_validado_at, c.created_at,
+                      (SELECT COUNT(*) FROM alquileres a WHERE a.cliente_id = c.id) AS pedidos
+                 FROM clientes c WHERE c.id = %s""",
+            (cid,),
+        ).fetchone()
+        if row:
+            clientes.append(row_to_dict(row))
+    return {"cuil": cuil, "clientes": clientes}
+
+
 def duplicados(conn) -> list[dict]:
     """Grupos de clientes que comparten un CUIL verificado — candidatos a
     fusionar (justo lo que el índice único de CUIL rechaza)."""
     from identity import merge
 
-    out = []
+    return [
+        _enriquecer_grupo_duplicado(conn, g["cuil"], g["ids"])
+        for g in merge.candidatos_duplicados(conn)
+    ]
+
+
+def duplicados_de(conn, cliente_id: int) -> dict | None:
+    """El grupo de duplicados (mismo CUIL verificado) que incluye a este
+    cliente puntual, si existe — para sugerir la fusión desde su propia
+    ficha (#1251 Fase 2). Reusa `identity.merge.candidatos_duplicados` (ya
+    agrega por CUIL, barato) en vez de una query nueva."""
+    from identity import merge
+
     for g in merge.candidatos_duplicados(conn):
-        items = []
-        for cid in g["ids"]:
-            row = conn.execute(
-                """SELECT c.id, c.nombre, c.apellido, c.email, c.telefono,
-                          c.nombre_completo_renaper, c.dni_validado_at, c.created_at,
-                          (SELECT COUNT(*) FROM alquileres a WHERE a.cliente_id = c.id) AS pedidos
-                     FROM clientes c WHERE c.id = %s""",
-                (cid,),
-            ).fetchone()
-            if row:
-                items.append(row_to_dict(row))
-        out.append({"cuil": g["cuil"], "clientes": items})
-    return out
+        if cliente_id in g["ids"]:
+            return _enriquecer_grupo_duplicado(conn, g["cuil"], g["ids"])
+    return None

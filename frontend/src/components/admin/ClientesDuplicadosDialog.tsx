@@ -86,7 +86,9 @@ export function ClientesDuplicadosDialog({
   );
 }
 
-function GrupoCard({ grupo, onMerged }: { grupo: GrupoDuplicado; onMerged: () => void }) {
+/** Exportado para reusar en `ClienteDetalleDialog` (#1251 Fase 2) — sugerencia
+ * de fusión inline desde la propia ficha, misma UI/lógica que la vista global. */
+export function GrupoCard({ grupo, onMerged }: { grupo: GrupoDuplicado; onMerged: () => void }) {
   // Sugerencia por defecto: conservar la cuenta con más pedidos (más historia).
   const sugerido = [...grupo.clientes].sort((a, b) => b.pedidos - a.pedidos)[0]?.id;
   const [target, setTarget] = useState<number>(sugerido);

@@ -25,9 +25,9 @@ clientes/
     identidad.py        # nombre_legal, direccion_legal — delega en identity/
     fiscal.py             # perfiles_fiscales, productoras_vinculadas, resumen_fiscal
     historial.py            # resumen (pedidos, para la ficha admin)
-    cliente.py                 # listar, obtener, duplicados (CRUD admin — lectura)
+    cliente.py                 # listar, obtener, duplicados, duplicados_de (CRUD admin — lectura)
   commands/           # ESCRITURA — la única puerta de mutación
-    cliente.py          # crear, actualizar, eliminar
+    cliente.py          # crear, actualizar, eliminar (soft delete)
 ```
 
 **Consultado por AMBOS lados**: `routes/clientes.py` (admin, `require_admin`) y
@@ -54,7 +54,12 @@ devuelve `queries.cliente.obtener(...)` para no reconstruir la fila a mano); `qu
   el route lo traduce a `HTTPException`. Lo que se escapa (constraint de Postgres, etc.) lo
   cubre `@map_pg_errors` en el route — no un `except Exception` genérico que filtre el
   mensaje interno de Postgres.
+- **`eliminar` es soft delete** (`eliminado_at`, mismo patrón que equipos #206) — nunca un
+  `DELETE FROM clientes` físico. `queries.cliente.listar` lo oculta por default;
+  `queries.cliente.obtener` NO lo filtra (un pedido viejo puede seguir apuntando a un
+  cliente borrado — la ficha admin tiene que poder mostrarlo).
 
 El supervisor marca: un `nombre_validado(d) or f"..."` recompuesto fuera de
 `queries/identidad.py`, un SELECT de `cliente_perfiles_fiscales`/`productoras` duplicado
-fuera de `queries/fiscal.py`, o un `import` de `commands/` dentro de `queries/`.
+fuera de `queries/fiscal.py`, un `import` de `commands/` dentro de `queries/`, o un `DELETE
+FROM clientes` reintroducido en vez de `commands.cliente.eliminar`.
