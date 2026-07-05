@@ -196,14 +196,24 @@ def cotizar(data: CotizarRequest, request: Request):
         descuento_manual_monto = 0.0
         descuento_manual_activo = False
         if tiene_fechas:
-            # ¿Qué cliente? El logueado (sesión cliente) o, si es admin, el
-            # `cliente_id` pedido (el builder admin cotiza para terceros).
+            # ¿Para qué cliente se cotiza?
+            #   - Admin (back-office): SIEMPRE el cliente del pedido (`data.cliente_id`),
+            #     nunca la ficha de la propia sesión. La admin-ness la da el EMAIL
+            #     (`require_admin`/`is_admin_email`), no el `role` — un dueño que se
+            #     logueó por el portal de cliente tiene una sesión `role="cliente"` +
+            #     su propio `cliente_id` Y además es admin. Con la precedencia vieja
+            #     (rama `role=="cliente"` primero) el builder cotizaba con el descuento
+            #     de la ficha del PROPIO admin para TODOS los pedidos, no la del pedido
+            #     → "descuento fantasma" (#1231). El camino que PERSISTE la plata
+            #     (`_recalcular_total_pedido`) ya usaba el cliente del pedido, así que
+            #     esto era solo el preview mintiendo, no datos corruptos.
+            #   - Cliente puro (portal): su propia ficha.
+            #   - Anónimo (sin sesión): sin descuento de cliente.
             target_cliente_id = None
-            if session:
-                if session.get("role") == "cliente" and session.get("cliente_id"):
-                    target_cliente_id = session["cliente_id"]
-                elif es_admin and data.cliente_id:
-                    target_cliente_id = data.cliente_id
+            if es_admin:
+                target_cliente_id = data.cliente_id
+            elif session and session.get("role") == "cliente" and session.get("cliente_id"):
+                target_cliente_id = session["cliente_id"]
             if target_cliente_id:
                 c = conn.execute(
                     "SELECT perfil_impuestos, descuento FROM clientes WHERE id=%s",
