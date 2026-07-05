@@ -61,7 +61,12 @@ Reglas que NO se rompen:
 - **Enteros ARS** en todo el cálculo (no `NUMERIC`).
 - **Multi-moneda no se mezcla:** cada caja tiene `moneda` (ARS/USD); saldos por moneda; transferencia/
   ajuste exigen misma moneda (sin conversión automática); P&L en ARS. La **moneda es inmutable tras
-  crear** — NO "arreglar" eso como si fuera bug.
+  crear** — NO "arreglar" eso como si fuera bug. **Cambio de divisa (comprar/vender USD con ARS)** pasa
+  por `commands/movimientos.py::crear_cambio_divisa` — NO un tipo de movimiento nuevo: dos `ajuste`
+  atados por `movimiento_par_id`, con `cotizacion` (pesos por dólar) guardada de forma informativa en
+  ambas filas. Acepta 2 de {monto en pesos, monto en la otra moneda, cotización} y deriva el tercero.
+  Una de las dos cuentas tiene que ser ARS (hoy solo hay ARS/USD). No reimplementar esta cuenta fuera
+  de la puerta única.
 - **Devengado (P&L) ≠ percibido (saldo de caja)** a propósito: pueden no coincidir mes a mes.
 - **Cobradores en la constante única `COBRADORES`** (Pablo/Tincho/Rambla; Rambla = cobrador por
   defecto) + `SOCIOS_HUMANOS` (Pablo/Tincho). **No duplicar** esos valores fuera de la constante.
