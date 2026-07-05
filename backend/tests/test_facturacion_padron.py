@@ -427,8 +427,16 @@ class _FakeConnPerfiles:
     es el primer perfil) el UPDATE de `clientes.cuit` + el SELECT/UPDATE de
     `_corregir_datos_facturacion_cliente`."""
 
-    def __init__(self, tiene_perfil_previo: bool, cliente_row: dict | None = None):
+    def __init__(
+        self,
+        tiene_perfil_previo: bool,
+        cliente_row: dict | None = None,
+        perfil_existente_row: dict | None = None,
+    ):
         self.tiene_perfil_previo = tiene_perfil_previo
+        # Si no es None, simula que ESTE cuit puntual ya tiene una fila (para
+        # el candado de re-verificar el propio default — ver test de abajo).
+        self.perfil_existente_row = perfil_existente_row
         self.cliente_row = cliente_row or {
             "razon_social": None,
             "domicilio_fiscal": None,
@@ -447,6 +455,8 @@ class _FakeConnPerfiles:
             def fetchone(self_inner):
                 return self_inner._row
 
+        if sql_norm.startswith("SELECT es_default FROM cliente_perfiles_fiscales"):
+            return _R(self.perfil_existente_row)
         if sql_norm.startswith("SELECT 1 FROM cliente_perfiles_fiscales"):
             return _R({"1": 1} if self.tiene_perfil_previo else None)
         if sql_norm.startswith("INSERT INTO cliente_perfiles_fiscales"):
@@ -518,6 +528,48 @@ def test_verificar_y_crear_perfil_fiscal_segundo_perfil_no_pisa_default(monkeypa
 
     _, params = conn.perfil_inserts[0]
     assert params[-1] is False  # es_default
+    assert conn.cliente_updates == []
+
+
+def test_verificar_y_crear_perfil_fiscal_reverificar_el_propio_default_sincroniza_clientes(monkeypatch):
+    """Bug real (encontrado en revisión): reverificar el CUIT que YA es el
+    default del cliente tiene que seguir sincronizando `clientes.*` con los
+    datos frescos de AFIP — antes, `ya_tiene_perfil` encontraba ESE MISMO
+    perfil y computaba `es_default=False` (porque "el cliente ya tiene un
+    perfil"), salteando el sync aunque siguiera siendo el default real."""
+    from services.facturacion.padron import verificar_y_crear_perfil_fiscal
+
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona",
+        lambda cuit, conn: _persona_afip(razon_social="Nombre Actualizado SA"),
+    )
+    # Este CUIT YA existe como perfil, y YA es el default.
+    conn = _FakeConnPerfiles(tiene_perfil_previo=True, perfil_existente_row={"es_default": True})
+
+    verificar_y_crear_perfil_fiscal("30712345678", cliente_id=7, conn=conn)
+
+    _, params = conn.perfil_inserts[0]
+    assert params[-1] is True  # es_default sigue TRUE en el upsert
+    # Y el sync a `clientes` (cuit + razón social/domicilio/perfil) SÍ corre.
+    assert any("UPDATE clientes SET cuit" in sql for sql, _ in conn.cliente_updates)
+    assert any("razon_social" in sql for sql, _ in conn.cliente_updates)
+
+
+def test_verificar_y_crear_perfil_fiscal_reverificar_perfil_no_default_no_sincroniza(monkeypatch):
+    """Reverificar un CUIT que YA existe pero NO es el default no debe tocar
+    `clientes` — solo refresca su propia fila."""
+    from services.facturacion.padron import verificar_y_crear_perfil_fiscal
+
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona",
+        lambda cuit, conn: _persona_afip(),
+    )
+    conn = _FakeConnPerfiles(tiene_perfil_previo=True, perfil_existente_row={"es_default": False})
+
+    verificar_y_crear_perfil_fiscal("30712345678", cliente_id=7, conn=conn)
+
+    _, params = conn.perfil_inserts[0]
+    assert params[-1] is False
     assert conn.cliente_updates == []
 
 

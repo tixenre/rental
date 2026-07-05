@@ -214,11 +214,26 @@ def verificar_y_crear_perfil_fiscal(
             f"AFIP no pudo clasificar la condición IVA del CUIT {cuit} — no se "
             "puede guardar un perfil fiscal sin esa clasificación confirmada."
         )
-    ya_tiene_perfil = conn.execute(
-        "SELECT 1 FROM cliente_perfiles_fiscales WHERE cliente_id = %s LIMIT 1",
-        (cliente_id,),
+    # Bug real (encontrado en revisión): si esto se calculaba solo con "¿el
+    # cliente ya tiene ALGÚN perfil?", reverificar el CUIT que YA es el default
+    # (el caso más común: refrescar el propio) computaba `es_default=False`
+    # (porque ese mismo perfil ya existe) — el ON CONFLICT no toca `es_default`
+    # así que la fila en `cliente_perfiles_fiscales` seguía bien, pero el
+    # sync a `clientes.*` de abajo se saltaba, dejando el "perfil default" que
+    # leen los call sites viejos con razón social/domicilio desactualizados
+    # tras una reverificación real. Se resuelve mirando ESTE cuit puntual.
+    perfil_existente = conn.execute(
+        "SELECT es_default FROM cliente_perfiles_fiscales WHERE cliente_id = %s AND cuit = %s",
+        (cliente_id, cuit),
     ).fetchone()
-    es_default = ya_tiene_perfil is None
+    if perfil_existente is not None:
+        es_default = bool(perfil_existente["es_default"])
+    else:
+        ya_tiene_perfil = conn.execute(
+            "SELECT 1 FROM cliente_perfiles_fiscales WHERE cliente_id = %s LIMIT 1",
+            (cliente_id,),
+        ).fetchone()
+        es_default = ya_tiene_perfil is None
     conn.execute(
         """
         INSERT INTO cliente_perfiles_fiscales

@@ -228,11 +228,25 @@ def cotizar(data: CotizarRequest, request: Request):
                 # #1240: solo la sesión cliente puede elegir facturar a nombre de
                 # un perfil personal alternativo o una productora (el admin no
                 # manda estos campos para el pedido de otro cliente).
-                if es_sesion_cliente and (data.perfil_fiscal_id or data.productora_id):
+                # `_resolver_datos_fiscales_pedido` scopea `perfil_fiscal_id` por
+                # `cliente_id` sola, pero NO valida membership de `productora_id`
+                # (asume que el caller ya lo hizo, como sí hace la creación real
+                # del pedido) — acá se valida explícitamente antes de usarlo, para
+                # no dejar que cualquier sesión cliente cotice con el perfil
+                # fiscal de una productora ajena solo adivinando su id.
+                productora_id_valida = None
+                if es_sesion_cliente and data.productora_id:
+                    vinculado = conn.execute(
+                        "SELECT 1 FROM productora_miembros WHERE productora_id = %s AND cliente_id = %s",
+                        (data.productora_id, target_cliente_id),
+                    ).fetchone()
+                    if vinculado:
+                        productora_id_valida = data.productora_id
+                if es_sesion_cliente and (data.perfil_fiscal_id or productora_id_valida):
                     from services.pedidos_enriquecimiento import _resolver_datos_fiscales_pedido
 
                     fiscal = _resolver_datos_fiscales_pedido(
-                        conn, target_cliente_id, data.perfil_fiscal_id, data.productora_id
+                        conn, target_cliente_id, data.perfil_fiscal_id, productora_id_valida
                     )
                     if fiscal.get("perfil_impuestos"):
                         perfil = fiscal["perfil_impuestos"]
