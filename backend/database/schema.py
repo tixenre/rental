@@ -2446,6 +2446,7 @@ def _init_db_schema(conn):
             imp_total               NUMERIC(12,2) NOT NULL,
             estado                  TEXT NOT NULL DEFAULT 'pendiente',
             nota_credito_de         INTEGER REFERENCES facturas_exportacion(id),
+            qr_payload              TEXT,
             raw_request             JSONB,
             raw_response            JSONB,
             errores                 JSONB,

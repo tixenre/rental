@@ -864,6 +864,66 @@ async def descargar_pdf_factura(
 
 
 # ---------------------------------------------------------------------------
+# GET /facturas-exportacion/{id}/pdf — un solo layout (ver render_exportacion.py docstring)
+# ---------------------------------------------------------------------------
+
+
+def _factura_exportacion_html_o_404(factura_id: int, conn):
+    from services.facturacion.repo_exportacion import get_by_id
+    from services.facturacion.comprobante_render_exportacion import factura_exportacion_html
+
+    factura = get_by_id(factura_id, conn)
+    if factura is None:
+        raise HTTPException(404, "Factura de Exportación no encontrada")
+    if factura.estado != "emitida":
+        raise HTTPException(400, "Solo se pueden ver/descargar/enviar facturas emitidas")
+
+    try:
+        html_str = factura_exportacion_html(factura, conn)
+    except (ValueError, RuntimeError) as e:
+        raise HTTPException(503, str(e))
+    return factura, html_str
+
+
+@router.get("/facturas-exportacion/{factura_id}/pdf")
+async def descargar_pdf_factura_exportacion(factura_id: int, request: Request, format: str = "pdf"):
+    """PDF de una Factura de Exportación, renderizado on-demand. `format=html` devuelve el preview
+    rápido (mismo patrón que `GET /facturas/{id}/pdf`) — un solo layout, sin selector."""
+    require_admin(request)
+
+    with get_db() as conn:
+        factura, html_str = _factura_exportacion_html_o_404(factura_id, conn)
+        if format == "html":
+            cert_pem = key_pem = None
+        else:
+            from services.facturacion.signing_cert import get_or_create_signing_cert
+            cert_pem, key_pem = get_or_create_signing_cert(conn)
+
+    if format == "html":
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=html_str, headers=_DOC_NO_CACHE)
+
+    from pdf import _render_pdf
+    from arca_fe import asegurar_pdf
+    from services.facturacion.comprobante_render_exportacion import factura_exportacion_filename
+
+    try:
+        pdf_bytes = await _render_pdf(html_str, page_size=None)
+        pdf_bytes = await asyncio.to_thread(asegurar_pdf, pdf_bytes, cert_pem, key_pem)
+    except Exception as e:
+        raise HTTPException(503, f"No se pudo generar el PDF: {e}")
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{factura_exportacion_filename(factura)}"',
+            **_DOC_NO_CACHE,
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
 # POST /facturas/{id}/enviar-mail
 # ---------------------------------------------------------------------------
 

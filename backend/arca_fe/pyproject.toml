@@ -1,6 +1,6 @@
 [project]
 name = "arca-fe"
-version = "0.2.0"
+version = "0.3.0"
 description = "Motor portable de facturación electrónica ARCA (ex-AFIP) — WSFEv1 + WSAA + padrón, sin dependencias de ningún framework."
 readme = "README.md"
 requires-python = ">=3.9"

@@ -56,7 +56,9 @@ Si vendés al exterior, `arca_fe` arma y autoriza la Factura de Exportación por
 de ARCA para eso (RG 2758) — receptor sin CUIT argentino (identificado por país destino), permiso
 de embarque, Incoterm y moneda extranjera, exenta de IVA. Es un circuito de AFIP distinto del de la
 factura doméstica — requiere habilitar esa relación de servicio aparte en el portal de AFIP (ver
-`TRAMITES_AFIP.md`), pero se usa con el mismo estilo de la librería.
+`TRAMITES_AFIP.md`), pero se usa con el mismo estilo de la librería. El documento ya emitido se
+renderiza con `renderizar_factura_exportacion_html` — un layout A4 propio (sin discriminación de
+IVA, con país destino/Incoterm/permiso de embarque), no una variante de los 3 layouts domésticos.
 
 ## Consulta de CUIT — como el autocompletar del facturador oficial
 

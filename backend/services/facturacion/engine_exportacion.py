@@ -26,7 +26,7 @@ from typing import Optional
 
 from database import get_db
 
-from arca_fe import ArcaError, CaeResult
+from arca_fe import ArcaError, CaeResult, armar_qr
 from arca_fe.modelos_exportacion import ComprobanteExportacionRequest
 from arca_fe.comprobante_exportacion import tipo_comprobante_exportacion
 from arca_fe.wsfex import WsfexClient, WSFEX_WSAA_SERVICIO
@@ -159,12 +159,30 @@ def emitir_factura_exportacion(
             ) from exc
 
         if cae_result.resultado == "A" and cae_result.cae:
+            # Receptor exterior sin CUIT argentino: sin un DocTipo real de AFIP para este caso, se
+            # usa la convención 99/0 ("Doc. (Otro)"/sin identificar) — tentativo, a confirmar contra
+            # el manual de RG4892 aplicado a WSFEXv1 (mismo criterio de honestidad que el resto del
+            # módulo: no se asume, se marca explícito).
+            qr_url = armar_qr(
+                cuit_emisor=cred.cuit,
+                pto_vta=comprobante.emisor.punto_venta,
+                cbte_tipo=int(cbte_tipo),
+                nro_cmp=cae_result.numero,
+                importe_total=comprobante.importe_neto,
+                doc_tipo_rec=99,
+                doc_nro_rec=0,
+                cae=cae_result.cae,
+                fecha=comprobante.fecha,
+                moneda=comprobante.moneda,
+                ctz=comprobante.cotizacion,
+            )
             update_cae_exportacion(
                 factura_id,
                 conn,
                 cbte_nro=cae_result.numero,
                 cae=cae_result.cae,
                 cae_vto=cae_result.cae_vto,
+                qr_payload=qr_url,
                 raw_response={
                     "resultado": cae_result.resultado,
                     "cae": cae_result.cae,

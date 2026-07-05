@@ -17,7 +17,7 @@ reservado para cuando el contrato público se declare estable. Un test de portab
 core nunca importe `backend.*`.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from .modelos import (
     CondicionIva,
@@ -53,9 +53,12 @@ from .modelos_exportacion import (
     DatosExportacion,
     CbteAsocExportacion,
     ComprobanteExportacionRequest,
+    ComprobanteFiscalExportacion,
     es_nota_credito_exportacion,
+    letra_comprobante_exportacion,
 )
 from .comprobante_exportacion import tipo_comprobante_exportacion, armar_fexauthorize
+from .render_exportacion import renderizar_factura_exportacion_html
 from .qr import armar_qr, qr_svg
 from .render import (
     renderizar_comprobante_html,
@@ -134,9 +137,12 @@ __all__ = [
     "DatosExportacion",
     "CbteAsocExportacion",
     "ComprobanteExportacionRequest",
+    "ComprobanteFiscalExportacion",
     "es_nota_credito_exportacion",
+    "letra_comprobante_exportacion",
     "tipo_comprobante_exportacion",
     "armar_fexauthorize",
+    "renderizar_factura_exportacion_html",
     "WsfexClient",
     "WSFEX_WSAA_SERVICIO",
     "wsfex_clear_cache",

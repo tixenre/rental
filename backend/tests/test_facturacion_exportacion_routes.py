@@ -6,6 +6,8 @@ el contrato del handler — guard de admin, parseo del body (`_comprobante_expor
 mapeo de errores (ValueError→400, ArcaError por subtipo, RuntimeError→503)."""
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from fastapi import HTTPException, Request
 from fastapi.testclient import TestClient
@@ -57,7 +59,7 @@ def _fake_factura_exportacion(estado="emitida") -> FacturaExportacion:
         receptor_razon_social="Acme Corp", receptor_pais_destino=203,
         receptor_domicilio=None, receptor_id_impositivo=None,
         incoterm="FOB", permiso_embarque="X123", moneda="USD", cotizacion=1000,
-        imp_total=1000, estado=estado, nota_credito_de=None,
+        imp_total=1000, estado=estado, nota_credito_de=None, qr_payload=None,
         raw_request=None, raw_response=None, errores=None,
         fecha_emision=None, created_at=None, created_by=None,
     )
@@ -72,6 +74,7 @@ def _fake_factura_exportacion(estado="emitida") -> FacturaExportacion:
         ("POST", "/api/admin/facturacion/exportacion"),
         ("GET", "/api/admin/facturacion/exportacion"),
         ("POST", "/api/admin/facturacion/exportacion/1/nota-credito"),
+        ("GET", "/api/facturas-exportacion/1/pdf"),
     ],
 )
 def test_rutas_exportacion_gatean_por_admin(method, path):
@@ -235,3 +238,86 @@ def test_listar_facturas_exportacion_devuelve_lista_y_count(monkeypatch):
     result = facturacion_routes.listar_facturas_exportacion(_fake_request(method="GET"))
     assert result["count"] == 2
     assert len(result["facturas"]) == 2
+
+
+# ── descargar_pdf_factura_exportacion: 404 / 400 / format=html / format=pdf ──
+
+
+class _FakeConn:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        pass
+
+
+def test_descargar_pdf_exportacion_404_si_no_existe(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.repo_exportacion.get_by_id", lambda factura_id, conn: None
+    )
+
+    with pytest.raises(HTTPException) as ei:
+        asyncio.run(
+            facturacion_routes.descargar_pdf_factura_exportacion(999, _fake_request(method="GET"))
+        )
+    assert ei.value.status_code == 404
+
+
+def test_descargar_pdf_exportacion_400_si_no_emitida(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.repo_exportacion.get_by_id",
+        lambda factura_id, conn: _fake_factura_exportacion("pendiente"),
+    )
+
+    with pytest.raises(HTTPException) as ei:
+        asyncio.run(
+            facturacion_routes.descargar_pdf_factura_exportacion(1, _fake_request(method="GET"))
+        )
+    assert ei.value.status_code == 400
+
+
+def test_descargar_pdf_exportacion_503_si_faltan_datos_de_arca(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.repo_exportacion.get_by_id",
+        lambda factura_id, conn: _fake_factura_exportacion(),
+    )
+
+    def _raise(*a, **kw):
+        raise ValueError("ComprobanteFiscalExportacion incompleto, faltan: qr_url")
+
+    monkeypatch.setattr(
+        "services.facturacion.comprobante_render_exportacion.factura_exportacion_html", _raise
+    )
+
+    with pytest.raises(HTTPException) as ei:
+        asyncio.run(
+            facturacion_routes.descargar_pdf_factura_exportacion(1, _fake_request(method="GET"))
+        )
+    assert ei.value.status_code == 503
+
+
+def test_descargar_pdf_exportacion_format_html_devuelve_preview_sin_renderer(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.repo_exportacion.get_by_id",
+        lambda factura_id, conn: _fake_factura_exportacion(),
+    )
+    monkeypatch.setattr(
+        "services.facturacion.comprobante_render_exportacion.factura_exportacion_html",
+        lambda factura, conn: "<html>FACTURA-E-X</html>",
+    )
+
+    resp = asyncio.run(
+        facturacion_routes.descargar_pdf_factura_exportacion(
+            1, _fake_request(method="GET"), format="html"
+        )
+    )
+    assert resp.status_code == 200
+    assert b"FACTURA-E-X" in resp.body

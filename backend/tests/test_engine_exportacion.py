@@ -138,7 +138,8 @@ def _patch_common(monkeypatch, wsfex_instance, *, habilitado_exportacion=True):
             incoterm="FOB", permiso_embarque="X", moneda="USD", cotizacion=Decimal("1000"),
             imp_total=Decimal("1000.00"),
             estado="emitida" if "update_cae" in calls else "error",
-            nota_credito_de=None, raw_request=None, raw_response=None,
+            nota_credito_de=None, qr_payload=calls.get("update_cae", {}).get("qr_payload"),
+            raw_request=None, raw_response=None,
             errores=None, fecha_emision=None, created_at=None, created_by=None,
         )
 
@@ -159,6 +160,7 @@ def test_emitir_factura_exportacion_pide_cae_nuevo_cuando_no_hay_recovery(monkey
     assert wsfex.consultar_calls == [2], "debe consultar el PRÓXIMO número (2), no el último (1)"
     assert calls["update_cae"]["cbte_nro"] == 2
     assert calls["update_cae"]["cae"] == "70012345670001"
+    assert calls["update_cae"]["qr_payload"].startswith("https://www.afip.gob.ar/fe/qr/?p=")
     assert factura.estado == "emitida"
 
 
@@ -166,7 +168,7 @@ def test_emitir_factura_exportacion_no_duplica_cae_de_la_anterior(monkeypatch):
     """Mismo bug de prod que WSFEv1: NO debe reusar el CAE de la última factura autorizada."""
     wsfex = _FakeWsfex(endpoint="x", cuit=1, token="t", sign="s")
     wsfex.ultimo = 1
-    wsfex.consultar_resp = {"Resultado": "A", "Cae": "OTRO_CAE_VIEJO"}
+    wsfex.consultar_resp = {"Resultado": "A", "Cae": "70099999990000"}
 
     calls = _patch_common(monkeypatch, wsfex)
     engine_exportacion.emitir_factura_exportacion("santini", _fake_comprobante())
@@ -174,7 +176,7 @@ def test_emitir_factura_exportacion_no_duplica_cae_de_la_anterior(monkeypatch):
     # numero_a_emitir=2 "existe" en la consulta fake (recuperado) → NO pide un CAE nuevo,
     # recupera el de la consulta (idempotencia post-timeout, no un CAE distinto por error).
     assert wsfex.consultar_calls == [2]
-    assert calls["update_cae"]["cae"] == "OTRO_CAE_VIEJO"
+    assert calls["update_cae"]["cae"] == "70099999990000"
     assert len(wsfex.autorizar_calls) == 0, "no debe pedir un CAE nuevo si ya se recuperó uno"
 
 

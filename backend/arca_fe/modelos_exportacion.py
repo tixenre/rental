@@ -26,7 +26,7 @@ from decimal import Decimal
 from enum import IntEnum
 from typing import Optional
 
-from .modelos import CaeResult, Concepto, Emisor, _validar_y_normalizar_cuit
+from .modelos import CaeResult, Concepto, Emisor, ItemFactura, _validar_y_normalizar_cuit
 
 
 class CbteTipoExportacion(IntEnum):
@@ -42,6 +42,14 @@ class CbteTipoExportacion(IntEnum):
 def es_nota_credito_exportacion(cbte_tipo: CbteTipoExportacion) -> bool:
     """`True` si `cbte_tipo` es la nota de crédito de exportación (21)."""
     return CbteTipoExportacion(cbte_tipo) == CbteTipoExportacion.NOTA_CREDITO_E
+
+
+def letra_comprobante_exportacion(cbte_tipo: CbteTipoExportacion) -> str:
+    """"E" para los 3 tipos (19/20/21) — a diferencia del comprobante doméstico (A/B/C/M según
+    condición IVA de ambas partes), AFIP identifica TODO comprobante de exportación con la letra
+    fija "E" (no depende de quién factura ni a quién)."""
+    CbteTipoExportacion(cbte_tipo)
+    return "E"
 
 
 @dataclass(frozen=True)
@@ -179,12 +187,67 @@ class ComprobanteExportacionRequest:
         _validar_estructura_exportacion(self)
 
 
+@dataclass(frozen=True)
+class ComprobanteFiscalExportacion:
+    """La foto final de una Factura de Exportación YA EMITIDA — todo lo que hace falta para
+    renderizar el documento (`arca_fe.render_exportacion.renderizar_factura_exportacion_html`).
+    Paralelo a `modelos.ComprobanteFiscal`, pero SIN desglose de IVA (la exportación está exenta) y
+    con receptor exterior (`ReceptorExterior`, sin CUIT/DocTipo argentino) en vez de `Receptor`.
+
+    Reusa `ItemFactura` de `modelos.py` tal cual — es genérico (código/descripción/precio/subtotal/
+    cantidad/unidad/bonificación), no depende de IVA ni de nada doméstico.
+
+    `ValueError` en la construcción si falta `cae`/`numero`/`cae_vto`/`qr_url` — mismo criterio que
+    `ComprobanteFiscal`: un comprobante sin esos 4 datos no se puede renderizar como válido."""
+
+    cbte_tipo: CbteTipoExportacion
+    pto_vta: int
+    numero: int
+    fecha_emision: date
+    emisor_cuit: str
+    emisor_razon_social: Optional[str]
+    emisor_condicion_iva_label: str
+    emisor_domicilio: Optional[str]
+    receptor_razon_social: str
+    receptor_pais_destino_label: str
+    receptor_domicilio: Optional[str]
+    receptor_id_impositivo: Optional[str]
+    incoterm: str
+    permiso_embarque: Optional[str]
+    moneda: str
+    cotizacion: Decimal
+    items: tuple[ItemFactura, ...]
+    importe_total: Decimal
+    cae: str
+    cae_vto: date
+    qr_url: str
+    concepto_label: str = ""
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "cbte_tipo", CbteTipoExportacion(self.cbte_tipo))
+        faltantes = [
+            campo
+            for campo, val in (
+                ("cae", self.cae), ("numero", self.numero),
+                ("cae_vto", self.cae_vto), ("qr_url", self.qr_url),
+            )
+            if not val
+        ]
+        if faltantes:
+            raise ValueError(
+                "ComprobanteFiscalExportacion: no se puede renderizar sin "
+                f"{', '.join(faltantes)} — comprobante no emitido/incompleto."
+            )
+
+
 __all__ = [
     "CbteTipoExportacion",
     "es_nota_credito_exportacion",
+    "letra_comprobante_exportacion",
     "ReceptorExterior",
     "DatosExportacion",
     "CbteAsocExportacion",
     "ComprobanteExportacionRequest",
+    "ComprobanteFiscalExportacion",
     "CaeResult",
 ]

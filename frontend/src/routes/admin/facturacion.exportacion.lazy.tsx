@@ -8,7 +8,7 @@ import { createLazyFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, RefreshCw, Undo2 } from "lucide-react";
+import { Plus, RefreshCw, Undo2, Eye, Download } from "lucide-react";
 
 import {
   facturacionApi,
@@ -213,15 +213,37 @@ function FacturaExportacionPage() {
                       </div>
                     </td>
                     <td className="px-4 py-2.5">
-                      {f.estado === "emitida" && !esNC && (
-                        <button
-                          type="button"
-                          onClick={() => setNcDe(f)}
-                          title="Emitir Nota de Crédito"
-                          className="text-muted-foreground hover:text-ink flex items-center gap-1 text-xs"
-                        >
-                          <Undo2 className="h-3.5 w-3.5" />
-                        </button>
+                      {f.estado === "emitida" && (
+                        <div className="flex items-center gap-2.5 justify-end">
+                          <a
+                            href={`/api/facturas-exportacion/${f.id}/pdf?format=html`}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Ver"
+                            className="text-muted-foreground hover:text-ink"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </a>
+                          <a
+                            href={`/api/facturas-exportacion/${f.id}/pdf`}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Descargar PDF"
+                            className="text-muted-foreground hover:text-ink"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </a>
+                          {!esNC && (
+                            <button
+                              type="button"
+                              onClick={() => setNcDe(f)}
+                              title="Emitir Nota de Crédito"
+                              className="text-muted-foreground hover:text-ink"
+                            >
+                              <Undo2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
                       )}
                     </td>
                   </tr>

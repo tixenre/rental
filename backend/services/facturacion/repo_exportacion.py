@@ -34,6 +34,7 @@ class FacturaExportacion:
     imp_total: Decimal
     estado: str
     nota_credito_de: Optional[int]
+    qr_payload: Optional[str]
     raw_request: Optional[dict]
     raw_response: Optional[dict]
     errores: Optional[list]
@@ -63,6 +64,7 @@ def _row_to_factura_exportacion(row: dict) -> FacturaExportacion:
         imp_total=row["imp_total"],
         estado=row["estado"],
         nota_credito_de=row["nota_credito_de"],
+        qr_payload=row["qr_payload"],
         raw_request=row["raw_request"],
         raw_response=row["raw_response"],
         errores=row["errores"],
@@ -181,6 +183,7 @@ def update_cae_exportacion(
     cbte_nro: int,
     cae: str,
     cae_vto: date,
+    qr_payload: str,
     raw_response: dict,
     estado: str = "emitida",
 ) -> None:
@@ -188,11 +191,11 @@ def update_cae_exportacion(
     conn.execute(
         """
         UPDATE facturas_exportacion
-           SET cbte_nro = %s, cae = %s, cae_vto = %s,
+           SET cbte_nro = %s, cae = %s, cae_vto = %s, qr_payload = %s,
                raw_response = %s, estado = %s, fecha_emision = now()
          WHERE id = %s
         """,
-        (cbte_nro, cae, cae_vto, json.dumps(raw_response), estado, factura_id),
+        (cbte_nro, cae, cae_vto, qr_payload, json.dumps(raw_response), estado, factura_id),
     )
 
 

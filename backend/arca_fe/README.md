@@ -154,6 +154,30 @@ son la mejor referencia disponible sin acceso al WSDL real de homologación — 
 contra AFIP antes de usar en producción (ver `arca_fe/wsfex.py`/`comprobante_exportacion.py`
 docstrings). Nunca reemplazarlos por versión de un guess: probar contra homologación real primero.
 
+Para renderizar el documento ya emitido (mismo criterio que `renderizar_comprobante_html`, ver
+arriba), construí un `ComprobanteFiscalExportacion` con el CAE/QR ya resueltos y pasalo a
+`renderizar_factura_exportacion_html` (`arca_fe/render_exportacion.py`) — UN solo layout A4, sin
+discriminación de IVA (la exportación está exenta), con país destino/Incoterm/permiso de embarque en
+vez de condición IVA receptor/condición de venta:
+
+```python
+from arca_fe import ComprobanteFiscalExportacion, renderizar_factura_exportacion_html
+
+datos = ComprobanteFiscalExportacion(
+    cbte_tipo=19, pto_vta=3, numero=resultado.numero, fecha_emision=date.today(),
+    emisor_cuit="20301234563", emisor_razon_social="Mi Empresa", emisor_condicion_iva_label="IVA Responsable Inscripto",
+    emisor_domicilio="Av. Siempre Viva 742", receptor_razon_social="Acme Corp",
+    receptor_pais_destino_label="Estados Unidos", receptor_domicilio="123 Main St", receptor_id_impositivo="",
+    incoterm="FOB", permiso_embarque="24001EC01000123X", moneda="USD", cotizacion=Decimal("1000"),
+    items=(ItemFactura(codigo="001", descripcion="Exportación #1", precio_unitario=Decimal("1000"), subtotal=Decimal("1000")),),
+    importe_total=Decimal("1000"), cae=resultado.cae, cae_vto=resultado.cae_vto,
+    qr_url=armar_qr(cuit_emisor=20301234563, pto_vta=3, cbte_tipo=19, nro_cmp=resultado.numero,
+                     importe_total=Decimal("1000"), doc_tipo_rec=99, doc_nro_rec=0, cae=resultado.cae,
+                     fecha=date.today(), moneda="USD", ctz=Decimal("1000")),
+)
+html = renderizar_factura_exportacion_html(datos)
+```
+
 ## Previsualizar cómo se ve un comprobante (sin CAE real)
 
 `arca_fe.ejemplos.generar_galeria_html()` arma una página HTML con varios comprobantes de muestra
