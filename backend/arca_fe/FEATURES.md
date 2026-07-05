@@ -50,6 +50,14 @@ el régimen MiPyme), la librería valida las reglas estructurales específicas q
 este tipo de comprobante (datos de cobro obligatorios, códigos de anulación), para que no se te
 escape un comprobante FCE incompleto.
 
+## Factura de Exportación (WSFEXv1)
+
+Si vendés al exterior, `arca_fe` arma y autoriza la Factura de Exportación por el circuito propio
+de ARCA para eso (RG 2758) — receptor sin CUIT argentino (identificado por país destino), permiso
+de embarque, Incoterm y moneda extranjera, exenta de IVA. Es un circuito de AFIP distinto del de la
+factura doméstica — requiere habilitar esa relación de servicio aparte en el portal de AFIP (ver
+`TRAMITES_AFIP.md`), pero se usa con el mismo estilo de la librería.
+
 ## Consulta de CUIT — como el autocompletar del facturador oficial
 
 Dado un CUIT, `arca_fe` te devuelve la razón social, el domicilio fiscal y la condición ante el IVA

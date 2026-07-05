@@ -38,16 +38,19 @@ actuar en tu nombre. Esto se hace en **Administrador de Relaciones de Clave Fisc
 buscador de AFIP), sección "Nueva Relación" → elegís el servicio → el alias del certificado (paso
 2) → confirmás.
 
-Los dos servicios que esta librería usa:
+Los servicios que esta librería usa:
 
 | Servicio a buscar en AFIP | Para qué | Usado por |
 |---|---|---|
 | **"wsfe" / Facturación Electrónica** | Emitir comprobantes (CAE), consultar puntos de venta/tipos de comprobante | `arca_fe.wsfe.WsfeClient` |
 | **"Consulta Constancia de Inscripción"** (⚠️ el nombre viejo "Padrón" ya no aparece en el buscador de AFIP — es el mismo servicio, renombrado) | Autocompletar razón social/domicilio/condición IVA de un CUIT | `arca_fe.padron.PadronClient` |
+| **"Comprobantes de Exportación" (WSFEXv1)** ⚠️ nombre EXACTO a confirmar en el buscador de AFIP al momento de delegar — no asumir que es igual al de "wsfe" | Emitir Facturas de Exportación (CAE de exportación) | `arca_fe.wsfex.WsfexClient` |
 
 Sin esta delegación, cada llamada a `WsaaLogin` para ese servicio falla — el error típico de AFIP
 es algo del estilo "no se encontró una relación entre el certificado y el CUIT solicitante para el
-servicio solicitado".
+servicio solicitado". **Los tres servicios se delegan POR SEPARADO** — tener "wsfe" habilitado NO
+habilita automáticamente WSFEXv1 (son relaciones de servicio independientes, aunque compartan el
+mismo CUIT/certificado); un emisor que factura doméstico pero no exportación no necesita este paso.
 
 ## 4. (Solo si vas a emitir Factura A) Punto de venta habilitado
 
@@ -64,6 +67,8 @@ todo.
 - [ ] Servicio **"wsfe"** delegado al alias del certificado (Administrador de Relaciones).
 - [ ] Servicio **"Consulta Constancia de Inscripción"** delegado (si vas a usar `PadronClient` —
       autocompletar datos de un CUIT).
+- [ ] Servicio de **Comprobantes de Exportación (WSFEXv1)** delegado (si vas a usar `WsfexClient` —
+      facturar al exterior; no es automático por tener "wsfe" ya delegado).
 - [ ] Al menos un punto de venta habilitado en Comprobantes en línea.
 
 ## Errores comunes y a qué trámite de arriba corresponden
@@ -74,6 +79,7 @@ todo.
 | CUIT real que "no existe" en el padrón | Relación de "Consulta Constancia de Inscripción" no delegada — o estás en homologación (que solo conoce CUITs de prueba) | Paso 3, u homologación vs. producción |
 | Certificado rechazado / `cms.sign.invalid` | Cert vencido, o de homologación usado contra producción (o viceversa) | Paso 2 |
 | `FECAESolicitar` rechaza con "punto de venta inexistente" | Punto de venta no habilitado | Paso 4 |
+| `FEXAuthorize` falla con "no se encontró una relación..." aunque "wsfe" sí funcione | Servicio de exportación NO delegado — son relaciones independientes | Paso 3 (Comprobantes de Exportación) |
 
 ## Validador automático de estos trámites — patrón ya resuelto (en el consumidor, no en la librería)
 
