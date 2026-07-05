@@ -46,22 +46,32 @@ EQA, EQB = 9_600_611, 9_600_612
 
 @contextmanager
 def _count_specs_queries(monkeypatch):
-    """Cuenta ejecuciones de cualquier query que toque `equipo_specs`."""
+    """Cuenta ejecuciones de cualquier query que toque `equipo_specs` — tanto
+    vía `execute()` (camino viejo) como vía `pipelined_select()` (#1240: el
+    pipeline de proyectar_lista corre las queries independientes en batch,
+    fuera de PGConnection.execute — hay que contarlas ahí también)."""
     from database.core import PGConnection
 
     counter = [0]
-    orig = PGConnection.execute
+    orig_execute = PGConnection.execute
+    orig_pipelined = PGConnection.pipelined_select
 
-    def _wrapped(self, sql, params=()):
+    def _wrapped_execute(self, sql, params=()):
         if "equipo_specs" in sql:
             counter[0] += 1
-        return orig(self, sql, params)
+        return orig_execute(self, sql, params)
 
-    monkeypatch.setattr(PGConnection, "execute", _wrapped)
+    def _wrapped_pipelined(self, queries):
+        counter[0] += sum(1 for sql, _ in queries if "equipo_specs" in sql)
+        return orig_pipelined(self, queries)
+
+    monkeypatch.setattr(PGConnection, "execute", _wrapped_execute)
+    monkeypatch.setattr(PGConnection, "pipelined_select", _wrapped_pipelined)
     try:
         yield counter
     finally:
-        monkeypatch.setattr(PGConnection, "execute", orig)
+        monkeypatch.setattr(PGConnection, "execute", orig_execute)
+        monkeypatch.setattr(PGConnection, "pipelined_select", orig_pipelined)
 
 
 def _limpiar(conn):

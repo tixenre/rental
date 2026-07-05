@@ -27,14 +27,20 @@ from database import (
     attach_ficha,
     attach_specs_destacados,
     attach_specs_estructuradas,
+    query_ficha_batch,
+    shape_ficha_rows,
     MARCA_SUBQUERY,
 )
 from reservas import calcular_disponibilidad
 from reservas.disponibilidad import _derivar_compuestos
 from reservas.semantics import componentes_de
-from services.contenido import contenido_de
-from services.categorias import listar_categorias_flat
-from services.specs import get_equipo_specs_rows
+from services.contenido import contenido_de, query_contenido_batch, shape_contenido_rows
+from services.categorias import (
+    listar_categorias_flat,
+    query_categorias_de_equipos,
+    shape_categorias_de_equipos_rows,
+)
+from services.specs import query_equipo_specs_rows, shape_equipo_specs_rows
 
 
 # ── Constantes de ordenamiento (espejo de routes/equipos/core.py) ─────────────
@@ -187,15 +193,39 @@ def proyectar_lista(
         bid = equipo.get("brand_id")
         equipo["brand"] = brands_map.get(bid) if bid else None
 
-    equipos = attach_categorias(conn, equipos)
+    # Los 4 attaches (categorías + kit/ficha/specs si incluir_detalle) son
+    # independientes entre sí — todos filtran por el mismo lote de `ids`, sin
+    # depender del resultado de ningún otro. En vez de 4 round-trips
+    # secuenciales, se piden en UN pipeline (#1240: el TTFB medido en vivo
+    # contra staging está dominado por latencia de red, no por tiempo de
+    # query). `pipelined_select` devuelve los resultados en el mismo orden
+    # que se encolaron las queries — de ahí el `zip` con las keys.
+    ids = [e["id"] for e in equipos]
+    pipeline_items = [("categorias", query_categorias_de_equipos(ids))]
     if incluir_detalle:
-        equipos = attach_kit(conn, equipos)
-        equipos = attach_ficha(conn, equipos)
+        pipeline_items += [
+            ("kit", query_contenido_batch(ids, solo_activos=True)),
+            ("ficha", query_ficha_batch(ids)),
+            ("specs", query_equipo_specs_rows(ids)),
+        ]
+    queries_reales = [(k, q) for k, q in pipeline_items if q is not None]
+    resultados = conn.pipelined_select([q for _, q in queries_reales]) if queries_reales else []
+    filas_por_key = dict(zip((k for k, _ in queries_reales), resultados))
+
+    cat_map = shape_categorias_de_equipos_rows(filas_por_key.get("categorias", []))
+    equipos = attach_categorias(conn, equipos, cat_map=cat_map)
+
+    if incluir_detalle:
+        contenido_map = shape_contenido_rows(filas_por_key.get("kit", []), ids)
+        equipos = attach_kit(conn, equipos, contenido_map=contenido_map)
+
+        ficha_map = shape_ficha_rows(filas_por_key.get("ficha", []), ids)
+        equipos = attach_ficha(conn, equipos, ficha_map=ficha_map)
+
         # Un solo query para las dos: attach_specs_estructuradas y
-        # attach_specs_destacados piden el mismo JOIN (equipo_specs+spec_definitions+
-        # categoria_spec_templates) para el mismo lote de ids — pedirlo acá evita
-        # ejecutarlo dos veces en cada carga de catálogo.
-        specs_rows = get_equipo_specs_rows(conn, [e["id"] for e in equipos])
+        # attach_specs_destacados piden el mismo JOIN — pedirlo una vez y
+        # repartirlo evita ejecutarlo dos veces en cada carga de catálogo.
+        specs_rows = shape_equipo_specs_rows(filas_por_key.get("specs", []), ids)
         equipos = attach_specs_estructuradas(conn, equipos, rows_by_equipo=specs_rows)
         equipos = attach_specs_destacados(conn, equipos, rows_by_equipo=specs_rows)
 

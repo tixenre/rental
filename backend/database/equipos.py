@@ -7,18 +7,22 @@ desde `database.py`. `attach_kit` deriva el contenido de la puerta única
 """
 
 
-def attach_kit(conn, equipos: list[dict]) -> list[dict]:
+def attach_kit(conn, equipos: list[dict], contenido_map: dict | None = None) -> list[dict]:
     """Agrega componentes de kit a cada equipo, vía la puerta única
     `services.contenido` (fuente única del "qué incluye"). `solo_activos=True`:
     el catálogo NO muestra componentes soft-deleted — preserva el criterio previo
-    de esta función. Import lazy para evitar el ciclo database↔services."""
+    de esta función. Import lazy para evitar el ciclo database↔services.
+
+    `contenido_map`: resultado ya calculado de `contenido_de_batch`/
+    `shape_contenido_rows` — pasalo si ya lo pediste vos (ej. dentro de un
+    pipeline de queries, #1240), para no ejecutar el mismo query de nuevo."""
     if not equipos:
         return equipos
 
-    from services.contenido import contenido_de_batch
-
     ids = [e["id"] for e in equipos]
-    por_equipo = contenido_de_batch(conn, ids, solo_activos=True)
+    if contenido_map is None:
+        from services.contenido import contenido_de_batch
+        contenido_map = contenido_de_batch(conn, ids, solo_activos=True)
     for e in equipos:
         e["kit"] = [{
             "componente_id": c["componente_id"],
@@ -28,18 +32,23 @@ def attach_kit(conn, equipos: list[dict]) -> list[dict]:
             "cantidad":      c["cantidad"],
             "descuento_pct": c["descuento_pct"],
             "esencial":      c["esencial"],
-        } for c in por_equipo.get(e["id"], [])]
+        } for c in contenido_map.get(e["id"], [])]
 
     return equipos
 
 
-def attach_categorias(conn, equipos: list[dict]) -> list[dict]:
-    """Agrega `categorias` (lista de {id, nombre, parent_id}) a cada equipo."""
+def attach_categorias(conn, equipos: list[dict], cat_map: dict | None = None) -> list[dict]:
+    """Agrega `categorias` (lista de {id, nombre, parent_id}) a cada equipo.
+
+    `cat_map`: resultado ya calculado de `categorias_de_equipos`/
+    `shape_categorias_de_equipos_rows` — pasalo si ya lo pediste vos (ej.
+    dentro de un pipeline de queries, #1240)."""
     if not equipos:
         return equipos
-    from services.categorias.queries.ancestry import categorias_de_equipos
     ids = [e["id"] for e in equipos]
-    cat_map = categorias_de_equipos(conn, ids)
+    if cat_map is None:
+        from services.categorias.queries.ancestry import categorias_de_equipos
+        cat_map = categorias_de_equipos(conn, ids)
     for e in equipos:
         e["categorias"] = cat_map.get(e["id"], [])
     return equipos
@@ -87,7 +96,7 @@ def shape_ficha_rows(rows, equipo_ids: list[int]) -> dict[int, dict]:
     return {eid: f_map.get(eid) or dict(_empty) for eid in equipo_ids}
 
 
-def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
+def attach_ficha(conn, equipos: list[dict], ficha_map: dict | None = None) -> list[dict]:
     """Agrega la ficha textual (descripcion, notas, keywords, enriquecimiento
     extra). Las specs estructuradas viven en `equipo_specs` y se atachan
     vía `attach_specs_estructuradas`.
@@ -95,15 +104,19 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
     Post-Fase F: montura/formato/resolucion/peso/dimensiones/alimentacion
     fueron droppeadas — esos campos son specs en equipo_specs.
     Post-Fase E: specs_json y raw_json fueron droppeados.
+
+    `ficha_map`: resultado ya calculado de `query_ficha_batch`/`shape_ficha_rows`
+    — pasalo si ya lo pediste vos (ej. dentro de un pipeline de queries, #1240).
     """
     if not equipos:
         return equipos
     ids = [e["id"] for e in equipos]
-    query = query_ficha_batch(ids)
-    cur = conn.cursor()
-    cur.execute(*query)
-    ficha_map = shape_ficha_rows(cur.fetchall(), ids)
-    cur.close()
+    if ficha_map is None:
+        query = query_ficha_batch(ids)
+        cur = conn.cursor()
+        cur.execute(*query)
+        ficha_map = shape_ficha_rows(cur.fetchall(), ids)
+        cur.close()
     for e in equipos:
         e["ficha"] = ficha_map.get(e["id"])
     return equipos
