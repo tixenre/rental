@@ -61,6 +61,37 @@ def _build_query(ph: str, solo_activos: bool) -> str:
     """
 
 
+def query_contenido_batch(equipo_ids, solo_activos: bool = True) -> tuple[str, tuple] | None:
+    """SQL + params del batch de contenido — separado de la ejecución para que
+    un caller que ya corre OTRAS queries independientes (ej. el pipeline de
+    `services.catalogo.proyeccion.proyectar_lista`, #1240) pueda incluir esta
+    en el mismo lote sin re-implementar el SQL (rompería la puerta única).
+    `None` si `equipo_ids` está vacío — no hay query válida que armar.
+
+    Uso normal (un caller aislado): seguir usando `contenido_de_batch`/
+    `contenido_de` de más abajo. Esta función es SOLO para componer con
+    `shape_contenido_rows` cuando el caller maneja su propio pipeline/batch de
+    queries — no bypasea la puerta única, solo separa "armar el SQL" de
+    "ejecutarlo"."""
+    ids = list(dict.fromkeys(int(e) for e in equipo_ids))
+    if not ids:
+        return None
+    ph = ",".join("%s" for _ in ids)
+    return _build_query(ph, solo_activos), tuple(ids)
+
+
+def shape_contenido_rows(rows, equipo_ids) -> dict[int, list[dict]]:
+    """Da forma `{equipo_id: [componente_dict, ...]}` a filas YA obtenidas de
+    `query_contenido_batch` (ver ahí el motivo de separar armado de ejecución).
+    Equipos sin componentes (o todos filtrados) aparecen con lista vacía."""
+    ids = list(dict.fromkeys(int(e) for e in equipo_ids))
+    out: dict[int, list[dict]] = {eid: [] for eid in ids}
+    for r in rows:
+        d = row_to_dict(r)
+        out.setdefault(d["equipo_id"], []).append(d)
+    return out
+
+
 def contenido_de_batch(conn, equipo_ids, solo_activos: bool = True) -> dict[int, list[dict]]:
     """Componentes directos (display) de VARIOS equipos en una query.
 
@@ -73,18 +104,12 @@ def contenido_de_batch(conn, equipo_ids, solo_activos: bool = True) -> dict[int,
     soft-deleted; `False` (documentos/detalle de pedido) los incluye. Ver
     `_build_query` para el porqué de que NO sea universal.
     """
-    ids = list(dict.fromkeys(int(e) for e in equipo_ids))
-    if not ids:
+    query = query_contenido_batch(equipo_ids, solo_activos)
+    if query is None:
         return {}
-    # psycopg3 (driver actual): placeholders `%s` nativos — el wrapper ya no
-    # traduce `?`. `%s` también funciona bajo el shim psycopg2 (no-op).
-    ph = ",".join("%s" for _ in ids)
-    rows = conn.execute(_build_query(ph, solo_activos), tuple(ids)).fetchall()
-    out: dict[int, list[dict]] = {eid: [] for eid in ids}
-    for r in rows:
-        d = row_to_dict(r)
-        out.setdefault(d["equipo_id"], []).append(d)
-    return out
+    sql, params = query
+    rows = conn.execute(sql, params).fetchall()
+    return shape_contenido_rows(rows, equipo_ids)
 
 
 def contenido_de(conn, equipo_id: int, solo_activos: bool = True) -> list[dict]:
