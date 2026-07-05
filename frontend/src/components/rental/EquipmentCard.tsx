@@ -174,6 +174,9 @@ export function EquipmentCard({
           qty={qty || 1}
           conIva={conIva}
           size="lg"
+          perDayFinal={hasDateRange ? item.pricePerDayFinal : undefined}
+          descuentoPct={hasDateRange ? item.discountPct : undefined}
+          descuentoOrigen={hasDateRange ? item.discountOrigin : undefined}
         />
 
         {qty === 0 ? (

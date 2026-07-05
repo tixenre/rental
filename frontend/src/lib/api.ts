@@ -134,6 +134,15 @@ export type BackendEquipo = {
   disponible?: number;
   /** A1 #635: tipo de producto. */
   tipo?: "simple" | "kit" | "combo";
+  /** Descuento GANADOR (cliente vs. jornadas, no acumulable) ya resuelto por el
+   *  backend — solo presente si se piden fechas (`desde`/`hasta`). 0 para combos
+   *  (Fase C-3, #1219: no acumulan el descuento global). El front NO recalcula
+   *  esto, solo lo multiplica por jornadas/cantidad (MEMORIA 2026-07-05). */
+  descuento_pct?: number;
+  descuento_origen?: "cliente" | "jornadas" | null;
+  /** Precio por jornada YA con `descuento_pct` aplicado. Igual a `precio_jornada`
+   *  cuando no hay descuento o el equipo es un combo. */
+  precio_jornada_final?: number;
   /** Nombre público calculado por el backend a partir del template de la categoría.
    *  Presente en la respuesta del catálogo cuando hay template configurado. */
   nombre_publico?: string | null;
