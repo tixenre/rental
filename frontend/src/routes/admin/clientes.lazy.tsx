@@ -1,20 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
-import {
-  Plus,
-  Search,
-  Pencil,
-  Trash2,
-  Eye,
-  MoreHorizontal,
-  ShieldCheck,
-  ShieldAlert,
-  Copy,
-  Check,
-  Users,
-  UserPlus,
-} from "lucide-react";
+import { createLazyFileRoute } from "@tanstack/react-router";
+import { Plus, Search, Trash2, Eye, MoreHorizontal, ShieldCheck, Users, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
@@ -27,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/design-system/ui/table";
-import { ActionMenu, BottomSheet } from "@/components/mobile";
+import { ActionMenu } from "@/components/mobile";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,28 +26,20 @@ import {
   AlertDialogTitle,
 } from "@/design-system/ui/alert-dialog";
 
-import { adminApi, ESTADO_LABEL, type Cliente } from "@/lib/admin/api";
-import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
+import { adminApi, type Cliente } from "@/lib/admin/api";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { QueryState } from "@/components/admin/QueryState";
 import { TableSkeleton } from "@/components/admin/skeletons";
 import { EmptyState } from "@/design-system/composites/EmptyState";
-import { ClienteFormDialog } from "@/components/admin/ClienteFormDialog";
+import { ClienteDetalleDialog } from "@/components/admin/ClienteDetalleDialog";
 import { ClientesDuplicadosDialog } from "@/components/admin/ClientesDuplicadosDialog";
 import { InvitarClienteDialog } from "@/components/admin/InvitarClienteDialog";
 import { useDocumentTitle } from "@/lib/use-document-title";
-import { AuthedHttpError } from "@/lib/authedFetch";
-import { fmtArs, formatFechaDisplay } from "@/lib/format";
-import { nombreCliente } from "@/lib/cliente-nombre";
 import { PERFIL_IMPUESTOS_LABEL, type PerfilImpuestos } from "@/lib/iva";
 
 export const Route = createLazyFileRoute("/admin/clientes")({
   component: ClientesPage,
 });
-
-const estadoLabel = (e: string) =>
-  e === "presupuesto" ? "Solicitado" : (ESTADO_LABEL[e as keyof typeof ESTADO_LABEL] ?? e);
-const fmtFecha = (s: string | null) => formatFechaDisplay(s);
 
 function ClientesPage() {
   useDocumentTitle("Clientes · Back Office");
@@ -73,9 +52,8 @@ function ClientesPage() {
     const t = setTimeout(() => setDebouncedQ(q.trim()), 250);
     return () => clearTimeout(t);
   }, [q]);
-  const [editing, setEditing] = useState<Cliente | null>(null);
+  const [detalle, setDetalle] = useState<Cliente | null>(null);
   const [creating, setCreating] = useState(false);
-  const [viewing, setViewing] = useState<Cliente | null>(null);
   const [deleting, setDeleting] = useState<Cliente | null>(null);
   const [menuCliente, setMenuCliente] = useState<Cliente | null>(null);
   const [showDuplicados, setShowDuplicados] = useState(false);
@@ -157,11 +135,11 @@ function ClientesPage() {
                     <TableRow
                       key={c.id}
                       className="cursor-pointer hover:bg-accent/30"
-                      onClick={() => setViewing(c)}
+                      onClick={() => setDetalle(c)}
                     >
                       <TableCell>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-ink">{nombreCliente(c)}</span>
+                          <span className="text-ink">{c.nombre_legal}</span>
                           {c.dni_validado_at ? (
                             <ShieldCheck
                               className="h-3.5 w-3.5 shrink-0 text-verde-ink"
@@ -202,18 +180,10 @@ function ClientesPage() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            aria-label="Ver historial"
-                            onClick={() => setViewing(c)}
+                            aria-label="Ver / editar cliente"
+                            onClick={() => setDetalle(c)}
                           >
                             <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            aria-label="Editar datos"
-                            onClick={() => setEditing(c)}
-                          >
-                            <Pencil className="h-4 w-4" />
                           </Button>
                           <Button
                             size="icon"
@@ -238,17 +208,12 @@ function ClientesPage() {
           onOpenChange={(v) => {
             if (!v) setMenuCliente(null);
           }}
-          title={menuCliente ? nombreCliente(menuCliente) : undefined}
+          title={menuCliente ? menuCliente.nombre_legal : undefined}
           actions={[
             {
-              label: "Ver historial",
+              label: "Ver / editar cliente",
               icon: <Eye className="h-4 w-4" />,
-              onClick: () => setViewing(menuCliente!),
-            },
-            {
-              label: "Editar datos",
-              icon: <Pencil className="h-4 w-4" />,
-              onClick: () => setEditing(menuCliente!),
+              onClick: () => setDetalle(menuCliente!),
             },
             {
               label: "Eliminar",
@@ -259,27 +224,16 @@ function ClientesPage() {
           ]}
         />
 
-        <ClienteFormDialog open={creating} onOpenChange={setCreating} cliente={null} />
+        <ClienteDetalleDialog open={creating} onOpenChange={setCreating} cliente={null} />
         <ClientesDuplicadosDialog open={showDuplicados} onOpenChange={setShowDuplicados} />
         <InvitarClienteDialog open={showInvitar} onOpenChange={setShowInvitar} />
-        <ClienteFormDialog
-          open={!!editing}
+        <ClienteDetalleDialog
+          open={!!detalle}
           onOpenChange={(v) => {
-            if (!v) setEditing(null);
+            if (!v) setDetalle(null);
           }}
-          cliente={editing}
-        />
-
-        <ClienteHistorialSheet
-          cliente={viewing}
-          onOpenChange={(v) => {
-            if (!v) setViewing(null);
-          }}
-          onEdit={(c) => {
-            setViewing(null);
-            setEditing(c);
-          }}
-          onUpdated={(c) => setViewing(c)}
+          cliente={detalle}
+          onSaved={(c) => setDetalle(c)}
         />
 
         <AlertDialog
@@ -291,7 +245,7 @@ function ClientesPage() {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>
-                Eliminar a {deleting ? nombreCliente(deleting) : ""}
+                Eliminar a {deleting ? deleting.nombre_legal : ""}
               </AlertDialogTitle>
               <AlertDialogDescription>
                 No se borrarán los pedidos históricos, pero quedarán sin cliente asignado.
@@ -313,405 +267,3 @@ function ClientesPage() {
   );
 }
 
-function ClienteHistorialSheet({
-  cliente,
-  onOpenChange,
-  onEdit,
-  onUpdated,
-}: {
-  cliente: Cliente | null;
-  onOpenChange: (v: boolean) => void;
-  onEdit: (c: Cliente) => void;
-  onUpdated: (c: Cliente) => void;
-}) {
-  const navigate = useNavigate();
-  const qc = useQueryClient();
-  const [linkVerif, setLinkVerif] = useState<string | null>(null);
-  const [generando, setGenerando] = useState(false);
-  const [copiado, setCopiado] = useState(false);
-  const [rechequeando, setRechequeando] = useState(false);
-  const [sessionIdManual, setSessionIdManual] = useState("");
-
-  useEffect(() => {
-    setLinkVerif(null);
-    setCopiado(false);
-    setSessionIdManual("");
-  }, [cliente?.id]);
-
-  async function rechequearVerificacion(sessionIdOverride?: string) {
-    if (!cliente) return;
-    setRechequeando(true);
-    try {
-      const r = await adminApi.rechequearVerificacion(cliente.id, sessionIdOverride);
-      const actualizado = await adminApi.getCliente(cliente.id);
-      onUpdated(actualizado);
-      qc.invalidateQueries({ queryKey: ["admin", "clientes"] });
-      const sesionCorta = r.session_id ? ` (sesión ${r.session_id.slice(0, 8)}…)` : "";
-      if (actualizado.dni_validado_at) {
-        toast.success("Didit ya lo tiene aprobado — identidad verificada.");
-      } else if (r.status === "Declined") {
-        toast.error(`Didit lo sigue mostrando rechazado${sesionCorta}.`);
-      } else {
-        toast.message(`Didit responde: ${r.status || "sin novedades"}${sesionCorta}.`);
-      }
-    } catch (err) {
-      toast.error(
-        err instanceof AuthedHttpError && err.status === 409
-          ? "Este cliente todavía no inició una verificación con Didit."
-          : "No se pudo re-chequear con Didit",
-      );
-    } finally {
-      setRechequeando(false);
-    }
-  }
-
-  const pedidosQ = useQuery({
-    queryKey: ["admin", "cliente-pedidos", cliente?.id],
-    queryFn: () => adminApi.getClientePedidos(cliente!.id),
-    enabled: !!cliente?.id,
-  });
-
-  const pedidos = pedidosQ.data ?? [];
-  const totalGastado = pedidos.reduce((acc, p) => acc + (p.monto_total ?? 0), 0);
-
-  // #1240: solo lectura — perfiles fiscales personales + productoras vinculadas
-  // (la gestión real vive en el self-service del cliente y en /admin/productoras).
-  const perfilesFiscalesQ = useQuery({
-    queryKey: ["admin", "cliente-perfiles-fiscales", cliente?.id],
-    queryFn: () => adminApi.getClientePerfilesFiscales(cliente!.id),
-    enabled: !!cliente?.id,
-  });
-
-  return (
-    <>
-      <BottomSheet
-        open={!!cliente}
-        onOpenChange={onOpenChange}
-        title={cliente ? nombreCliente(cliente) : ""}
-        showClose
-        maxH="max-h-[90vh]"
-      >
-        {cliente && (
-          <div className="px-4 pb-6 space-y-4">
-            <p className="text-sm text-muted-foreground">
-              {cliente.email || cliente.telefono || "Sin contacto registrado"}
-            </p>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <Info label="CUIT" value={cliente.cuit || "—"} />
-              <Info label="Descuento" value={cliente.descuento ? `${cliente.descuento}%` : "—"} />
-              <Info label="Dirección" value={cliente.direccion || "—"} className="col-span-2" />
-              <Info label="Perfil" value={cliente.perfil_impuestos || "—"} />
-            </div>
-
-            {/* #1240: perfiles fiscales personales + productoras vinculadas — solo
-              lectura (la gestión real vive en el self-service del cliente y en
-              /admin/productoras). */}
-            {!!(
-              perfilesFiscalesQ.data?.perfiles.length || perfilesFiscalesQ.data?.productoras.length
-            ) && (
-              <div className="space-y-2 rounded-lg border hairline p-3 text-sm">
-                {!!perfilesFiscalesQ.data?.perfiles.length && (
-                  <div>
-                    <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Perfiles fiscales personales
-                    </div>
-                    <ul className="space-y-0.5">
-                      {perfilesFiscalesQ.data.perfiles.map((p) => (
-                        <li key={p.id} className="text-ink">
-                          {p.etiqueta || p.razon_social || p.cuit} · {p.cuit}
-                          {p.es_default && (
-                            <span className="ml-1.5 text-xs text-muted-foreground">(default)</span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {!!perfilesFiscalesQ.data?.productoras.length && (
-                  <div>
-                    <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Productoras vinculadas
-                    </div>
-                    <ul className="space-y-0.5">
-                      {perfilesFiscalesQ.data.productoras.map((pr) => (
-                        <li key={pr.id} className="text-ink">
-                          {pr.razon_social || pr.cuit} · {pr.cuit}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Identidad Didit */}
-            {cliente.dni_validado_at ? (
-              <div className="rounded-lg border border-verde/30 bg-verde/8 px-3 py-2.5 space-y-1.5">
-                <div className="flex items-center gap-1.5 text-verde-ink text-sm font-semibold">
-                  <ShieldCheck className="h-4 w-4 shrink-0" />
-                  Identidad verificada
-                </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-ink">
-                  {(cliente.nombre_completo_renaper || cliente.nombre_renaper) && (
-                    <div className="col-span-2">
-                      <span className="text-muted-foreground">Nombre legal: </span>
-                      {cliente.nombre_completo_renaper ||
-                        `${cliente.nombre_renaper ?? ""} ${cliente.apellido_renaper ?? ""}`.trim()}
-                    </div>
-                  )}
-                  {cliente.dni && (
-                    <div>
-                      <span className="text-muted-foreground">DNI: </span>
-                      <span className="font-mono">{cliente.dni}</span>
-                    </div>
-                  )}
-                  {cliente.cuil && (
-                    <div>
-                      <span className="text-muted-foreground">CUIL: </span>
-                      <span className="font-mono">{cliente.cuil}</span>
-                    </div>
-                  )}
-                  {cliente.fecha_nacimiento_renaper && (
-                    <div>
-                      <span className="text-muted-foreground">Nacimiento: </span>
-                      {cliente.fecha_nacimiento_renaper}
-                    </div>
-                  )}
-                  {cliente.genero_renaper && (
-                    <div>
-                      <span className="text-muted-foreground">Género: </span>
-                      {cliente.genero_renaper === "M"
-                        ? "Masculino"
-                        : cliente.genero_renaper === "F"
-                          ? "Femenino"
-                          : cliente.genero_renaper}
-                    </div>
-                  )}
-                  {cliente.nacionalidad_renaper && (
-                    <div>
-                      <span className="text-muted-foreground">Nacionalidad: </span>
-                      {cliente.nacionalidad_renaper}
-                    </div>
-                  )}
-                  {cliente.lugar_nacimiento_renaper && (
-                    <div>
-                      <span className="text-muted-foreground">Lugar de nacimiento: </span>
-                      {cliente.lugar_nacimiento_renaper}
-                    </div>
-                  )}
-                  {cliente.estado_civil_renaper && (
-                    <div>
-                      <span className="text-muted-foreground">Estado civil: </span>
-                      {cliente.estado_civil_renaper}
-                    </div>
-                  )}
-                  {cliente.tipo_documento_renaper && (
-                    <div>
-                      <span className="text-muted-foreground">Tipo doc.: </span>
-                      {cliente.tipo_documento_renaper}
-                    </div>
-                  )}
-                  {cliente.emision_documento_renaper && (
-                    <div>
-                      <span className="text-muted-foreground">Emisión: </span>
-                      {cliente.emision_documento_renaper}
-                    </div>
-                  )}
-                  {cliente.vencimiento_documento_renaper && (
-                    <div>
-                      <span className="text-muted-foreground">Vencimiento: </span>
-                      {cliente.vencimiento_documento_renaper}
-                    </div>
-                  )}
-                  {cliente.direccion_renaper && (
-                    <div className="col-span-2">
-                      <span className="text-muted-foreground">Domicilio: </span>
-                      {cliente.direccion_renaper}
-                    </div>
-                  )}
-                </div>
-                <div className="text-2xs text-muted-foreground font-mono">
-                  Verificado {fmtFecha(cliente.dni_validado_at)}
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-lg border hairline px-3 py-2.5 space-y-2.5">
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <ShieldAlert className="h-4 w-4 shrink-0" />
-                  Identidad sin verificar
-                  {cliente.dni_verificacion_estado === "rechazado" && " — rechazada por Didit"}
-                  {cliente.dni_verificacion_estado === "en_revision" && " — en revisión en Didit"}
-                </div>
-                {cliente.dni_verificacion_motivo && (
-                  <p className="text-xs text-muted-foreground">{cliente.dni_verificacion_motivo}</p>
-                )}
-                <div className="space-y-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={rechequeando}
-                    onClick={() => rechequearVerificacion()}
-                  >
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    {rechequeando ? "Consultando a Didit…" : "Re-chequear con Didit"}
-                  </Button>
-                  <p className="text-2xs text-muted-foreground">
-                    Le vuelve a preguntar a Didit — revisa todo el historial de intentos del
-                    cliente, no solo el último, así encuentra la sesión aprobada aunque haya
-                    reintentado después. Si nunca inició una verificación, no hace nada.
-                  </p>
-                  <details className="text-2xs">
-                    <summary className="cursor-pointer text-muted-foreground select-none">
-                      ¿Sabés el session_id exacto? Consultalo directo
-                    </summary>
-                    <div className="mt-1.5 flex items-center gap-2">
-                      <Input
-                        value={sessionIdManual}
-                        onChange={(e) => setSessionIdManual(e.target.value)}
-                        placeholder="session_id de Didit (ej. de una sesión sin historial acá)"
-                        className="flex-1 font-mono text-xs"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={rechequeando || !sessionIdManual.trim()}
-                        onClick={() => rechequearVerificacion(sessionIdManual.trim())}
-                        className="shrink-0"
-                      >
-                        Consultar
-                      </Button>
-                    </div>
-                  </details>
-                </div>
-                {linkVerif ? (
-                  <div className="space-y-1.5">
-                    <p className="text-xs text-muted-foreground">
-                      Mandále este link al cliente (WhatsApp, mail, etc.):
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        readOnly
-                        value={linkVerif}
-                        className="flex-1 truncate font-mono text-xs text-ink"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          navigator.clipboard.writeText(linkVerif);
-                          setCopiado(true);
-                          setTimeout(() => setCopiado(false), 2000);
-                        }}
-                        className="shrink-0"
-                      >
-                        {copiado ? (
-                          <Check className="h-3.5 w-3.5 text-verde-ink" />
-                        ) : (
-                          <Copy className="h-3.5 w-3.5" />
-                        )}
-                        {copiado ? "Copiado" : "Copiar"}
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={generando}
-                    onClick={async () => {
-                      if (!cliente) return;
-                      setGenerando(true);
-                      try {
-                        const r = await adminApi.generarLinkVerificacion(cliente.id);
-                        setLinkVerif(r.url);
-                      } catch {
-                        toast.error("No se pudo generar el link de verificación");
-                      } finally {
-                        setGenerando(false);
-                      }
-                    }}
-                  >
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    {generando ? "Generando…" : "Generar link de verificación"}
-                  </Button>
-                )}
-              </div>
-            )}
-
-            <div className="flex justify-end">
-              <Button variant="outline" size="sm" onClick={() => onEdit(cliente)}>
-                <Pencil className="h-4 w-4 mr-1" /> Editar datos
-              </Button>
-            </div>
-
-            <div className="border-t hairline pt-4">
-              <div className="flex items-baseline justify-between mb-2">
-                <h3 className="font-display text-lg text-ink">Historial de pedidos</h3>
-                <div className="font-mono text-xs text-muted-foreground">
-                  {pedidos.length} pedidos · {fmtArs(totalGastado)}
-                </div>
-              </div>
-
-              {pedidosQ.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
-              {!pedidosQ.isLoading && pedidos.length === 0 && (
-                <div className="text-sm text-muted-foreground">Sin pedidos.</div>
-              )}
-
-              <div className="space-y-2">
-                {pedidos.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() =>
-                      navigate({ to: "/admin/pedidos/$id", params: { id: String(p.id) } })
-                    }
-                    className="w-full text-left rounded-md border hairline p-3 hover:bg-accent/30 transition-colors"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="font-mono text-xs text-muted-foreground">
-                        #{p.numero_pedido ?? p.id}
-                      </div>
-                      <EstadoBadge estado={p.estado} label={estadoLabel(p.estado)} />
-                    </div>
-                    <div className="text-sm mt-1">
-                      {fmtFecha(p.fecha_desde)} → {fmtFecha(p.fecha_hasta)}
-                    </div>
-                    {p.equipos && (
-                      <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                        {p.equipos}
-                      </div>
-                    )}
-                    <div className="flex justify-between mt-1.5 text-sm tabular-nums">
-                      <span className="text-muted-foreground">{fmtArs(p.monto_pagado)} pagado</span>
-                      <span className="text-ink">{fmtArs(p.monto_total)}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </BottomSheet>
-    </>
-  );
-}
-
-function Info({
-  label,
-  value,
-  className = "",
-}: {
-  label: string;
-  value: string;
-  className?: string;
-}) {
-  return (
-    <div className={className}>
-      <div className="t-eyebrow">{label}</div>
-      <div className="text-ink">{value}</div>
-    </div>
-  );
-}

@@ -1006,6 +1006,10 @@ export type Cliente = {
   tipo_documento_renaper: string | null;
   estado_civil_renaper: string | null;
   apodo: string | null;
+  // Resueltos server-side (mismo criterio que GET /api/cliente/me): RENAPER
+  // si está verificado, si no el nombre/dirección base — no recomponer en TS.
+  nombre_legal: string;
+  direccion_legal: string | null;
 };
 export type ClientesListResp = {
   total: number;
