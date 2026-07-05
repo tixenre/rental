@@ -416,3 +416,150 @@ def test_verificar_receptor_propaga_falla_de_resolver_persona(monkeypatch):
 
     with pytest.raises(RuntimeError, match="AFIP caída"):
         verificar_y_actualizar_receptor("30712345678", cliente_id=7, conn=conn)
+
+
+# ── verificar_y_crear_perfil_fiscal / verificar_y_crear_productora (#1240) ───
+
+
+class _FakeConnPerfiles:
+    """Fake conn para `verificar_y_crear_perfil_fiscal` — soporta el SELECT de
+    "¿ya tiene algún perfil?", el upsert de `cliente_perfiles_fiscales`, y (si
+    es el primer perfil) el UPDATE de `clientes.cuit` + el SELECT/UPDATE de
+    `_corregir_datos_facturacion_cliente`."""
+
+    def __init__(self, tiene_perfil_previo: bool, cliente_row: dict | None = None):
+        self.tiene_perfil_previo = tiene_perfil_previo
+        self.cliente_row = cliente_row or {
+            "razon_social": None,
+            "domicilio_fiscal": None,
+            "perfil_impuestos": None,
+        }
+        self.perfil_inserts: list[tuple[str, tuple]] = []
+        self.cliente_updates: list[tuple[str, tuple]] = []
+
+    def execute(self, sql, params=None):
+        sql_norm = " ".join(sql.split())
+
+        class _R:
+            def __init__(self_inner, row):
+                self_inner._row = row
+
+            def fetchone(self_inner):
+                return self_inner._row
+
+        if sql_norm.startswith("SELECT 1 FROM cliente_perfiles_fiscales"):
+            return _R({"1": 1} if self.tiene_perfil_previo else None)
+        if sql_norm.startswith("INSERT INTO cliente_perfiles_fiscales"):
+            self.perfil_inserts.append((sql_norm, params))
+            return None
+        if sql_norm.startswith("UPDATE clientes SET cuit"):
+            self.cliente_updates.append((sql_norm, params))
+            return None
+        if sql_norm.startswith("SELECT razon_social, domicilio_fiscal, perfil_impuestos"):
+            return _R(self.cliente_row)
+        if sql_norm.startswith("UPDATE clientes SET"):
+            self.cliente_updates.append((sql_norm, params))
+            return None
+        raise AssertionError(f"SQL inesperado: {sql_norm}")
+
+
+def test_verificar_y_crear_perfil_fiscal_bloquea_si_afip_no_clasifica(monkeypatch):
+    from services.facturacion.padron import verificar_y_crear_perfil_fiscal
+
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona",
+        lambda cuit, conn: _persona_afip(condicion_iva=""),
+    )
+    conn = _FakeConnPerfiles(tiene_perfil_previo=False)
+
+    with pytest.raises(RuntimeError, match="condición IVA"):
+        verificar_y_crear_perfil_fiscal("30712345678", cliente_id=7, conn=conn)
+
+    assert conn.perfil_inserts == []
+
+
+def test_verificar_y_crear_perfil_fiscal_primer_perfil_es_default_y_sincroniza_clientes(monkeypatch):
+    """El primer perfil de un cliente se marca `es_default=TRUE` y ADEMÁS
+    actualiza `clientes.cuit` + los campos de facturación (vía
+    `_corregir_datos_facturacion_cliente`) — así el perfil default que siguen
+    leyendo los call sites no tocados por esta iniciativa refleja el primero
+    verificado."""
+    from services.facturacion.padron import verificar_y_crear_perfil_fiscal
+
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona",
+        lambda cuit, conn: _persona_afip(),
+    )
+    conn = _FakeConnPerfiles(tiene_perfil_previo=False)
+
+    persona = verificar_y_crear_perfil_fiscal("30712345678", cliente_id=7, conn=conn)
+
+    assert persona.razon_social == "Empresa Nueva SA"
+    assert len(conn.perfil_inserts) == 1
+    _, params = conn.perfil_inserts[0]
+    assert params[-1] is True  # es_default
+    # se sincronizó `clientes` (cuit + los 3 campos de facturación)
+    assert any("UPDATE clientes SET cuit" in sql for sql, _ in conn.cliente_updates)
+    assert any("razon_social" in sql for sql, _ in conn.cliente_updates)
+
+
+def test_verificar_y_crear_perfil_fiscal_segundo_perfil_no_pisa_default(monkeypatch):
+    """Si el cliente YA tiene un perfil, el nuevo NO se marca default ni toca
+    `clientes` — solo se agrega a la lista."""
+    from services.facturacion.padron import verificar_y_crear_perfil_fiscal
+
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona",
+        lambda cuit, conn: _persona_afip(),
+    )
+    conn = _FakeConnPerfiles(tiene_perfil_previo=True)
+
+    verificar_y_crear_perfil_fiscal("30712345678", cliente_id=7, conn=conn, etiqueta="Productora X")
+
+    _, params = conn.perfil_inserts[0]
+    assert params[-1] is False  # es_default
+    assert conn.cliente_updates == []
+
+
+class _FakeConnProductoras:
+    def __init__(self):
+        self.inserts: list[tuple[str, tuple]] = []
+
+    def execute(self, sql, params=None):
+        sql_norm = " ".join(sql.split())
+        if sql_norm.startswith("INSERT INTO productoras"):
+            self.inserts.append((sql_norm, params))
+            return None
+        raise AssertionError(f"SQL inesperado: {sql_norm}")
+
+
+def test_verificar_y_crear_productora_bloquea_si_afip_no_clasifica(monkeypatch):
+    from services.facturacion.padron import verificar_y_crear_productora
+
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona",
+        lambda cuit, conn: _persona_afip(condicion_iva=""),
+    )
+    conn = _FakeConnProductoras()
+
+    with pytest.raises(RuntimeError, match="condición IVA"):
+        verificar_y_crear_productora("30712345678", conn=conn)
+
+    assert conn.inserts == []
+
+
+def test_verificar_y_crear_productora_upsert_por_cuit(monkeypatch):
+    from services.facturacion.padron import verificar_y_crear_productora
+
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona",
+        lambda cuit, conn: _persona_afip(),
+    )
+    conn = _FakeConnProductoras()
+
+    persona = verificar_y_crear_productora("30712345678", conn=conn, notas="Ref: rodaje X")
+
+    assert persona.razon_social == "Empresa Nueva SA"
+    assert len(conn.inserts) == 1
+    _, params = conn.inserts[0]
+    assert params == ("30712345678", "responsable_inscripto", "Empresa Nueva SA", "Calle Nueva 123", "Ref: rodaje X")

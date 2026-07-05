@@ -189,3 +189,93 @@ def _corregir_datos_facturacion_cliente(cliente_id: int, persona: PersonaArca, c
         f"UPDATE clientes SET {set_clause} WHERE id = %s",
         (*cambios.values(), cliente_id),
     )
+
+
+def verificar_y_crear_perfil_fiscal(
+    cuit: str, cliente_id: int, conn, etiqueta: str | None = None
+):
+    """Da de alta (o refresca) un perfil fiscal PERSONAL del cliente —
+    `cliente_perfiles_fiscales`, #1240. Reusa `resolver_persona` (mismo motivo
+    tipado que el resto del módulo); BLOQUEA (RuntimeError) si AFIP no puede
+    clasificar la condición IVA — no existe fila "a medias" en esta tabla, toda
+    fila nace de una verificación exitosa (cierra el fallback de entrada manual
+    sin verificar que tenía `cliente_update_me`).
+
+    Upsert por `(cliente_id, cuit)` — reverificar un CUIT ya guardado refresca
+    razón social/domicilio/condición IVA sin duplicar la fila. Si es el
+    PRIMER perfil del cliente, se marca `es_default=TRUE` y además se
+    actualiza `clientes.cuit/razon_social/domicilio_fiscal/perfil_impuestos`
+    (reusa `_corregir_datos_facturacion_cliente`) — así el "perfil default"
+    que siguen leyendo los call sites no tocados por esta iniciativa refleja
+    el primer perfil verificado, sin que ellos necesiten cambiar nada."""
+    persona = resolver_persona(cuit, conn)
+    if not persona.condicion_iva:
+        raise RuntimeError(
+            f"AFIP no pudo clasificar la condición IVA del CUIT {cuit} — no se "
+            "puede guardar un perfil fiscal sin esa clasificación confirmada."
+        )
+    ya_tiene_perfil = conn.execute(
+        "SELECT 1 FROM cliente_perfiles_fiscales WHERE cliente_id = %s LIMIT 1",
+        (cliente_id,),
+    ).fetchone()
+    es_default = ya_tiene_perfil is None
+    conn.execute(
+        """
+        INSERT INTO cliente_perfiles_fiscales
+            (cliente_id, cuit, perfil_impuestos, razon_social, domicilio_fiscal, etiqueta, es_default)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (cliente_id, cuit) DO UPDATE SET
+            perfil_impuestos = EXCLUDED.perfil_impuestos,
+            razon_social     = EXCLUDED.razon_social,
+            domicilio_fiscal = EXCLUDED.domicilio_fiscal,
+            verificado_at    = now(),
+            updated_at       = now()
+        """,
+        (
+            cliente_id,
+            cuit,
+            persona.condicion_iva,
+            persona.razon_social or None,
+            persona.domicilio or None,
+            etiqueta,
+            es_default,
+        ),
+    )
+    if es_default:
+        conn.execute("UPDATE clientes SET cuit = %s WHERE id = %s", (cuit, cliente_id))
+        _corregir_datos_facturacion_cliente(cliente_id, persona, conn)
+    return persona
+
+
+def verificar_y_crear_productora(cuit: str, conn, notas: str | None = None):
+    """Da de alta (o refresca) una PRODUCTORA — entidad fiscal compartida entre
+    varias cuentas de cliente, `productoras`/`productora_miembros` (#1240).
+    A diferencia de los perfiles personales, la crea/edita el ADMIN (sin
+    self-service del cliente, sin login propio) — mismo mecanismo de
+    verificación (`resolver_persona`, bloqueante si AFIP no clasifica la
+    condición IVA) que el resto del módulo, sin reimplementar la consulta.
+
+    Upsert por `cuit` (UNIQUE) — reverificar refresca razón social/domicilio/
+    condición IVA sin duplicar la fila; `notas` se preserva si no se manda una
+    nueva (no se pisa con NULL en un re-verify)."""
+    persona = resolver_persona(cuit, conn)
+    if not persona.condicion_iva:
+        raise RuntimeError(
+            f"AFIP no pudo clasificar la condición IVA del CUIT {cuit} — no se "
+            "puede dar de alta una productora sin esa clasificación confirmada."
+        )
+    conn.execute(
+        """
+        INSERT INTO productoras (cuit, perfil_impuestos, razon_social, domicilio_fiscal, notas)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (cuit) DO UPDATE SET
+            perfil_impuestos = EXCLUDED.perfil_impuestos,
+            razon_social     = EXCLUDED.razon_social,
+            domicilio_fiscal = EXCLUDED.domicilio_fiscal,
+            notas            = COALESCE(EXCLUDED.notas, productoras.notas),
+            verificado_at    = now(),
+            updated_at       = now()
+        """,
+        (cuit, persona.condicion_iva, persona.razon_social or None, persona.domicilio or None, notas),
+    )
+    return persona

@@ -59,6 +59,12 @@ class CotizarRequest(BaseModel):
     # precio de línea) → dos totales del mismo pedido que podían no coincidir.
     # Ver MEMORIA 2026-06-06 "Datos del pedido: plata congelada".
     respetar_precio_item: Optional[bool] = False
+    # #1240: a nombre de quién se está cotizando (perfil personal alternativo o
+    # productora) — solo lo honra una sesión cliente (mismo criterio que el resto
+    # de este bloque: el admin cotiza para el cliente del pedido, no para sí
+    # mismo). Mutuamente excluyentes; NULL/NULL = perfil default de la cuenta.
+    perfil_fiscal_id: Optional[int] = None
+    productora_id: Optional[int] = None
 
     # Mismo validador que `PedidoDatos.descuento_pct` (routes/alquileres/core.py)
     # — este override vivía sin cota de rango (hallazgo de la Fase A del split
@@ -205,10 +211,12 @@ def cotizar(data: CotizarRequest, request: Request):
             #   - Cliente puro (portal): su propia ficha.
             #   - Anónimo (sin sesión): sin descuento de cliente.
             target_cliente_id = None
+            es_sesion_cliente = False
             if es_admin:
                 target_cliente_id = data.cliente_id
             elif session and session.get("role") == "cliente" and session.get("cliente_id"):
                 target_cliente_id = session["cliente_id"]
+                es_sesion_cliente = True
             if target_cliente_id:
                 c = conn.execute(
                     "SELECT perfil_impuestos, descuento FROM clientes WHERE id=%s",
@@ -217,6 +225,17 @@ def cotizar(data: CotizarRequest, request: Request):
                 if c:
                     perfil = c["perfil_impuestos"]
                     descuento_cliente_pct = c["descuento"] or 0.0
+                # #1240: solo la sesión cliente puede elegir facturar a nombre de
+                # un perfil personal alternativo o una productora (el admin no
+                # manda estos campos para el pedido de otro cliente).
+                if es_sesion_cliente and (data.perfil_fiscal_id or data.productora_id):
+                    from services.pedidos_enriquecimiento import _resolver_datos_fiscales_pedido
+
+                    fiscal = _resolver_datos_fiscales_pedido(
+                        conn, target_cliente_id, data.perfil_fiscal_id, data.productora_id
+                    )
+                    if fiscal.get("perfil_impuestos"):
+                        perfil = fiscal["perfil_impuestos"]
             # Override MANUAL del admin (lo edita en vivo en el builder del
             # pedido) — jerarquía (Fase C-1, #1219): gana OUTRIGHT sobre
             # cliente/jornadas, ya NO reemplaza el descuento del cliente para

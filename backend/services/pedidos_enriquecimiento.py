@@ -59,24 +59,60 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
     return result
 
 
+_CAMPOS_FISCALES = "perfil_impuestos, razon_social, domicilio_fiscal, email_facturacion, cuit"
+
+
+def _resolver_datos_fiscales_pedido(
+    conn, cliente_id: int, perfil_fiscal_id=None, productora_id=None
+) -> dict:
+    """Resuelve los 5 campos fiscales de UN pedido con 3 niveles de prioridad
+    (#1240 — perfiles fiscales múltiples + productoras): **productora elegida**
+    > **perfil personal elegido** > **perfil default de la cuenta** (`clientes`,
+    comportamiento de siempre). Devuelve `{perfil_impuestos, razon_social,
+    domicilio_fiscal, email_facturacion, cuit}` — mismas claves que el SELECT
+    directo a `clientes` que reemplaza, para que los call sites existentes (que
+    leen `cliente_perfil_impuestos`/`cliente_cuit`/etc. ya resueltos en el dict
+    de pedido) no necesiten cambiar. `perfil_fiscal_id`/`productora_id` NULL =
+    comportamiento de hoy sin ningún cambio."""
+    if productora_id:
+        row = conn.execute(
+            f"SELECT {_CAMPOS_FISCALES} FROM productoras WHERE id = %s",
+            (productora_id,),
+        ).fetchone()
+        if row:
+            return row_to_dict(row)
+    if perfil_fiscal_id:
+        row = conn.execute(
+            f"""SELECT {_CAMPOS_FISCALES} FROM cliente_perfiles_fiscales
+                WHERE id = %s AND cliente_id = %s""",
+            (perfil_fiscal_id, cliente_id),
+        ).fetchone()
+        if row:
+            return row_to_dict(row)
+    row = conn.execute(
+        f"SELECT {_CAMPOS_FISCALES} FROM clientes WHERE id = %s",
+        (cliente_id,),
+    ).fetchone()
+    return row_to_dict(row) if row else {}
+
+
 def _enriquecer_pedido_con_cliente_fiscal(conn, pedido: dict) -> dict:
     """Mergea perfil_impuestos + datos de Factura A del cliente en el pedido.
 
     Usado por los endpoints de PDF para que `_pedido_html` pueda decidir si
-    discriminar IVA (Factura A para Responsable Inscripto).
+    discriminar IVA (Factura A para Responsable Inscripto). Resuelve vía
+    `_resolver_datos_fiscales_pedido` — si el pedido eligió una productora o un
+    perfil personal alternativo (`pedido["productora_id"]`/`["perfil_fiscal_id"]`,
+    columnas reales de `alquileres`), usa esos datos en vez de los de `clientes`.
     """
     cid = pedido.get("cliente_id")
     if not cid:
         return pedido
-    row = conn.execute(
-        """SELECT perfil_impuestos, razon_social, domicilio_fiscal,
-                  email_facturacion, cuit
-           FROM clientes WHERE id = %s""",
-        (cid,),
-    ).fetchone()
-    if not row:
+    c = _resolver_datos_fiscales_pedido(
+        conn, cid, pedido.get("perfil_fiscal_id"), pedido.get("productora_id")
+    )
+    if not c:
         return pedido
-    c = row_to_dict(row)
     pedido["cliente_perfil_impuestos"] = c.get("perfil_impuestos")
     pedido["cliente_razon_social"] = c.get("razon_social")
     pedido["cliente_domicilio_fiscal"] = c.get("domicilio_fiscal")
