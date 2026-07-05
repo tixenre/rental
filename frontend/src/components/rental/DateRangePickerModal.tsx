@@ -469,9 +469,10 @@ export function DateRangePickerModal({
             </div>
           )}
 
-          {/* ── Feedback general (stock > regla de jornada / hint) ──────────
-              Los casos ligados puntualmente a la Devolución (cerrada / suma
-              jornada) ya se explican en la caja de arriba — no se repiten. */}
+          {/* ── Feedback general (stock > hint sin fecha) ────────────────────
+              Sin inconveniente no se aclara nada: la regla de jornada solo se
+              explica cuando realmente aplica (dentro de la caja de Devolución,
+              arriba) — no como advertencia permanente aunque todo esté bien. */}
           {rangoCruzaBloqueado ? (
             /* WARN: sin stock en el rango — no bloquea Aplicar, advierte para revisar el carrito */
             <p className="flex items-start gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
@@ -480,13 +481,6 @@ export function DateRangePickerModal({
                 Algunos equipos del carrito no tienen stock en estas fechas —{" "}
                 <strong>revisá el carrito</strong> antes de solicitar.
               </span>
-            </p>
-          ) : hasStart && !sumaJornadaPorHora && !devolucionCerrada ? (
-            /* INFO: regla general de jornada — mismo tratamiento visual que la
-               antelación mínima de abajo (amber, no un hint apagado). */
-            <p className="flex items-center gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
-              <Clock className="h-3.5 w-3.5 shrink-0 text-amber" />
-              Devolver más tarde que la hora de retiro suma una jornada.
             </p>
           ) : !hasStart ? (
             /* HINT: sin fecha elegida aún */
