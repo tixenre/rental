@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createLazyFileRoute } from "@tanstack/react-router";
-import { Plus, Search, Trash2, Eye, MoreHorizontal, ShieldCheck, Users, UserPlus } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Trash2,
+  Eye,
+  MoreHorizontal,
+  ShieldCheck,
+  Users,
+  UserPlus,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
@@ -266,4 +275,3 @@ function ClientesPage() {
     </AdminPage>
   );
 }
-

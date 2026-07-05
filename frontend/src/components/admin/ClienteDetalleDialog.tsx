@@ -599,9 +599,9 @@ function IdentidadSinVerificar({
           {rechequeando ? "Consultando a Didit…" : "Re-chequear con Didit"}
         </Button>
         <p className="text-2xs text-muted-foreground">
-          Le vuelve a preguntar a Didit — revisa todo el historial de intentos del cliente, no
-          solo el último, así encuentra la sesión aprobada aunque haya reintentado después. Si
-          nunca inició una verificación, no hace nada.
+          Le vuelve a preguntar a Didit — revisa todo el historial de intentos del cliente, no solo
+          el último, así encuentra la sesión aprobada aunque haya reintentado después. Si nunca
+          inició una verificación, no hace nada.
         </p>
         <details className="text-2xs">
           <summary className="cursor-pointer text-muted-foreground select-none">
@@ -633,8 +633,18 @@ function IdentidadSinVerificar({
             Mandále este link al cliente (WhatsApp, mail, etc.):
           </p>
           <div className="flex items-center gap-2">
-            <Input readOnly value={linkVerif} className="flex-1 truncate font-mono text-xs text-ink" />
-            <Button type="button" variant="outline" size="sm" onClick={onCopiar} className="shrink-0">
+            <Input
+              readOnly
+              value={linkVerif}
+              className="flex-1 truncate font-mono text-xs text-ink"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onCopiar}
+              className="shrink-0"
+            >
               {copiado ? (
                 <Check className="h-3.5 w-3.5 text-verde-ink" />
               ) : (
@@ -645,7 +655,13 @@ function IdentidadSinVerificar({
           </div>
         </div>
       ) : (
-        <Button type="button" variant="outline" size="sm" disabled={generando} onClick={onGenerarLink}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={generando}
+          onClick={onGenerarLink}
+        >
           <ShieldCheck className="h-3.5 w-3.5" />
           {generando ? "Generando…" : "Generar link de verificación"}
         </Button>
