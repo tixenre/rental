@@ -475,7 +475,7 @@ export function DateRangePickerModal({
               arriba) — no como advertencia permanente aunque todo esté bien. */}
           {rangoCruzaBloqueado ? (
             /* WARN: sin stock en el rango — no bloquea Aplicar, advierte para revisar el carrito */
-            <p className="flex items-start gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
+            <p className="flex items-start gap-1.5 rounded-md bg-amber/10 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
               <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber" />
               <span>
                 Algunos equipos del carrito no tienen stock en estas fechas —{" "}
@@ -495,7 +495,7 @@ export function DateRangePickerModal({
               visual que las demás advertencias no bloqueantes, para que no pase
               desapercibido por qué faltan horas cercanas a "ahora". */}
           {!allowPast && leadTimeHoras > 0 && (
-            <p className="flex items-center gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
+            <p className="flex items-center gap-1.5 rounded-md bg-amber/10 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
               <Clock className="h-3.5 w-3.5 shrink-0 text-amber" />
               <span>
                 Reservás online con al menos <strong>{leadTimeHoras} h de anticipación</strong> —
