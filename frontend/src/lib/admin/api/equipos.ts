@@ -34,6 +34,11 @@ export const equiposMethods = {
       solo_eliminados?: boolean;
       incluir_eliminados?: boolean;
       falta?: FaltaField;
+      /** false → saltea kit/ficha/specs en el backend (más rápido). Pasalo
+       * SOLO si la pantalla no lee esos campos del resultado — default
+       * (sin setear) preserva el detalle completo para todo el resto de
+       * los callers de listEquipos. */
+      incluir_detalle?: boolean;
     } = {},
   ) => {
     const sp = new URLSearchParams();
@@ -44,6 +49,7 @@ export const equiposMethods = {
     if (params.solo_eliminados) sp.set("solo_eliminados", "true");
     if (params.incluir_eliminados) sp.set("incluir_eliminados", "true");
     if (params.falta) sp.set("falta", params.falta);
+    if (params.incluir_detalle === false) sp.set("incluir_detalle", "false");
     sp.set("per_page", String(params.per_page ?? 500));
     return authedJson<EquiposListResp>(`/api/equipos?${sp.toString()}`);
   },

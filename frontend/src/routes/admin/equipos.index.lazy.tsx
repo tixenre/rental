@@ -146,6 +146,9 @@ function EquiposPage() {
         solo_incompletos: soloIncompletos || undefined,
         solo_eliminados: vistaPapelera || undefined,
         falta,
+        // Esta tabla no lee specs/kit/ficha de cada fila (ver EquiposTableHelpers) —
+        // el backend los saltea, el detalle completo lo trae el modal de edición aparte.
+        incluir_detalle: false,
       }),
   });
   const kpisQ = useQuery({

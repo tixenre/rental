@@ -119,6 +119,7 @@ def proyectar_lista(
     desde: str | None = None,
     hasta: str | None = None,
     is_admin: bool = False,
+    incluir_detalle: bool = True,
 ) -> dict:
     """Ensambla la lista paginada de equipos para el catálogo.
 
@@ -137,6 +138,16 @@ def proyectar_lista(
         desde, hasta:   Fechas YYYY-MM-DD para disponibilidad (ambas o ninguna).
         is_admin:       Si True, incluye equipos no visibles y salta el filtro
                         de stock teórico.
+        incluir_detalle: Si False, saltea attach_kit/attach_ficha/specs — para
+                        vistas de LISTADO que no los muestran (la tabla del
+                        admin solo lee nombre/marca/categoría/precio/stock; el
+                        detalle de un equipo puntual sigue trayéndolos completos
+                        vía `proyectar_uno`/GET /equipos/{id}, sin cambios). El
+                        catálogo público SIEMPRE necesita el default `True`
+                        (filtra/rankea por specs y kit client-side). Precio
+                        efectivo de combo se calcula siempre (columna `tipo`,
+                        no depende de attach_kit) — sin esto un combo mostraría
+                        su precio crudo (0) en vez del derivado de componentes.
 
     Returns:
         {"total": N, "page": P, "per_page": PP, "items": [...]}
@@ -176,16 +187,17 @@ def proyectar_lista(
         bid = equipo.get("brand_id")
         equipo["brand"] = brands_map.get(bid) if bid else None
 
-    equipos = attach_kit(conn, equipos)
     equipos = attach_categorias(conn, equipos)
-    equipos = attach_ficha(conn, equipos)
-    # Un solo query para las dos: attach_specs_estructuradas y
-    # attach_specs_destacados piden el mismo JOIN (equipo_specs+spec_definitions+
-    # categoria_spec_templates) para el mismo lote de ids — pedirlo acá evita
-    # ejecutarlo dos veces en cada carga de catálogo.
-    specs_rows = get_equipo_specs_rows(conn, [e["id"] for e in equipos])
-    equipos = attach_specs_estructuradas(conn, equipos, rows_by_equipo=specs_rows)
-    equipos = attach_specs_destacados(conn, equipos, rows_by_equipo=specs_rows)
+    if incluir_detalle:
+        equipos = attach_kit(conn, equipos)
+        equipos = attach_ficha(conn, equipos)
+        # Un solo query para las dos: attach_specs_estructuradas y
+        # attach_specs_destacados piden el mismo JOIN (equipo_specs+spec_definitions+
+        # categoria_spec_templates) para el mismo lote de ids — pedirlo acá evita
+        # ejecutarlo dos veces en cada carga de catálogo.
+        specs_rows = get_equipo_specs_rows(conn, [e["id"] for e in equipos])
+        equipos = attach_specs_estructuradas(conn, equipos, rows_by_equipo=specs_rows)
+        equipos = attach_specs_destacados(conn, equipos, rows_by_equipo=specs_rows)
 
     # Combos: precio efectivo (derivado de componentes), no el crudo de la tabla.
     combo_ids = [e["id"] for e in equipos if e.get("tipo") == "combo"]
