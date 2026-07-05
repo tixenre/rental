@@ -81,8 +81,8 @@ def _resolve_session(request: Request) -> dict | None:
     jti = data.get("jti") if isinstance(data, dict) else None
     if not jti:
         return None
-    from auth import sessions_store  # perezoso: rompe el ciclo con auth/__init__
-    if sessions_store.is_active(jti) is None:
+    from auth.queries import sessions as sessions_queries  # perezoso: rompe el ciclo con auth/__init__
+    if sessions_queries.is_active(jti) is None:
         return None
     return data
 
@@ -111,10 +111,10 @@ def _make_session_response(
     if extra:
         payload.update(extra)
 
-    from auth import sessions_store  # perezoso: rompe el ciclo con auth/__init__
+    from auth.commands import sessions as sessions_commands  # perezoso: rompe el ciclo con auth/__init__
     owner_type = "cliente" if (extra or {}).get("role") == "cliente" else "admin"
     user_agent = request.headers.get("user-agent") if request is not None else None
-    jti = sessions_store.create_session(
+    jti = sessions_commands.create_session(
         owner_type=owner_type,
         owner_email=email,
         cliente_id=(extra or {}).get("cliente_id"),

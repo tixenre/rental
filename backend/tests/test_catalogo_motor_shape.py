@@ -269,8 +269,8 @@ class TestQueryCount:
     def test_lista_publica_query_count(self, client, monkeypatch):
         """La lista pública no supera el baseline ni introduce N+1."""
         with _count_queries(monkeypatch) as counter:
-            from auth.sessions_store import is_active as orig_is_active
-            monkeypatch.setattr("auth.sessions_store.is_active", orig_is_active)
+            from auth.queries.sessions import is_active as orig_is_active
+            monkeypatch.setattr("auth.queries.sessions.is_active", orig_is_active)
             r = client.get("/api/equipos")
         assert r.status_code == 200
         n = counter[0]

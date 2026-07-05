@@ -45,7 +45,7 @@ def _client() -> TestClient:
 def admin_cookie(monkeypatch):
     from auth.session import signer
 
-    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
+    monkeypatch.setattr("auth.queries.sessions.is_active", lambda jti: {"jti": jti})
     payload = {"email": "admin@test.com", "role": "admin", "jti": "clientes-perfiles-db"}
     return {"session": signer.dumps(payload)}
 

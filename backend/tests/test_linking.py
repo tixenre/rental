@@ -9,16 +9,17 @@ from fastapi.testclient import TestClient
 
 from auth.session import signer
 from auth import auth_linking_router
-from auth import identities_store
-from auth.passkey import store as passkey_store
+from auth.queries import identities as identities_queries
+from auth.commands import identities as identities_commands
+from auth.passkey import commands as passkey_commands, queries as passkey_queries
 
 pytestmark = pytest.mark.unit
 
 
 @pytest.fixture(autouse=True)
-def _stub_sessions_store(monkeypatch):
+def _stub_sessions(monkeypatch):
     # get_session valida la firma Y que el jti siga vivo (allowlist) → lo damos por activo.
-    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti} if jti else None)
+    monkeypatch.setattr("auth.queries.sessions.is_active", lambda jti: {"jti": jti} if jti else None)
 
 
 def _client() -> TestClient:
@@ -52,10 +53,10 @@ class TestListKeys:
         assert _client().get("/cliente/auth/keys").status_code == 401
 
     def test_une_passkeys_e_identidades(self, monkeypatch):
-        monkeypatch.setattr(passkey_store, "list_for_owner", lambda *a, **k: [
+        monkeypatch.setattr(passkey_queries, "list_for_owner", lambda *a, **k: [
             {"id": 1, "device_name": "iPhone", "transports": "internal",
              "created_at": "2026-01-01", "last_used_at": None}])
-        monkeypatch.setattr(identities_store, "list_for_cliente", lambda cid: [
+        monkeypatch.setattr(identities_queries, "list_for_cliente", lambda cid: [
             {"id": 5, "method": "google", "identifier": "sub-abc", "email": "tincho@gmail.com",
              "verified_at": "x", "created_at": "2026-01-02"}])
         c = _client()
@@ -73,9 +74,9 @@ class TestListKeys:
 
 class TestRemoveKey:
     def _stub_counts(self, monkeypatch, *, passkeys: int, identities: int):
-        monkeypatch.setattr(passkey_store, "list_for_owner",
+        monkeypatch.setattr(passkey_queries, "list_for_owner",
                             lambda *a, **k: [{"id": i} for i in range(passkeys)])
-        monkeypatch.setattr(identities_store, "count_for_cliente", lambda cid: identities)
+        monkeypatch.setattr(identities_queries, "count_for_cliente", lambda cid: identities)
 
     def test_sin_stepup_401(self, monkeypatch):
         # Sin confirmación con passkey reciente (cookie stepup), el borrado se rechaza.
@@ -96,7 +97,7 @@ class TestRemoveKey:
             captured.update(key_id=key_id, owner_type=owner_type, cliente_id=cliente_id)
             return True
 
-        monkeypatch.setattr(passkey_store, "delete_for_owner", fake_del)
+        monkeypatch.setattr(passkey_commands, "delete_for_owner", fake_del)
         r = _client_con_stepup(42).delete("/cliente/auth/keys/passkey/1")
         assert r.status_code == 200
         # pasa el cliente_id de la SESIÓN (42), no algo del request → anti-IDOR
@@ -105,7 +106,7 @@ class TestRemoveKey:
     def test_borra_identidad_scopeado_al_dueno(self, monkeypatch):
         self._stub_counts(monkeypatch, passkeys=1, identities=1)  # total = 2
         captured = {}
-        monkeypatch.setattr(identities_store, "unlink_for_cliente",
+        monkeypatch.setattr(identities_commands, "unlink_for_cliente",
                             lambda pk, cid: captured.update(pk=pk, cid=cid) or True)
         r = _client_con_stepup(42).delete("/cliente/auth/keys/identity/5")
         assert r.status_code == 200
@@ -117,7 +118,7 @@ class TestRemoveKey:
 
     def test_no_encontrada_404(self, monkeypatch):
         self._stub_counts(monkeypatch, passkeys=2, identities=0)
-        monkeypatch.setattr(passkey_store, "delete_for_owner", lambda *a, **k: False)
+        monkeypatch.setattr(passkey_commands, "delete_for_owner", lambda *a, **k: False)
         assert _client_con_stepup().delete("/cliente/auth/keys/passkey/99").status_code == 404
 
 
@@ -137,8 +138,8 @@ class TestGoogleLinkHelpers:
     def test_completar_link_ok(self, monkeypatch):
         from auth import google
         monkeypatch.setattr(google, "get_session", lambda req: {"role": "cliente", "cliente_id": 42})
-        monkeypatch.setattr("auth.identities_store.google_identity_for_cliente", lambda cid: None)
-        monkeypatch.setattr("auth.identities_store.link_identity", lambda **kw: "linked")
+        monkeypatch.setattr("auth.queries.identities.google_identity_for_cliente", lambda cid: None)
+        monkeypatch.setattr("auth.commands.identities.link_identity", lambda **kw: "linked")
         res = google._completar_link_google(None, 42, "sub-abc", "e@x.com")
         assert res.status_code == 303 and "keys=ok" in res.headers["location"]
 
@@ -146,8 +147,8 @@ class TestGoogleLinkHelpers:
         # taken_by_other ya NO es un dead-end: rutea al intento de merge (misma persona).
         from auth import google
         monkeypatch.setattr(google, "get_session", lambda req: {"role": "cliente", "cliente_id": 42})
-        monkeypatch.setattr("auth.identities_store.google_identity_for_cliente", lambda cid: None)
-        monkeypatch.setattr("auth.identities_store.link_identity", lambda **kw: "taken_by_other")
+        monkeypatch.setattr("auth.queries.identities.google_identity_for_cliente", lambda cid: None)
+        monkeypatch.setattr("auth.commands.identities.link_identity", lambda **kw: "taken_by_other")
         calls = {}
         monkeypatch.setattr(google, "_merge_cuentas_por_google",
                             lambda req, *, actual, sub: calls.update(actual=actual, sub=sub) or "MERGE")
@@ -159,10 +160,10 @@ class TestGoogleLinkHelpers:
         # Ya hay un Google distinto vinculado → no se suma un segundo (una cuenta = un Google).
         from auth import google
         monkeypatch.setattr(google, "get_session", lambda req: {"role": "cliente", "cliente_id": 42})
-        monkeypatch.setattr("auth.identities_store.google_identity_for_cliente",
+        monkeypatch.setattr("auth.queries.identities.google_identity_for_cliente",
                             lambda cid: {"id": 1, "identifier": "OTRO-sub", "email": "x@y.com"})
         called = {"n": 0}
-        monkeypatch.setattr("auth.identities_store.link_identity",
+        monkeypatch.setattr("auth.commands.identities.link_identity",
                             lambda **kw: called.update(n=called["n"] + 1) or "linked")
         res = google._completar_link_google(None, 42, "sub-nuevo", "e@x.com")
         assert "keys=ya_google" in res.headers["location"]
@@ -173,7 +174,7 @@ class TestGoogleLinkHelpers:
         from auth import google
         called = {"n": 0}
         monkeypatch.setattr(google, "get_session", lambda req: {"role": "cliente", "cliente_id": 99})
-        monkeypatch.setattr("auth.identities_store.link_identity",
+        monkeypatch.setattr("auth.commands.identities.link_identity",
                             lambda **kw: called.update(n=called["n"] + 1) or "linked")
         res = google._completar_link_google(None, 42, "sub-abc", "e@x.com")
         assert "keys=error" in res.headers["location"]
@@ -185,11 +186,11 @@ class TestMergePorGoogle:
 
     def test_actual_absorbable_merge_y_entra_a_la_real(self, monkeypatch):
         from auth import google
-        monkeypatch.setattr("auth.identities_store.find_cliente_by_identity", lambda m, i: 99)
+        monkeypatch.setattr("auth.queries.identities.find_cliente_by_identity", lambda m, i: 99)
         # actual (42, la liviana) es absorbible; otra (99, la real) no
-        monkeypatch.setattr("auth.account_merge.account_is_absorbable", lambda cid: cid == 42)
+        monkeypatch.setattr("auth.queries.account_merge.account_is_absorbable", lambda cid: cid == 42)
         calls = {}
-        monkeypatch.setattr("auth.account_merge.merge_accounts", lambda **kw: calls.update(merge=kw))
+        monkeypatch.setattr("auth.commands.account_merge.merge_accounts", lambda **kw: calls.update(merge=kw))
         monkeypatch.setattr(
             google, "_mint_session_para_cuenta",
             lambda cid, req, *, redirect: calls.update(mint=(cid, redirect)) or "MINTED")
@@ -200,21 +201,21 @@ class TestMergePorGoogle:
 
     def test_otra_absorbable_la_absorbe_y_se_queda(self, monkeypatch):
         from auth import google
-        monkeypatch.setattr("auth.identities_store.find_cliente_by_identity", lambda m, i: 99)
+        monkeypatch.setattr("auth.queries.identities.find_cliente_by_identity", lambda m, i: 99)
         # otra (99) es la liviana; actual (42) es la real donde estás
-        monkeypatch.setattr("auth.account_merge.account_is_absorbable", lambda cid: cid == 99)
+        monkeypatch.setattr("auth.queries.account_merge.account_is_absorbable", lambda cid: cid == 99)
         calls = {}
-        monkeypatch.setattr("auth.account_merge.merge_accounts", lambda **kw: calls.update(merge=kw))
+        monkeypatch.setattr("auth.commands.account_merge.merge_accounts", lambda **kw: calls.update(merge=kw))
         out = google._merge_cuentas_por_google(None, actual=42, sub="s")
         assert calls["merge"] == {"source": 99, "target": 42}
         assert out.status_code == 303 and "keys=merged" in out.headers["location"]
 
     def test_ninguna_absorbable_no_mergea(self, monkeypatch):
         from auth import google
-        monkeypatch.setattr("auth.identities_store.find_cliente_by_identity", lambda m, i: 99)
-        monkeypatch.setattr("auth.account_merge.account_is_absorbable", lambda cid: False)
+        monkeypatch.setattr("auth.queries.identities.find_cliente_by_identity", lambda m, i: 99)
+        monkeypatch.setattr("auth.queries.account_merge.account_is_absorbable", lambda cid: False)
         called = {"n": 0}
-        monkeypatch.setattr("auth.account_merge.merge_accounts",
+        monkeypatch.setattr("auth.commands.account_merge.merge_accounts",
                             lambda **kw: called.update(n=called["n"] + 1))
         out = google._merge_cuentas_por_google(None, actual=42, sub="s")
         assert "keys=taken" in out.headers["location"]
@@ -222,6 +223,6 @@ class TestMergePorGoogle:
 
     def test_google_ya_no_tomado_error(self, monkeypatch):
         from auth import google
-        monkeypatch.setattr("auth.identities_store.find_cliente_by_identity", lambda m, i: None)
+        monkeypatch.setattr("auth.queries.identities.find_cliente_by_identity", lambda m, i: None)
         out = google._merge_cuentas_por_google(None, actual=42, sub="s")
         assert "keys=error" in out.headers["location"]

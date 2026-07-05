@@ -136,7 +136,7 @@ def test_listar_descuentos_jornada_incluye_los_sembrados_ordenados(escala):
 
 @pytest.fixture(autouse=True)
 def _sessions_active(monkeypatch):
-    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
+    monkeypatch.setattr("auth.queries.sessions.is_active", lambda jti: {"jti": jti})
 
 
 def _admin_cookie():

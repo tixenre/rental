@@ -52,7 +52,7 @@ _COOKIE = f"session={signer.dumps({'email': 'listadet@test.com', 'role': 'client
 
 @pytest.fixture(autouse=True)
 def _sessions_active(monkeypatch):
-    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
+    monkeypatch.setattr("auth.queries.sessions.is_active", lambda jti: {"jti": jti})
 
 
 def _limpiar(conn):

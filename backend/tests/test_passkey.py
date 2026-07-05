@@ -15,20 +15,20 @@ from auth.session import signer
 from auth import auth_passkey_router as router
 from auth.passkey import ceremonies
 from auth.passkey import config as cfg
-from auth.passkey import store
+from auth.passkey import commands as passkey_commands, queries as passkey_queries
 from auth.ratelimit import _failures as _rl_failures
 
 pytestmark = pytest.mark.unit
 
 
 @pytest.fixture(autouse=True)
-def _stub_sessions_store(monkeypatch):
+def _stub_sessions(monkeypatch):
     """El login con passkey mintea la sesión vía `_make_session_response` (registra
     fila server-side) y ahora pasa por el rate-limit por IP. Stubbeamos el store de
     sesiones (sin DB) y limpiamos el contador de rate-limit entre tests (estado
     global compartido con OAuth/staging)."""
-    monkeypatch.setattr("auth.sessions_store.create_session", lambda **kw: "stub-jti")
-    monkeypatch.setattr("auth.sessions_store.is_active",
+    monkeypatch.setattr("auth.commands.sessions.create_session", lambda **kw: "stub-jti")
+    monkeypatch.setattr("auth.queries.sessions.is_active",
                         lambda jti: {"jti": jti} if jti else None)
     _rl_failures.clear()
 
@@ -117,9 +117,9 @@ def _cliente_session(cliente_id: int = 42) -> str:
 
 class TestLoginComplete:
     def _setup(self, monkeypatch, *, row, new_count):
-        monkeypatch.setattr(store, "get_by_credential_id", lambda cid: row)
+        monkeypatch.setattr(passkey_queries, "get_by_credential_id", lambda cid: row)
         monkeypatch.setattr(ceremonies, "verify_authentication", lambda **kw: new_count)
-        monkeypatch.setattr(store, "update_sign_count", lambda *a, **k: None)
+        monkeypatch.setattr(passkey_commands, "update_sign_count", lambda *a, **k: None)
 
     def test_admin_mintea_misma_cookie(self, monkeypatch):
         self._setup(monkeypatch, row={
@@ -155,7 +155,7 @@ class TestLoginComplete:
         assert r.status_code == 401
 
     def test_credencial_desconocida_401(self, monkeypatch):
-        monkeypatch.setattr(store, "get_by_credential_id", lambda cid: None)
+        monkeypatch.setattr(passkey_queries, "get_by_credential_id", lambda cid: None)
         c = _client()
         c.cookies.set("wa_chal_auth", ceremonies.sign_challenge("chal"))
         r = c.post("/auth/passkey/login/complete", json={"credential": {"id": "nope"}})
@@ -193,7 +193,7 @@ class TestRateLimit:
     def test_demasiados_fallos_cortan_con_429(self, monkeypatch):
         # Cada intento falla (credencial desconocida → 401) y suma al contador por IP.
         # _RATE_MAX=10 → los primeros 10 fallan 401; el 11º lo corta el rate-limit (429).
-        monkeypatch.setattr(store, "get_by_credential_id", lambda cid: None)
+        monkeypatch.setattr(passkey_queries, "get_by_credential_id", lambda cid: None)
         c = _client()
         c.cookies.set("wa_chal_auth", ceremonies.sign_challenge("chal"))
         codes = [
@@ -218,7 +218,7 @@ class TestRegisterComplete:
         monkeypatch.setattr(ceremonies, "verify_registration",
                             lambda **kw: {"credential_id": "cid", "public_key": "pk",
                                           "sign_count": 0, "aaguid": "aa"})
-        monkeypatch.setattr(store, "insert_credential",
+        monkeypatch.setattr(passkey_commands, "insert_credential",
                             lambda **kw: captured.update(kw) or 7)
         c = _client()
         c.cookies.set("session", _admin_session())
@@ -251,7 +251,7 @@ class TestRegisterComplete:
         monkeypatch.setattr(ceremonies, "verify_registration",
                             lambda **kw: {"credential_id": "cid", "public_key": "pk",
                                           "sign_count": 0, "aaguid": "aa"})
-        monkeypatch.setattr(store, "insert_credential", lambda **kw: 9)
+        monkeypatch.setattr(passkey_commands, "insert_credential", lambda **kw: 9)
         c = _client()
         c.cookies.set("session", _cliente_session(cliente_id=42))
         c.cookies.set("wa_chal_reg",
@@ -266,7 +266,7 @@ class TestRegisterComplete:
         monkeypatch.setattr(ceremonies, "verify_registration",
                             lambda **kw: {"credential_id": "cid", "public_key": "pk",
                                           "sign_count": 0, "aaguid": "aa"})
-        monkeypatch.setattr(store, "insert_credential", lambda **kw: 7)
+        monkeypatch.setattr(passkey_commands, "insert_credential", lambda **kw: 7)
         c = _client()
         c.cookies.set("session", _admin_session())
         c.cookies.set("wa_chal_reg",
@@ -384,7 +384,7 @@ class TestGestionIDOR:
             captured.update(cred_pk=cred_pk, owner_type=owner_type, cliente_id=cliente_id)
             return True
 
-        monkeypatch.setattr(store, "delete_for_owner", fake_delete)
+        monkeypatch.setattr(passkey_commands, "delete_for_owner", fake_delete)
         c = _client()
         c.cookies.set("session", _cliente_session(cliente_id=42))
         r = c.delete("/cliente/auth/passkey/credentials/99")
@@ -393,7 +393,7 @@ class TestGestionIDOR:
         assert captured == {"cred_pk": 99, "owner_type": "cliente", "cliente_id": 42}
 
     def test_cliente_delete_ajeno_404(self, monkeypatch):
-        monkeypatch.setattr(store, "delete_for_owner", lambda *a, **k: False)
+        monkeypatch.setattr(passkey_commands, "delete_for_owner", lambda *a, **k: False)
         c = _client()
         c.cookies.set("session", _cliente_session(cliente_id=42))
         assert c.delete("/cliente/auth/passkey/credentials/99").status_code == 404
@@ -407,11 +407,11 @@ class TestStepup:
         assert _client().post("/cliente/auth/passkey/stepup/begin").status_code == 401
 
     def test_complete_passkey_propia_marca_stepup(self, monkeypatch):
-        monkeypatch.setattr(store, "get_by_credential_id", lambda cid: {
+        monkeypatch.setattr(passkey_queries, "get_by_credential_id", lambda cid: {
             "id": 1, "owner_type": "cliente", "owner_email": "", "cliente_id": 42,
             "public_key": "pk", "sign_count": 0})
         monkeypatch.setattr(ceremonies, "verify_authentication", lambda **kw: 0)
-        monkeypatch.setattr(store, "update_sign_count", lambda *a, **k: None)
+        monkeypatch.setattr(passkey_commands, "update_sign_count", lambda *a, **k: None)
         c = _client()
         c.cookies.set("session", _cliente_session(cliente_id=42))
         c.cookies.set("wa_chal_stepup", ceremonies.sign_challenge("chal"))
@@ -421,7 +421,7 @@ class TestStepup:
 
     def test_complete_passkey_de_otra_cuenta_401(self, monkeypatch):
         # La passkey es del cliente 99, pero la sesión es del 42 → step-up rechazado.
-        monkeypatch.setattr(store, "get_by_credential_id", lambda cid: {
+        monkeypatch.setattr(passkey_queries, "get_by_credential_id", lambda cid: {
             "id": 1, "owner_type": "cliente", "owner_email": "", "cliente_id": 99,
             "public_key": "pk", "sign_count": 0})
         c = _client()

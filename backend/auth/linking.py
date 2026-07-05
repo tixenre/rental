@@ -8,7 +8,7 @@ y permite **quitar** una llave con el guardrail **"no podés quitar tu última l
 account-linking de la iniciativa de identidad (#1098, Fase 1B): "varias llaves
 intercambiables" sobre una cuenta estable.
 
-Todo scopeado al dueño (`cliente_id` de la sesión) — anti-IDOR, igual que `passkey/store`.
+Todo scopeado al dueño (`cliente_id` de la sesión) — anti-IDOR, igual que `passkey/commands`.
 """
 import logging
 
@@ -16,8 +16,9 @@ from fastapi import APIRouter, HTTPException, Request
 
 from auth.guards import require_cliente
 from auth.stepup import require_recent_auth
-from auth.passkey import store as passkey_store
-from auth import identities_store
+from auth.passkey import commands as passkey_commands, queries as passkey_queries
+from auth.queries import identities as identities_queries
+from auth.commands import identities as identities_commands
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -26,8 +27,8 @@ router = APIRouter()
 def _total_keys(cliente_id: int) -> int:
     """Total de llaves de la cuenta (passkeys + identidades). Fuente única del
     guardrail de "última llave" — cuenta las DOS tablas (no alcanza con una sola)."""
-    passkeys = len(passkey_store.list_for_owner("cliente", cliente_id=cliente_id))
-    return passkeys + identities_store.count_for_cliente(cliente_id)
+    passkeys = len(passkey_queries.list_for_owner("cliente", cliente_id=cliente_id))
+    return passkeys + identities_queries.count_for_cliente(cliente_id)
 
 
 @router.get("/cliente/auth/keys")
@@ -37,7 +38,7 @@ def cliente_list_keys(request: Request):
     sess = require_cliente(request)
     cid = sess["cliente_id"]
     keys: list[dict] = []
-    for pk in passkey_store.list_for_owner("cliente", cliente_id=cid):
+    for pk in passkey_queries.list_for_owner("cliente", cliente_id=cid):
         keys.append({
             "kind": "passkey",
             "id": pk["id"],
@@ -46,7 +47,7 @@ def cliente_list_keys(request: Request):
             "created_at": pk["created_at"],
             "last_used_at": pk["last_used_at"],
         })
-    for idy in identities_store.list_for_cliente(cid):
+    for idy in identities_queries.list_for_cliente(cid):
         method = idy["method"]
         # Google: mostrar el mail con que se vinculó (el `identifier` es el `sub` opaco);
         # si no lo tenemos (vínculos viejos), cae al genérico "Google". 'email' → el mail.
@@ -79,9 +80,9 @@ def cliente_remove_key(kind: str, key_id: int, request: Request):
     if _total_keys(cid) <= 1:
         raise HTTPException(409, "No podés quitar tu única llave de acceso. Agregá otra primero.")
     if kind == "passkey":
-        ok = passkey_store.delete_for_owner(key_id, "cliente", cliente_id=cid)
+        ok = passkey_commands.delete_for_owner(key_id, "cliente", cliente_id=cid)
     else:
-        ok = identities_store.unlink_for_cliente(key_id, cid)
+        ok = identities_commands.unlink_for_cliente(key_id, cid)
     if not ok:
         raise HTTPException(404, "Llave no encontrada.")
     return {"ok": True}

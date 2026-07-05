@@ -199,7 +199,8 @@ def test_merge_absorbe_la_cuenta_liviana_y_mueve_sus_llaves():
     cuenta liviana a la cuenta real y la borra. `account_is_absorbable` solo deja
     absorber lo vacío (liviana, sin verificar, sin pedidos)."""
     from database import init_db, get_db
-    from auth.account_merge import account_is_absorbable, merge_accounts
+    from auth.queries.account_merge import account_is_absorbable
+    from auth.commands.account_merge import merge_accounts
 
     init_db()
     cred = "cred-merge-src"

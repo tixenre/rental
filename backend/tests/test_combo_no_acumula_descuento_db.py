@@ -48,7 +48,7 @@ FD, FH = "2031-07-01T10:00:00", "2031-07-02T10:00:00"  # 1 jornada
 
 @pytest.fixture(autouse=True)
 def _sessions_active(monkeypatch):
-    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
+    monkeypatch.setattr("auth.queries.sessions.is_active", lambda jti: {"jti": jti})
 
 
 def _limpiar(conn, pedido_ids):
