@@ -15,6 +15,7 @@ import {
   Copy,
   BarChart3,
   RotateCcw,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -385,8 +386,18 @@ function EquiposPage() {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Buscar (nombre, marca, modelo, serie, specs, keywords…)"
-              className="pl-9 text-base sm:text-sm"
+              className="pl-9 pr-9 text-base sm:text-sm"
             />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => setSearchInput("")}
+                aria-label="Limpiar búsqueda"
+                className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-ink"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
           <Select
             value={categoria || "__all"}
