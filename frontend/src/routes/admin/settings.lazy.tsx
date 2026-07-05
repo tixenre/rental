@@ -6,7 +6,6 @@ import { AdminSection } from "@/components/admin/AdminSection";
 import { EmailsAdmin } from "@/components/admin/email/EmailsAdmin";
 import { ComisionesSection } from "@/components/admin/settings/ComisionesSection";
 import { DescuentosJornadaSection } from "@/components/admin/settings/DescuentosJornadaSection";
-import { BufferSection } from "@/components/admin/settings/BufferSection";
 import { GoogleAnalyticsSection } from "@/components/admin/settings/GoogleAnalyticsSection";
 import { CalendarFeedSection } from "@/components/admin/settings/CalendarFeedSection";
 import { HorariosSection } from "@/components/admin/settings/HorariosSection";
@@ -35,10 +34,6 @@ function SettingsPage() {
           <DescuentosJornadaSection />
         </AdminSection>
 
-        <AdminSection title="Buffer entre alquileres" storageKey="settings:buffer">
-          <BufferSection />
-        </AdminSection>
-
         <AdminSection
           title="Claves de acceso (acceso sin contraseña)"
           storageKey="settings:passkeys"
@@ -51,7 +46,7 @@ function SettingsPage() {
           <SessionsSection />
         </AdminSection>
 
-        <AdminSection title="Horarios y avisos del picker" storageKey="settings:horarios">
+        <AdminSection title="Horarios" storageKey="settings:horarios">
           <HorariosSection />
         </AdminSection>
 

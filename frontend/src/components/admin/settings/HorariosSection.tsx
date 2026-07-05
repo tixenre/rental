@@ -1,10 +1,10 @@
 /**
- * HorariosSection — todo lo que controla el picker de fechas público, en una
- * sola card: antelación mínima (ex-`LeadTimeSection`, fusionada acá porque
- * las dos cosas alimentan el mismo picker y antes vivían en secciones
- * separadas sin relación visible), horarios habilitados por día, y el TEXTO
- * de los dos avisos que arma `services/fechas.py::disclaimers_retiro` (#1237)
- * — antes hardcodeado en Python, ahora editable para no tener que pedir un
+ * HorariosSection — TODOS los settings de horas del alquiler en una sola
+ * card (antes repartidos en 3 secciones sin relación visible: ex-
+ * `LeadTimeSection`, ex-`BufferSection` y esta misma): antelación mínima,
+ * buffer entre alquileres, horarios habilitados por día, y el TEXTO de los
+ * dos avisos que arma `services/fechas.py::disclaimers_retiro` (#1237) —
+ * antes hardcodeado en Python, ahora editable para no tener que pedir un
  * cambio de código por una coma.
  */
 import { useEffect, useState } from "react";
@@ -18,6 +18,69 @@ import { Textarea } from "@/design-system/ui/textarea";
 import { Spinner } from "@/design-system/ui/spinner";
 
 import { adminApi } from "@/lib/admin/api";
+
+// ── Buffer entre alquileres (motor de reservas) ─────────────────────────────
+
+function BufferBlock() {
+  const qc = useQueryClient();
+  const [valor, setValor] = useState("");
+
+  const settingQ = useQuery({
+    queryKey: ["settings", "buffer_horas_alquiler"],
+    queryFn: () => adminApi.getSetting("buffer_horas_alquiler"),
+    staleTime: 0,
+  });
+
+  useEffect(() => {
+    if (settingQ.data && valor === "") setValor(settingQ.data.value ?? "0");
+  }, [settingQ.data, valor]);
+
+  const updateMut = useMutation({
+    mutationFn: (v: string) => adminApi.updateSetting("buffer_horas_alquiler", v),
+    onSuccess: () => {
+      toast.success("Buffer actualizado");
+      qc.invalidateQueries({ queryKey: ["settings"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const actual = settingQ.data?.value ?? "0";
+  const dirty = valor.trim() !== actual && valor.trim() !== "";
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <h3 className="text-sm font-semibold text-ink">Buffer entre alquileres</h3>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Horas de prep/revisión exigidas entre que un equipo vuelve y sale de nuevo. Con buffer
+          &gt; 0, dos alquileres del mismo equipo no pueden quedar pegados (respeta la hora de
+          retiro/devolución). Poné 0 para permitir alquileres consecutivos. Ej: 24 = un día.
+        </p>
+      </div>
+      <div className="flex items-end gap-2">
+        <div className="space-y-1">
+          <div className="text-2xs uppercase tracking-wide text-muted-foreground">
+            Horas de buffer
+          </div>
+          <Input
+            type="number"
+            min={0}
+            className="w-28"
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+          />
+        </div>
+        <Button
+          size="sm"
+          onClick={() => updateMut.mutate(String(Math.max(0, Math.floor(Number(valor) || 0))))}
+          disabled={!dirty || updateMut.isPending}
+        >
+          {updateMut.isPending ? "Guardando…" : "Guardar"}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 // ── Antelación mínima (lead-time, #1126) ────────────────────────────────────
 
@@ -313,14 +376,19 @@ export function HorariosSection() {
   return (
     <section className="rounded-lg border hairline bg-background p-4 space-y-5">
       <div>
-        <h2 className="font-display text-lg text-ink">Horarios y avisos del picker</h2>
+        <h2 className="font-display text-lg text-ink">Horarios</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Todo lo que controla el selector de fechas del catálogo público: cuánta antelación pedís,
-          qué horarios habilitás por día, y qué texto ve el cliente en los avisos.
+          Todos los settings de horas del alquiler: espaciado entre alquileres del motor de
+          reservas, cuánta antelación pedís y qué horarios habilitás en el selector de fechas del
+          catálogo público, y qué texto ve el cliente en los avisos.
         </p>
       </div>
 
-      <LeadTimeBlock />
+      <BufferBlock />
+
+      <div className="border-t hairline pt-4">
+        <LeadTimeBlock />
+      </div>
 
       <div className="border-t hairline pt-4">
         <HorariosGridBlock />
