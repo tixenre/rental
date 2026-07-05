@@ -18,6 +18,7 @@ import {
   deriveEndDate,
   diaAbierto,
   earliestRetiro,
+  finDeSemanaReducido,
   franjaParaFecha,
   laterTime,
   minTimeForDate,
@@ -100,6 +101,9 @@ export function DateRangePickerModal({
   // si respectHorarios. En modo admin pasamos null efectivo abajo.
   const horariosRaw = useHorarios();
   const horarios = respectHorarios ? horariosRaw : null;
+  // Derivado del setting real (`horarios_retiro`), no un texto fijo — si el
+  // admin cambia los horarios de fin de semana, el aviso se ajusta solo.
+  const finDeSemana = !allowPast && finDeSemanaReducido(horarios);
   // Estable durante el ciclo de vida del modal — evita recomputar memos por render.
   const today = useMemo(() => startOfDay(new Date()), []);
   const now = useMemo(() => new Date(), []);
@@ -500,9 +504,10 @@ export function DateRangePickerModal({
               <span>
                 Reservás online con al menos <strong>{leadTimeHoras} h de anticipación</strong> —
                 por eso no ves horas más cercanas a ahora.{" "}
+                {finDeSemana && "Sábados y domingos además tenemos horarios reducidos. "}
                 {urgenciaWhatsappUrl ? (
                   <>
-                    ¿Urgencia?{" "}
+                    ¿Urgencia{finDeSemana && " o necesitás otro horario"}?{" "}
                     <a
                       href={urgenciaWhatsappUrl}
                       target="_blank"
