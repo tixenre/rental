@@ -115,18 +115,21 @@ debe depender de un route).
   del precio de línea persistido (Fase 2).
 - Facturación: candados propios en `docs/SISTEMA_FACTURACION.md`.
 
-## Hallazgos de la auditoría cruzada (2026-07-02) — estado: por priorizar con el dueño
+## Hallazgos de la auditoría cruzada (2026-07-02) — iniciativa #1184 CERRADA (2026-07-03)
 
 Verificado con 6 auditorías paralelas independientes (no solo lectura de código — cruzando
-call-sites reales). Priorizado por impacto real, no por tier de origen.
+call-sites reales). Priorizado por impacto real, no por tier de origen. **Todos los ítems marcados
+✅/~~tachado~~ están resueltos y mergeados a `dev`** (tracking #1184, cerrado 2026-07-03). Lo que
+queda abierto son los ítems 5 (parcial, alcance acotado a propósito), 6 (pendiente de confirmación
+de diseño del dueño), 7 (dormido), y 11-14 (bajo impacto, documentados) — ninguno es un bug activo
+conocido hoy.
 
-### 🚨 Descubrimiento crítico de proceso (no de código)
+### 🚨 Descubrimiento crítico de proceso (no de código) — ✅ RESUELTO
 **El PR #1181 — el fix ORIGINAL del bug #405 (editor de pedidos cotizando con precio de catálogo en
-vez del precio de línea congelado) — nunca se mergeó.** Sigue **abierto, sin tocar `dev` ni `main`**
-(confirmado: `respetar_precio_item` no existe en ningún branch real, solo en la rama de PR sin
-mergear). El registro en `MEMORIA.md`/`DECISIONES.md` lo daba por shippeado — era incorrecto. **El
-bug #405 está potencialmente activo en producción hoy mismo.** Mergeable state: `clean`. Prioridad
-máxima: mergear #1181 antes que cualquier otra cosa de esta lista.
+vez del precio de línea congelado) —** se creyó sin mergear al momento de esta auditoría, pero
+**sí se mergeó a `dev` el mismo día** (commit `9cc4924`, 2026-07-05) — `respetar_precio_item` está
+presente y activo en `backend/routes/alquileres/cotizacion.py`. **El bug #405 está resuelto, no
+activo.** Corrección registrada en `MEMORIA.md` (entrada 2026-07-02, "Auditoría cruzada de plata").
 
 ### Bugs reales (activos hoy)
 1. ~~**`_enriquecer_pedido_con_total` (`routes/alquileres/core.py`) ignora `cobro_modo`**~~ —
@@ -171,12 +174,15 @@ máxima: mergear #1181 antes que cualquier otra cosa de esta lista.
      precio cacheado, no el bug concreto). Documentado como fase futura opcional.
    - En ambos casos lo persistido/cobrado sigue siendo correcto — es el número que se MUESTRA el que
      puede no coincidir.
-6. **`frontend/src/lib/pricing.ts`** — TODO explícito en el código dice "por ahora es lineal, sin
-   descuentos" (#73) pero el backend YA implementó descuentos hace tiempo. Se usa en `PriceBlock`
-   (la pieza canónica de precio del catálogo, `equipment/shared/`) — el precio que ve el cliente en
-   la card/ficha **no incluye descuentos**, mientras el total real al cotizar/confirmar sí. Puede ser
-   intencional ("precio de lista" vs. "precio final"), pero vale la pena que el dueño lo confirme —
-   hoy es discrepancia visual entre catálogo y checkout.
+6. **`frontend/src/lib/pricing.ts`** — sigue siendo pura multiplicación (`perDay × jornadas × qty`,
+   sin descuento); lo usa `PriceBlock` (la pieza canónica de precio del catálogo,
+   `equipment/shared/`), así que el precio que ve el cliente en la card/ficha **no incluye
+   descuentos**, mientras el total real al cotizar/confirmar sí. El comentario viejo en el código
+   ("TODO #73: falta implementar descuentos") era **obsoleto y engañoso** — se limpió el 2026-07-03
+   (commit `052475a`) porque los descuentos ya estaban implementados en el backend hace tiempo — pero
+   **el comportamiento no cambió**: la card sigue mostrando "precio de lista" sin descuento. Sigue
+   pendiente que el dueño confirme si es la UX querida (lista vs. final) o un gap a cerrar — nadie lo
+   preguntó todavía, el commit de arriba solo corrigió el comentario.
 
 ### Bug dormido (no activo hoy, pero listo para revivir)
 7. **`PedidoPage.tsx` (editor de pedido del portal CLIENTE)** — mismo patrón que el bug original
@@ -237,6 +243,6 @@ incidente real en prod), no un descuido.
 
 ---
 
-_Reglas/criterio en MEMORIA: **auditoría cruzada de plata (2026-07-02, a proponer)**. Motores
+_Reglas/criterio en MEMORIA: **auditoría cruzada de plata (2026-07-02)**. Motores
 referenciados: `backend/contabilidad/CLAUDE.md`, `backend/reservas/CLAUDE.md`,
-`docs/SISTEMA_FACTURACION.md`, `docs/SISTEMA_CARRITO.md`. Iniciativa: #1184 (fase 3)._
+`docs/SISTEMA_FACTURACION.md`, `docs/SISTEMA_CARRITO.md`. Iniciativa: #1184 (CERRADA 2026-07-03)._
