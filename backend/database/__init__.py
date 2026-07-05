@@ -46,6 +46,8 @@ from database.equipos import (
     attach_ficha,
     attach_specs_destacados,
     attach_specs_estructuradas,
+    query_ficha_batch,
+    shape_ficha_rows,
 )
 from database.schema import init_db
 
@@ -57,5 +59,6 @@ __all__ = [
     "get_db", "row_to_dict", "to_datetime", "to_iso", "now_ar",
     "attach_kit", "attach_categorias", "attach_ficha",
     "attach_specs_destacados", "attach_specs_estructuradas",
+    "query_ficha_batch", "shape_ficha_rows",
     "init_db",
 ]

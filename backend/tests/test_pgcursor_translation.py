@@ -155,6 +155,35 @@ def test_insert_returning_agrega_clause_y_devuelve_id():
     assert rid == 42
 
 
+# ── pipelined_select: mismas guardas que execute, ANTES de tocar el pipeline ──
+# (no necesita que _FakeConn soporte .pipeline() real — las guardas rechazan
+# antes de llegar ahí; la semántica real del pipeline se prueba contra
+# Postgres real en test_pipelined_select_db.py)
+
+def test_pipelined_select_rechaza_literal_pct():
+    conn = _conn()
+    with pytest.raises(ValueError):
+        conn.pipelined_select([
+            ("SELECT * FROM t WHERE id = %s", (1,)),
+            ("SELECT * FROM t WHERE n LIKE '%foo%'", ()),
+        ])
+
+
+def test_pipelined_select_rechaza_placeholder_sin_params():
+    conn = _conn()
+    with pytest.raises(ValueError):
+        conn.pipelined_select([
+            ("SELECT * FROM t WHERE id = %s", (1,)),
+            ("SELECT * FROM t WHERE id = %s", ()),
+        ])
+
+
+def test_pipelined_select_rechaza_no_string():
+    conn = _conn()
+    with pytest.raises(TypeError):
+        conn.pipelined_select([("SELECT 1", ()), (123, ())])
+
+
 def test_insert_returning_valida_column():
     conn = _conn()
     with pytest.raises(ValueError):

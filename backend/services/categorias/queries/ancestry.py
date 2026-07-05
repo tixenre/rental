@@ -111,27 +111,49 @@ def categoria_ids_de_equipo(conn, equipo_id: int) -> list[int]:
     return [r["categoria_id"] for r in rows]
 
 
-def categorias_de_equipos(conn, equipo_ids: list[int]) -> dict[int, list[dict]]:
-    """Returns {equipo_id: [{id, nombre, parent_id}, ...]} for each equipo.
-    Useful for attaching category info to equipos lists.
+_CATEGORIAS_DE_EQUIPOS_SQL = """
+    SELECT ec.equipo_id, c.id, c.nombre, c.parent_id
+    FROM equipo_categorias ec
+    JOIN categorias c ON c.id = ec.categoria_id
+    WHERE ec.equipo_id = ANY(%s)
+    ORDER BY ec.equipo_id, ec.orden
+"""
 
-    Batch, objeto completo por categoría. Para un solo equipo y solo los IDs
-    (más liviano), usar `categoria_ids_de_equipo` (arriba)."""
+
+def query_categorias_de_equipos(equipo_ids: list[int]) -> tuple[str, tuple] | None:
+    """SQL + params de `categorias_de_equipos` — separado de la ejecución para
+    que un caller que ya corre OTRAS queries independientes (ej. el pipeline
+    de `services.catalogo.proyeccion.proyectar_lista`, #1240) pueda incluir
+    esta en el mismo lote sin reimplementar el SQL. `None` si `equipo_ids`
+    está vacío."""
     if not equipo_ids:
-        return {}
-    rows = conn.execute("""
-        SELECT ec.equipo_id, c.id, c.nombre, c.parent_id
-        FROM equipo_categorias ec
-        JOIN categorias c ON c.id = ec.categoria_id
-        WHERE ec.equipo_id = ANY(%s)
-        ORDER BY ec.equipo_id, ec.orden
-    """, (equipo_ids,)).fetchall()
+        return None
+    return _CATEGORIAS_DE_EQUIPOS_SQL, (equipo_ids,)
+
+
+def shape_categorias_de_equipos_rows(rows) -> dict[int, list[dict]]:
+    """Da forma `{equipo_id: [{id, nombre, parent_id}, ...]}` a filas YA
+    obtenidas de `query_categorias_de_equipos`."""
     result: dict[int, list[dict]] = {}
     for r in rows:
         result.setdefault(r["equipo_id"], []).append({
             "id": r["id"], "nombre": r["nombre"], "parent_id": r["parent_id"],
         })
     return result
+
+
+def categorias_de_equipos(conn, equipo_ids: list[int]) -> dict[int, list[dict]]:
+    """Returns {equipo_id: [{id, nombre, parent_id}, ...]} for each equipo.
+    Useful for attaching category info to equipos lists.
+
+    Batch, objeto completo por categoría. Para un solo equipo y solo los IDs
+    (más liviano), usar `categoria_ids_de_equipo` (arriba)."""
+    query = query_categorias_de_equipos(equipo_ids)
+    if query is None:
+        return {}
+    sql, params = query
+    rows = conn.execute(sql, params).fetchall()
+    return shape_categorias_de_equipos_rows(rows)
 
 
 def sql_filtro_categoria(table_alias: Literal["e"] = "e") -> str:

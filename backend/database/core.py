@@ -314,6 +314,37 @@ class PGConnection:
             self.raw_conn.rollback()
             raise
 
+    def pipelined_select(self, queries: list[tuple[str, tuple]]) -> list[list["PGRow"]]:
+        """Ejecuta N SELECTs de solo lectura, independientes entre sí, en UNA
+        sola conexión sin esperar el round-trip de cada uno antes de mandar el
+        siguiente (pipeline mode nativo de psycopg3) — colapsa N round-trips
+        de red a ~1. Devuelve los resultados en el mismo orden que `queries`.
+
+        Pensado para el caso "necesito los resultados de varias queries que no
+        dependen entre sí" (ej. varios `attach_*` del catálogo, todos filtrando
+        por el mismo lote de ids) — NO para mezclar con escrituras. Si alguna
+        query falla, TODAS fallan juntas (semántica del pipeline de Postgres:
+        un statement roto aborta el batch completo) — el caller no necesita
+        limpiar nada extra, `close()` ya hace rollback antes de devolver la
+        conexión al pool.
+        """
+        for sql, params in queries:
+            if not isinstance(sql, str):
+                raise TypeError(f"pipelined_select() recibió SQL no-string: {type(sql).__name__}")
+            _assert_params_present(sql, params)
+            _assert_pct_safe(sql)
+        cursors = []
+        with self.raw_conn.pipeline():
+            for sql, params in queries:
+                cur = self.raw_conn.cursor()
+                cur.execute(sql, params)
+                cursors.append(cur)
+            results = [
+                [PGRow(row, cur.description) for row in cur.fetchall()]
+                for cur in cursors
+            ]
+        return results
+
     def insert_returning(self, sql: str, params=(), *, column: str = "id"):
         """Ejecuta un `INSERT … RETURNING <column>` y devuelve el valor —
         reemplazo idiomático de `lastrowid`. `sql` NO debe traer el RETURNING (se
