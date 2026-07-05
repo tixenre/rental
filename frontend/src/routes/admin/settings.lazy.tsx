@@ -12,8 +12,6 @@ import { HorariosSection } from "@/components/admin/settings/HorariosSection";
 import { FaqSection } from "@/components/admin/settings/FaqSection";
 import { RankingSection } from "@/components/admin/settings/RankingSection";
 import { CambioYPreciosSection } from "@/components/admin/settings/CambioYPreciosSection";
-import { PasskeysSection } from "@/components/admin/settings/PasskeysSection";
-import { SessionsSection } from "@/components/admin/settings/SessionsSection";
 import { FacturacionSection } from "@/components/admin/settings/FacturacionSection";
 
 export const Route = createLazyFileRoute("/admin/settings")({
@@ -32,18 +30,6 @@ function SettingsPage() {
       <div className="space-y-6">
         <AdminSection title="Descuentos por jornadas" storageKey="settings:descuentos">
           <DescuentosJornadaSection />
-        </AdminSection>
-
-        <AdminSection
-          title="Claves de acceso (acceso sin contraseña)"
-          storageKey="settings:passkeys"
-          defaultOpen={false}
-        >
-          <PasskeysSection />
-        </AdminSection>
-
-        <AdminSection title="Sesiones activas" storageKey="settings:sesiones" defaultOpen={false}>
-          <SessionsSection />
         </AdminSection>
 
         <AdminSection title="Horarios" storageKey="settings:horarios">
