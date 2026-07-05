@@ -208,3 +208,89 @@ def test_contrato_preview_excluye_equipo_soft_deleted(carrito_con_equipo):
     assert res.status_code == 200
     assert "Cámara contrato-preview-test" in res.text
     assert "Cámara borrada contrato-preview-test" not in res.text
+
+
+PRODUCTORA_ID = 9_340_201
+PRODUCTORA_CUIT = "30500002235"
+
+
+@pytest.fixture
+def productora_vinculada(carrito_con_equipo):
+    """El cliente por defecto queda con `perfil_impuestos` NULL/consumidor_final
+    (sin RI); esta productora vinculada SÍ es responsable_inscripto — el preview
+    del contrato tiene que reflejarla cuando se elige, y NO cuando no se elige
+    (hallazgo de revisión: `checkout_contrato_preview` ignoraba por completo el
+    `facturacionTarget` ya elegido en el checkout, mostrando siempre el default
+    de la cuenta)."""
+    from database import get_db
+
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM productora_miembros WHERE productora_id = %s", (PRODUCTORA_ID,))
+        conn.execute("DELETE FROM productoras WHERE id = %s", (PRODUCTORA_ID,))
+        conn.execute(
+            """INSERT INTO productoras (id, cuit, perfil_impuestos, razon_social)
+               VALUES (%s, %s, 'responsable_inscripto', 'Productora Preview SA')""",
+            (PRODUCTORA_ID, PRODUCTORA_CUIT),
+        )
+        conn.execute(
+            "INSERT INTO productora_miembros (productora_id, cliente_id) VALUES (%s, %s)",
+            (PRODUCTORA_ID, CLIENTE_ID),
+        )
+        conn.commit()
+        yield
+    finally:
+        conn.execute("DELETE FROM productora_miembros WHERE productora_id = %s", (PRODUCTORA_ID,))
+        conn.execute("DELETE FROM productoras WHERE id = %s", (PRODUCTORA_ID,))
+        conn.commit()
+        conn.close()
+
+
+def test_contrato_preview_sin_target_usa_default_de_la_cuenta(productora_vinculada):
+    res = client.post(
+        "/api/checkout/contrato-preview",
+        json={"session_id": SESSION_ID},
+        headers={"Cookie": _COOKIE},
+    )
+    assert res.status_code == 200
+    assert "Responsable Inscripto" not in res.text
+
+
+def test_contrato_preview_respeta_productora_elegida(productora_vinculada):
+    res = client.post(
+        "/api/checkout/contrato-preview",
+        json={"session_id": SESSION_ID, "productora_id": PRODUCTORA_ID},
+        headers={"Cookie": _COOKIE},
+    )
+    assert res.status_code == 200
+    assert "Responsable Inscripto" in res.text
+
+
+def test_contrato_preview_ignora_productora_no_vinculada(productora_vinculada):
+    """Una productora a la que el cliente NO pertenece se ignora silenciosamente
+    (cae al default) — no 404, no filtra datos fiscales de una productora
+    ajena en el preview."""
+    otra_productora_id = 9_340_202
+    from database import get_db
+
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM productoras WHERE id = %s", (otra_productora_id,))
+        conn.execute(
+            """INSERT INTO productoras (id, cuit, perfil_impuestos, razon_social)
+               VALUES (%s, '30500002243', 'responsable_inscripto', 'Productora Ajena SA')""",
+            (otra_productora_id,),
+        )
+        conn.commit()
+
+        res = client.post(
+            "/api/checkout/contrato-preview",
+            json={"session_id": SESSION_ID, "productora_id": otra_productora_id},
+            headers={"Cookie": _COOKIE},
+        )
+        assert res.status_code == 200
+        assert "Responsable Inscripto" not in res.text
+    finally:
+        conn.execute("DELETE FROM productoras WHERE id = %s", (otra_productora_id,))
+        conn.commit()
+        conn.close()

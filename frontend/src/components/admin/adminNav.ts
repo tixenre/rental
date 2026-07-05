@@ -107,6 +107,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { title: "Estadísticas", url: "/admin/estadisticas", icon: TrendingUp },
       { title: "Facturas ARCA", url: "/admin/facturas", icon: ClipboardList },
       { title: "Emisores ARCA", url: "/admin/facturacion/emisores", icon: Settings },
+      { title: "Productoras", url: "/admin/productoras", icon: Users },
       { title: "Glosario", url: "/admin/contabilidad/glosario", icon: BookOpen },
     ],
   },

@@ -261,6 +261,11 @@ class PedidoCreate(BaseModel):
     fecha_hasta:      Optional[str] = None
     items:            list[PedidoItem] = []
     estado:           Optional[str] = "presupuesto"
+    # #1240: a nombre de quién se factura este pedido — mutuamente excluyentes
+    # (validado por el caller, ej. `cliente_crear_pedido`), NULL/NULL = perfil
+    # default de la cuenta. El admin (builder de pedidos) no los usa hoy.
+    perfil_fiscal_id: Optional[int] = None
+    productora_id:    Optional[int] = None
 
     @field_validator("fecha_desde", "fecha_hasta")
     @classmethod
@@ -534,6 +539,13 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
     que tiene su propio `require_cliente`."""
     if not data.items and data.estado != "borrador":
         raise HTTPException(400, "El pedido debe tener al menos un ítem")
+    # Defense-in-depth (#1240, hallazgo de revisión): `cliente_crear_pedido` ya
+    # valida esto antes de llamar acá, pero esta es la ÚNICA puerta real de
+    # creación — sin este chequeo acá, cualquier caller futuro que sete ambos
+    # campos rompería el `CHECK chk_alquileres_facturacion_target` sin capturar
+    # (el único except de abajo es `DeadlockDetected`) → 500 crudo en vez de 400.
+    if data.perfil_fiscal_id and data.productora_id:
+        raise HTTPException(400, "Un pedido no puede facturar a un perfil personal y a una productora a la vez.")
 
     cliente_nombre   = data.cliente_nombre
     cliente_email    = data.cliente_email
@@ -597,12 +609,14 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
                 INSERT INTO alquileres (cliente_nombre, cliente_email, cliente_telefono,
                                      cliente_id, notas, fecha_desde, fecha_hasta,
                                      monto_total, estado, numero_pedido,
-                                     descuento_pct, descuento_jornadas_pct, fuente)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                                     descuento_pct, descuento_jornadas_pct, fuente,
+                                     perfil_fiscal_id, productora_id)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (cliente_nombre, cliente_email, cliente_telefono,
                   data.cliente_id, data.notas, data.fecha_desde or None, data.fecha_hasta or None,
                   0, estado_inicial, next_num,
-                  descuento_pct, 0.0, fuente))
+                  descuento_pct, 0.0, fuente,
+                  data.perfil_fiscal_id, data.productora_id))
 
             # Ítems vía la fuente única `_apply_pedido_items` (#805): preserva las
             # líneas personalizadas (equipo_id None → nombre_libre/cobro_modo/orden),

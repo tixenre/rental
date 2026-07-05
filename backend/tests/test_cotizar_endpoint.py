@@ -481,3 +481,82 @@ class TestLineasPorEquipo:
         assert linea["bruto"] == 70000
         assert linea["neto"] == 63000
         assert out["descuento_pct"] == 10
+
+
+class FakeConnProductora(FakeConn):
+    """FakeConn + soporte de `productora_miembros`/`productoras` para probar
+    el candado de membership del target fiscal (#1240)."""
+
+    def __init__(self, *args, miembro_de=(), productora_perfil="responsable_inscripto", **kwargs):
+        super().__init__(*args, **kwargs)
+        self.miembro_de = set(miembro_de)  # {(productora_id, cliente_id)}
+        self.productora_perfil = productora_perfil
+
+    def execute(self, sql, params=()):
+        self._sql = sql
+        self._params = params
+        return self
+
+    def fetchone(self):
+        if "FROM productora_miembros" in self._sql:
+            productora_id, cliente_id = self._params
+            return {"1": 1} if (productora_id, cliente_id) in self.miembro_de else None
+        if "FROM productoras" in self._sql:
+            return {
+                "perfil_impuestos": self.productora_perfil,
+                "razon_social": "Productora de Prueba",
+                "domicilio_fiscal": None,
+                "email_facturacion": None,
+                "cuit": "30500000000",
+            }
+        return super().fetchone()
+
+
+class TestTargetFiscalProductora:
+    """#1240: `productora_id` en el body SOLO se honra si el cliente de la
+    sesión está vinculado — sin esto, cualquier sesión cliente podía cotizar
+    con el perfil fiscal de una productora ajena adivinando su id."""
+
+    def test_productora_vinculada_gana_el_perfil(self, patch_db):
+        patch_db(
+            FakeConnProductora(
+                precios={7: 10000},
+                perfil="consumidor_final",
+                miembro_de={(5, 42)},
+                productora_perfil="responsable_inscripto",
+            ),
+            session={"role": "cliente", "cliente_id": 42},
+        )
+        data = CotizarRequest(
+            items=[CotizarItem(equipo_id=7, cantidad=1)],
+            fecha_desde="2026-06-01T10:00:00",
+            fecha_hasta="2026-06-08T10:00:00",
+            productora_id=5,
+        )
+        out = cotizar(data, FakeReq())
+
+        # Ganó la RI de la productora (con IVA), no el consumidor_final de la cuenta.
+        assert out["con_iva"] is True
+
+    def test_productora_no_vinculada_no_se_usa(self, patch_db):
+        """El cliente 42 NO está vinculado a la productora 5 — cotiza con SU
+        propio perfil (consumidor_final), no con el de la productora ajena."""
+        patch_db(
+            FakeConnProductora(
+                precios={7: 10000},
+                perfil="consumidor_final",
+                miembro_de=set(),  # sin vínculo
+                productora_perfil="responsable_inscripto",
+            ),
+            session={"role": "cliente", "cliente_id": 42},
+        )
+        data = CotizarRequest(
+            items=[CotizarItem(equipo_id=7, cantidad=1)],
+            fecha_desde="2026-06-01T10:00:00",
+            fecha_hasta="2026-06-08T10:00:00",
+            productora_id=5,
+        )
+        out = cotizar(data, FakeReq())
+
+        # Sin membership, la productora se ignora — sigue en consumidor_final (sin IVA).
+        assert out["con_iva"] is False

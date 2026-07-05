@@ -2962,3 +2962,72 @@ cancel-in-progress` ya cancela corridas viejas.
   marca cualquier construcción de datos del receptor de una factura (nombre/domicilio) que use el dato
   guardado en la cuenta como preferente sobre el resuelto vía `resolver_persona`/
   `verificar_y_actualizar_receptor` para el CUIT que se está facturando.
+
+### 2026-07-05 — Perfiles fiscales múltiples por cliente + productoras (entidad fiscal compartida, #1240)
+
+- **Contexto.** El dueño notó que `FacturacionModal` (un modal nuevo en el checkout, del mismo día)
+  exponía el mismo `FacturacionForm` viejo que ya vivía en el perfil del portal — y ese formulario
+  tenía un fallback de entrada manual sin verificar (`cliente_update_me` permitía guardar razón
+  social/domicilio a mano, sin pasar por AFIP; el único gate era el checksum del CUIT, no una
+  confirmación real). El backstop de emisión ya pisaba ese dato al facturar de verdad, pero generaba
+  una discrepancia confusa: el cliente creía haber guardado sus datos y la factura salía distinta.
+- **Escalada durante el análisis.** Al plantear la solución (sacar el fallback manual), el dueño
+  preguntó si valía la pena "complejizar" sumando: (1) que un cliente pueda tener más de un CUIT
+  propio (personal/freelance); (2) que un cliente pueda comprar EN NOMBRE de una productora —
+  entidad con su propio CUIT, compartida entre varias cuentas (una persona puede pertenecer a
+  varias productoras y viceversa). Los tres problemas se resolvieron en una sola iniciativa,
+  encarada en rama aislada (`feature/perfiles-fiscales-y-productoras`) por el porte del cambio
+  (patrón "PR como hoja de ruta", 2026-06-27).
+- **Decisión de diseño para minimizar complejidad.** La parte difícil de modelar una entidad
+  compartida entre cuentas no es el CUIT propio — es "¿quién puede tocarla?" (invitaciones, roles,
+  quién es el dueño). Al hacer que el **admin sea el único que crea/edita/vincula** productoras
+  (sin login propio, sin self-service del cliente), esa complejidad entera desaparece: no hace
+  falta un sistema de invitaciones ni de permisos.
+- **Esquema.** 3 tablas nuevas: `cliente_perfiles_fiscales` (CUIT + `es_default`, único por
+  `(cliente_id, cuit)` y por `(cliente_id) WHERE es_default`), `productoras` (CUIT único global),
+  `productora_miembros` (PK compuesta `(productora_id, cliente_id)`, sin roles). `alquileres` gana
+  `perfil_fiscal_id`/`productora_id` (mutuamente excluyentes vía `CHECK`), resueltos EN VIVO —
+  coherente con "Datos del pedido: contacto en vivo, plata congelada" (2026-06-06): se congela el
+  puntero (qué eligió el cliente para ESE pedido), no razón social/domicilio.
+  `clientes.cuit/perfil_impuestos/...` se mantiene intacta — pasa a representar "el perfil
+  default", que siguen leyendo sin cambios los ~10 call sites ya existentes.
+- **Prioridad de resolución.** Nuevo helper único `services/pedidos_enriquecimiento.
+  _resolver_datos_fiscales_pedido(conn, cliente_id, perfil_fiscal_id, productora_id)`: productora
+  elegida > perfil personal elegido > default de la cuenta (comportamiento de hoy si ninguno). Es
+  el ÚNICO punto de palanca real — los 5 call sites que ya leían datos fiscales de un pedido pasan
+  a llamarlo en vez de reimplementar la rama condicional cada uno.
+- **Verificación bloqueante, sin excepción.** `verificar_y_crear_perfil_fiscal`/
+  `verificar_y_crear_productora` (`services/facturacion/padron.py`) reusan `resolver_persona` —
+  toda fila nace de una verificación exitosa contra ARCA, RuntimeError (422 en el endpoint) si AFIP
+  no confirma. Cierra el fallback manual de raíz: `cliente_update_me`/`PerfilUpdate` pierde
+  `cuit`/`perfil_impuestos`/`razon_social`/`domicilio_fiscal`/`email_facturacion` — esos campos ya
+  no se aceptan ahí. `cliente_verificar_cuit` queda como delegado legacy (mismo endpoint viejo,
+  misma forma de respuesta) del `POST /api/cliente/facturacion/perfiles` nuevo, mientras el
+  frontend viejo no termine de migrar.
+- **Selección en el checkout.** `CheckoutResumen` gana un selector "Facturar a nombre de" —
+  aparece SOLO si hay más de una opción (perfiles personales + productoras vinculadas); si no, el
+  default de la cuenta es la única opción y no hace falta elegir. Se propaga como
+  `FacturacionTarget` a través de `onCrearPedido` → `createOrder` → `POST /api/cliente/pedidos`
+  (`perfil_fiscal_id`/`productora_id`, validados como propios/vinculados del cliente autenticado —
+  400 si vienen los dos, 404 si no pertenecen).
+- **Identity merge — hallazgo real durante la implementación.** El test de cobertura mecánica
+  `test_identity_merge_cobertura` (anti-drift: toda FK a `clientes` clasificada en
+  `TABLAS_REASIGNADAS`/`TABLAS_DESCARTADAS`) falló al agregar las tablas nuevas — sin clasificarlas,
+  un merge de cuentas las hubiera perdido en SILENCIO (cascade delete de `clientes`, sin reasignar).
+  Se clasificaron en `TABLAS_REASIGNADAS` con reasignación dedup-aware: `cliente_perfiles_fiscales`
+  se mueve deduplicando por `cuit` (`es_default` se desmarca en el move para nunca chocar con el
+  índice único parcial; si el target queda sin ningún default teniendo perfiles, se promueve el más
+  reciente); `productora_miembros` se mueve deduplicando por `productora_id` (PK compuesta). De
+  paso, `auth/account_merge.py::account_is_absorbable` (el merge LIVIANO de una cuenta sin
+  verificar) sumó el chequeo de perfiles fiscales a "sin datos que perder" — una cuenta liviana sin
+  verificar SÍ puede tener un perfil fiscal (`POST .../perfiles` no exige `dni_validado_at`), gap
+  que existía antes de este fix.
+- **Consecuencias.** 9 commits atómicos en la rama (esquema+migración, capa de servicio,
+  enriquecimiento, endpoints personales, endpoints productoras + creación de pedido, backfill,
+  frontend perfiles personales, frontend selector checkout, frontend admin productoras+ficha
+  cliente). Suite completa verde (3162+ tests unit, ~15 tests nuevos de integración contra Postgres
+  real incluyendo 2 de merge real con dos conexiones). `ruff`/`tsc`/`eslint`/`npm run build` en
+  verde en cada paso. El supervisor marca: un dato fiscal guardado a mano sin pasar por
+  `verificar_y_crear_perfil_fiscal`/`verificar_y_crear_productora`; un consumidor nuevo de datos
+  fiscales de un pedido que no pase por `_resolver_datos_fiscales_pedido`; una tabla nueva con FK a
+  `clientes` sin clasificar en `identity/merge.py`.

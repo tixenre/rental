@@ -9,6 +9,7 @@ import type {
   Cliente,
   ClienteInput,
   ClientePedidoRow,
+  ClientePerfilesFiscales,
   PedidoCreateInput,
   CobroModo,
   CalendarioPedido,
@@ -162,6 +163,9 @@ export const pedidosMethods = {
   // clientes — detalle / edición
   getCliente: (id: number) => authedJson<Cliente>(`/api/clientes/${id}`),
   getClientePedidos: (id: number) => authedJson<ClientePedidoRow[]>(`/api/clientes/${id}/pedidos`),
+  // Solo lectura (#1240): perfiles fiscales personales + productoras vinculadas.
+  getClientePerfilesFiscales: (id: number) =>
+    authedJson<ClientePerfilesFiscales>(`/api/clientes/${id}/perfiles-fiscales`),
   updateCliente: (id: number, data: Partial<ClienteInput>) =>
     authedJson<Cliente>(`/api/clientes/${id}`, {
       method: "PATCH",

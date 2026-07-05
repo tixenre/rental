@@ -29,11 +29,18 @@ export async function validarCheckout(
  *  devuelve el HTML completo tal cual lo arma el backend (`_contrato_html`,
  *  marcado con el aviso de simulación). No es JSON, por eso no usa
  *  `authedJson` — se lee como texto. */
-export async function obtenerContratoPreviewHtml(sessionId: string): Promise<string> {
+export async function obtenerContratoPreviewHtml(
+  sessionId: string,
+  target?: { perfilFiscalId?: number; productoraId?: number },
+): Promise<string> {
   const res = await authedFetch("/api/checkout/contrato-preview", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ session_id: sessionId }),
+    body: JSON.stringify({
+      session_id: sessionId,
+      perfil_fiscal_id: target?.perfilFiscalId ?? null,
+      productora_id: target?.productoraId ?? null,
+    }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");

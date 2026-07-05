@@ -126,6 +126,8 @@ def checkout_aceptar_tyc(request: Request):
 
 class ContratoPreviewIn(BaseModel):
     session_id: str
+    perfil_fiscal_id: int | None = None
+    productora_id: int | None = None
 
 
 def _marcar_como_simulacion(html_str: str) -> str:
@@ -211,11 +213,46 @@ def checkout_contrato_preview(data: ContratoPreviewIn, request: Request):
 
             # Solo se necesita el perfil fiscal (decide si el bloque de
             # Responsable Inscripto aparece en el documento) — el resto de
-            # los datos del cliente van con placeholders (ver abajo).
-            cli = conn.execute(
-                "SELECT perfil_impuestos FROM clientes WHERE id = %s", (cliente_id,),
-            ).fetchone()
-            perfil_impuestos = row_to_dict(cli).get("perfil_impuestos") if cli else None
+            # los datos del cliente van con placeholders (ver abajo). Respeta
+            # el `facturacionTarget` YA elegido en el checkout (bug real,
+            # encontrado en revisión): sin esto, el preview siempre mostraba
+            # la condición IVA del perfil default de la cuenta aunque el
+            # cliente ya hubiera elegido una productora/perfil con una
+            # condición distinta — podía mostrar/ocultar el bloque de
+            # Responsable Inscripto equivocado justo antes de firmar. Misma
+            # validación de pertenencia que `cotizacion.py`/`cliente_crear_pedido`
+            # (productora: membership; perfil: dueño), fail-open a `None` si
+            # no valida — cae al default de la cuenta, nunca a otro cliente.
+            productora_id_valida = None
+            if data.productora_id:
+                vinculado = conn.execute(
+                    "SELECT 1 FROM productora_miembros WHERE productora_id = %s AND cliente_id = %s",
+                    (data.productora_id, cliente_id),
+                ).fetchone()
+                if vinculado:
+                    productora_id_valida = data.productora_id
+
+            perfil_fiscal_id_valido = None
+            if data.perfil_fiscal_id:
+                propio = conn.execute(
+                    "SELECT 1 FROM cliente_perfiles_fiscales WHERE id = %s AND cliente_id = %s",
+                    (data.perfil_fiscal_id, cliente_id),
+                ).fetchone()
+                if propio:
+                    perfil_fiscal_id_valido = data.perfil_fiscal_id
+
+            if perfil_fiscal_id_valido or productora_id_valida:
+                from services.pedidos_enriquecimiento import _resolver_datos_fiscales_pedido
+
+                fiscal = _resolver_datos_fiscales_pedido(
+                    conn, cliente_id, perfil_fiscal_id_valido, productora_id_valida
+                )
+                perfil_impuestos = fiscal.get("perfil_impuestos")
+            else:
+                cli = conn.execute(
+                    "SELECT perfil_impuestos FROM clientes WHERE id = %s", (cliente_id,),
+                ).fetchone()
+                perfil_impuestos = row_to_dict(cli).get("perfil_impuestos") if cli else None
 
             pedido = {
                 "id": "preview",

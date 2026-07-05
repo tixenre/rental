@@ -29,7 +29,7 @@ import { PriceBlock } from "@/components/rental/equipment/shared/PriceBlock";
 import { FavButton } from "@/components/rental/equipment/shared/FavButton";
 import { ShareButton } from "@/components/rental/equipment/shared/ShareButton";
 import { createOrder } from "@/lib/orders";
-import { CheckoutResumen } from "@/components/rental/CheckoutResumen";
+import { CheckoutResumen, type FacturacionTarget } from "@/components/rental/CheckoutResumen";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
 import { useHeroPhotos, heroImgProps } from "@/lib/studio/hero-photos";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
@@ -377,7 +377,7 @@ export function CartSheet({
     setStep("resumen");
   }
 
-  async function handleCrearPedido(sessionConfirmed: boolean) {
+  async function handleCrearPedido(sessionConfirmed: boolean, target: FacturacionTarget) {
     await createOrder({
       status: "solicitado",
       startDate: fechaDesde ?? undefined,
@@ -386,6 +386,8 @@ export function CartSheet({
       endTime: horaHasta,
       days: jornadas,
       sessionConfirmed,
+      perfilFiscalId: target.perfilFiscalId,
+      productoraId: target.productoraId,
       resolvedItems: entries.map(({ eq, qty }) => ({
         id: eq.id,
         name: eq.name,

@@ -9,7 +9,7 @@ sabía manejarlo bien. Ahora hay un solo punto que arma el desglose para los 6
 consumidores reales: detalle admin, PDF/mail, portal cliente, y el motor de
 facturación (`services/facturacion/engine.py`).
 """
-from database import row_to_dict, to_datetime
+from database import to_datetime
 from services.precios import calcular_total, jornadas_periodo
 
 
@@ -51,12 +51,20 @@ def desglose_de_pedido(conn, pedido: dict) -> dict:
     """
     perfil = pedido.get("cliente_perfil_impuestos")
     if perfil is None and pedido.get("cliente_id"):
-        row = conn.execute(
-            "SELECT perfil_impuestos FROM clientes WHERE id = %s",
-            (pedido["cliente_id"],),
-        ).fetchone()
-        if row:
-            perfil = row_to_dict(row).get("perfil_impuestos")
+        # #1240: si el pedido eligió una productora o un perfil personal alternativo
+        # (`productora_id`/`perfil_fiscal_id`, columnas reales de `alquileres`), ese
+        # target gana sobre el perfil default de `clientes` — mismo criterio que
+        # `services.pedidos_enriquecimiento._resolver_datos_fiscales_pedido`.
+        from services.pedidos_enriquecimiento import _resolver_datos_fiscales_pedido
+
+        c = _resolver_datos_fiscales_pedido(
+            conn,
+            pedido["cliente_id"],
+            pedido.get("perfil_fiscal_id"),
+            pedido.get("productora_id"),
+        )
+        if c:
+            perfil = c.get("perfil_impuestos")
             pedido["cliente_perfil_impuestos"] = perfil
 
     descuento_cliente_pct = pedido.get("descuento_cliente_pct") or 0.0

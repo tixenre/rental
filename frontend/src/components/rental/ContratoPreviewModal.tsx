@@ -23,10 +23,12 @@ export function ContratoPreviewModal({
   open,
   onOpenChange,
   sessionId,
+  facturacionTarget,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   sessionId: string;
+  facturacionTarget?: { perfilFiscalId?: number; productoraId?: number };
 }) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -39,6 +41,8 @@ export function ContratoPreviewModal({
   // spinner desaparecía apenas volvía el fetch y el cliente se quedaba
   // mirando una pantalla en blanco que parecía rota.
   const [iframeReady, setIframeReady] = useState(false);
+  const perfilFiscalId = facturacionTarget?.perfilFiscalId;
+  const productoraId = facturacionTarget?.productoraId;
 
   useEffect(() => {
     if (!open) return;
@@ -47,7 +51,7 @@ export function ContratoPreviewModal({
     setCargando(true);
     setIframeReady(false);
     setError(null);
-    obtenerContratoPreviewHtml(sessionId)
+    obtenerContratoPreviewHtml(sessionId, { perfilFiscalId, productoraId })
       .then((h) => {
         if (!alive) return;
         url = URL.createObjectURL(new Blob([h], { type: "text/html" }));
@@ -64,7 +68,7 @@ export function ContratoPreviewModal({
       setBlobUrl(null);
       if (url) URL.revokeObjectURL(url);
     };
-  }, [open, sessionId]);
+  }, [open, sessionId, perfilFiscalId, productoraId]);
 
   const mostrarSpinner = cargando || (!error && blobUrl && !iframeReady);
 

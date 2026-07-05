@@ -48,6 +48,10 @@ export type CreateOrderInput = {
    *  `services/checkout/validar.py::_check_firma`. Inerte mientras
    *  `FIRMA_CHECKOUT_OBLIGATORIA` esté apagado server-side. */
   sessionConfirmed?: boolean;
+  /** #1240: a nombre de quién se factura este pedido — mutuamente
+   *  excluyentes, ambos `undefined` = perfil default de la cuenta. */
+  perfilFiscalId?: number;
+  productoraId?: number;
 };
 
 export type Order = {
@@ -178,6 +182,8 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     // session_id del carrito (#280 Fase 1): cierra el funnel de conversión
     session_id: useCart.getState().sessionId,
     session_confirmed: input.sessionConfirmed ?? false,
+    perfil_fiscal_id: input.perfilFiscalId ?? null,
+    productora_id: input.productoraId ?? null,
   };
 
   let created: Record<string, unknown>;

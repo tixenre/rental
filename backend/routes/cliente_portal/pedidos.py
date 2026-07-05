@@ -62,6 +62,10 @@ class PedidoClienteCreate(BaseModel):
     # sin passkey. La firma fuerte es la cookie `stepup` (passkey / on-the-fly), que el
     # server lee aparte (no viaja en el body). Ver el gate más abajo.
     session_confirmed: bool = False
+    # #1240: a nombre de quién se factura ESTE pedido — mutuamente excluyentes,
+    # NULL/NULL = perfil default de la cuenta (comportamiento de siempre).
+    perfil_fiscal_id: Optional[int] = None
+    productora_id: Optional[int] = None
 
     @field_validator("fecha_desde", "fecha_hasta")
     @classmethod
@@ -123,6 +127,26 @@ def cliente_crear_pedido(
         if faltan:
             raise HTTPException(422, detail={"faltan": faltan})
 
+    # #1240: a nombre de quién se factura este pedido — mutuamente excluyentes,
+    # y cada uno se valida como propio del cliente autenticado (nunca el de otro).
+    if data.perfil_fiscal_id and data.productora_id:
+        raise HTTPException(400, "Elegí un perfil personal O una productora, no los dos")
+    with get_db() as _conn:
+        if data.perfil_fiscal_id:
+            propio = _conn.execute(
+                "SELECT 1 FROM cliente_perfiles_fiscales WHERE id = %s AND cliente_id = %s",
+                (data.perfil_fiscal_id, cliente_id),
+            ).fetchone()
+            if not propio:
+                raise HTTPException(404, "Perfil fiscal no encontrado")
+        if data.productora_id:
+            vinculado = _conn.execute(
+                "SELECT 1 FROM productora_miembros WHERE productora_id = %s AND cliente_id = %s",
+                (data.productora_id, cliente_id),
+            ).fetchone()
+            if not vinculado:
+                raise HTTPException(404, "Productora no encontrada")
+
     # Reusamos la lógica de creación del back-office para mantener una sola fuente.
     from routes.alquileres import create_pedido_retry, PedidoCreate, PedidoItem
     from services.carrito import precios_catalogo_para_reserva
@@ -141,6 +165,8 @@ def cliente_crear_pedido(
         fecha_hasta=data.fecha_hasta,
         notas=data.notas,
         estado="presupuesto",
+        perfil_fiscal_id=data.perfil_fiscal_id,
+        productora_id=data.productora_id,
         items=[
             PedidoItem(
                 equipo_id=i.equipo_id,
@@ -202,7 +228,7 @@ def cliente_pedidos(request: Request):
         pedidos = conn.execute("""
             SELECT id, numero_pedido, estado, fecha_desde, fecha_hasta,
                    monto_total, monto_pagado, descuento_pct, descuento_jornadas_pct,
-                   notas, created_at
+                   notas, created_at, perfil_fiscal_id, productora_id
             FROM alquileres
             WHERE cliente_id = %s
             ORDER BY created_at DESC NULLS LAST, numero_pedido DESC
@@ -216,12 +242,35 @@ def cliente_pedidos(request: Request):
             [p["id"] for p in pedidos], conn
         )
 
-        # Perfil fiscal del cliente, una sola vez para toda la lista (no por
-        # pedido) — `_enriquecer_pedido_con_total` lo respeta si ya viene seteado.
+        # Perfil fiscal DEFAULT del cliente, una sola vez para toda la lista (no
+        # por pedido) — `_enriquecer_pedido_con_total` lo respeta si ya viene
+        # seteado. #1240: algunos pedidos puntuales pueden haber elegido una
+        # productora o un perfil personal alternativo — se resuelven esos en
+        # batch (2 queries más, no N+1) para no perder ese override en el
+        # listado.
         perfil_row = conn.execute(
             "SELECT perfil_impuestos FROM clientes WHERE id = %s", (cliente_id,)
         ).fetchone()
         perfil_impuestos = row_to_dict(perfil_row).get("perfil_impuestos") if perfil_row else None
+
+        perfil_fiscal_ids = list({p["perfil_fiscal_id"] for p in pedidos if p["perfil_fiscal_id"]})
+        productora_ids = list({p["productora_id"] for p in pedidos if p["productora_id"]})
+        perfil_impuestos_por_perfil_id: dict[int, str] = {}
+        perfil_impuestos_por_productora_id: dict[int, str] = {}
+        if perfil_fiscal_ids:
+            ph = ",".join(["%s"] * len(perfil_fiscal_ids))
+            rows = conn.execute(
+                f"SELECT id, perfil_impuestos FROM cliente_perfiles_fiscales WHERE id IN ({ph})",
+                perfil_fiscal_ids,
+            ).fetchall()
+            perfil_impuestos_por_perfil_id = {r["id"]: r["perfil_impuestos"] for r in rows}
+        if productora_ids:
+            ph = ",".join(["%s"] * len(productora_ids))
+            rows = conn.execute(
+                f"SELECT id, perfil_impuestos FROM productoras WHERE id IN ({ph})",
+                productora_ids,
+            ).fetchall()
+            perfil_impuestos_por_productora_id = {r["id"]: r["perfil_impuestos"] for r in rows}
 
         from routes.alquileres import _enriquecer_pedido_con_total
 
@@ -229,7 +278,12 @@ def cliente_pedidos(request: Request):
         for p in pedidos:
             d = row_to_dict(p)
             d["cliente_id"] = cliente_id
-            d["cliente_perfil_impuestos"] = perfil_impuestos
+            if p["productora_id"] and p["productora_id"] in perfil_impuestos_por_productora_id:
+                d["cliente_perfil_impuestos"] = perfil_impuestos_por_productora_id[p["productora_id"]]
+            elif p["perfil_fiscal_id"] and p["perfil_fiscal_id"] in perfil_impuestos_por_perfil_id:
+                d["cliente_perfil_impuestos"] = perfil_impuestos_por_perfil_id[p["perfil_fiscal_id"]]
+            else:
+                d["cliente_perfil_impuestos"] = perfil_impuestos
             d["items"] = [
                 _proyectar(it, _ITEM_CAMPOS_PORTAL)
                 for it in items_por_pedido.get(p["id"], [])
@@ -277,7 +331,8 @@ def cliente_pedido_detalle(id: int, request: Request):
         pedido = conn.execute("""
             SELECT id, numero_pedido, estado, fecha_desde, fecha_hasta,
                    monto_total, monto_pagado, descuento_pct,
-                   descuento_jornadas_pct, cliente_id, notas, created_at
+                   descuento_jornadas_pct, cliente_id, notas, created_at,
+                   perfil_fiscal_id, productora_id
             FROM alquileres
             WHERE id = %s AND cliente_id = %s
         """, (id, cliente_id)).fetchone()

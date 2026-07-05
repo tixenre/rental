@@ -7,7 +7,7 @@
  * métodos de acceso y sesiones) — antes repartida con la página /cliente/perfil.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
 import { Button } from "@/design-system/ui/button";
 import { toast } from "sonner";
@@ -33,7 +33,15 @@ import { AccessMethods } from "@/components/rental/AccessMethods";
 import { SessionManager } from "@/components/rental/SessionManager";
 import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { invalidateClienteSession, PERFIL_IMPUESTOS_LABEL } from "@/lib/iva";
-import { cuitValido, verificarCuitArca } from "@/lib/cuit";
+import {
+  cuitValido,
+  crearPerfilFiscal,
+  listarPerfilesFiscales,
+  listarProductoras,
+  marcarPerfilFiscalDefault,
+  type PerfilFiscal,
+  type Productora,
+} from "@/lib/cuit";
 import type { Perfil } from "./ClientePortalTypes";
 
 // ── Navegación: sidebar item ──────────────────────────────────────────────────
@@ -549,120 +557,193 @@ export function FacturacionForm({
 }: {
   perfil: Perfil;
   onPerfilChange: (p: Perfil) => void;
-  /** Se llama tras un guardado exitoso — lo usa `FacturacionModal` para
-   *  cerrarse solo; en el perfil del portal (no es un modal) se omite. */
+  /** Se llama tras un alta exitosa — lo usa `FacturacionModal` para cerrarse
+   *  solo; en el perfil del portal (no es un modal) se omite. */
   onSaved?: () => void;
 }) {
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    cuit: perfil.cuit ?? "",
-    perfil_impuestos: (perfil.perfil_impuestos ?? "consumidor_final") as PerfilImpuestos,
-    razon_social: perfil.razon_social ?? "",
-    domicilio_fiscal: perfil.domicilio_fiscal ?? "",
-    email_facturacion: perfil.email_facturacion ?? "",
-  });
-  // Feedback inmediato de formato (mismo checksum mod-11 que el backend hace
-  // cumplir de verdad en PATCH /api/cliente/me — esto no reemplaza esa
-  // validación, solo evita el viaje al servidor con un número mal tipeado).
-  const cuitOk = form.cuit.trim() === "" || cuitValido(form.cuit);
-  // Responsable Inscripto/Monotributo/Exento no existen sin CUIT en Argentina — el backend
-  // rechaza guardar cualquiera de estos perfiles sin un CUIT válido (bug real: un cliente
-  // guardó 'monotributo' sin nunca verificar su CUIT, la factura salió sin domicilio). Mismo
-  // chequeo acá para avisar ANTES del viaje al servidor, no reemplaza la validación real.
-  const requiereCuit = form.perfil_impuestos !== "consumidor_final";
-  const tieneCuitValido = form.cuit.trim() !== "" && cuitValido(form.cuit);
-  const faltaCuitParaElPerfil = requiereCuit && !tieneCuitValido;
+  // #1240: sin fallback de entrada manual — el cliente SOLO tipea el CUIT,
+  // todo lo demás (razón social/domicilio/condición IVA) sale de una
+  // verificación real y BLOQUEANTE contra ARCA (`crearPerfilFiscal`, 422 si
+  // AFIP no confirma — no se guarda nada a medias). Puede guardar VARIOS CUIT
+  // propios (perfiles fiscales) y elegir cuál usar por pedido en el checkout;
+  // las productoras (entidad fiscal compartida) las vincula el admin, acá
+  // solo se muestran en modo lectura.
+  const [perfiles, setPerfiles] = useState<PerfilFiscal[] | null>(null);
+  const [productoras, setProductoras] = useState<Productora[] | null>(null);
+  const [cargando, setCargando] = useState(true);
 
-  // Verificación contra el padrón de ARCA: el cliente solo confirma el CUIT
-  // — si ARCA lo encuentra, condición IVA/razón social/domicilio quedan
-  // persistidos por el propio endpoint (no hace falta autocompletarlos a
-  // mano, ARCA los corrige igual al momento de facturar). Si ARCA no puede
-  // confirmarlo, se avisa y se cae al formulario editable de siempre.
+  const [cuit, setCuit] = useState("");
+  const [etiqueta, setEtiqueta] = useState("");
   const [verificando, setVerificando] = useState(false);
-  const [verificado, setVerificado] = useState<{
-    perfil_impuestos: PerfilImpuestos;
-    razon_social: string;
-    domicilio_fiscal: string;
-  } | null>(null);
-  const [motivoNoEncontrado, setMotivoNoEncontrado] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const cuitOk = cuit.trim() === "" || cuitValido(cuit);
 
-  function setCuit(cuit: string) {
-    setForm({ ...form, cuit });
-    // El CUIT cambió — la verificación anterior (si había) ya no aplica.
-    setVerificado(null);
-    setMotivoNoEncontrado(null);
+  useEffect(() => {
+    let alive = true;
+    Promise.all([listarPerfilesFiscales(), listarProductoras()])
+      .then(([p, pr]) => {
+        if (!alive) return;
+        setPerfiles(p);
+        setProductoras(pr);
+      })
+      .catch(() => {
+        if (alive) {
+          setPerfiles([]);
+          setProductoras([]);
+        }
+      })
+      .finally(() => {
+        if (alive) setCargando(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  function reflejarEnPerfil(p: {
+    cuit: string;
+    perfil_impuestos: PerfilImpuestos;
+    razon_social: string | null;
+    domicilio_fiscal: string | null;
+  }) {
+    onPerfilChange({
+      ...perfil,
+      cuit: p.cuit,
+      perfil_impuestos: p.perfil_impuestos,
+      razon_social: p.razon_social ?? "",
+      domicilio_fiscal: p.domicilio_fiscal ?? "",
+    });
+    invalidateClienteSession();
   }
 
-  async function handleVerificar() {
-    if (verificando || !cuitOk || !form.cuit.trim()) return;
+  async function handleAgregar(e: React.FormEvent) {
+    e.preventDefault();
+    if (verificando || !cuitOk || !cuit.trim()) return;
     setVerificando(true);
-    setMotivoNoEncontrado(null);
+    setError(null);
     try {
-      const r = await verificarCuitArca(form.cuit);
-      if (r.encontrado) {
-        setVerificado({
-          perfil_impuestos: r.perfil_impuestos,
-          razon_social: r.razon_social,
-          domicilio_fiscal: r.domicilio_fiscal,
-        });
-        setForm((f) => ({
-          ...f,
-          cuit: r.cuit,
-          perfil_impuestos: r.perfil_impuestos,
-          razon_social: r.razon_social,
-          domicilio_fiscal: r.domicilio_fiscal,
-        }));
-        // El endpoint ya lo persistió — reflejar el cambio al toque, sin
-        // esperar a "Guardar cambios" (mismo criterio que `patchPerfil`).
-        onPerfilChange({
-          ...perfil,
-          cuit: r.cuit,
-          perfil_impuestos: r.perfil_impuestos,
-          razon_social: r.razon_social,
-          domicilio_fiscal: r.domicilio_fiscal,
-        });
-        invalidateClienteSession();
-        toast.success("CUIT verificado con ARCA");
-      } else {
-        setVerificado(null);
-        setMotivoNoEncontrado(r.motivo);
-      }
+      const nuevo = await crearPerfilFiscal(cuit, { etiqueta: etiqueta.trim() || undefined });
+      setPerfiles((prev) => {
+        const resto = (prev ?? []).filter((p) => p.cuit !== nuevo.cuit);
+        return [
+          ...(nuevo.es_default ? resto.map((p) => ({ ...p, es_default: false })) : resto),
+          nuevo,
+        ];
+      });
+      if (nuevo.es_default) reflejarEnPerfil(nuevo);
+      setCuit("");
+      setEtiqueta("");
+      toast.success("CUIT verificado con ARCA");
+      onSaved?.();
     } catch (err) {
-      setMotivoNoEncontrado(
-        err instanceof Error ? err.message : "Error verificando el CUIT con ARCA",
-      );
+      setError(err instanceof Error ? err.message : "AFIP no pudo confirmar este CUIT.");
     } finally {
       setVerificando(false);
     }
   }
 
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    if (saving || !cuitOk || faltaCuitParaElPerfil) return;
-    setSaving(true);
+  async function handleMarcarDefault(id: number) {
+    const elegido = (perfiles ?? []).find((p) => p.id === id);
+    if (!elegido) return;
     try {
-      await patchPerfil(perfil, onPerfilChange, form, { invalidate: true });
-      toast.success("Facturación actualizada");
-      onSaved?.();
+      await marcarPerfilFiscalDefault(id);
+      setPerfiles((prev) => (prev ?? []).map((p) => ({ ...p, es_default: p.id === id })));
+      reflejarEnPerfil(elegido);
+      toast.success("Perfil default actualizado");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error al guardar");
-    } finally {
-      setSaving(false);
+      toast.error(err instanceof Error ? err.message : "Error al actualizar");
     }
   }
 
+  if (cargando) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+        <Spinner size="sm" />
+        Cargando…
+      </div>
+    );
+  }
+
   return (
-    <form onSubmit={handleSave} className="space-y-5">
-      <Field
-        label="CUIT / CUIL"
-        hint="Lo verificamos contra ARCA — puede diferir del CUIL de tu identidad."
+    <div className="space-y-5">
+      {!!perfiles?.length && (
+        <div className="space-y-2">
+          <div className="text-xs font-semibold uppercase tracking-wider text-ink">
+            Tus CUIT verificados
+          </div>
+          {perfiles.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-start justify-between gap-3 rounded-md border hairline p-3"
+            >
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-ink">
+                  <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-verde-ink" />
+                  {p.etiqueta || p.razon_social || p.cuit}
+                  {p.es_default && (
+                    <span className="rounded-full bg-verde/15 px-2 py-0.5 text-3xs font-semibold uppercase tracking-wider text-verde-ink">
+                      Default
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {p.cuit} · {PERFIL_IMPUESTOS_LABEL[p.perfil_impuestos]}
+                </div>
+                {p.domicilio_fiscal && (
+                  <div className="text-xs text-muted-foreground">{p.domicilio_fiscal}</div>
+                )}
+              </div>
+              {!p.es_default && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => void handleMarcarDefault(p.id)}
+                >
+                  Usar como default
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!!productoras?.length && (
+        <div className="space-y-2">
+          <div className="text-xs font-semibold uppercase tracking-wider text-ink">
+            Productoras vinculadas
+          </div>
+          {productoras.map((pr) => (
+            <div key={pr.id} className="rounded-md border hairline p-3">
+              <div className="text-sm font-medium text-ink">{pr.razon_social || pr.cuit}</div>
+              <div className="text-xs text-muted-foreground">
+                {pr.cuit} · {PERFIL_IMPUESTOS_LABEL[pr.perfil_impuestos]}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <form
+        onSubmit={handleAgregar}
+        className={cn(
+          "space-y-3",
+          (perfiles?.length || productoras?.length) && "border-t hairline pt-5",
+        )}
       >
-        <div className="flex gap-2">
+        <Field
+          label="Agregar un CUIT"
+          hint="Lo verificamos contra ARCA — puede diferir del CUIL de tu identidad. Nunca se guarda un dato sin confirmar."
+        >
           <input
             type="text"
             inputMode="numeric"
-            value={form.cuit}
-            onChange={(e) => setCuit(e.target.value.replace(/[^\d-]/g, "").slice(0, 13))}
+            value={cuit}
+            onChange={(e) => {
+              setCuit(e.target.value.replace(/[^\d-]/g, "").slice(0, 13));
+              setError(null);
+            }}
             placeholder="20-12345678-9"
             aria-invalid={!cuitOk}
             className={cn(
@@ -670,116 +751,26 @@ export function FacturacionForm({
               cuitOk ? "hairline" : "border-destructive",
             )}
           />
-          <Button
-            type="button"
-            variant="outline"
-            className="shrink-0"
-            disabled={verificando || !cuitOk || !form.cuit.trim()}
-            onClick={() => void handleVerificar()}
-          >
-            {verificando ? "Verificando…" : "Verificar"}
-          </Button>
-        </div>
-        {!cuitOk && (
-          <p className="text-xs text-destructive">CUIT/CUIL inválido — revisá el número.</p>
-        )}
-      </Field>
-
-      {verificado ? (
-        <div className="space-y-1 rounded-md border border-verde/40 bg-verde/10 p-4">
-          <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-verde-ink">
-            <BadgeCheck className="h-3.5 w-3.5" />
-            Verificado con ARCA
-          </div>
-          <div className="text-sm font-medium text-ink">
-            {PERFIL_IMPUESTOS_LABEL[verificado.perfil_impuestos]}
-          </div>
-          {verificado.razon_social && (
-            <div className="text-sm text-muted-foreground">{verificado.razon_social}</div>
-          )}
-          {verificado.domicilio_fiscal && (
-            <div className="text-sm text-muted-foreground">{verificado.domicilio_fiscal}</div>
-          )}
-        </div>
-      ) : (
-        <>
-          {motivoNoEncontrado && (
-            <p className="text-xs text-muted-foreground">
-              No pudimos verificarlo automáticamente ({motivoNoEncontrado}). Completá los datos a
-              mano:
-            </p>
-          )}
-          <Field
-            label="Condición frente al IVA"
-            hint="Determina cómo se discrimina el IVA en tus facturas"
-          >
-            <select
-              value={form.perfil_impuestos}
-              onChange={(e) =>
-                setForm({ ...form, perfil_impuestos: e.target.value as PerfilImpuestos })
-              }
-              className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
-            >
-              <option value="consumidor_final">Consumidor final</option>
-              <option value="responsable_inscripto">Responsable inscripto (Factura A)</option>
-              <option value="monotributo">Monotributo</option>
-              <option value="exento">Exento</option>
-            </select>
-          </Field>
-
-          {faltaCuitParaElPerfil && (
-            <p className="text-xs text-destructive">
-              Responsable Inscripto, Monotributo y Exento necesitan un CUIT verificado — cargá tu
-              CUIT arriba y apretá &quot;Verificar&quot; antes de guardar.
-            </p>
-          )}
-
-          {/* Datos fiscales adicionales — visibles para cualquier perfil que no sea Consumidor
-              Final (antes solo se mostraban para Responsable Inscripto; Monotributo/Exento
-              también necesitan poder cargar domicilio a mano si la verificación con ARCA falla). */}
-          {requiereCuit && (
-            <div className="space-y-3 rounded-md border border-dashed hairline bg-amber-soft/40 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wider text-ink">
-                Datos fiscales
-              </div>
-              <Field label="Razón social" hint="Nombre legal (o tu nombre, si sos monotributista)">
-                <input
-                  type="text"
-                  value={form.razon_social}
-                  onChange={(e) => setForm({ ...form, razon_social: e.target.value })}
-                  placeholder="Productora SA"
-                  className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
-                />
-              </Field>
-              <Field label="Domicilio fiscal" hint="Si difiere del domicilio del DNI">
-                <input
-                  type="text"
-                  value={form.domicilio_fiscal}
-                  onChange={(e) => setForm({ ...form, domicilio_fiscal: e.target.value })}
-                  placeholder="Av. Siempre Viva 123, Mar del Plata"
-                  className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
-                />
-              </Field>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Email de facturación — no lo resuelve ARCA, siempre editable a mano. */}
-      {form.perfil_impuestos === "responsable_inscripto" && (
-        <Field label="Email de facturación" hint="Si querés que la factura llegue a otro email">
+        </Field>
+        <Field label="Etiqueta (opcional)" hint='Para reconocerlo, ej. "Personal" o "Freelance"'>
           <input
-            type="email"
-            value={form.email_facturacion}
-            onChange={(e) => setForm({ ...form, email_facturacion: e.target.value })}
-            placeholder="facturacion@empresa.com"
+            type="text"
+            value={etiqueta}
+            onChange={(e) => setEtiqueta(e.target.value)}
+            placeholder="Personal"
+            maxLength={40}
             className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
           />
         </Field>
-      )}
-
-      <SaveButton saving={saving} disabled={!cuitOk || faltaCuitParaElPerfil} />
-    </form>
+        {!cuitOk && (
+          <p className="text-xs text-destructive">CUIT/CUIL inválido — revisá el número.</p>
+        )}
+        {error && <p className="text-xs text-destructive">AFIP no pudo confirmarlo: {error}</p>}
+        <Button type="submit" disabled={verificando || !cuitOk || !cuit.trim()} className="w-full">
+          {verificando ? "Verificando…" : "Verificar y guardar"}
+        </Button>
+      </form>
+    </div>
   );
 }
 
