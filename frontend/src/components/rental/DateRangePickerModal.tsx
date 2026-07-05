@@ -395,13 +395,16 @@ export function DateRangePickerModal({
           </div>
 
           {/* ── Devolución calculada (solo si hay rango) ───────────── */}
+          {/* La explicación de por qué (día cerrado / suma jornada) vive DENTRO
+              de esta misma caja — antes era una caja aparte repitiendo el
+              mismo dato con otro color, dos avisos por una sola cosa. */}
           {hasRange && (
             <div
               className={cn(
-                "rounded-xl border px-3.5 py-2.5 sm:py-3 flex items-center justify-between gap-3",
+                "rounded-xl border px-3.5 py-2.5 sm:py-3",
                 // Jerarquía de estados visuales (de mayor a menor prioridad):
                 // 1. devolucionCerrada → destructive (bloquea)
-                // 2. sumaJornadaPorHora → naranja (advierte)
+                // 2. sumaJornadaPorHora → naranja (advierte, color de warning)
                 // 3. normal → amber (ok)
                 devolucionCerrada
                   ? "border-destructive/40 bg-destructive/10"
@@ -410,53 +413,66 @@ export function DateRangePickerModal({
                     : "border-amber/40 bg-amber-soft/60",
               )}
             >
-              <div>
-                <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1">
-                  Devolución
-                </div>
-                <div className="flex items-center gap-1.5 leading-none">
-                  <span
-                    className={cn(
-                      "tabular-nums text-base font-display leading-none",
-                      devolucionCerrada ? "text-destructive" : "text-ink",
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1">
+                    Devolución
+                  </div>
+                  <div className="flex items-center gap-1.5 leading-none">
+                    <span
+                      className={cn(
+                        "tabular-nums text-base font-display leading-none",
+                        devolucionCerrada ? "text-destructive" : "text-ink",
+                      )}
+                    >
+                      {format(endDate!, "dd MMM yyyy", { locale: es })}
+                    </span>
+                    {/* Badge "+1 J" — solo cuando suma jornada por hora */}
+                    {sumaJornadaPorHora && !devolucionCerrada && (
+                      <Pill className="bg-naranja/20 px-1.5 font-mono font-semibold uppercase tracking-wider text-ink">
+                        +1 J
+                      </Pill>
                     )}
-                  >
-                    {format(endDate!, "dd MMM yyyy", { locale: es })}
-                  </span>
-                  {/* Badge "+1 J" — solo cuando suma jornada por hora */}
-                  {sumaJornadaPorHora && !devolucionCerrada && (
-                    <Pill className="bg-naranja/20 px-1.5 font-mono font-semibold uppercase tracking-wider text-ink">
-                      +1 J
-                    </Pill>
-                  )}
+                  </div>
                 </div>
+                {/* Hora de devolución — "—" si el día está cerrado */}
+                {devolucionCerrada ? (
+                  <span className="font-mono text-sm text-muted-foreground/50">—</span>
+                ) : (
+                  <TimeStepSelect
+                    value={endTime}
+                    onChange={onEndTimeChange}
+                    min={franjaDevolucion?.desde}
+                    max={franjaDevolucion?.hasta}
+                    aria-label="Hora de devolución"
+                    className="text-sm font-mono tabular-nums text-ink/80 hover:text-ink rounded-md px-2 py-1 bg-background border hairline"
+                  />
+                )}
               </div>
-              {/* Hora de devolución — "—" si el día está cerrado */}
               {devolucionCerrada ? (
-                <span className="font-mono text-sm text-muted-foreground/50">—</span>
+                <p className="flex items-start gap-1.5 mt-2 pt-2 border-t border-destructive/20 text-xs text-destructive">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  Cae en un día cerrado. Ajustá las jornadas o la fecha de retiro.
+                </p>
               ) : (
-                <TimeStepSelect
-                  value={endTime}
-                  onChange={onEndTimeChange}
-                  min={franjaDevolucion?.desde}
-                  max={franjaDevolucion?.hasta}
-                  aria-label="Hora de devolución"
-                  className="text-sm font-mono tabular-nums text-ink/80 hover:text-ink rounded-md px-2 py-1 bg-background border hairline"
-                />
+                sumaJornadaPorHora && (
+                  <p className="flex items-center gap-1.5 mt-2 pt-2 border-t border-naranja/20 text-xs text-ink">
+                    <Clock className="h-3.5 w-3.5 shrink-0 text-naranja" />
+                    <span>
+                      Más tarde que tu retiro ({startTime}) → <strong>suma 1 jornada</strong>.
+                      Devolvé a las {startTime} o antes para mantener {jornadas - 1}{" "}
+                      {jornadas - 1 === 1 ? "jornada" : "jornadas"}.
+                    </span>
+                  </p>
+                )
               )}
             </div>
           )}
 
-          {/* ── Feedback (jerarquía: error > warn > hint) ──────────── */}
-          {devolucionCerrada ? (
-            /* ERROR: día cerrado → bloquea Aplicar */
-            <p className="flex items-start gap-1.5 text-xs text-destructive">
-              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-              La devolución cae el{" "}
-              <strong>{format(endDate!, "EEEE dd MMM", { locale: es })}</strong>, que está cerrado.
-              Ajustá las jornadas o la fecha de retiro.
-            </p>
-          ) : rangoCruzaBloqueado ? (
+          {/* ── Feedback general (stock > regla de jornada / hint) ──────────
+              Los casos ligados puntualmente a la Devolución (cerrada / suma
+              jornada) ya se explican en la caja de arriba — no se repiten. */}
+          {rangoCruzaBloqueado ? (
             /* WARN: sin stock en el rango — no bloquea Aplicar, advierte para revisar el carrito */
             <p className="flex items-start gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
               <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber" />
@@ -465,30 +481,20 @@ export function DateRangePickerModal({
                 <strong>revisá el carrito</strong> antes de solicitar.
               </span>
             </p>
-          ) : sumaJornadaPorHora ? (
-            /* WARN: jornada extra por hora → Aplicar habilitado (avisa, no bloquea) */
-            <p className="flex items-center gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
-              <Clock className="h-3.5 w-3.5 shrink-0 text-amber" />
-              <span>
-                Devolvés a las <strong>{endTime}</strong>, más tarde que tu retiro ({startTime}) →{" "}
-                <strong>suma 1 jornada</strong>. Devolvé a las {startTime} o antes para mantener{" "}
-                {jornadas - 1} {jornadas - 1 === 1 ? "jornada" : "jornadas"}.
-              </span>
-            </p>
-          ) : hasStart ? (
+          ) : hasStart && !sumaJornadaPorHora && !devolucionCerrada ? (
             /* INFO: regla general de jornada — mismo tratamiento visual que la
                antelación mínima de abajo (amber, no un hint apagado). */
             <p className="flex items-center gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
               <Clock className="h-3.5 w-3.5 shrink-0 text-amber" />
               Devolver más tarde que la hora de retiro suma una jornada.
             </p>
-          ) : (
+          ) : !hasStart ? (
             /* HINT: sin fecha elegida aún */
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
               Tocá un día en el calendario para fijar el retiro. La devolución se calcula sola.
             </p>
-          )}
+          ) : null}
 
           {/* Antelación mínima (#1126) — siempre visible si está configurada (el
               piso real ya lo aplican el calendario y la hora); mismo tratamiento
