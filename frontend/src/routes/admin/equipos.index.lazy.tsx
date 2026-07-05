@@ -49,6 +49,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/design-system/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/design-system/ui/dropdown-menu";
 
 import { adminApi, type Equipo, type EquipoInput, type FaltaField } from "@/lib/admin/api";
 import { stashEquiposReturnSearch } from "@/lib/admin/equiposReturnSearch";
@@ -752,7 +759,7 @@ function EquiposPage() {
                     />
                   </TableCell>
                   <TableCell className="text-right">
-                    {/* Mobile: un botón → ActionMenu */}
+                    {/* Mobile: un botón → ActionMenu (bottom sheet) */}
                     <Button
                       size="icon"
                       variant="ghost"
@@ -762,80 +769,74 @@ function EquiposPage() {
                     >
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
-                    {/* Desktop: botones individuales */}
-                    <div className="hidden sm:inline-flex gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        title={eq.visible_catalogo ? "Ocultar del catálogo" : "Mostrar en catálogo"}
-                        onClick={() => toggleVisibleMut.mutate(eq)}
-                      >
-                        {eq.visible_catalogo ? (
-                          <Eye className="h-4 w-4" />
+                    {/* Desktop: mismo menú, como dropdown (#DS pattern — ver MarcasSection) */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="hidden sm:inline-flex"
+                          aria-label={`Acciones de ${eq.nombre}`}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuItem onClick={() => toggleVisibleMut.mutate(eq)}>
+                          {eq.visible_catalogo ? (
+                            <EyeOff className="mr-2 h-4 w-4" />
+                          ) : (
+                            <Eye className="mr-2 h-4 w-4" />
+                          )}
+                          {eq.visible_catalogo ? "Ocultar del catálogo" : "Mostrar en catálogo"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setHistorialEquipo(eq)}>
+                          <History className="mr-2 h-4 w-4" />
+                          Historial de alquileres
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setMantenimientoEquipo(eq)}>
+                          <Wrench className="mr-2 h-4 w-4" />
+                          Mantenimiento
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            stashReturnSearch();
+                            navigate({
+                              to: "/admin/equipos/$id/editar",
+                              params: { id: String(eq.id) },
+                            });
+                          }}
+                        >
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => duplicateMut.mutate(eq.id)}
+                          disabled={duplicateMut.isPending}
+                        >
+                          <Copy className="mr-2 h-4 w-4" />
+                          Duplicar
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {eq.eliminado_at ? (
+                          <DropdownMenuItem
+                            onClick={() => restoreMut.mutate(eq.id)}
+                            disabled={restoreMut.isPending}
+                          >
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                            Restaurar
+                          </DropdownMenuItem>
                         ) : (
-                          <EyeOff className="h-4 w-4" />
+                          <DropdownMenuItem
+                            onClick={() => setDeleting(eq)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Eliminar
+                          </DropdownMenuItem>
                         )}
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        title="Historial de alquileres"
-                        onClick={() => setHistorialEquipo(eq)}
-                      >
-                        <History className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        title="Mantenimiento"
-                        onClick={() => setMantenimientoEquipo(eq)}
-                      >
-                        <Wrench className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        title="Editar"
-                        onClick={() => {
-                          stashReturnSearch();
-                          navigate({
-                            to: "/admin/equipos/$id/editar",
-                            params: { id: String(eq.id) },
-                          });
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        title="Duplicar (clona ficha, categorías y kit — serie vacía)"
-                        onClick={() => duplicateMut.mutate(eq.id)}
-                        disabled={duplicateMut.isPending}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      {eq.eliminado_at ? (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          title="Restaurar"
-                          onClick={() => restoreMut.mutate(eq.id)}
-                          disabled={restoreMut.isPending}
-                        >
-                          <RotateCcw className="h-4 w-4 text-ink" />
-                        </Button>
-                      ) : (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          aria-label="Eliminar equipo"
-                          onClick={() => setDeleting(eq)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
