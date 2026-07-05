@@ -62,6 +62,7 @@ class _FakeConn:
                     "domicilio": None,
                     "iibb": None,
                     "inicio_actividades": None,
+                    "habilitado_exportacion": False,
                     "notas": None,
                     "created_at": None,
                     "updated_at": None,
@@ -164,6 +165,7 @@ def test_gating_emisor_inactivo_levanta(monkeypatch):
                         "cert_enc": b"x", "key_enc": b"x",
                         "activo": False, "razon_social": None,
                         "domicilio": None, "iibb": None, "inicio_actividades": None,
+                        "habilitado_exportacion": False,
                         "notas": None,
                         "created_at": None, "updated_at": None,
                     }
@@ -277,6 +279,7 @@ class _FakeConnEmisor:
                     "domicilio": None,
                     "iibb": None,
                     "inicio_actividades": None,
+                    "habilitado_exportacion": False,
                     "notas": None,
                     "created_at": None,
                     "updated_at": None,

@@ -198,6 +198,7 @@ def crear_emisor(request: Request, body: dict):
     domicilio = (body.get("domicilio") or "").strip() or None
     iibb = (body.get("iibb") or "").strip() or None
     inicio_actividades = (body.get("inicio_actividades") or "").strip() or None
+    habilitado_exportacion = bool(body.get("habilitado_exportacion", False))
     notas = (body.get("notas") or "").strip() or None
 
     if not nombre or not cuit or not pto_vta or not condicion_iva:
@@ -221,6 +222,7 @@ def crear_emisor(request: Request, body: dict):
                 domicilio=domicilio,
                 iibb=iibb,
                 inicio_actividades=inicio_actividades,
+                habilitado_exportacion=habilitado_exportacion,
                 notas=notas,
             )
             from services.facturacion.emisores_repo import get_by_id
@@ -254,6 +256,7 @@ def actualizar_emisor(emisor_id: int, request: Request, body: dict):
                 domicilio=body.get("domicilio"),
                 iibb=body.get("iibb"),
                 inicio_actividades=body.get("inicio_actividades"),
+                habilitado_exportacion=body.get("habilitado_exportacion"),
                 notas=body.get("notas"),
             )
             emisor = get_by_id(emisor_id, conn)
@@ -799,6 +802,7 @@ def _emisor_to_dict(e) -> dict:
         "domicilio": e.domicilio,
         "iibb": e.iibb,
         "inicio_actividades": e.inicio_actividades,
+        "habilitado_exportacion": e.habilitado_exportacion,
         "notas": e.notas,
         "created_at": e.created_at.isoformat() if e.created_at else None,
         "updated_at": e.updated_at.isoformat() if e.updated_at else None,

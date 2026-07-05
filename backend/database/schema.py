@@ -2322,6 +2322,14 @@ def _init_db_schema(conn):
         ALTER TABLE emisores_arca
             ADD COLUMN IF NOT EXISTS inicio_actividades TEXT
     """)
+    # Factura de Exportación (WSFEXv1): un emisor necesita una relación de servicio AFIP
+    # SEPARADA de "wsfe" (mismo mecanismo que exige el padrón) — sin este flag, un intento de
+    # facturar exportación con un emisor que nunca delegó esa relación falla recién al pegarle a
+    # AFIP con un ArcaAuthError críptico; con el flag, se puede bloquear antes con un mensaje claro.
+    conn.execute("""
+        ALTER TABLE emisores_arca
+            ADD COLUMN IF NOT EXISTS habilitado_exportacion BOOLEAN NOT NULL DEFAULT false
+    """)
 
     # ── Perfiles fiscales múltiples + productoras (#1240) ────────────────────
     # Refina la regla "facturación siempre usa el dato de AFIP verificado" (2026-07-05):
