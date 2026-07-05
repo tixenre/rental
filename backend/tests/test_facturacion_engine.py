@@ -944,10 +944,12 @@ def test_preview_receptor_usa_domicilio_de_afip_si_no_esta_guardado(monkeypatch)
 # ── previsualizar_factura_html: mismo layout que la factura real, SIN CAE ──
 
 
-def test_preview_html_renderiza_el_mismo_layout_con_cae_pendiente(monkeypatch):
+def test_preview_html_renderiza_el_mismo_layout_sin_cae_real(monkeypatch):
     """Pedido del dueño: ver la factura COMPLETA (mismo layout/plantilla real) antes de
-    emitir, no solo el resumen de chequeos — sin pedirle nada más a ARCA. CAE/QR son
-    placeholder ("(pendiente)") porque todavía no existen."""
+    emitir, no solo el resumen de chequeos — sin pedirle nada más a ARCA. Un preview de
+    factura NUNCA puede parecer válido: el CAE es texto explícitamente no-numérico (no
+    "(pendiente)" a secas, que podría leerse como un número truncado), más banner + marca
+    de agua imposibles de confundir con un comprobante real."""
     wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
     _patch_preview_common(monkeypatch, wsfe)
     monkeypatch.setattr(engine, "now_ar", lambda: datetime(2026, 7, 15))
@@ -955,9 +957,10 @@ def test_preview_html_renderiza_el_mismo_layout_con_cae_pendiente(monkeypatch):
     html = engine.previsualizar_factura_html(1, conn=_FakeConn())
 
     assert "<html" in html.lower() or "<!doctype" in html.lower()
-    assert "(pendiente)" in html  # CAE placeholder, no inventa un CAE real
+    assert "SIN EMITIR" in html and "NO VÁLIDO" in html  # CAE explícitamente no-numérico
     assert "Juan Pérez" in html  # nombre del receptor, del pedido de prueba
     assert "BORRADOR" in html  # banner imposible de confundir con un comprobante real
+    assert html.count("NO VÁLIDO — PREVIEW") >= 6  # marca de agua repetida, no un solo aviso chico
 
 
 def test_preview_html_propaga_error_de_comprobante_invalido(monkeypatch):
