@@ -52,8 +52,20 @@ export function useRoiPctDefault(opts?: { staleTime?: number }): number {
 /** Lead-time: horas mínimas de antelación para que el cliente reserve online
  *  (#1126). Default 0 = apagado. El admin lo configura desde /admin/settings.
  *  El backend es la fuente de verdad (lo enforza el portero + el backstop de
- *  creación); el front lo lee solo para avisar antes de tiempo (disclaimer). */
-export function useAntelacionMinimaHoras(opts?: { staleTime?: number }): number {
+ *  creación); el front lo lee solo para avisar antes de tiempo (disclaimer).
+ *
+ *  Expone también `ready` (¿ya resolvió la query, sea con éxito o con el
+ *  catch-a-null?): mientras carga, `horas` cae al default 0 — indistinguible
+ *  de "antelación apagada de verdad". Un consumidor que DERIVE un piso/clamp
+ *  de este valor (no solo mostrarlo) tiene que esperar `ready`, o corre el
+ *  riesgo de clampear con el 0 de arranque y quedarse con eso pisado incluso
+ *  después de que llegue el valor real (visto en prod: date picker clampeaba
+ *  la hora a "ahora" con el 0 inicial, y esa hora sobrevivía aunque el piso
+ *  correcto —antelación real— corriera la FECHA para adelante después). */
+export function useAntelacionMinimaHorasQuery(opts?: { staleTime?: number }): {
+  horas: number;
+  ready: boolean;
+} {
   const q = useQuery({
     queryKey: ["settings", "antelacion_minima_horas"],
     queryFn: () => adminApi.getSetting("antelacion_minima_horas").catch(() => null),
@@ -61,7 +73,14 @@ export function useAntelacionMinimaHoras(opts?: { staleTime?: number }): number 
     retry: 0,
   });
   const parsed = Number(q.data?.value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  return {
+    horas: Number.isFinite(parsed) && parsed > 0 ? parsed : 0,
+    ready: !q.isLoading,
+  };
+}
+
+export function useAntelacionMinimaHoras(opts?: { staleTime?: number }): number {
+  return useAntelacionMinimaHorasQuery(opts).horas;
 }
 
 /** Helper puro: precio jornada en ARS según fórmula

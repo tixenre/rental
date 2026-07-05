@@ -17,11 +17,17 @@ import {
   computeJornadas,
   deriveEndDate,
   diaAbierto,
+  earliestRetiro,
   franjaParaFecha,
+  laterTime,
+  minTimeForDate,
   timeToMinutes,
   ymd,
 } from "@/lib/rental-dates";
 import { useHorarios } from "@/lib/horarios";
+import { useAntelacionMinimaHorasQuery } from "@/hooks/useSettings";
+import { useBusinessPhone } from "@/lib/business";
+import { whatsappLink } from "@/lib/whatsapp";
 import { apiGetDiasBloqueados } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -96,6 +102,32 @@ export function DateRangePickerModal({
   const horarios = respectHorarios ? horariosRaw : null;
   // Estable durante el ciclo de vida del modal — evita recomputar memos por render.
   const today = useMemo(() => startOfDay(new Date()), []);
+  const now = useMemo(() => new Date(), []);
+
+  // ── Piso de retiro: "ahora" + antelación mínima (#1126) ────────────────
+  // Solo aplica al carrito público (`!allowPast`): el admin nunca queda
+  // limitado (carga urgencias/retroactivo a mano), mismo criterio que el
+  // backend (`services/fechas.py`). `earliest` queda `undefined` hasta que el
+  // setting realmente resuelve (`leadTimeReady`) — el 0 con el que arranca la
+  // query mientras carga es indistinguible de "antelación apagada de verdad",
+  // y ya clampeó la hora a "ahora" con ese 0 falso antes de que llegara el
+  // valor real (la fecha se corregía después, pero la hora clampeada de más
+  // quedaba pisada — visto en prod). Mientras no está listo, ningún piso de
+  // antelación se aplica (nada se clampea de más).
+  const { horas: leadTimeHorasRaw, ready: leadTimeReady } = useAntelacionMinimaHorasQuery();
+  const leadTimeHoras = allowPast ? 0 : leadTimeHorasRaw;
+  const leadTimeKnown = allowPast || leadTimeReady;
+  const earliest = useMemo(
+    () => (leadTimeKnown ? earliestRetiro(now, leadTimeHoras) : undefined),
+    [now, leadTimeHoras, leadTimeKnown],
+  );
+  // Mismo helper que el disclaimer de urgencia del carrito (CartDrawer) — una
+  // sola forma de armar el link de WhatsApp, no una URL ad-hoc acá.
+  const businessPhone = useBusinessPhone();
+  const urgenciaWhatsappUrl = whatsappLink({
+    phone: businessPhone,
+    message: "¡Hola! Necesito reservar con menos anticipación de la mínima. ¿Me pueden ayudar?",
+  });
 
   // ── Días bloqueados (sin stock) ──────────────────────────────────────
   const ventanaDesde = ymd(today);
@@ -134,13 +166,50 @@ export function DateRangePickerModal({
   // en el carrito qué ítems no están disponibles para ese período.
   const blocked = devolucionCerrada;
 
-  // ── Clamp hora a franja cuando el día cambia ──────────────────────────
-  // Solo si respetamos horarios; en modo admin la hora es libre.
+  // ── Si el DÍA de retiro quedó entero antes del piso, mover la fecha ─────
+  // `minTimeForDate` no da piso cuando `startDate` es un día ANTERIOR al de
+  // `earliest` (ese día no tiene ninguna hora válida) — por diseño, para no
+  // pisar un día POSTERIOR (que no necesita piso). Pero un carrito con una
+  // fecha vieja persistida (de antes de que la antelación empujara el piso a
+  // otro día, o simplemente porque pasaron las horas) queda mostrando esa
+  // fecha/hora inválida sin corregirse: el clamp de hora de abajo no alcanza
+  // porque no hay NINGUNA hora válida ese día. Se mueve la fecha completa al
+  // primer día válido (preservando la cantidad de jornadas); el clamp de hora
+  // de abajo corre de nuevo en el siguiente render y ajusta la hora.
   useEffect(() => {
-    if (!respectHorarios) return;
-    if (franjaRetiro && startTime < franjaRetiro.desde) onStartTimeChange(franjaRetiro.desde);
-    else if (franjaRetiro && startTime > franjaRetiro.hasta) onStartTimeChange(franjaRetiro.hasta);
-  }, [respectHorarios, franjaRetiro, startTime, onStartTimeChange]);
+    if (allowPast || !startDate || !earliest) return;
+    const pisoDia = startOfDay(earliest);
+    if (startOfDay(startDate).getTime() >= pisoDia.getTime()) return;
+    onDatesChange(
+      pisoDia,
+      endDate ? deriveEndDate(pisoDia, jornadas, startTime, endTime) : undefined,
+    );
+  }, [allowPast, startDate, endDate, earliest, jornadas, startTime, endTime, onDatesChange]);
+
+  // ── Clamp de la hora de retiro: franja horaria + antelación mínima ──────
+  // Los dos pisos/techos se combinan en UN solo efecto que calcula el valor
+  // final de una — dos efectos independientes, cada uno empujando hacia su
+  // propio límite, pueden pisarse en loop infinito cuando el rango entre
+  // ambos queda vacío (piso de antelación > cierre de la franja): A sube,
+  // B baja, A vuelve a subir… nunca converge (visto en prod, #maximum-update-
+  // depth). Si el rango queda vacío, la antelación (piso duro — el backend
+  // igual la re-valida) se acota al cierre de la franja para no ofrecer un
+  // slot imposible ni loopear.
+  const pisoHoraRetiro = allowPast ? undefined : minTimeForDate(startDate, earliest);
+  const hiHoraRetiro = respectHorarios ? franjaRetiro?.hasta : undefined;
+  let loHoraRetiro = respectHorarios
+    ? laterTime(franjaRetiro?.desde, pisoHoraRetiro)
+    : pisoHoraRetiro;
+  if (loHoraRetiro && hiHoraRetiro && timeToMinutes(loHoraRetiro) > timeToMinutes(hiHoraRetiro)) {
+    loHoraRetiro = hiHoraRetiro;
+  }
+  useEffect(() => {
+    if (!startDate) return;
+    let next = startTime;
+    if (loHoraRetiro && next < loHoraRetiro) next = loHoraRetiro;
+    if (hiHoraRetiro && next > hiHoraRetiro) next = hiHoraRetiro;
+    if (next !== startTime) onStartTimeChange(next);
+  }, [startDate, loHoraRetiro, hiHoraRetiro, startTime, onStartTimeChange]);
   useEffect(() => {
     if (!respectHorarios) return;
     if (franjaDevolucion && endTime < franjaDevolucion.desde)
@@ -269,8 +338,8 @@ export function DateRangePickerModal({
                     <TimeStepSelect
                       value={startTime}
                       onChange={onStartTimeChange}
-                      min={franjaRetiro?.desde}
-                      max={franjaRetiro?.hasta}
+                      min={loHoraRetiro}
+                      max={hiHoraRetiro}
                       aria-label="Hora de retiro"
                       className="text-sm font-mono tabular-nums text-ink/80 hover:text-ink rounded-md px-2 py-1 bg-background border hairline"
                     />
@@ -415,6 +484,36 @@ export function DateRangePickerModal({
                 : "Tocá un día en el calendario para fijar el retiro. La devolución se calcula sola."}
             </p>
           )}
+
+          {/* Antelación mínima (#1126) — siempre visible si está configurada (el
+              piso real ya lo aplican el calendario y la hora); mismo tratamiento
+              visual que las demás advertencias no bloqueantes, para que no pase
+              desapercibido por qué faltan horas cercanas a "ahora". */}
+          {!allowPast && leadTimeHoras > 0 && (
+            <p className="flex items-center gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
+              <Clock className="h-3.5 w-3.5 shrink-0 text-amber" />
+              <span>
+                Reservás online con al menos <strong>{leadTimeHoras} h de anticipación</strong> —
+                por eso no ves horas más cercanas a ahora.{" "}
+                {urgenciaWhatsappUrl ? (
+                  <>
+                    ¿Urgencia?{" "}
+                    <a
+                      href={urgenciaWhatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold underline underline-offset-2 hover:text-amber"
+                    >
+                      Escribinos por WhatsApp
+                    </a>
+                    .
+                  </>
+                ) : (
+                  "¿Urgencia? Escribinos para coordinar."
+                )}
+              </span>
+            </p>
+          )}
         </div>
 
         {/* ── Calendario ────────────────────────────────────────────── */}
@@ -426,7 +525,8 @@ export function DateRangePickerModal({
             numberOfMonths={isMobile ? 1 : 2}
             locale={es}
             disabled={(date: Date) =>
-              (!allowPast && date < today) || (respectHorarios && !diaAbierto(horarios, date))
+              (!allowPast && date < (earliest ? startOfDay(earliest) : today)) ||
+              (respectHorarios && !diaAbierto(horarios, date))
             }
             modifiers={calModifiers}
             modifiersClassNames={calModifiersClassNames}

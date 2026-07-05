@@ -180,3 +180,47 @@ export function slotsEntre(desde: string, hasta: string): string[] {
   }
   return out;
 }
+
+// ── Piso de retiro: "ahora" + antelación mínima (#1126) ─────────────────────
+// El backend es la fuente de verdad (portero + backstop de creación en
+// `services/fechas.py`); estos helpers reproducen el mismo piso en el picker
+// para que no se puedan ELEGIR fechas/horas que el backend igual rechazaría.
+
+/**
+ * Instante más temprano de retiro permitido: `now` + `leadTimeHoras` (setting
+ * `antelacion_minima_horas`). `leadTimeHoras=0` → simplemente "ahora" (no se
+ * puede elegir un horario ya pasado). Redondea hacia el próximo slot de 30 min
+ * (los únicos que ofrece `TimeStepSelect`) para no mostrar una hora que ya
+ * venció apenas se calcula.
+ */
+export function earliestRetiro(now: Date, leadTimeHoras: number): Date {
+  const withLead = new Date(now.getTime() + Math.max(0, leadTimeHoras) * 3_600_000);
+  withLead.setSeconds(0, 0);
+  const resto = withLead.getMinutes() % 30;
+  if (resto !== 0) withLead.setMinutes(withLead.getMinutes() + (30 - resto));
+  return withLead;
+}
+
+/**
+ * Hora mínima seleccionable ("HH:MM") para `date`, dado el piso `earliest`
+ * (ver `earliestRetiro`). `undefined` si falta `date` o `earliest` (piso aún
+ * desconocido — no clampear en base a un dato incompleto), o si `date` es un
+ * día posterior al de `earliest` (ese día no tiene piso).
+ */
+export function minTimeForDate(
+  date: Date | undefined,
+  earliest: Date | undefined,
+): string | undefined {
+  if (!date || !earliest) return undefined;
+  if (startOfDay(date).getTime() !== startOfDay(earliest).getTime()) return undefined;
+  return `${String(earliest.getHours()).padStart(2, "0")}:${String(earliest.getMinutes()).padStart(2, "0")}`;
+}
+
+/** La más tardía de dos horas "HH:MM" — combina dos pisos independientes
+ *  (horarios habilitados + antelación mínima) sin que uno pise al otro.
+ *  `undefined` si ninguno de los dos aplica. */
+export function laterTime(a?: string, b?: string): string | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  return timeToMinutes(a) >= timeToMinutes(b) ? a : b;
+}

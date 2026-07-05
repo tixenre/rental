@@ -313,6 +313,66 @@ class TestAdmin:
         assert out["con_iva"] is False
         assert out["total_final"] == 70000
 
+    def test_admin_con_sesion_de_cliente_cotiza_para_el_pedido_no_para_si_mismo(
+        self, patch_db, monkeypatch
+    ):
+        """Regresión del "descuento fantasma" (#1231): un dueño que se logueó por el
+        PORTAL DE CLIENTE tiene sesión `role="cliente"` + su propio `cliente_id`, y
+        además es admin (por email). El builder del back-office debe cotizar para el
+        cliente DEL PEDIDO (`data.cliente_id`), NO para la ficha del propio admin.
+
+        Antes, la rama `role=="cliente"` ganaba y el preview leía el descuento de la
+        ficha del admin (acá 50%) para TODO pedido, mostrando un "Descuento para
+        <cliente del pedido>" que no existía en la base."""
+        monkeypatch.setattr(alq, "is_admin_email", lambda email: True)
+        patch_db(
+            FakeConn(
+                precios={7: 10000},
+                perfiles_por_id={
+                    42: ("consumidor_final", 50),  # la ficha del PROPIO admin (50% — el fantasma)
+                    99: ("consumidor_final", 0),   # el cliente REAL del pedido (sin descuento)
+                },
+            ),
+            # Sesión de cliente PERO con email admin — el caso que dispara el bug.
+            session={"role": "cliente", "cliente_id": 42, "email": "duenio@test.com"},
+        )
+        data = CotizarRequest(
+            items=[CotizarItem(equipo_id=7, cantidad=1)],
+            fecha_desde="2026-06-01T10:00:00",
+            fecha_hasta="2026-06-08T10:00:00",
+            cliente_id=99,  # el builder arma el pedido para el cliente 99
+        )
+        out = cotizar(data, FakeReq())
+
+        # Usó el cliente 99 (0%), NO la ficha del admin (50%). Sin descuento fantasma.
+        assert out["descuento_monto"] == 0
+        assert out["neto"] == 70000  # bruto = 10000 × 7 jornadas, sin descuento
+        assert out["descuento_origen"] == "ninguno"
+
+    def test_admin_sin_cliente_id_no_hereda_su_propio_descuento(self, patch_db, monkeypatch):
+        """Corolario: un admin (aunque su sesión sea de cliente con descuento) cotizando
+        SIN `cliente_id` (pedido nuevo, sin cliente elegido todavía) NO debe heredar su
+        propio descuento — target queda en None → sin descuento de cliente."""
+        monkeypatch.setattr(alq, "is_admin_email", lambda email: True)
+        patch_db(
+            FakeConn(
+                precios={7: 10000},
+                perfiles_por_id={42: ("consumidor_final", 50)},
+            ),
+            session={"role": "cliente", "cliente_id": 42, "email": "duenio@test.com"},
+        )
+        data = CotizarRequest(
+            items=[CotizarItem(equipo_id=7, cantidad=1)],
+            fecha_desde="2026-06-01T10:00:00",
+            fecha_hasta="2026-06-08T10:00:00",
+            # sin cliente_id
+        )
+        out = cotizar(data, FakeReq())
+
+        assert out["descuento_monto"] == 0
+        assert out["neto"] == 70000  # bruto = 10000 × 7 jornadas, sin descuento
+        assert out["descuento_origen"] == "ninguno"
+
 
 class TestPreciosDesdeBackend:
     """El precio lo pone el backend (de equipos), nunca el front."""
