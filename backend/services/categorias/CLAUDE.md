@@ -71,3 +71,11 @@ services/categorias/
 - **`categorias_sin_equipos` (audit.py) no tiene consumidor todavía.** Reservada
   para la feature de completitud de catálogo (skill `catalogo`) — no es código
   muerto, no la borres por falta de caller.
+- **`asignar_categorias()` diffea contra el estado actual antes de escribir**
+  (no DELETE+INSERT incondicional): el form de equipo la llama en cada save,
+  aunque no se haya tocado la sección de categorías, y un reemplazo ciego
+  generaba dead rows en `equipo_categorias` (+ un UPDATE de más en
+  `equipos.nombre_publico` vía `actualizar_nombres_de`) en cada guardado sin
+  cambios reales. Si el set y el orden no cambiaron, es un no-op total. No
+  reintroducir el DELETE-completo — `set_categoria_masivo` sí lo hace a
+  propósito (es un reemplazo masivo explícito, no un save incidental).

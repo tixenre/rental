@@ -156,7 +156,9 @@ def _init_db_schema(conn):
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_marcas_nombre ON marcas(nombre)")
+    # idx_marcas_nombre (índice plano sobre `nombre`) se retiró: `nombre` ya es
+    # UNIQUE arriba, Postgres ya crea su propio índice de soporte — era 100%
+    # redundante (ver migración q4r5s6t7u8v9_drop_redundant_plain_indexes).
 
     # Migration: agregar columnas visible y orden para admin settings
     conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS visible BOOLEAN NOT NULL DEFAULT TRUE")
@@ -198,7 +200,9 @@ def _init_db_schema(conn):
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS direccion_maps_url TEXT")
     # Migration: link clientes to Supabase Auth users (Phase 1 of unified backend)
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS supabase_uid UUID UNIQUE")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_clientes_supabase_uid ON clientes(supabase_uid)")
+    # idx_clientes_supabase_uid (índice plano) se retiró: `supabase_uid` ya es
+    # UNIQUE arriba, era 100% redundante (ver migración
+    # q4r5s6t7u8v9_drop_redundant_plain_indexes).
     # Cuentas livianas (alta passwordless con passkey): la cuenta NACE sin datos
     # (solo id + passkey); Didit completa identidad/contacto al primer pedido —y los
     # escribe en `*_renaper`, no en estos campos base— así que se relajan los NOT NULL.
@@ -738,10 +742,9 @@ def _init_db_schema(conn):
             UNIQUE (categoria_raiz_id, spec_key)
         )
     """)
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_spec_def_categoria "
-        "ON spec_definitions(categoria_raiz_id, spec_key)"
-    )
+    # idx_spec_def_categoria se retiró: mismas 2 columnas y mismo orden que el
+    # UNIQUE (categoria_raiz_id, spec_key) de arriba — era 100% redundante (ver
+    # migración q4r5s6t7u8v9_drop_redundant_plain_indexes).
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_spec_def_compat "
         "ON spec_definitions(spec_key) WHERE es_compatibilidad"
@@ -1386,11 +1389,14 @@ def _init_db_schema(conn):
             END IF;
         END $$;
     """)
-    # Fase C-4 (#1231): fuerza el override manual a ganar OUTRIGHT aunque su
-    # valor sea 0 — sin esto, `descuento_pct=0`/`descuento_manual_monto=0` es
-    # indistinguible de "sin override" y no hay forma de expresar "quiero 0%
-    # en ESTE pedido puntual" cuando cliente/jornadas ganarían por fallback
-    # (ver `descuentos/queries/decision.py::resolver_descuento_pedido`).
+    # ⏰ LEGACY: columna HUÉRFANA — el feature "forzar 0%" (Fase C-4, #1231, el
+    # toggle "Forzar este valor") se removió porque el override manual ya gana
+    # outright cuando está puesto y no hay descuentos fijos por cliente, así que
+    # forzar 0% nunca hacía falta. La columna se DEJA (nada la lee/escribe, queda
+    # en su default FALSE) en vez de droparla en el mismo release: las migraciones
+    # corren al startup y el contenedor viejo podría leer una columna ya borrada
+    # durante el solapamiento del deploy. Droppear en una migración futura, una vez
+    # que esta remoción esté 100% en prod.
     conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_manual_activo BOOLEAN NOT NULL DEFAULT FALSE")
 
     # email infra (migración a4e8c2b9d710)
@@ -2064,10 +2070,9 @@ def _init_db_schema(conn):
         "CREATE INDEX IF NOT EXISTS idx_ediciones_taller_taller "
         "ON ediciones_taller(taller_id)"
     )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_ediciones_taller_slug "
-        "ON ediciones_taller(slug)"
-    )
+    # idx_ediciones_taller_slug se retiró: `slug` ya es UNIQUE en el CREATE
+    # TABLE de arriba — era 100% redundante (ver migración
+    # q4r5s6t7u8v9_drop_redundant_plain_indexes).
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS clases_taller (
@@ -2316,6 +2321,94 @@ def _init_db_schema(conn):
     conn.execute("""
         ALTER TABLE emisores_arca
             ADD COLUMN IF NOT EXISTS inicio_actividades TEXT
+    """)
+
+    # ── Perfiles fiscales múltiples + productoras (#1240) ────────────────────
+    # Refina la regla "facturación siempre usa el dato de AFIP verificado" (2026-07-05):
+    # `clientes.cuit/perfil_impuestos/razon_social/domicilio_fiscal/email_facturacion`
+    # se mantienen intactas (siguen siendo "el perfil default" que leen ~10 call sites
+    # sin cambios) — estas 3 tablas son ADITIVAS, no reemplazan nada.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS cliente_perfiles_fiscales (
+            id                SERIAL PRIMARY KEY,
+            cliente_id        INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+            cuit              TEXT NOT NULL,
+            perfil_impuestos  TEXT NOT NULL,
+            razon_social      TEXT,
+            domicilio_fiscal  TEXT,
+            email_facturacion TEXT,
+            etiqueta          TEXT,
+            verificado_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+            es_default        BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_cliente_perfiles_fiscales_cliente_id
+        ON cliente_perfiles_fiscales(cliente_id)
+    """)
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_cliente_perfiles_fiscales_default
+        ON cliente_perfiles_fiscales(cliente_id) WHERE es_default
+    """)
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_cliente_perfiles_fiscales_cuit
+        ON cliente_perfiles_fiscales(cliente_id, cuit)
+    """)
+
+    # Productoras: entidad fiscal SIN login propio, administrada por el admin (crea +
+    # verifica CUIT contra ARCA + vincula/desvincula cuentas de cliente). Sin roles ni
+    # invitaciones — el admin es el único que gestiona la membresía.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS productoras (
+            id                SERIAL PRIMARY KEY,
+            cuit              TEXT NOT NULL UNIQUE,
+            perfil_impuestos  TEXT NOT NULL,
+            razon_social      TEXT,
+            domicilio_fiscal  TEXT,
+            email_facturacion TEXT,
+            notas             TEXT,
+            verificado_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+            created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS productora_miembros (
+            productora_id  INTEGER NOT NULL REFERENCES productoras(id) ON DELETE CASCADE,
+            cliente_id     INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+            created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+            PRIMARY KEY (productora_id, cliente_id)
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_productora_miembros_cliente_id
+        ON productora_miembros(cliente_id)
+    """)
+
+    # Pedido: a nombre de quién se factura (mutuamente excluyentes; NULL/NULL = default de
+    # la cuenta, comportamiento de siempre). Se resuelve EN VIVO (solo se congela el
+    # puntero, no razón social/domicilio) — coherente con "Datos del pedido: contacto en
+    # vivo, plata congelada" (2026-06-06).
+    conn.execute("""
+        ALTER TABLE alquileres
+            ADD COLUMN IF NOT EXISTS perfil_fiscal_id INTEGER REFERENCES cliente_perfiles_fiscales(id)
+    """)
+    conn.execute("""
+        ALTER TABLE alquileres
+            ADD COLUMN IF NOT EXISTS productora_id INTEGER REFERENCES productoras(id)
+    """)
+    conn.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint WHERE conname = 'chk_alquileres_facturacion_target'
+            ) THEN
+                ALTER TABLE alquileres ADD CONSTRAINT chk_alquileres_facturacion_target
+                    CHECK (perfil_fiscal_id IS NULL OR productora_id IS NULL);
+            END IF;
+        END $$;
     """)
 
     # ── Estudio: trabajos / producciones (galería "en acción") ───────────────

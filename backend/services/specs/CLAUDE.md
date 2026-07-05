@@ -44,6 +44,14 @@
 > checkbox en el form admin — 3 audiencias, 3 decisiones de UX legítimas, NO drift). Lo que
 > estaba mal no era la política, era el query duplicado — encontrado auditando por qué un
 > bool=false se trataba "distinto en cada lugar" tras cargar specs reales (Iniciativa A).
+> **2026-07-04:** consolidar el SQL en una función no alcanzaba — `proyectar_lista`
+> (`services/catalogo/proyeccion.py`) seguía llamando `attach_specs_estructuradas` Y
+> `attach_specs_destacados` por separado, cada una pidiendo `get_equipo_specs_rows` de
+> nuevo para el mismo lote de ids (2 ejecuciones del JOIN por carga de catálogo). Ambas
+> funciones ahora aceptan `rows_by_equipo` opcional; `proyectar_lista` lo pide una sola
+> vez y se lo pasa a las dos. Encontrado investigando un reporte de "la búsqueda de
+> equipos se siente lenta" (la causa real era la carga inicial del catálogo, no la
+> búsqueda en sí).
 >
 > **`CategoriaRegistry` ya no declara navegación** (Fase 6, desenredo categorías↔specs):
 > solo `nombre` (ancla a una categoría real por nombre) + `specs`. `sub_categorias`/

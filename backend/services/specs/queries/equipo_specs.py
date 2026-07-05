@@ -107,18 +107,16 @@ def specs_en_nombre_de_equipo(conn, equipo_id: int) -> list[dict]:
     return out
 
 
-def get_equipo_specs_rows(conn, equipo_ids: list[int]) -> dict[int, list[dict]]:
-    """{equipo_id: [{spec_def_id, spec_key, label, tipo, unidad, value,
-    prioridad, en_card, en_filtros, destacado}]} para el lote de equipo_ids.
-
-    Dedup por (equipo_id, spec_def_id) — un equipo puede estar en varias
-    categorías de la misma raíz, quedándose con la de mayor prioridad
-    (DISTINCT ON). `{}` si `equipo_ids` está vacío (no ejecuta el IN () inválido)."""
+def query_equipo_specs_rows(equipo_ids: list[int]) -> tuple[str, tuple] | None:
+    """SQL + params de `get_equipo_specs_rows` — separado de la ejecución para
+    que un caller que ya corre OTRAS queries independientes (ej. el pipeline
+    de `services.catalogo.proyeccion.proyectar_lista`, #1240) pueda incluir
+    esta en el mismo lote sin reimplementar el SQL. `None` si `equipo_ids`
+    está vacío (no ejecuta el `IN ()` inválido)."""
     if not equipo_ids:
-        return {}
+        return None
     placeholders = ",".join(["%s"] * len(equipo_ids))
-    rows = conn.execute(
-        f"""
+    sql = f"""
         SELECT DISTINCT ON (es.equipo_id, sd.id)
             es.equipo_id, sd.id AS spec_def_id, sd.spec_key, sd.label,
             sd.tipo, sd.unidad, es.value,
@@ -134,12 +132,30 @@ def get_equipo_specs_rows(conn, equipo_ids: list[int]) -> dict[int, list[dict]]:
            AND t.categoria_id = ec.categoria_id
         WHERE es.equipo_id IN ({placeholders})
         ORDER BY es.equipo_id, sd.id, COALESCE(sd.prioridad, 100)
-        """,
-        tuple(equipo_ids),
-    ).fetchall()
+    """
+    return sql, tuple(equipo_ids)
 
+
+def shape_equipo_specs_rows(rows, equipo_ids: list[int]) -> dict[int, list[dict]]:
+    """Da forma `{equipo_id: [{spec_def_id, spec_key, label, ...}]}` a filas
+    YA obtenidas de `query_equipo_specs_rows`."""
     out: dict[int, list[dict]] = {eid: [] for eid in equipo_ids}
     for r in rows:
         row = dict(r)
         out[row["equipo_id"]].append(row)
     return out
+
+
+def get_equipo_specs_rows(conn, equipo_ids: list[int]) -> dict[int, list[dict]]:
+    """{equipo_id: [{spec_def_id, spec_key, label, tipo, unidad, value,
+    prioridad, en_card, en_filtros, destacado}]} para el lote de equipo_ids.
+
+    Dedup por (equipo_id, spec_def_id) — un equipo puede estar en varias
+    categorías de la misma raíz, quedándose con la de mayor prioridad
+    (DISTINCT ON). `{}` si `equipo_ids` está vacío (no ejecuta el IN () inválido)."""
+    query = query_equipo_specs_rows(equipo_ids)
+    if query is None:
+        return {}
+    sql, params = query
+    rows = conn.execute(sql, params).fetchall()
+    return shape_equipo_specs_rows(rows, equipo_ids)

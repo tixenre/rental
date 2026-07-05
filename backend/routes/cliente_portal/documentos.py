@@ -45,9 +45,7 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
     # Datos del cliente para el contrato + Factura A si aplica.
     # Nombre y dirección: preferir datos RENAPER si la identidad fue verificada.
     cli = conn.execute(
-        """SELECT nombre, apellido, email, telefono, direccion, cuit,
-                  perfil_impuestos, razon_social, domicilio_fiscal,
-                  email_facturacion,
+        """SELECT nombre, apellido, email, telefono, direccion,
                   dni, nombre_renaper, apellido_renaper, direccion_renaper
            FROM clientes WHERE id = %s""",
         (cliente_id,),
@@ -59,12 +57,21 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
         pedido["cliente_email"] = c.get("email")
         pedido["cliente_telefono"] = c.get("telefono")
         pedido["cliente_direccion"] = direccion_validada(c) or c.get("direccion")
-        pedido["cliente_cuit"] = c.get("cuit")
         pedido["cliente_dni"] = c.get("dni")
-        pedido["cliente_perfil_impuestos"] = c.get("perfil_impuestos")
-        pedido["cliente_razon_social"] = c.get("razon_social")
-        pedido["cliente_domicilio_fiscal"] = c.get("domicilio_fiscal")
-        pedido["cliente_email_facturacion"] = c.get("email_facturacion")
+
+    # Datos fiscales: #1240 — productora elegida > perfil personal elegido >
+    # perfil default de la cuenta, misma fuente única que el resto del sistema.
+    from services.pedidos_enriquecimiento import _resolver_datos_fiscales_pedido
+
+    fiscal = _resolver_datos_fiscales_pedido(
+        conn, cliente_id, pedido.get("perfil_fiscal_id"), pedido.get("productora_id")
+    )
+    if fiscal:
+        pedido["cliente_cuit"] = fiscal.get("cuit")
+        pedido["cliente_perfil_impuestos"] = fiscal.get("perfil_impuestos")
+        pedido["cliente_razon_social"] = fiscal.get("razon_social")
+        pedido["cliente_domicilio_fiscal"] = fiscal.get("domicilio_fiscal")
+        pedido["cliente_email_facturacion"] = fiscal.get("email_facturacion")
 
     # Desglose canónico (bruto/descuento/neto/IVA) — misma fuente de verdad
     # que el admin: el PDF sólo pinta lo que devuelve `calcular_total`.

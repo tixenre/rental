@@ -50,7 +50,6 @@ import { Chequeos } from "@/design-system/composites/Chequeos";
 import { Spinner } from "@/design-system/ui/spinner";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
-import { Switch } from "@/design-system/ui/switch";
 import { MoneyInput } from "@/design-system/ui/money-input";
 import { Textarea } from "@/design-system/ui/textarea";
 import { Skeleton } from "@/design-system/ui/skeleton";
@@ -189,7 +188,6 @@ function PedidoEditorPage() {
     descuentoPct: draft.datos?.descuento_pct ?? null,
     descuentoTipo: draft.datos?.descuento_manual_tipo ?? null,
     descuentoMonto: draft.datos?.descuento_manual_monto ?? null,
-    descuentoManualActivo: draft.datos?.descuento_manual_activo ?? null,
     // Defensa en profundidad (sumado a `key={id}` en `PedidoEditorRoute`,
     // arriba): aunque este panel ya se remonta al cambiar de pedido, el hook
     // en sí queda protegido para cualquier otro consumidor que no lo haga.
@@ -742,9 +740,7 @@ function PedidoEditorPage() {
                 selector a "%" solo. Con 2+ controles adentro, un <label> no
                 es seguro; FieldLabel sigue bien para los campos de un solo input. */}
             <div className="block mt-3">
-              <span className="block t-eyebrow mb-1">
-                Descuento manual (0 = automático, salvo "Forzar" activado)
-              </span>
+              <span className="block t-eyebrow mb-1">Descuento manual (0 = automático)</span>
               <div className="flex items-center gap-2">
                 <SegmentedControl
                   value={datos.descuento_manual_tipo}
@@ -811,19 +807,6 @@ function PedidoEditorPage() {
                   </div>
                 )}
               </div>
-              {/* Fase C-4 (#1231): `0` es el sentinel de "sin override" — sin
-                  esto, no hay forma de forzar "quiero 0% en ESTE pedido
-                  puntual" cuando cliente/jornadas ganarían por fallback (ej.
-                  un `descuento_cliente_pct` congelado que ya no corresponde). */}
-              <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                <Switch
-                  checked={datos.descuento_manual_activo}
-                  onCheckedChange={(v) =>
-                    setDatos((d) => d && { ...d, descuento_manual_activo: v })
-                  }
-                />
-                Forzar este valor (permite 0% aunque cliente/jornadas tengan descuento)
-              </label>
             </div>
           </RailSection>
 
@@ -1063,6 +1046,17 @@ const ESTADOS_FACTURABLES: PedidoEstado[] = [
   "devuelto",
   "finalizado",
 ];
+
+// Proporción ancho/alto de cada layout (ver arca_fe/render.py: "simplificada" = 4:5 fijo,
+// "oficial"/"detallada" = A4). El preview del modal usa esto para dimensionar el panel de la
+// factura SIN el sobrante gris que el propio HTML deja alrededor cuando el viewport no matchea
+// la proporción exacta (el `.page`/`body` de arca_fe centra y escala manteniendo aspecto — si le
+// damos el mismo aspecto de entrada, el sobrante desaparece solo, no hay que "recortar" nada).
+const LAYOUT_ASPECT: Record<string, number> = {
+  simplificada: 1080 / 1350,
+  oficial: 210 / 297,
+  detallada: 210 / 297,
+};
 
 function FacturacionRailSection({
   pedidoId,
@@ -1318,10 +1312,11 @@ function FacturacionRailSection({
       )}
 
       <AlertDialog open={showPreview} onOpenChange={setShowPreview}>
-        <AlertDialogContent className="flex h-[94vh] w-[96vw] max-w-none flex-row overflow-hidden p-0">
+        <AlertDialogContent className="flex h-[94vh] w-fit max-w-[95vw] flex-row overflow-hidden p-0">
           {/* Columna izquierda: info + chequeos + acciones. Columna derecha: la factura a pantalla
-              completa de alto — el documento es lo que hay que mirar más de cerca, así que se le
-              da todo el espacio vertical posible en vez de compartirlo con un resumen en texto. */}
+              completa de alto, dimensionada a la proporción REAL del layout elegido (LAYOUT_ASPECT)
+              — así no queda el sobrante gris que el propio HTML de arca_fe deja alrededor cuando
+              el viewport no matchea el aspecto (ese HTML centra y escala manteniendo proporción). */}
           <div className="flex w-[360px] shrink-0 flex-col overflow-y-auto border-r hairline">
             <AlertDialogHeader className="px-5 py-4 text-left">
               <AlertDialogTitle>Confirmar factura</AlertDialogTitle>
@@ -1355,7 +1350,10 @@ function FacturacionRailSection({
             </AlertDialogFooter>
           </div>
 
-          <div className="relative flex-1 overflow-hidden bg-[#e5e5e5]">
+          <div
+            className="relative h-full shrink-0 overflow-hidden bg-[#e5e5e5]"
+            style={{ aspectRatio: LAYOUT_ASPECT[layout] ?? LAYOUT_ASPECT.simplificada }}
+          >
             {!facturaHtmlError && (!facturaBlobUrl || !facturaIframeReady) && (
               <div className="absolute inset-0 flex items-center justify-center gap-2 bg-[#e5e5e5] text-sm text-muted-foreground">
                 <Spinner size="sm" />

@@ -119,6 +119,33 @@ def test_initdb_mas_upgrade_llega_al_head(clean_db):
     )
 
 
+def test_upgrade_no_apaga_loggers_ya_creados(clean_db):
+    """Regresión: `migrations/env.py::fileConfig()` sin
+    `disable_existing_loggers=False` apagaba (`.disabled = True`) TODO logger
+    ya creado en el proceso al correr `alembic upgrade` — que corre en el
+    MISMO proceso que la app en cada arranque (`main.py::_run_alembic_migrations`,
+    background thread), después de que todos los módulos ya crearon su
+    `logger = logging.getLogger(__name__)`. Efecto real: el logging de casi
+    todo el backend se apagaba en silencio en cada deploy/restart. Reproducido
+    también en tests: rompía `caplog` en cualquier test que corriera después
+    de uno que llamara `init_db()`/alembic (`test_checkout_portero.py`)."""
+    import logging
+
+    from alembic import command
+    from database import init_db
+
+    centinela = logging.getLogger("test_centinela_pre_existente")
+    assert not centinela.disabled
+
+    init_db()
+    command.upgrade(_alembic_config(), "head")
+
+    assert not centinela.disabled, (
+        "alembic upgrade dejó `.disabled=True` en un logger que ya existía "
+        "antes de correr — volvió el bug de fileConfig(disable_existing_loggers)."
+    )
+
+
 def test_upgrade_con_datos_legacy_llega_al_head(clean_db):
     """Regresión #690: el camino de prod NO es solo init_db()+upgrade en vacío.
 

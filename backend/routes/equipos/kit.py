@@ -101,6 +101,9 @@ def add_kit_item(id: int, data: KitItem, request: Request):
                     "(el componente ya contiene a este equipo en su cadena).",
                 )
             try:
+                # El editor de kit llama este mismo POST por cada campo que se
+                # ajusta (cantidad, descuento, esencial) — el WHERE evita un
+                # UPDATE (y su dead row) cuando el valor ya es el mismo.
                 conn.execute("""
                     INSERT INTO kit_componentes (equipo_id, componente_id, cantidad, descuento_pct, esencial)
                     VALUES (%s,%s,%s,%s,%s)
@@ -108,6 +111,9 @@ def add_kit_item(id: int, data: KitItem, request: Request):
                         cantidad=excluded.cantidad,
                         descuento_pct=excluded.descuento_pct,
                         esencial=excluded.esencial
+                    WHERE kit_componentes.cantidad IS DISTINCT FROM excluded.cantidad
+                       OR kit_componentes.descuento_pct IS DISTINCT FROM excluded.descuento_pct
+                       OR kit_componentes.esencial IS DISTINCT FROM excluded.esencial
                 """, (id, data.componente_id, data.cantidad, data.descuento_pct, data.esencial))
                 conn.commit()
             except Exception as e:
@@ -140,9 +146,12 @@ def reorder_kit(id: int, data: KitReorder, request: Request):
     with get_db() as conn:
         try:
             for i, componente_id in enumerate(data.orden):
+                # Reordenar sin mover nada (abrir/cerrar el editor, soltar en
+                # el mismo lugar) no debería generar un UPDATE por fila.
                 conn.execute(
-                    "UPDATE kit_componentes SET orden=%s WHERE equipo_id=%s AND componente_id=%s",
-                    (i, id, componente_id)
+                    "UPDATE kit_componentes SET orden=%s "
+                    "WHERE equipo_id=%s AND componente_id=%s AND orden IS DISTINCT FROM %s",
+                    (i, id, componente_id, i)
                 )
             conn.commit()
             return {"ok": True}

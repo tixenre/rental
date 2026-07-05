@@ -212,7 +212,6 @@ def calcular_total(
     descuento_manual_pct: Optional[float] = 0.0,
     descuento_manual_tipo: Optional[str] = "pct",
     descuento_manual_monto: Optional[float] = 0,
-    descuento_manual_activo: bool = False,
 ) -> TotalDesglose:
     """Cálculo canónico del total de un pedido.
 
@@ -229,9 +228,6 @@ def calcular_total(
       descuento_manual_monto:      override explícito del pedido en $ (``alquileres.descuento_manual_monto``),
                                     usado cuando ``descuento_manual_tipo == "monto"``. Capeado al bruto
                                     DESCONTABLE (no al bruto total — ver nota de combos abajo).
-      descuento_manual_activo:     Fase C-4 (#1231): fuerza el override manual a ganar OUTRIGHT aunque
-                                    su valor sea 0 — única forma de expresar "quiero 0% en ESTE pedido
-                                    puntual" cuando cliente/jornadas ganarían por fallback.
 
     Jerarquía (Fase C-1, #1219): si el override manual está seteado (≠0 según
     su tipo) gana OUTRIGHT sobre cliente/jornadas — ver
@@ -254,7 +250,7 @@ def calcular_total(
     )
     resuelto = resolver_descuento_monto_pedido(
         bruto_descontable, descuento_manual_tipo, descuento_manual_pct, descuento_manual_monto,
-        descuento_cliente_pct, descuento_jornadas_pct, descuento_manual_activo,
+        descuento_cliente_pct, descuento_jornadas_pct,
     )
     descuento_monto = resuelto["monto"]
     pct = resuelto["pct"]

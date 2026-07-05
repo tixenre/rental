@@ -12,6 +12,7 @@ import { useAntelacionMinimaHoras } from "@/hooks/useSettings";
 import { useBusinessPhone } from "@/lib/business";
 import { whatsappLink } from "@/lib/whatsapp";
 import { CartDrawerView } from "./CartDrawerView";
+import type { FacturacionTarget } from "./CheckoutResumen";
 
 type CheckoutStep = "carrito" | "resumen" | "exito";
 
@@ -284,7 +285,7 @@ export function CartDrawer({
     setStep("resumen");
   }
 
-  async function handleCrearPedido(sessionConfirmed: boolean) {
+  async function handleCrearPedido(sessionConfirmed: boolean, target: FacturacionTarget) {
     const order = await createOrder({
       status: "solicitado",
       startDate,
@@ -294,6 +295,8 @@ export function CartDrawer({
       days: d,
       notes: notas.trim() || undefined,
       sessionConfirmed,
+      perfilFiscalId: target.perfilFiscalId,
+      productoraId: target.productoraId,
       resolvedItems: list.map(({ it, qty }) => ({
         id: it.id,
         name: it.name,

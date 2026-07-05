@@ -40,6 +40,9 @@ TABLAS_REASIGNADAS = frozenset({
     "solicitudes_modificacion", # atadas a los pedidos
     "cliente_listas",           # listas guardadas del usuario
     "aceptaciones_tyc",         # UNIQUE(cliente_id, version) → dedup por version (ON CONFLICT DO NOTHING)
+    "cliente_perfiles_fiscales",  # #1240 — dedup por cuit; es_default se resuelve aparte (no puede
+                                   # haber dos TRUE para el mismo cliente_id, índice único parcial)
+    "productora_miembros",         # #1240 — dedup por productora_id (PK compuesta)
 })
 # FKs que NO se mueven: mueren con el DELETE del source. Las sesiones llevan el id viejo
 # en la cookie firmada → re-login; los carritos son efímeros (FK SET NULL).
@@ -134,6 +137,32 @@ def merge_accounts(*, source: int, target: int, conn=None) -> None:
                      WHERE a.cliente_id=%s
                        AND NOT EXISTS (SELECT 1 FROM aceptaciones_tyc t
                                         WHERE t.cliente_id=%s AND t.version=a.version)""",
+                (target, source, target),
+            )
+            # #1240: perfiles fiscales — dedup por cuit; `es_default` se pone en FALSE en el
+            # move para nunca chocar con el índice único parcial (a lo sumo el target ya
+            # tenía uno propio, o se promueve el más reciente abajo si se quedó sin ninguno).
+            conn.execute(
+                """UPDATE cliente_perfiles_fiscales AS p SET cliente_id=%s, es_default=FALSE
+                     WHERE p.cliente_id=%s
+                       AND NOT EXISTS (SELECT 1 FROM cliente_perfiles_fiscales t
+                                        WHERE t.cliente_id=%s AND t.cuit=p.cuit)""",
+                (target, source, target),
+            )
+            conn.execute(
+                """UPDATE cliente_perfiles_fiscales SET es_default=TRUE
+                     WHERE id = (SELECT id FROM cliente_perfiles_fiscales
+                                  WHERE cliente_id=%s ORDER BY created_at DESC LIMIT 1)
+                       AND NOT EXISTS (SELECT 1 FROM cliente_perfiles_fiscales
+                                        WHERE cliente_id=%s AND es_default)""",
+                (target, target),
+            )
+            # #1240: vínculos a productoras — dedup por productora_id (PK compuesta).
+            conn.execute(
+                """UPDATE productora_miembros AS m SET cliente_id=%s
+                     WHERE m.cliente_id=%s
+                       AND NOT EXISTS (SELECT 1 FROM productora_miembros t
+                                        WHERE t.cliente_id=%s AND t.productora_id=m.productora_id)""",
                 (target, source, target),
             )
             # Reasignación simple (sin UNIQUE por-cuenta que pueda chocar).

@@ -181,6 +181,17 @@ export function apiGetMarcs() {
   return get<{ items: BackendMarca[] }>("/api/marcas");
 }
 
+/** Avisos del date picker (antelación mínima, horarios reducidos de fin de
+ * semana) contextuales a la fecha elegida — la regla y el texto los decide
+ * el backend (`services.fechas.disclaimers_retiro`, #1237); acá solo se pide
+ * y se muestra `mensaje`, sin reimplementar la lógica en TS. */
+export function apiGetDisclaimersRetiro(fechaDesde?: string, fechaHasta?: string) {
+  return get<{ disclaimers: { check: string; mensaje: string }[] }>(
+    "/api/public/rental/disclaimers",
+    { fecha_desde: fechaDesde ?? "", fecha_hasta: fechaHasta ?? "" },
+  );
+}
+
 /* ─── Estudio ────────────────────────────────────────────────────────── */
 
 export type EstudioFoto = {

@@ -51,10 +51,6 @@ class CotizarRequest(BaseModel):
     # para que el preview coincida con lo que se va a persistir.
     descuento_manual_tipo: Optional[str] = None
     descuento_manual_monto: Optional[float] = None
-    # Fase C-4 (#1231): fuerza el override manual a ganar aunque valga 0 — el
-    # builder lo edita en vivo para que el preview coincida con lo que
-    # persiste `_apply_pedido_datos`/`_recalcular_total_pedido` al guardar.
-    descuento_manual_activo: Optional[bool] = None
     # Solo lo honra una sesión admin: respeta el `precio_jornada` que manda cada
     # ítem de catálogo (el snapshot congelado del pedido que se está editando)
     # en vez de re-buscarlo en `equipos`. Sin esto, el editor de pedidos admin
@@ -63,6 +59,12 @@ class CotizarRequest(BaseModel):
     # precio de línea) → dos totales del mismo pedido que podían no coincidir.
     # Ver MEMORIA 2026-06-06 "Datos del pedido: plata congelada".
     respetar_precio_item: Optional[bool] = False
+    # #1240: a nombre de quién se está cotizando (perfil personal alternativo o
+    # productora) — solo lo honra una sesión cliente (mismo criterio que el resto
+    # de este bloque: el admin cotiza para el cliente del pedido, no para sí
+    # mismo). Mutuamente excluyentes; NULL/NULL = perfil default de la cuenta.
+    perfil_fiscal_id: Optional[int] = None
+    productora_id: Optional[int] = None
 
     # Mismo validador que `PedidoDatos.descuento_pct` (routes/alquileres/core.py)
     # — este override vivía sin cota de rango (hallazgo de la Fase A del split
@@ -194,7 +196,6 @@ def cotizar(data: CotizarRequest, request: Request):
         descuento_manual_pct = 0.0
         descuento_manual_tipo = "pct"
         descuento_manual_monto = 0.0
-        descuento_manual_activo = False
         if tiene_fechas:
             # ¿Para qué cliente se cotiza?
             #   - Admin (back-office): SIEMPRE el cliente del pedido (`data.cliente_id`),
@@ -210,10 +211,12 @@ def cotizar(data: CotizarRequest, request: Request):
             #   - Cliente puro (portal): su propia ficha.
             #   - Anónimo (sin sesión): sin descuento de cliente.
             target_cliente_id = None
+            es_sesion_cliente = False
             if es_admin:
                 target_cliente_id = data.cliente_id
             elif session and session.get("role") == "cliente" and session.get("cliente_id"):
                 target_cliente_id = session["cliente_id"]
+                es_sesion_cliente = True
             if target_cliente_id:
                 c = conn.execute(
                     "SELECT perfil_impuestos, descuento FROM clientes WHERE id=%s",
@@ -222,6 +225,31 @@ def cotizar(data: CotizarRequest, request: Request):
                 if c:
                     perfil = c["perfil_impuestos"]
                     descuento_cliente_pct = c["descuento"] or 0.0
+                # #1240: solo la sesión cliente puede elegir facturar a nombre de
+                # un perfil personal alternativo o una productora (el admin no
+                # manda estos campos para el pedido de otro cliente).
+                # `_resolver_datos_fiscales_pedido` scopea `perfil_fiscal_id` por
+                # `cliente_id` sola, pero NO valida membership de `productora_id`
+                # (asume que el caller ya lo hizo, como sí hace la creación real
+                # del pedido) — acá se valida explícitamente antes de usarlo, para
+                # no dejar que cualquier sesión cliente cotice con el perfil
+                # fiscal de una productora ajena solo adivinando su id.
+                productora_id_valida = None
+                if es_sesion_cliente and data.productora_id:
+                    vinculado = conn.execute(
+                        "SELECT 1 FROM productora_miembros WHERE productora_id = %s AND cliente_id = %s",
+                        (data.productora_id, target_cliente_id),
+                    ).fetchone()
+                    if vinculado:
+                        productora_id_valida = data.productora_id
+                if es_sesion_cliente and (data.perfil_fiscal_id or productora_id_valida):
+                    from services.pedidos_enriquecimiento import _resolver_datos_fiscales_pedido
+
+                    fiscal = _resolver_datos_fiscales_pedido(
+                        conn, target_cliente_id, data.perfil_fiscal_id, productora_id_valida
+                    )
+                    if fiscal.get("perfil_impuestos"):
+                        perfil = fiscal["perfil_impuestos"]
             # Override MANUAL del admin (lo edita en vivo en el builder del
             # pedido) — jerarquía (Fase C-1, #1219): gana OUTRIGHT sobre
             # cliente/jornadas, ya NO reemplaza el descuento del cliente para
@@ -233,8 +261,6 @@ def cotizar(data: CotizarRequest, request: Request):
                 descuento_manual_tipo = data.descuento_manual_tipo
             if es_admin and data.descuento_manual_monto:
                 descuento_manual_monto = data.descuento_manual_monto
-            if es_admin:
-                descuento_manual_activo = bool(data.descuento_manual_activo)
             descuento_jornadas_pct = obtener_descuento_jornadas(conn, jornadas)
 
         desglose = calcular_total(
@@ -245,7 +271,6 @@ def cotizar(data: CotizarRequest, request: Request):
             descuento_manual_pct=descuento_manual_pct,
             descuento_manual_tipo=descuento_manual_tipo,
             descuento_manual_monto=descuento_manual_monto,
-            descuento_manual_activo=descuento_manual_activo,
             perfil_impuestos=perfil,
         )
 
@@ -253,7 +278,7 @@ def cotizar(data: CotizarRequest, request: Request):
         # decidió el pct en `calcular_total`, así nunca puede divergir.
         descuento_origen = resolver_origen_pedido_monto(
             descuento_manual_tipo, descuento_manual_pct, descuento_manual_monto,
-            descuento_cliente_pct, descuento_jornadas_pct, descuento_manual_activo,
+            descuento_cliente_pct, descuento_jornadas_pct,
         )
 
         # Desglose POR LÍNEA para que el front MUESTRE (no calcule) el detalle por

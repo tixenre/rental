@@ -5,6 +5,7 @@ middleware.py — Protección de rutas con cookie de sesión.
 from fastapi import Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from auth.session import get_session, dev_bypass_enabled
+from routes.settings import PUBLIC_SETTINGS_KEYS
 
 PUBLIC_EXACT = {"/", "/login", "/admin/login", "/cliente", "/health", "/health/migrations", "/health/frontend", "/csp-report"}
 
@@ -94,6 +95,22 @@ async def auth_middleware(request: Request, call_next):
     if request.method in ("GET", "HEAD") and any(path.startswith(p) for p in PUBLIC_API_READONLY):
         return await call_next(request)
     if any(path.startswith(p) for p in PUBLIC_API_ANY):
+        return await call_next(request)
+    # `/api/settings/{key}` y `/api/settings` (lectura): pese al docstring de
+    # `get_setting`/`list_settings` ("lectura pública"), esta ruta NO estaba
+    # eximida acá — un visitante anónimo (Logo, FAQ, hero del catálogo, el
+    # date picker, el Footer) recibía 401 en silencio. Solo se exime GET/HEAD,
+    # y solo para las keys de `PUBLIC_SETTINGS_KEYS` (el resto — comisiones,
+    # recordatorios, email_* — sigue atrás del guard); `list_settings` filtra
+    # a ese mismo subset cuando no hay sesión, así que `/api/settings` (sin
+    # key) también se puede eximir sin dumpear settings internas.
+    if request.method in ("GET", "HEAD") and (
+        path == "/api/settings"
+        or (
+            path.startswith("/api/settings/")
+            and path[len("/api/settings/") :] in PUBLIC_SETTINGS_KEYS
+        )
+    ):
         return await call_next(request)
     # Assets estáticos de dist root (no-/api/ con extensión de archivo).
     if not path.startswith("/api/") and path.endswith(STATIC_EXTENSIONS):

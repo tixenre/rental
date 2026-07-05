@@ -17,6 +17,8 @@ from services.fechas import (
     dentro_de_ventana_horas,
     mes_actual_ar,
     validar_horarios_habilitados,
+    dia_fin_de_semana_reducido,
+    disclaimers_retiro,
 )
 
 
@@ -228,3 +230,161 @@ def test_horarios_dia_no_habilitado():
     # 2026-06-30 es martes.
     msg = validar_horarios_habilitados(conn, "2026-06-30T10:00", None)
     assert msg and "no habilitado" in msg
+
+
+# ── dia_fin_de_semana_reducido ───────────────────────────────────────────────────
+
+_HORARIOS_REDUCIDOS = {
+    "lun": {"desde": "09:00", "hasta": "19:00"},
+    "mar": {"desde": "09:00", "hasta": "19:00"},
+    "mie": {"desde": "09:00", "hasta": "19:00"},
+    "jue": {"desde": "09:00", "hasta": "19:00"},
+    "vie": {"desde": "09:00", "hasta": "19:00"},
+    "sab": {"desde": "10:00", "hasta": "14:00"},
+    "dom": None,
+}
+_HORARIOS_PAREJOS = {d: {"desde": "09:00", "hasta": "19:00"} for d in
+                      ["lun", "mar", "mie", "jue", "vie", "sab", "dom"]}
+
+
+def test_finde_reducido_sabado():
+    # 2026-07-04 es sábado.
+    assert dia_fin_de_semana_reducido(_HORARIOS_REDUCIDOS, datetime.date(2026, 7, 4)) is True
+
+
+def test_finde_reducido_domingo_cerrado():
+    # 2026-07-05 es domingo (null = cerrado → 0 min, siempre < lunes).
+    assert dia_fin_de_semana_reducido(_HORARIOS_REDUCIDOS, datetime.date(2026, 7, 5)) is True
+
+
+def test_finde_no_reducido_dia_de_semana():
+    # Un martes nunca cuenta como "finde", aunque tuviera menos horas.
+    assert dia_fin_de_semana_reducido(_HORARIOS_REDUCIDOS, datetime.date(2026, 6, 30)) is False
+
+
+def test_finde_no_reducido_si_horarios_parejos():
+    assert dia_fin_de_semana_reducido(_HORARIOS_PAREJOS, datetime.date(2026, 7, 4)) is False
+
+
+def test_finde_no_reducido_sin_config():
+    assert dia_fin_de_semana_reducido(None, datetime.date(2026, 7, 4)) is False
+
+
+def test_finde_no_reducido_sin_referencia_lunes():
+    # Sin franja de lunes no hay base de comparación — no se afirma nada.
+    sin_lunes = {"sab": {"desde": "10:00", "hasta": "12:00"}}
+    assert dia_fin_de_semana_reducido(sin_lunes, datetime.date(2026, 7, 4)) is False
+
+
+# ── disclaimers_retiro ────────────────────────────────────────────────────────
+
+
+class _FakeConnByKey:
+    """Distingue por la key real del WHERE (`params[0]`), no por substring de
+    SQL — necesario cuando un test mockea DOS settings a la vez
+    (`antelacion_minima_horas` Y `horarios_retiro`), cosa que `_FakeConn`
+    (que matchea por 'app_settings' en el texto del SQL, igual para ambos)
+    no puede distinguir."""
+
+    def __init__(self, values: dict):
+        self._values = values
+
+    def execute(self, sql, params=None):
+        key = params[0] if params else None
+        value = self._values.get(key)
+        return _FakeCursor({"value": value} if value is not None else None)
+
+
+def test_disclaimers_vacio_sin_settings():
+    conn = _FakeConnByKey({})
+    assert disclaimers_retiro(conn, None, None) == []
+
+
+def test_disclaimers_antelacion_sin_fecha_elegida():
+    # Todavía relevante: el calendario ya tiene días/horas deshabilitados.
+    conn = _FakeConnByKey({"antelacion_minima_horas": "12"})
+    avisos = disclaimers_retiro(conn, None, None)
+    assert [a["check"] for a in avisos] == ["antelacion"]
+    assert "12 h" in avisos[0]["mensaje"]
+
+
+def test_disclaimers_antelacion_avisa_aunque_la_fecha_elegida_este_lejos():
+    # Regla PERMANENTE del catálogo (no de la fecha puntual elegida) — sigue
+    # avisando aunque el retiro elegido esté a 30 días, para no desaparecer
+    # justo cuando coincide con otro aviso contextual (ej. horarios_finde).
+    conn = _FakeConnByKey({"antelacion_minima_horas": "12"})
+    lejos = (now_ar() + datetime.timedelta(days=30)).strftime("%Y-%m-%dT%H:%M")
+    avisos = disclaimers_retiro(conn, lejos, None)
+    assert [a["check"] for a in avisos] == ["antelacion"]
+
+
+def test_disclaimers_antelacion_avisa_con_fecha_cercana():
+    conn = _FakeConnByKey({"antelacion_minima_horas": "12"})
+    pronto = (now_ar() + datetime.timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M")
+    avisos = disclaimers_retiro(conn, pronto, None)
+    assert [a["check"] for a in avisos] == ["antelacion"]
+
+
+def test_disclaimers_finde_reducido_por_fecha_elegida():
+    conn = _FakeConnByKey({"horarios_retiro": json.dumps(_HORARIOS_REDUCIDOS)})
+    avisos = disclaimers_retiro(conn, "2026-07-04T10:00", "2026-07-05T10:00")  # sáb→dom
+    assert [a["check"] for a in avisos] == ["horarios_finde"]
+
+
+def test_disclaimers_finde_no_avisa_si_fecha_elegida_es_dia_de_semana():
+    conn = _FakeConnByKey({"horarios_retiro": json.dumps(_HORARIOS_REDUCIDOS)})
+    avisos = disclaimers_retiro(conn, "2026-06-30T10:00", "2026-07-01T10:00")  # mar→mié
+    assert avisos == []
+
+
+def test_disclaimers_finde_no_avisa_si_horarios_parejos():
+    conn = _FakeConnByKey({"horarios_retiro": json.dumps(_HORARIOS_PAREJOS)})
+    avisos = disclaimers_retiro(conn, "2026-07-04T10:00", None)  # sábado
+    assert avisos == []
+
+
+def test_disclaimers_ambos_a_la_vez():
+    # Antelación bien holgada (240h = 10 días) para que el "próximo sábado o
+    # domingo" (a lo sumo 6 días) siempre caiga dentro de la ventana, sin
+    # depender de qué día es "hoy" al correr el test.
+    conn = _FakeConnByKey({
+        "antelacion_minima_horas": "240",
+        "horarios_retiro": json.dumps(_HORARIOS_REDUCIDOS),
+    })
+    hoy = now_ar().date()
+    proximo_finde = next(
+        hoy + datetime.timedelta(days=i) for i in range(1, 8) if (hoy + datetime.timedelta(days=i)).weekday() >= 5
+    )
+    fecha = f"{proximo_finde.isoformat()}T10:00"
+    avisos = disclaimers_retiro(conn, fecha, None)
+    assert {a["check"] for a in avisos} == {"antelacion", "horarios_finde"}
+
+
+# ── Texto editable de los disclaimers (app_settings) ────────────────────────
+
+
+def test_disclaimers_antelacion_usa_texto_custom_con_placeholder():
+    conn = _FakeConnByKey({
+        "antelacion_minima_horas": "12",
+        "disclaimer_antelacion_texto": "Ojo: pedimos {horas}hs mínimo de antelación.",
+    })
+    avisos = disclaimers_retiro(conn, None, None)
+    assert avisos[0]["mensaje"] == "Ojo: pedimos 12hs mínimo de antelación."
+
+
+def test_disclaimers_antelacion_texto_vacio_cae_al_default():
+    conn = _FakeConnByKey({
+        "antelacion_minima_horas": "12",
+        "disclaimer_antelacion_texto": "   ",
+    })
+    avisos = disclaimers_retiro(conn, None, None)
+    assert "12 h" in avisos[0]["mensaje"]
+
+
+def test_disclaimers_horarios_finde_usa_texto_custom():
+    conn = _FakeConnByKey({
+        "horarios_retiro": json.dumps(_HORARIOS_REDUCIDOS),
+        "disclaimer_horarios_finde_texto": "Finde: horario acotado.",
+    })
+    avisos = disclaimers_retiro(conn, "2026-07-04T10:00", None)  # sábado
+    assert avisos == [{"check": "horarios_finde", "mensaje": "Finde: horario acotado."}]

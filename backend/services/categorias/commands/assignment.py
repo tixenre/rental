@@ -36,11 +36,35 @@ def _expandir_y_ordenar(conn, ids: list[int]) -> list[int]:
 
 def asignar_categorias(conn, equipo_id: int, categoria_ids: list[int]) -> None:
     """Reemplaza todas las categorías de un equipo. Expande ancestros.
-    Side effect: regenera el nombre público (best-effort)."""
+    Solo escribe lo que cambió (diff contra el estado actual): el form de
+    equipo llama esto en cada save aunque no se haya tocado la sección de
+    categorías, y un DELETE+INSERT incondicional generaba dead rows en cada
+    guardado sin cambios reales.
+    Side effect: regenera el nombre público (best-effort), solo si algo cambió."""
     ordered = _expandir_y_ordenar(conn, categoria_ids)
 
-    conn.execute("DELETE FROM equipo_categorias WHERE equipo_id = %s", (equipo_id,))
-    for orden, cid_int in enumerate(ordered):
+    actuales = conn.execute(
+        "SELECT categoria_id, orden FROM equipo_categorias WHERE equipo_id = %s",
+        (equipo_id,),
+    ).fetchall()
+    orden_actual = {row["categoria_id"]: row["orden"] for row in actuales}
+    nuevo_set = {cid: orden for orden, cid in enumerate(ordered)}
+
+    a_borrar = [cid for cid in orden_actual if cid not in nuevo_set]
+    a_escribir = [
+        (cid, orden) for cid, orden in nuevo_set.items() if orden_actual.get(cid) != orden
+    ]
+
+    if not a_borrar and not a_escribir:
+        return
+
+    if a_borrar:
+        placeholders = ",".join(["%s"] * len(a_borrar))
+        conn.execute(
+            f"DELETE FROM equipo_categorias WHERE equipo_id = %s AND categoria_id IN ({placeholders})",
+            (equipo_id, *a_borrar),
+        )
+    for cid_int, orden in a_escribir:
         conn.execute(
             "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) "
             "VALUES (%s, %s, %s) "

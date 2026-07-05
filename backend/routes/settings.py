@@ -154,11 +154,16 @@ ALLOWED_SETTINGS_KEYS = {
     "apple_touch_icon_url",   # Ícono iOS derivado del isologo.
     "icon_512_url",           # Ícono cuadrado 512 derivado del isologo (no es el og:image).
     "whatsapp_phone",    # Teléfono del negocio para click-to-chat (formato +5492235852510).
-    "email_from",        # From address de mails ('Rambla <pedidos@rambla.com.uy>'). Pisado por env EMAIL_FROM.
+    "email_from",        # From address de mails ('Rambla <hola@rambla.house>'). Pisado por env EMAIL_FROM.
     "email_admin_to",    # Destinatario de notif al admin cuando entra un pedido. Pisado por env EMAIL_ADMIN_TO.
     "buffer_horas_alquiler",  # Horas de prep/revisión exigidas entre alquileres. Int >= 0.
     "antelacion_minima_horas",  # Lead-time: horas mín. de antelación para reservar online (#1126). Int >= 0. 0 = apagado.
     "horarios_retiro",   # Horas habilitadas de retiro/devolución por día de semana. JSON.
+    # ── Texto de los disclaimers del picker público (services/fechas.py::disclaimers_retiro) ──
+    # Editable para que el dueño ajuste la redacción sin pedir un cambio de código.
+    # Vacío → cae al default hardcodeado (ver DEFAULT_* en services/fechas.py).
+    "disclaimer_antelacion_texto",       # Admite el placeholder literal "{horas}".
+    "disclaimer_horarios_finde_texto",
     "faq_json",          # Preguntas frecuentes editables. JSON [{title, items:[{q,a}]}].
     "hero_taglines",     # Taglines del hero del catálogo. JSON [[línea1, línea2], ...].
     # ── Datos del negocio (editables desde "Diseño y marca") ─────────
@@ -185,6 +190,33 @@ ALLOWED_SETTINGS_KEYS = {
     "recordatorios_dias_antes",   # Días de anticipación. Int 1-14.
 }
 
+# Subset de ALLOWED_SETTINGS_KEYS que el catálogo ANÓNIMO (sin sesión) puede
+# leer — cada una tiene un consumidor real fuera de /admin (grep confirmado):
+# Logo (wordmark_svg), hero del catálogo (hero_taglines), FAQ (faq_json), meta
+# OG (og_image_url), favicons (favicon_url/apple_touch_icon_url), Footer +
+# CheckoutResumen (business_*), WhatsApp CTA (whatsapp_phone), el date picker
+# (antelacion_minima_horas/horarios_retiro). El resto de ALLOWED_SETTINGS_KEYS
+# (comisiones_modelo, recordatorios_*, email_*, roi/usd/shipping — solo admin)
+# se queda atrás del guard de sesión: `middleware.py` usa este set para
+# eximir SOLO estas keys del chequeo de auth en `/api/settings/{key}` y en la
+# lista `/api/settings` (filtrada acá abajo para el caso sin sesión).
+PUBLIC_SETTINGS_KEYS = {
+    "wordmark_svg",
+    "og_image_url",
+    "favicon_url",
+    "apple_touch_icon_url",
+    "hero_taglines",
+    "faq_json",
+    "whatsapp_phone",
+    "antelacion_minima_horas",
+    "horarios_retiro",
+    "business_address",
+    "business_maps_url",
+    "business_phone_display",
+    "business_email",
+    "business_instagram",
+}
+
 # Keys cuyo valor puede borrarse (volver al default) desde la UI. El resto
 # rechaza string vacía para no romper cálculos / settings críticas.
 CLEARABLE_SETTINGS_KEYS = {
@@ -194,6 +226,8 @@ CLEARABLE_SETTINGS_KEYS = {
     "business_email",
     "business_instagram",
     "ga4_measurement_id",  # Vaciarlo apaga Google Analytics.
+    "disclaimer_antelacion_texto",       # Vaciarlo vuelve al texto default.
+    "disclaimer_horarios_finde_texto",
 }
 
 # Formato de un Measurement ID de GA4: 'G-' seguido de alfanuméricos.
@@ -243,12 +277,21 @@ def get_setting(key: str):
 
 
 @router.get("/settings")
-def list_settings():
-    """Lista todas las settings públicas. Útil para el panel admin."""
+def list_settings(request: Request):
+    """Lista settings. Con sesión (panel admin): todas las de
+    `ALLOWED_SETTINGS_KEYS`. Sin sesión (catálogo anónimo, ej.
+    `useBusinessContact`): solo `PUBLIC_SETTINGS_KEYS` — la ruta la deja
+    pasar sin auth (`middleware.py`), así que acá se filtra explícitamente
+    para no dumpear settings internas (comisiones, recordatorios, etc.) a
+    cualquiera."""
+    from auth.session import get_session
+
+    tiene_sesion = get_session(request) is not None
     with get_db() as conn:
         rows = conn.execute(
             "SELECT key, value, updated_at, updated_by FROM app_settings ORDER BY key"
         ).fetchall()
+        permitidas = ALLOWED_SETTINGS_KEYS if tiene_sesion else PUBLIC_SETTINGS_KEYS
         return {
             "items": [
                 {
@@ -258,7 +301,7 @@ def list_settings():
                     "updated_by": r["updated_by"],
                 }
                 for r in rows
-                if r["key"] in ALLOWED_SETTINGS_KEYS
+                if r["key"] in permitidas
             ]
         }
 
@@ -332,6 +375,8 @@ def update_setting(key: str, payload: dict, request: Request):
                 "Measurement ID inválido. Tiene que ser como 'G-XXXXXXXXXX' "
                 "(lo sacás de Google Analytics → Admin → Flujos de datos → Web).",
             )
+    if key in ("disclaimer_antelacion_texto", "disclaimer_horarios_finde_texto") and len(value) > 300:
+        raise HTTPException(400, "Texto demasiado largo (máx. 300 caracteres)")
     if key == "horarios_retiro":
         value = _validar_horarios(value)
     if key == "faq_json":

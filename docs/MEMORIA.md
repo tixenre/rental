@@ -961,6 +961,62 @@ vez de todas las columnas que `desglose_de_pedido`/`calcular_total` necesitan. R
 `test_reconciliacion_no_marca_falso_positivo_con_descuento_de_cliente` (Postgres real; confirmado que
 falla contra el código viejo).
 
+### 2026-07-05 — Regla: facturación siempre usa el dato de AFIP verificado para el CUIT usado, nunca lo guardado en la cuenta
+
+Regla explícita del dueño: si un comprobante se factura con un CUIT, **el nombre/razón social/domicilio
+que van en la factura son los que ARCA devuelve PARA ESE CUIT** — no lo que esté guardado en la cuenta
+del cliente, aunque coincida la mayoría de las veces. Lo que manda para ARCA es el CUIL/CUIT, no la
+identidad interna de la cuenta. `emitir_factura` ya lo hacía bien (`persona.razon_social or
+pedido.get(...)` — AFIP gana si respondió algo); el preview (`previsualizar_factura`) tenía el orden
+invertido (lo guardado ganaba, AFIP solo si faltaba) — bug real: mostraba el nombre viejo de la cuenta
+pese a que ARCA ya había confirmado uno distinto para el CUIT puntual de esa factura. Corregido para que
+preview y emisión usen el mismo criterio: **el dato fresco de AFIP tiene prioridad, no es un
+fallback-si-falta**. El supervisor marca cualquier construcción de datos del receptor de una factura
+(nombre/domicilio) que use el dato guardado en la cuenta como preferente sobre el resuelto vía
+`resolver_persona`/`verificar_y_actualizar_receptor` para el CUIT que se está facturando.
+
+### 2026-07-05 — Perfiles fiscales múltiples por cliente + productoras (entidad fiscal compartida, #1240)
+
+El modal `FacturacionModal` (checkout) reusaba el mismo fallback de entrada manual sin verificar
+que tenía `cliente_update_me` — un cliente podía guardar razón social/domicilio a mano, sin pasar
+nunca por AFIP (el backstop de emisión los pisaba igual, pero generaba confusión: "guardé mis
+datos" vs. lo que sale en la factura). Al resolverlo aparecieron dos problemas de fondo:
+(1) un cliente puede necesitar facturar con más de un CUIT propio (personal/freelance);
+(2) un cliente puede comprar EN NOMBRE de una productora (CUIT propio, compartido entre varias
+cuentas — una persona puede pertenecer a varias productoras y viceversa). Los tres se resuelven en
+una sola iniciativa.
+
+**Perfiles fiscales personales** (`cliente_perfiles_fiscales`, self-service): el cliente solo tipea
+el CUIT — razón social/domicilio/condición IVA salen SIEMPRE de una verificación real y
+**bloqueante** contra ARCA (`verificar_y_crear_perfil_fiscal`, 422 si AFIP no confirma; sin fallback
+manual). Puede guardar varios, marcar uno default. `clientes.cuit/perfil_impuestos/...` se mantiene
+intacta como "el perfil default" — los ~10 call sites que ya la leían no cambiaron.
+
+**Productoras** (`productoras`/`productora_miembros`, entidad SIN login propio): el **admin** es el
+único que crea (verifica el CUIT igual que un perfil personal), vincula y desvincula cuentas de
+cliente — sin roles ni invitaciones, minimiza la complejidad del caso "compartido entre cuentas".
+Página admin `/admin/productoras`.
+
+**Resolución en un pedido**: 3 niveles de prioridad — productora elegida > perfil personal elegido >
+default de la cuenta (`services/pedidos_enriquecimiento._resolver_datos_fiscales_pedido`, el único
+punto de palanca real). `alquileres.perfil_fiscal_id`/`productora_id` (mutuamente excluyentes,
+`CHECK`) se resuelven **en vivo** (no se congela razón social/domicilio, solo el puntero — coherente
+con "Datos del pedido: contacto en vivo, plata congelada", 2026-06-06). El cliente elige en el
+checkout (`CheckoutResumen`, selector "Facturar a nombre de", solo aparece si hay más de una
+opción); el admin ve (solo lectura) los perfiles/productoras de un cliente en su ficha.
+
+**Identity merge**: `cliente_perfiles_fiscales`/`productora_miembros` clasificadas en
+`TABLAS_REASIGNADAS` con reasignación dedup-aware (por `cuit`/`productora_id`, promoviendo un nuevo
+default si hace falta) — sin esto, un merge de cuentas las perdía en silencio (cascade delete).
+`account_is_absorbable` suma el chequeo de perfiles fiscales a "sin datos que perder" (una cuenta
+liviana sin verificar SÍ puede tener un perfil fiscal, antes de este fix se ignoraba).
+
+El supervisor marca: un dato fiscal (razón social/domicilio/condición IVA) guardado a mano sin pasar
+por `verificar_y_crear_perfil_fiscal`/`verificar_y_crear_productora`; un consumidor nuevo de datos
+fiscales de un pedido que no pase por `_resolver_datos_fiscales_pedido`; una tabla nueva con FK a
+`clientes` sin clasificar en `identity/merge.py`. Cómo → docstrings de `services/facturacion/padron.py`
+y `services/pedidos_enriquecimiento.py`; tracking #1240.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

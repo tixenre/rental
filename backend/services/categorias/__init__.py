@@ -23,6 +23,8 @@ from .queries.ancestry import (
     buscar_id_por_nombre,
     categoria_ids_de_equipo,
     categorias_de_equipos,
+    query_categorias_de_equipos,
+    shape_categorias_de_equipos_rows,
 )
 from .queries.audit import (
     equipos_sin_categoria,
@@ -68,6 +70,8 @@ __all__ = [
     "buscar_id_por_nombre",
     "categoria_ids_de_equipo",
     "categorias_de_equipos",
+    "query_categorias_de_equipos",
+    "shape_categorias_de_equipos_rows",
     "sql_filtro_categoria",
     "sql_filtro_equipos_por_categoria",
     "categoria_por_id",

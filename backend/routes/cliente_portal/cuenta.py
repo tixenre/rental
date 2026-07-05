@@ -227,34 +227,25 @@ class VerificarCuitIn(BaseModel):
 @router.post("/api/cliente/facturacion/verificar-cuit")
 @limiter.limit("10/minute")
 def cliente_verificar_cuit(data: VerificarCuitIn, request: Request):
-    """Verifica el CUIT del cliente contra el padrón de ARCA — mismo criterio
-    que ya usa `emitir_factura` al facturar de verdad (`verificar_y_actualizar_
-    receptor`), pero disparado ACÁ, como Didit con RENAPER: el cliente solo
-    tipea el CUIT, ARCA confirma condición IVA/razón social/domicilio, y esos
-    datos (+ el propio CUIT, ya confirmado) quedan PERSISTIDOS en la cuenta al
-    toque — no hace falta que el cliente los autocomplete a mano (ARCA los
-    corrige igual al momento de facturar, así que pedírselos dos veces es
-    trabajo redundante).
-
-    Best-effort a nivel HTTP (siempre 200, mismo patrón que `/admin/arca/
-    padron/{cuit}`): si ARCA no puede confirmarlo, no se persiste nada — el
-    front cae al formulario editable a mano de siempre."""
+    """⏰ LEGACY: delegado fino de `POST /api/cliente/facturacion/perfiles`
+    (#1240) — se mantiene con esta forma de respuesta (best-effort, siempre
+    200) solo mientras el frontend viejo (`FacturacionForm`, antes de la Fase
+    7 de #1240) no migre al endpoint nuevo. Remover cuando esa migración
+    mergee. No duplica la verificación: reusa `verificar_y_crear_perfil_fiscal`
+    tal cual (mismo bloqueo si AFIP no clasifica la condición IVA)."""
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
     cuit = data.cuit.strip()
     if not cuil_valido(cuit):
         raise HTTPException(400, "CUIT/CUIL inválido — verificá el número.")
 
-    from services.facturacion.padron import verificar_y_actualizar_receptor
+    from services.facturacion.padron import verificar_y_crear_perfil_fiscal
     with get_db() as conn:
         try:
-            persona = verificar_y_actualizar_receptor(cuit, cliente_id, conn)
+            persona = verificar_y_crear_perfil_fiscal(cuit, cliente_id, conn)
         except RuntimeError as e:
+            conn.rollback()
             return {"encontrado": False, "motivo": str(e)}
-        # El CUIT en sí no lo toca `verificar_y_actualizar_receptor` (ahí es
-        # el INPUT/receptor, no algo a corregir) — acá SÍ es el dato nuevo que
-        # el cliente acaba de confirmar contra ARCA.
-        conn.execute("UPDATE clientes SET cuit = %s WHERE id = %s", (cuit, cliente_id))
         conn.commit()
 
     return {
@@ -266,18 +257,126 @@ def cliente_verificar_cuit(data: VerificarCuitIn, request: Request):
     }
 
 
+# ── Perfiles fiscales múltiples (#1240) ──────────────────────────────────────
+# El cliente puede tener VARIOS CUIT propios (personal, freelance, etc.) —
+# `cliente_perfiles_fiscales`. Toda fila nace de una verificación real contra
+# AFIP (`verificar_y_crear_perfil_fiscal`, bloqueante) — cierra el fallback de
+# entrada manual sin verificar que tenía `cliente_update_me`. Las productoras
+# (entidad fiscal compartida, admin-only) viven en `routes/productoras.py`;
+# el cliente solo las LEE (`GET /api/cliente/productoras` más abajo).
+
+class PerfilFiscalCreate(BaseModel):
+    cuit: str
+    etiqueta: Optional[str] = None
+    email_facturacion: Optional[str] = None
+
+
+@router.get("/api/cliente/facturacion/perfiles")
+def cliente_listar_perfiles_fiscales(request: Request):
+    session = require_cliente(request)
+    cliente_id = session["cliente_id"]
+    with get_db() as conn:
+        rows = conn.execute(
+            """SELECT id, cuit, perfil_impuestos, razon_social, domicilio_fiscal,
+                      email_facturacion, etiqueta, es_default
+               FROM cliente_perfiles_fiscales
+               WHERE cliente_id = %s
+               ORDER BY es_default DESC, created_at ASC""",
+            (cliente_id,),
+        ).fetchall()
+    return [row_to_dict(r) for r in rows]
+
+
+@router.post("/api/cliente/facturacion/perfiles", status_code=201)
+@limiter.limit("10/minute")
+def cliente_crear_perfil_fiscal(data: PerfilFiscalCreate, request: Request):
+    """Da de alta (o refresca) un perfil fiscal personal — BLOQUEANTE: si AFIP
+    no puede confirmar el CUIT, 422 con el motivo real, no se guarda nada a
+    medias (cierra el fallback manual que tenía `cliente_update_me`)."""
+    session = require_cliente(request)
+    cliente_id = session["cliente_id"]
+    cuit = data.cuit.strip()
+    if not cuil_valido(cuit):
+        raise HTTPException(400, "CUIT/CUIL inválido — verificá el número.")
+
+    from services.facturacion.padron import verificar_y_crear_perfil_fiscal
+    with get_db() as conn:
+        try:
+            verificar_y_crear_perfil_fiscal(cuit, cliente_id, conn, etiqueta=data.etiqueta)
+        except RuntimeError as e:
+            conn.rollback()
+            raise HTTPException(422, f"AFIP no pudo confirmar este CUIT: {e}")
+        if data.email_facturacion:
+            # No lo resuelve ARCA — campo libre, igual que ya era antes de #1240.
+            conn.execute(
+                """UPDATE cliente_perfiles_fiscales SET email_facturacion = %s
+                   WHERE cliente_id = %s AND cuit = %s""",
+                (data.email_facturacion.strip().lower(), cliente_id, cuit),
+            )
+        conn.commit()
+        row = conn.execute(
+            """SELECT id, cuit, perfil_impuestos, razon_social, domicilio_fiscal,
+                      email_facturacion, etiqueta, es_default
+               FROM cliente_perfiles_fiscales
+               WHERE cliente_id = %s AND cuit = %s""",
+            (cliente_id, cuit),
+        ).fetchone()
+    return row_to_dict(row) if row else {}
+
+
+@router.patch("/api/cliente/facturacion/perfiles/{perfil_id}/default")
+def cliente_marcar_perfil_default(perfil_id: int, request: Request):
+    """Marca un perfil como el default de la cuenta — desmarca el anterior en
+    la MISMA transacción (el índice único parcial `uq_cliente_perfiles_
+    fiscales_default` nunca ve dos filas TRUE a la vez: primero se ponen todas
+    en FALSE, después se marca la elegida)."""
+    session = require_cliente(request)
+    cliente_id = session["cliente_id"]
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT id FROM cliente_perfiles_fiscales WHERE id = %s AND cliente_id = %s",
+            (perfil_id, cliente_id),
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Perfil fiscal no encontrado")
+        conn.execute(
+            "UPDATE cliente_perfiles_fiscales SET es_default = FALSE WHERE cliente_id = %s",
+            (cliente_id,),
+        )
+        conn.execute(
+            "UPDATE cliente_perfiles_fiscales SET es_default = TRUE, updated_at = now() WHERE id = %s",
+            (perfil_id,),
+        )
+        conn.commit()
+    return {"ok": True}
+
+
+@router.get("/api/cliente/productoras")
+def cliente_listar_productoras(request: Request):
+    """Productoras a las que el cliente autenticado está vinculado — solo
+    lectura (la crea/edita/vincula el admin, `routes/productoras.py`).
+    Alimenta la pantalla "Mis productoras" del portal y el selector del
+    checkout."""
+    session = require_cliente(request)
+    cliente_id = session["cliente_id"]
+    with get_db() as conn:
+        rows = conn.execute(
+            """SELECT p.id, p.cuit, p.perfil_impuestos, p.razon_social, p.domicilio_fiscal
+               FROM productoras p
+               JOIN productora_miembros pm ON pm.productora_id = p.id
+               WHERE pm.cliente_id = %s
+               ORDER BY p.razon_social NULLS LAST, p.id""",
+            (cliente_id,),
+        ).fetchall()
+    return [row_to_dict(r) for r in rows]
+
+
 class PerfilUpdate(BaseModel):
     nombre:    Optional[str] = None
     apellido:  Optional[str] = None
     telefono:  Optional[str] = None
     direccion: Optional[str] = None
-    cuit:      Optional[str] = None
     apodo:     Optional[str] = None
-    # Datos fiscales (cliente puede actualizar para Factura A).
-    perfil_impuestos:  Optional[str] = None
-    razon_social:      Optional[str] = None
-    domicilio_fiscal:  Optional[str] = None
-    email_facturacion: Optional[str] = None
 
 
 @router.patch("/api/cliente/me")
@@ -287,23 +386,19 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
     Tras verificar identidad (dni_validado_at IS NOT NULL), `nombre`/`apellido`/
     `direccion` quedan bloqueados — son los datos que certifica RENAPER, y el
     portal los muestra en modo lectura desde `*_renaper` una vez verificado.
-    Los datos FISCALES (perfil_impuestos/cuit/razon_social/domicilio_fiscal/
-    email_facturacion) NO se bloquean — son de facturación, no de identidad
-    (el `cuit` de la factura puede diferir del `cuil` verificado por RENAPER,
-    ver el hint del form en ClientePortalHelpers.tsx), y el cliente tiene que
-    poder actualizarlos siempre (ej. desde `FacturacionModal` en el checkout).
     `telefono`/`apodo` tampoco se bloquean nunca. NO se permite cambiar email
     (clave de identidad OAuth) ni descuento.
-    """
+
+    Los datos FISCALES (cuit/perfil_impuestos/razon_social/domicilio_fiscal/
+    email_facturacion) ya NO se editan acá (#1240) — cerraba un fallback de
+    entrada manual sin verificar contra AFIP. Viven en
+    `POST /api/cliente/facturacion/perfiles` (bloqueante: solo se guarda lo
+    que ARCA confirma para el CUIT tipeado)."""
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
 
     with get_db() as conn:
         verificado = cliente_verificado(conn, cliente_id)
-        row_cuit = conn.execute(
-            "SELECT cuit FROM clientes WHERE id = %s", (cliente_id,)
-        ).fetchone()
-    cuit_actual = (row_cuit["cuit"] if row_cuit else None) or ""
 
     # Campos bloqueados post-verificación: solo los que certifica RENAPER.
     _BLOQUEADOS = ("nombre", "apellido", "direccion")
@@ -328,44 +423,8 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
         sets.append("telefono = %s"); vals.append(data.telefono.strip())
     if data.direccion is not None:
         sets.append("direccion = %s"); vals.append(data.direccion.strip())
-    if data.cuit is not None:
-        cuit_in = data.cuit.strip()
-        # Mismo dígito verificador (mod-11) que ancla el CUIL de identidad
-        # (identity/anchor.py) — el CUIT de facturación es un número distinto,
-        # pero el checksum de 11 dígitos es el mismo algoritmo en Argentina.
-        # No se normaliza el string guardado (se acepta con guiones/espacios,
-        # como ya lo tolera `comprobante_pedido.py` al leerlo para ARCA).
-        if cuit_in and not cuil_valido(cuit_in):
-            raise HTTPException(400, "CUIT/CUIL inválido — verificá el número.")
-        sets.append("cuit = %s"); vals.append(cuit_in or None)
     if data.apodo is not None:
         sets.append("apodo = %s"); vals.append(data.apodo.strip() or None)
-    if data.perfil_impuestos is not None:
-        p = data.perfil_impuestos.strip()
-        if p not in ("consumidor_final", "responsable_inscripto", "monotributo", "exento"):
-            raise HTTPException(400, "Perfil impositivo inválido")
-        if p != "consumidor_final":
-            # Responsable Inscripto/Monotributo/Exento no existen sin CUIT en Argentina — sin
-            # este chequeo, el cliente podía guardar cualquiera de estos perfiles desde el
-            # <select> del portal SIN pasar nunca por "Verificar" contra ARCA (bug real: una
-            # factura salió con el perfil guardado pero domicilio vacío, sin confirmar). El CUIT
-            # puede venir de ESTE mismo request (recién tipeado) o ya estar guardado.
-            cuit_nuevo = data.cuit if data.cuit is not None else cuit_actual
-            cuit_norm = (cuit_nuevo or "").replace("-", "").strip()
-            if not (cuit_norm.isdigit() and len(cuit_norm) == 11):
-                raise HTTPException(
-                    400,
-                    "Para facturar como Responsable Inscripto, Monotributo o Exento necesitás "
-                    "un CUIT verificado — usá 'Verificar' con tu CUIT antes de guardar este perfil.",
-                )
-        sets.append("perfil_impuestos = %s"); vals.append(p)
-    if data.razon_social is not None:
-        sets.append("razon_social = %s"); vals.append(data.razon_social.strip() or None)
-    if data.domicilio_fiscal is not None:
-        sets.append("domicilio_fiscal = %s"); vals.append(data.domicilio_fiscal.strip() or None)
-    if data.email_facturacion is not None:
-        sets.append("email_facturacion = %s")
-        vals.append(data.email_facturacion.strip().lower() or None)
 
     if not sets:
         raise HTTPException(400, "Sin cambios")

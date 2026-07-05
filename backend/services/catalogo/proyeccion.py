@@ -27,13 +27,20 @@ from database import (
     attach_ficha,
     attach_specs_destacados,
     attach_specs_estructuradas,
+    query_ficha_batch,
+    shape_ficha_rows,
     MARCA_SUBQUERY,
 )
 from reservas import calcular_disponibilidad
 from reservas.disponibilidad import _derivar_compuestos
 from reservas.semantics import componentes_de
-from services.contenido import contenido_de
-from services.categorias import listar_categorias_flat
+from services.contenido import query_contenido_batch, shape_contenido_rows
+from services.categorias import (
+    listar_categorias_flat,
+    query_categorias_de_equipos,
+    shape_categorias_de_equipos_rows,
+)
+from services.specs import query_equipo_specs_rows, shape_equipo_specs_rows
 
 
 # ── Constantes de ordenamiento (espejo de routes/equipos/core.py) ─────────────
@@ -118,6 +125,7 @@ def proyectar_lista(
     desde: str | None = None,
     hasta: str | None = None,
     is_admin: bool = False,
+    incluir_detalle: bool = True,
 ) -> dict:
     """Ensambla la lista paginada de equipos para el catálogo.
 
@@ -136,6 +144,16 @@ def proyectar_lista(
         desde, hasta:   Fechas YYYY-MM-DD para disponibilidad (ambas o ninguna).
         is_admin:       Si True, incluye equipos no visibles y salta el filtro
                         de stock teórico.
+        incluir_detalle: Si False, saltea attach_kit/attach_ficha/specs — para
+                        vistas de LISTADO que no los muestran (la tabla del
+                        admin solo lee nombre/marca/categoría/precio/stock; el
+                        detalle de un equipo puntual sigue trayéndolos completos
+                        vía `proyectar_uno`/GET /equipos/{id}, sin cambios). El
+                        catálogo público SIEMPRE necesita el default `True`
+                        (filtra/rankea por specs y kit client-side). Precio
+                        efectivo de combo se calcula siempre (columna `tipo`,
+                        no depende de attach_kit) — sin esto un combo mostraría
+                        su precio crudo (0) en vez del derivado de componentes.
 
     Returns:
         {"total": N, "page": P, "per_page": PP, "items": [...]}
@@ -175,11 +193,41 @@ def proyectar_lista(
         bid = equipo.get("brand_id")
         equipo["brand"] = brands_map.get(bid) if bid else None
 
-    equipos = attach_kit(conn, equipos)
-    equipos = attach_categorias(conn, equipos)
-    equipos = attach_ficha(conn, equipos)
-    equipos = attach_specs_estructuradas(conn, equipos)
-    equipos = attach_specs_destacados(conn, equipos)
+    # Los 4 attaches (categorías + kit/ficha/specs si incluir_detalle) son
+    # independientes entre sí — todos filtran por el mismo lote de `ids`, sin
+    # depender del resultado de ningún otro. En vez de 4 round-trips
+    # secuenciales, se piden en UN pipeline (#1240: el TTFB medido en vivo
+    # contra staging está dominado por latencia de red, no por tiempo de
+    # query). `pipelined_select` devuelve los resultados en el mismo orden
+    # que se encolaron las queries — de ahí el `zip` con las keys.
+    ids = [e["id"] for e in equipos]
+    pipeline_items = [("categorias", query_categorias_de_equipos(ids))]
+    if incluir_detalle:
+        pipeline_items += [
+            ("kit", query_contenido_batch(ids, solo_activos=True)),
+            ("ficha", query_ficha_batch(ids)),
+            ("specs", query_equipo_specs_rows(ids)),
+        ]
+    queries_reales = [(k, q) for k, q in pipeline_items if q is not None]
+    resultados = conn.pipelined_select([q for _, q in queries_reales]) if queries_reales else []
+    filas_por_key = dict(zip((k for k, _ in queries_reales), resultados))
+
+    cat_map = shape_categorias_de_equipos_rows(filas_por_key.get("categorias", []))
+    equipos = attach_categorias(conn, equipos, cat_map=cat_map)
+
+    if incluir_detalle:
+        contenido_map = shape_contenido_rows(filas_por_key.get("kit", []), ids)
+        equipos = attach_kit(conn, equipos, contenido_map=contenido_map)
+
+        ficha_map = shape_ficha_rows(filas_por_key.get("ficha", []), ids)
+        equipos = attach_ficha(conn, equipos, ficha_map=ficha_map)
+
+        # Un solo query para las dos: attach_specs_estructuradas y
+        # attach_specs_destacados piden el mismo JOIN — pedirlo una vez y
+        # repartirlo evita ejecutarlo dos veces en cada carga de catálogo.
+        specs_rows = shape_equipo_specs_rows(filas_por_key.get("specs", []), ids)
+        equipos = attach_specs_estructuradas(conn, equipos, rows_by_equipo=specs_rows)
+        equipos = attach_specs_destacados(conn, equipos, rows_by_equipo=specs_rows)
 
     # Combos: precio efectivo (derivado de componentes), no el crudo de la tabla.
     combo_ids = [e["id"] for e in equipos if e.get("tipo") == "combo"]
@@ -223,32 +271,47 @@ def proyectar_uno(conn, equipo_id: int) -> dict | None:
     ).fetchone()
     if not row:
         return None
+    equipo = row_to_dict(row)
+    ids = [equipo_id]
 
-    equipo = attach_ficha(conn, [row_to_dict(row)])[0]
-    equipo = attach_categorias(conn, [equipo])[0]
-    equipo = attach_specs_estructuradas(conn, [equipo])[0]
-
-    # Componentes vía la puerta única (services.contenido). solo_activos=False:
-    # preserva el comportamiento de la ficha (no filtraba soft-deleted).
-    equipo["kit"] = [{
-        "componente_id": c["componente_id"],
-        "cantidad":      c["cantidad"],
-        "descuento_pct": c["descuento_pct"],
-        "esencial":      c["esencial"],
-        "nombre":        c["nombre"],
-        "marca":         c["marca"],
-        "foto_url":      c["foto_url"],
-    } for c in contenido_de(conn, equipo_id, solo_activos=False)]
-
-    # Galería multi-foto (#125): principal primero.
-    fotos = conn.execute(
+    # Mismos 5 queries independientes que la ficha necesita (ficha/categorías/
+    # specs/kit/fotos) en un pipeline, en vez de 5 round-trips secuenciales —
+    # mismo criterio que proyectar_lista (#1240).
+    fotos_sql = (
         "SELECT url, es_principal FROM equipo_fotos "
         "WHERE equipo_id = %s AND url IS NOT NULL AND url <> '' "
-        "ORDER BY es_principal DESC, orden ASC, id ASC",
-        (equipo_id,),
-    ).fetchall()
+        "ORDER BY es_principal DESC, orden ASC, id ASC"
+    )
+    pipeline_items = [
+        ("ficha", query_ficha_batch(ids)),
+        ("categorias", query_categorias_de_equipos(ids)),
+        ("specs", query_equipo_specs_rows(ids)),
+        # solo_activos=False: preserva el criterio de siempre de la ficha (NO
+        # filtra componentes soft-deleted — a diferencia del catálogo/listado,
+        # que sí los oculta).
+        ("kit", query_contenido_batch(ids, solo_activos=False)),
+        ("fotos", (fotos_sql, (equipo_id,))),
+    ]
+    queries_reales = [(k, q) for k, q in pipeline_items if q is not None]
+    resultados = conn.pipelined_select([q for _, q in queries_reales]) if queries_reales else []
+    filas_por_key = dict(zip((k for k, _ in queries_reales), resultados))
+
+    equipo = attach_ficha(conn, [equipo], ficha_map=shape_ficha_rows(filas_por_key.get("ficha", []), ids))[0]
+    equipo = attach_categorias(
+        conn, [equipo], cat_map=shape_categorias_de_equipos_rows(filas_por_key.get("categorias", []))
+    )[0]
+    specs_rows = shape_equipo_specs_rows(filas_por_key.get("specs", []), ids)
+    equipo = attach_specs_estructuradas(conn, [equipo], rows_by_equipo=specs_rows)[0]
+
+    # Componentes vía la puerta única (services.contenido) — mismo shape que
+    # attach_kit (catálogo/listado), reusado en vez de reconstruirlo inline.
+    contenido_map = shape_contenido_rows(filas_por_key.get("kit", []), ids)
+    equipo = attach_kit(conn, [equipo], contenido_map=contenido_map)[0]
+
+    # Galería multi-foto (#125): principal primero.
     equipo["fotos"] = [
-        {"url": r["url"], "es_principal": bool(r["es_principal"])} for r in fotos
+        {"url": r["url"], "es_principal": bool(r["es_principal"])}
+        for r in filas_por_key.get("fotos", [])
     ]
 
     # Combo: precio efectivo (derivado de componentes), igual en todas las superficies.

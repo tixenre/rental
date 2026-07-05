@@ -26,7 +26,7 @@ import { EmptyImage } from "./EmptyImage";
 import { GuardarComoListaButton } from "./GuardarComoListaButton";
 import { CompartirComposicionButton } from "./CompartirComposicionButton";
 import { RentalDateModal } from "./RentalDateModal";
-import { CheckoutResumen } from "./CheckoutResumen";
+import { CheckoutResumen, type FacturacionTarget } from "./CheckoutResumen";
 import type { PerfilImpuestos } from "@/lib/iva";
 import {
   AlertDialog,
@@ -137,7 +137,7 @@ export function CartDrawerView({
   pedidoEnviado: { id: number; numeroPedido: string } | null;
   sessionId: string;
   onVolverAlCarrito: () => void;
-  onCrearPedido: (sessionConfirmed: boolean) => Promise<void>;
+  onCrearPedido: (sessionConfirmed: boolean, target: FacturacionTarget) => Promise<void>;
   startDate?: Date;
   endDate?: Date;
   startTime: string;

@@ -133,19 +133,9 @@ class TestResolverDescuentoPedido:
     def test_manual_topa_en_100(self):
         assert resolver_descuento_pedido(150.0, 0, 0) == 100.0
 
-    # ── manual_activo (Fase C-4, #1231): forzar 0% en un pedido puntual ────
-
-    def test_manual_activo_fuerza_cero_aunque_cliente_jornadas_ganen(self):
-        # Bug real: un pedido con descuento_cliente_pct congelado en 50% no
-        # tenía forma de expresar "quiero 0% en ESTE pedido" — 0 siempre caía
-        # al fallback. manual_activo=True lo fuerza a ganar outright.
-        assert resolver_descuento_pedido(0, 50.0, 20.0, manual_activo=True) == 0.0
-
-    def test_manual_activo_no_cambia_nada_si_manual_no_es_cero(self):
-        # Con un valor manual ya no-cero, el flag es redundante (mismo resultado).
-        assert resolver_descuento_pedido(5.0, 50.0, 20.0, manual_activo=True) == 5.0
-
-    def test_manual_activo_false_default_es_comportamiento_de_siempre(self):
+    def test_manual_cero_con_cliente_cae_al_cliente(self):
+        # `0` es "sin override" → cae al fallback aunque el cliente tenga descuento.
+        # No hay forma de forzar 0% con un cliente con descuento (limitación aceptada).
         assert resolver_descuento_pedido(0, 50.0, 20.0) == 50.0
 
 
@@ -158,9 +148,6 @@ class TestResolverOrigenPedido:
 
     def test_sin_nada_es_ninguno(self):
         assert resolver_origen_pedido(0, 0, 0) == "ninguno"
-
-    def test_manual_activo_forzado_a_cero_tambien_es_manual(self):
-        assert resolver_origen_pedido(0, 50.0, 20.0, manual_activo=True) == "manual"
 
 
 # ── resolver_descuento_monto_pedido / resolver_origen_pedido_monto (C-2) ──
@@ -215,16 +202,6 @@ class TestResolverDescuentoMontoPedido:
         vuelta = resolver_descuento_monto_pedido(bruto, "pct", ida["pct"], 0, 0, 0)
         assert abs(vuelta["monto"] - 50_000) <= 1
 
-    # ── manual_activo (Fase C-4, #1231) ────────────────────────────────────
-
-    def test_manual_activo_fuerza_monto_cero_en_tipo_monto(self):
-        r = resolver_descuento_monto_pedido(10_000, "monto", 0, 0, 10.0, 20.0, manual_activo=True)
-        assert r == {"monto": 0, "pct": 0.0}
-
-    def test_manual_activo_fuerza_pct_cero_en_tipo_pct(self):
-        r = resolver_descuento_monto_pedido(10_000, "pct", 0, 0, 10.0, 20.0, manual_activo=True)
-        assert r == {"monto": 0, "pct": 0.0}
-
 
 class TestResolverOrigenPedidoMonto:
     def test_tipo_monto_gana_el_origen(self):
@@ -236,7 +213,3 @@ class TestResolverOrigenPedidoMonto:
     def test_tipo_pct_delega_a_resolver_origen_pedido(self):
         assert resolver_origen_pedido_monto("pct", 5.0, 0, 10.0, 20.0) == "manual"
         assert resolver_origen_pedido_monto("pct", 0, 0, 10.0, 20.0) == "jornadas"
-
-    def test_manual_activo_es_manual_en_ambos_tipos(self):
-        assert resolver_origen_pedido_monto("monto", 0, 0, 10.0, 20.0, manual_activo=True) == "manual"
-        assert resolver_origen_pedido_monto("pct", 0, 0, 10.0, 20.0, manual_activo=True) == "manual"

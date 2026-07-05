@@ -22,13 +22,14 @@ import {
   laterTime,
   minTimeForDate,
   timeToMinutes,
+  toLocalISO,
   ymd,
 } from "@/lib/rental-dates";
 import { useHorarios } from "@/lib/horarios";
 import { useAntelacionMinimaHorasQuery } from "@/hooks/useSettings";
 import { useBusinessPhone } from "@/lib/business";
 import { whatsappLink } from "@/lib/whatsapp";
-import { apiGetDiasBloqueados } from "@/lib/api";
+import { apiGetDiasBloqueados, apiGetDisclaimersRetiro } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { TimeStepSelect } from "./TimeStepSelect";
@@ -128,6 +129,20 @@ export function DateRangePickerModal({
     phone: businessPhone,
     message: "¡Hola! Necesito reservar con menos anticipación de la mínima. ¿Me pueden ayudar?",
   });
+
+  // ── Avisos del picker (antelación / horarios reducidos de fin de semana) ─
+  // La regla ("¿corresponde avisar?") y el texto viven en el backend
+  // (`services.fechas.disclaimers_retiro`, #1237) — acá solo se pide con la
+  // selección actual y se muestra `mensaje`, nada se decide en TS.
+  const fechaDesdeISO = !allowPast && startDate ? toLocalISO(startDate, startTime) : undefined;
+  const fechaHastaISO = !allowPast && endDate ? toLocalISO(endDate, endTime) : undefined;
+  const disclaimersQ = useQuery({
+    queryKey: ["rental-disclaimers", fechaDesdeISO, fechaHastaISO],
+    queryFn: () => apiGetDisclaimersRetiro(fechaDesdeISO, fechaHastaISO),
+    enabled: open && !allowPast,
+    staleTime: 30_000,
+  });
+  const disclaimers = allowPast ? [] : (disclaimersQ.data?.disclaimers ?? []);
 
   // ── Días bloqueados (sin stock) ──────────────────────────────────────
   const ventanaDesde = ymd(today);
@@ -395,13 +410,16 @@ export function DateRangePickerModal({
           </div>
 
           {/* ── Devolución calculada (solo si hay rango) ───────────── */}
+          {/* La explicación de por qué (día cerrado / suma jornada) vive DENTRO
+              de esta misma caja — antes era una caja aparte repitiendo el
+              mismo dato con otro color, dos avisos por una sola cosa. */}
           {hasRange && (
             <div
               className={cn(
-                "rounded-xl border px-3.5 py-2.5 sm:py-3 flex items-center justify-between gap-3",
+                "rounded-xl border px-3.5 py-2.5 sm:py-3",
                 // Jerarquía de estados visuales (de mayor a menor prioridad):
                 // 1. devolucionCerrada → destructive (bloquea)
-                // 2. sumaJornadaPorHora → naranja (advierte)
+                // 2. sumaJornadaPorHora → naranja (advierte, color de warning)
                 // 3. normal → amber (ok)
                 devolucionCerrada
                   ? "border-destructive/40 bg-destructive/10"
@@ -410,109 +428,129 @@ export function DateRangePickerModal({
                     : "border-amber/40 bg-amber-soft/60",
               )}
             >
-              <div>
-                <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1">
-                  Devolución
-                </div>
-                <div className="flex items-center gap-1.5 leading-none">
-                  <span
-                    className={cn(
-                      "tabular-nums text-base font-display leading-none",
-                      devolucionCerrada ? "text-destructive" : "text-ink",
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1">
+                    Devolución
+                  </div>
+                  <div className="flex items-center gap-1.5 leading-none">
+                    <span
+                      className={cn(
+                        "tabular-nums text-base font-display leading-none",
+                        devolucionCerrada ? "text-destructive" : "text-ink",
+                      )}
+                    >
+                      {format(endDate!, "dd MMM yyyy", { locale: es })}
+                    </span>
+                    {/* Badge "+1 J" — solo cuando suma jornada por hora */}
+                    {sumaJornadaPorHora && !devolucionCerrada && (
+                      <Pill className="bg-naranja/20 px-1.5 font-mono font-semibold uppercase tracking-wider text-ink">
+                        +1 J
+                      </Pill>
                     )}
-                  >
-                    {format(endDate!, "dd MMM yyyy", { locale: es })}
-                  </span>
-                  {/* Badge "+1 J" — solo cuando suma jornada por hora */}
-                  {sumaJornadaPorHora && !devolucionCerrada && (
-                    <Pill className="bg-naranja/20 px-1.5 font-mono font-semibold uppercase tracking-wider text-ink">
-                      +1 J
-                    </Pill>
-                  )}
+                  </div>
                 </div>
+                {/* Hora de devolución — "—" si el día está cerrado */}
+                {devolucionCerrada ? (
+                  <span className="font-mono text-sm text-muted-foreground/50">—</span>
+                ) : (
+                  <TimeStepSelect
+                    value={endTime}
+                    onChange={onEndTimeChange}
+                    min={franjaDevolucion?.desde}
+                    max={franjaDevolucion?.hasta}
+                    aria-label="Hora de devolución"
+                    className="text-sm font-mono tabular-nums text-ink/80 hover:text-ink rounded-md px-2 py-1 bg-background border hairline"
+                  />
+                )}
               </div>
-              {/* Hora de devolución — "—" si el día está cerrado */}
               {devolucionCerrada ? (
-                <span className="font-mono text-sm text-muted-foreground/50">—</span>
+                <p className="flex items-start gap-1.5 mt-2 pt-2 border-t border-destructive/20 text-xs text-destructive">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  Cae en un día cerrado. Ajustá las jornadas o la fecha de retiro.
+                </p>
               ) : (
-                <TimeStepSelect
-                  value={endTime}
-                  onChange={onEndTimeChange}
-                  min={franjaDevolucion?.desde}
-                  max={franjaDevolucion?.hasta}
-                  aria-label="Hora de devolución"
-                  className="text-sm font-mono tabular-nums text-ink/80 hover:text-ink rounded-md px-2 py-1 bg-background border hairline"
-                />
+                sumaJornadaPorHora && (
+                  <p className="flex items-center gap-1.5 mt-2 pt-2 border-t border-naranja/20 text-xs text-ink">
+                    <Clock className="h-3.5 w-3.5 shrink-0 text-naranja" />
+                    <span>
+                      Más tarde que tu retiro ({startTime}) → <strong>suma 1 jornada</strong>.
+                      Devolvé a las {startTime} o antes para mantener {jornadas - 1}{" "}
+                      {jornadas - 1 === 1 ? "jornada" : "jornadas"}.
+                    </span>
+                  </p>
+                )
               )}
             </div>
           )}
 
-          {/* ── Feedback (jerarquía: error > warn > hint) ──────────── */}
-          {devolucionCerrada ? (
-            /* ERROR: día cerrado → bloquea Aplicar */
-            <p className="flex items-start gap-1.5 text-xs text-destructive">
-              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-              La devolución cae el{" "}
-              <strong>{format(endDate!, "EEEE dd MMM", { locale: es })}</strong>, que está cerrado.
-              Ajustá las jornadas o la fecha de retiro.
-            </p>
-          ) : rangoCruzaBloqueado ? (
-            /* WARN: sin stock en el rango — no bloquea Aplicar, advierte para revisar el carrito */
-            <p className="flex items-start gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
-              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber" />
+          {/* ── Feedback general (stock > hint sin fecha) ────────────────────
+              Sin inconveniente no se aclara nada: la regla de jornada solo se
+              explica cuando realmente aplica (dentro de la caja de Devolución,
+              arriba) — no como advertencia permanente aunque todo esté bien. */}
+          {rangoCruzaBloqueado ? (
+            /* WARN: sin stock en el rango — no bloquea Aplicar, advierte para revisar el carrito.
+               Naranja (`--color-naranja`, status "Aviso"), no amber — el amber es el color de
+               marca y se usa en toda la chrome del picker (botones, jornadas, calendario), así
+               que un aviso real en amber se pierde contra el fondo. */
+            <p className="flex items-start gap-1.5 rounded-md bg-naranja/12 border border-naranja/45 px-2.5 py-2 text-sm text-ink">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-naranja" />
               <span>
                 Algunos equipos del carrito no tienen stock en estas fechas —{" "}
-                <strong>revisá el carrito</strong> antes de solicitar.
+                <strong className="font-semibold">revisá el carrito</strong> antes de solicitar.
               </span>
             </p>
-          ) : sumaJornadaPorHora ? (
-            /* WARN: jornada extra por hora → Aplicar habilitado (avisa, no bloquea) */
-            <p className="flex items-center gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
-              <Clock className="h-3.5 w-3.5 shrink-0 text-amber" />
-              <span>
-                Devolvés a las <strong>{endTime}</strong>, más tarde que tu retiro ({startTime}) →{" "}
-                <strong>suma 1 jornada</strong>. Devolvé a las {startTime} o antes para mantener{" "}
-                {jornadas - 1} {jornadas - 1 === 1 ? "jornada" : "jornadas"}.
-              </span>
-            </p>
-          ) : (
-            /* HINT: info contextual — cambia según si hay fecha o no */
+          ) : !hasStart ? (
+            /* HINT: sin fecha elegida aún */
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
-              {hasStart
-                ? "Horarios cada 30 min — sujeto a confirmación. Devolver más tarde que la hora de retiro suma una jornada."
-                : "Tocá un día en el calendario para fijar el retiro. La devolución se calcula sola."}
+              Tocá un día en el calendario para fijar el retiro. La devolución se calcula sola.
             </p>
-          )}
+          ) : null}
 
-          {/* Antelación mínima (#1126) — siempre visible si está configurada (el
-              piso real ya lo aplican el calendario y la hora); mismo tratamiento
-              visual que las demás advertencias no bloqueantes, para que no pase
-              desapercibido por qué faltan horas cercanas a "ahora". */}
-          {!allowPast && leadTimeHoras > 0 && (
-            <p className="flex items-center gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
-              <Clock className="h-3.5 w-3.5 shrink-0 text-amber" />
-              <span>
-                Reservás online con al menos <strong>{leadTimeHoras} h de anticipación</strong> —
-                por eso no ves horas más cercanas a ahora.{" "}
+          {/* Avisos del backend (#1237) — contextuales a la fecha elegida; ver
+              `disclaimersQ` arriba. Un solo box aunque vengan varios avisos
+              (ej. antelación + horarios de finde a la vez), con un único CTA
+              de WhatsApp al pie en vez de repetirlo por aviso. */}
+          {disclaimers.length > 0 && (
+            /* Naranja (`--color-naranja`, status "Aviso"), no amber — mismo criterio que
+               el aviso de stock de arriba: el amber es color de marca (chrome del picker),
+               un aviso real necesita un color que no compita con eso. El backend manda el
+               mensaje completo (fuente de la REGLA, #1237); acá solo separamos la cláusula
+               antes de la primera coma para resaltarla en negrita — presentación, no criterio. */
+            <div className="rounded-md bg-naranja/12 border border-naranja/45 px-2.5 py-2 text-sm text-ink space-y-1.5">
+              {disclaimers.map((d) => {
+                const [headline, ...restParts] = d.mensaje.split(", ");
+                const rest = restParts.join(", ");
+                return (
+                  <p key={d.check} className="flex items-start gap-1.5">
+                    <Clock className="h-4 w-4 shrink-0 text-naranja mt-0.5" />
+                    <span>
+                      <strong className="font-semibold">{headline}</strong>
+                      {rest && <>, {rest}</>}
+                    </span>
+                  </p>
+                );
+              })}
+              <p className="pl-[22px]">
                 {urgenciaWhatsappUrl ? (
                   <>
-                    ¿Urgencia?{" "}
+                    ¿Urgencia o necesitás otro horario?{" "}
                     <a
                       href={urgenciaWhatsappUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-semibold underline underline-offset-2 hover:text-amber"
+                      className="font-semibold underline underline-offset-2 hover:text-naranja"
                     >
                       Escribinos por WhatsApp
                     </a>
                     .
                   </>
                 ) : (
-                  "¿Urgencia? Escribinos para coordinar."
+                  "¿Urgencia o necesitás otro horario? Escribinos para coordinar."
                 )}
-              </span>
-            </p>
+              </p>
+            </div>
           )}
         </div>
 

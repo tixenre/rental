@@ -1,12 +1,14 @@
-"""Candado: `PATCH /api/cliente/me` NO bloquea los datos FISCALES tras la
-verificación de identidad, solo los que certifica RENAPER (#1209 — bug
-encontrado al usar `FacturacionModal` desde el checkout: un cliente
-verificado no podía cambiar su perfil_impuestos/CUIT, aunque el propio hint
-del form dice "puede diferir del CUIL verificado de tu identidad").
+"""Candado: `PATCH /api/cliente/me` NO bloquea los datos PERSONALES tras la
+verificación de identidad, solo los que certifica RENAPER (#1209).
 
-Solo `nombre`/`apellido`/`direccion` quedan bloqueados post-verificación —
-`perfil_impuestos`/`cuit`/`razon_social`/`domicilio_fiscal`/`email_facturacion`
-tienen que poder actualizarse siempre.
+Los datos FISCALES (cuit/perfil_impuestos/razon_social/domicilio_fiscal/
+email_facturacion) YA NO se editan por `cliente_update_me` (#1240 — cerraba
+un fallback de entrada manual sin verificar contra AFIP): viven en los
+endpoints de `cliente_perfiles_fiscales`
+(`GET/POST /api/cliente/facturacion/perfiles`,
+`PATCH .../perfiles/{id}/default`), bloqueantes contra el padrón real de
+ARCA. `POST /api/cliente/facturacion/verificar-cuit` sigue existiendo como
+delegado legacy del POST nuevo.
 
 También candado del checksum de CUIT/CUIL (mod-11, `identity.anchor.cuil_valido`)
 que se sumó al mismo endpoint — un CUIT mal formado se rechaza con 400.
@@ -80,6 +82,7 @@ def cliente_verificado_fixture():
         conn.commit()
         yield conn
     finally:
+        conn.execute("DELETE FROM cliente_perfiles_fiscales WHERE cliente_id = %s", (CLIENTE_ID,))
         conn.execute("DELETE FROM clientes WHERE id = %s", (CLIENTE_ID,))
         conn.commit()
         conn.close()
@@ -89,25 +92,29 @@ def _patch(client, body):
     return client.patch("/api/cliente/me", json=body, headers={"Cookie": _COOKIE})
 
 
-class TestFacturacionEditablePostVerificacion:
-    def test_perfil_impuestos_y_cuit_se_pueden_cambiar_verificado(self, cliente_verificado_fixture):
+class TestFacturacionYaNoEditablePorCuentaMe:
+    """#1240: los 5 campos fiscales dejaron de existir en `PerfilUpdate` — un
+    PATCH que solo los mande no tiene NINGÚN campo real que aplicar, así que
+    cae en "Sin cambios" (400). Antes de #1240 esto devolvía 200 y los
+    persistía sin pasar por AFIP."""
+
+    def test_perfil_impuestos_cuit_y_razon_social_ya_no_se_aplican(self, cliente_verificado_fixture):
         from fastapi.testclient import TestClient
 
         client = TestClient(main.app)
         r = _patch(client, {
             "perfil_impuestos": "responsable_inscripto",
-            "cuit": "27230938607",  # CUIT válido (mod-11) — ver test_cuit_invalido_rechazado abajo
+            "cuit": "27230938607",
             "razon_social": "Estudio SRL",
         })
-        assert r.status_code == 200, r.text
-        body = r.json()
-        assert body["perfil_impuestos"] == "responsable_inscripto"
-        assert body["cuit"] == "27230938607"
-        assert body["razon_social"] == "Estudio SRL"
+        assert r.status_code == 400, r.text
+        assert "Sin cambios" in r.text
 
-    def test_domicilio_fiscal_y_email_facturacion_se_pueden_cambiar_verificado(
-        self, cliente_verificado_fixture,
-    ):
+        me = client.get("/api/cliente/me", headers={"Cookie": _COOKIE})
+        assert me.json()["perfil_impuestos"] == "consumidor_final"  # sin tocar
+        assert me.json()["cuit"] is None  # sin tocar
+
+    def test_domicilio_fiscal_y_email_facturacion_ya_no_se_aplican(self, cliente_verificado_fixture):
         from fastapi.testclient import TestClient
 
         client = TestClient(main.app)
@@ -115,10 +122,21 @@ class TestFacturacionEditablePostVerificacion:
             "domicilio_fiscal": "Av. Siempre Viva 123",
             "email_facturacion": "facturas@estudio.com",
         })
+        assert r.status_code == 400, r.text
+
+    def test_apodo_y_telefono_mezclados_con_fiscales_solo_aplican_los_reales(
+        self, cliente_verificado_fixture,
+    ):
+        """Si el body mezcla un campo real (`apodo`) con campos fiscales ya
+        eliminados, el real SÍ se aplica — Pydantic simplemente ignora las
+        claves que `PerfilUpdate` ya no declara."""
+        from fastapi.testclient import TestClient
+
+        client = TestClient(main.app)
+        r = _patch(client, {"apodo": "Anita", "perfil_impuestos": "monotributo"})
         assert r.status_code == 200, r.text
-        body = r.json()
-        assert body["domicilio_fiscal"] == "Av. Siempre Viva 123"
-        assert body["email_facturacion"] == "facturas@estudio.com"
+        assert r.json()["apodo"] == "Anita"
+        assert r.json()["perfil_impuestos"] == "consumidor_final"  # ignorado, sin tocar
 
     def test_nombre_apellido_direccion_siguen_bloqueados_verificado(self, cliente_verificado_fixture):
         from fastapi.testclient import TestClient
@@ -130,61 +148,11 @@ class TestFacturacionEditablePostVerificacion:
             r = _patch(client, {campo: valor})
             assert r.status_code == 403, f"{campo}: {r.text}"
 
-    def test_cuit_invalido_rechazado(self, cliente_verificado_fixture):
+    def test_telefono_y_apodo_no_se_bloquean_verificado(self, cliente_verificado_fixture):
         from fastapi.testclient import TestClient
 
         client = TestClient(main.app)
-        r = _patch(client, {"cuit": "20304050607"})  # checksum mod-11 incorrecto
-        assert r.status_code == 400, r.text
-
-    def test_cuit_vacio_limpia_el_campo(self, cliente_verificado_fixture):
-        from fastapi.testclient import TestClient
-
-        client = TestClient(main.app)
-        r = _patch(client, {"cuit": ""})
-        assert r.status_code == 200, r.text
-        assert r.json()["cuit"] is None
-
-
-class TestPerfilImpuestosExigeCuit:
-    """Regresión de bug real en producción: un cliente guardó `perfil_impuestos='monotributo'`
-    desde el <select> del portal SIN pasar nunca por "Verificar" contra ARCA — Responsable
-    Inscripto/Monotributo/Exento no existen sin CUIT en Argentina. La factura emitida después
-    salió con el perfil guardado pero sin domicilio, sin confirmar. `cliente_update_me` ahora
-    exige un CUIT con formato válido (11 dígitos) para cualquier perfil que no sea
-    'consumidor_final' — el CUIT puede venir del mismo request o ya estar guardado."""
-
-    def test_monotributo_sin_cuit_en_ningun_lado_se_rechaza(self, cliente_verificado_fixture):
-        from fastapi.testclient import TestClient
-
-        client = TestClient(main.app)
-        r = _patch(client, {"perfil_impuestos": "monotributo"})
-        assert r.status_code == 400, r.text
-
-    def test_monotributo_con_cuit_en_el_mismo_request_se_acepta(self, cliente_verificado_fixture):
-        from fastapi.testclient import TestClient
-
-        client = TestClient(main.app)
-        r = _patch(client, {"perfil_impuestos": "monotributo", "cuit": "27230938607"})
-        assert r.status_code == 200, r.text
-        assert r.json()["perfil_impuestos"] == "monotributo"
-
-    def test_exento_con_cuit_ya_guardado_previamente_se_acepta(self, cliente_verificado_fixture):
-        from fastapi.testclient import TestClient
-
-        client = TestClient(main.app)
-        r1 = _patch(client, {"cuit": "27230938607"})
-        assert r1.status_code == 200, r1.text
-
-        r2 = _patch(client, {"perfil_impuestos": "exento"})
-        assert r2.status_code == 200, r2.text
-        assert r2.json()["perfil_impuestos"] == "exento"
-
-    def test_consumidor_final_no_exige_cuit(self, cliente_verificado_fixture):
-        from fastapi.testclient import TestClient
-
-        client = TestClient(main.app)
-        r = _patch(client, {"perfil_impuestos": "consumidor_final"})
+        r = _patch(client, {"telefono": "223 555-1234", "apodo": "Anita"})
         assert r.status_code == 200, r.text
 
 
@@ -209,6 +177,9 @@ def cliente_no_verificado_fixture():
         conn.commit()
         yield conn
     finally:
+        conn.execute(
+            "DELETE FROM cliente_perfiles_fiscales WHERE cliente_id = %s", (CLIENTE_ID_DISPLAY,)
+        )
         conn.execute("DELETE FROM clientes WHERE id = %s", (CLIENTE_ID_DISPLAY,))
         conn.commit()
         conn.close()
@@ -277,29 +248,34 @@ class TestVistaResueltaParaDisplay:
 
 
 class TestVerificarCuitContraArca:
-    """`POST /api/cliente/facturacion/verificar-cuit` — el cliente solo tipea
-    el CUIT; si ARCA lo confirma, condición IVA/razón social/domicilio (+ el
-    propio CUIT) quedan persistidos al toque, sin que el cliente los
-    autocomplete a mano. Se mockea `verificar_y_actualizar_receptor` (haría
-    una llamada SOAP real a AFIP) — el candado es sobre el route, no sobre el
-    cliente SOAP en sí (eso lo cubre test_facturacion_padron.py)."""
+    """`POST /api/cliente/facturacion/verificar-cuit` — ⏰ LEGACY, delegado fino
+    de `POST /api/cliente/facturacion/perfiles` (#1240). El cliente solo
+    tipea el CUIT; si ARCA lo confirma, condición IVA/razón social/domicilio
+    quedan persistidos en `cliente_perfiles_fiscales` (+ sincronizados en
+    `clientes` por ser el primer/default perfil), sin que el cliente los
+    autocomplete a mano. Se mockea `resolver_persona` (haría una llamada SOAP
+    real a AFIP) — el candado es sobre el route + la capa de servicio nueva,
+    no sobre el cliente SOAP en sí (eso lo cubre test_facturacion_padron.py)."""
 
     _CUIT_VALIDO = "27230938607"  # mod-11 OK — ver test_cuit.py/anchor.py
+
+    def _persona(self):
+        from services.facturacion.padron import PersonaArca
+
+        return PersonaArca(
+            cuit=self._CUIT_VALIDO, razon_social="Estudio SRL", nombre="", apellido="",
+            domicilio="Av. Corrientes 1234", condicion_iva="responsable_inscripto",
+            estado_clave="ACTIVO",
+        )
 
     def test_encontrado_persiste_cuit_y_correcciones(
         self, cliente_no_verificado_fixture, monkeypatch,
     ):
         from fastapi.testclient import TestClient
-        from services.facturacion.padron import PersonaArca
 
-        persona = PersonaArca(
-            cuit=self._CUIT_VALIDO, razon_social="Estudio SRL", nombre="", apellido="",
-            domicilio="Av. Corrientes 1234", condicion_iva="responsable_inscripto",
-            estado_clave="ACTIVO",
-        )
         monkeypatch.setattr(
-            "services.facturacion.padron.verificar_y_actualizar_receptor",
-            lambda cuit, cliente_id, conn: persona,
+            "services.facturacion.padron.resolver_persona",
+            lambda cuit, conn: self._persona(),
         )
 
         client = TestClient(main.app)
@@ -318,19 +294,17 @@ class TestVerificarCuitContraArca:
             "domicilio_fiscal": "Av. Corrientes 1234",
         }
 
-        # El CUIT quedó persistido de verdad (lo escribe el route, no el mock).
+        # El CUIT quedó persistido de verdad — como perfil default (primer perfil).
         me = client.get("/api/cliente/me", headers={"Cookie": _COOKIE_DISPLAY})
         assert me.json()["cuit"] == self._CUIT_VALIDO
 
     def test_no_encontrado_no_persiste_nada(self, cliente_no_verificado_fixture, monkeypatch):
         from fastapi.testclient import TestClient
 
-        def _falla(cuit, cliente_id, conn):
+        def _falla(cuit, conn):
             raise RuntimeError("AFIP no pudo confirmar el CUIT (motivo de prueba)")
 
-        monkeypatch.setattr(
-            "services.facturacion.padron.verificar_y_actualizar_receptor", _falla,
-        )
+        monkeypatch.setattr("services.facturacion.padron.resolver_persona", _falla)
 
         client = TestClient(main.app)
         r = client.post(
@@ -353,13 +327,11 @@ class TestVerificarCuitContraArca:
 
         llamado = {"veces": 0}
 
-        def _no_deberia_llamarse(cuit, cliente_id, conn):
+        def _no_deberia_llamarse(cuit, conn):
             llamado["veces"] += 1
             raise AssertionError("no debería consultar ARCA con un CUIT mal formado")
 
-        monkeypatch.setattr(
-            "services.facturacion.padron.verificar_y_actualizar_receptor", _no_deberia_llamarse,
-        )
+        monkeypatch.setattr("services.facturacion.padron.resolver_persona", _no_deberia_llamarse)
 
         client = TestClient(main.app)
         r = client.post(
@@ -369,3 +341,197 @@ class TestVerificarCuitContraArca:
         )
         assert r.status_code == 400, r.text
         assert llamado["veces"] == 0
+
+
+class TestPerfilesFiscalesMultiples:
+    """`GET/POST /api/cliente/facturacion/perfiles` +
+    `PATCH .../perfiles/{id}/default` (#1240) — múltiples CUIT propios por
+    cliente, cada uno nacido de una verificación real contra ARCA."""
+
+    _CUIT_1 = "27230938607"  # mod-11 OK
+    _CUIT_2 = "20301234563"  # mod-11 OK
+
+    def _persona(self, cuit, razon_social="Empresa SA", condicion_iva="responsable_inscripto"):
+        from services.facturacion.padron import PersonaArca
+
+        return PersonaArca(
+            cuit=cuit, razon_social=razon_social, nombre="", apellido="",
+            domicilio="Calle 123", condicion_iva=condicion_iva, estado_clave="ACTIVO",
+        )
+
+    def test_crear_perfil_bloquea_si_afip_no_clasifica(
+        self, cliente_no_verificado_fixture, monkeypatch,
+    ):
+        from fastapi.testclient import TestClient
+
+        monkeypatch.setattr(
+            "services.facturacion.padron.resolver_persona",
+            lambda cuit, conn: self._persona(cuit, condicion_iva=""),
+        )
+        client = TestClient(main.app)
+        r = client.post(
+            "/api/cliente/facturacion/perfiles",
+            json={"cuit": self._CUIT_1},
+            headers={"Cookie": _COOKIE_DISPLAY},
+        )
+        assert r.status_code == 422, r.text
+
+        lista = client.get(
+            "/api/cliente/facturacion/perfiles", headers={"Cookie": _COOKIE_DISPLAY},
+        ).json()
+        assert lista == []
+
+    def test_primer_perfil_es_default_y_sincroniza_clientes(
+        self, cliente_no_verificado_fixture, monkeypatch,
+    ):
+        from fastapi.testclient import TestClient
+
+        monkeypatch.setattr(
+            "services.facturacion.padron.resolver_persona",
+            lambda cuit, conn: self._persona(cuit),
+        )
+        client = TestClient(main.app)
+        r = client.post(
+            "/api/cliente/facturacion/perfiles",
+            json={"cuit": self._CUIT_1, "etiqueta": "Personal"},
+            headers={"Cookie": _COOKIE_DISPLAY},
+        )
+        assert r.status_code == 201, r.text
+        assert r.json()["es_default"] is True
+        assert r.json()["etiqueta"] == "Personal"
+
+        me = client.get("/api/cliente/me", headers={"Cookie": _COOKIE_DISPLAY}).json()
+        assert me["cuit"] == self._CUIT_1
+        assert me["perfil_impuestos"] == "responsable_inscripto"
+
+    def test_segundo_perfil_no_pisa_el_default(self, cliente_no_verificado_fixture, monkeypatch):
+        from fastapi.testclient import TestClient
+
+        monkeypatch.setattr(
+            "services.facturacion.padron.resolver_persona",
+            lambda cuit, conn: self._persona(cuit),
+        )
+        client = TestClient(main.app)
+        client.post(
+            "/api/cliente/facturacion/perfiles",
+            json={"cuit": self._CUIT_1},
+            headers={"Cookie": _COOKIE_DISPLAY},
+        )
+        r2 = client.post(
+            "/api/cliente/facturacion/perfiles",
+            json={"cuit": self._CUIT_2, "etiqueta": "Productora personal"},
+            headers={"Cookie": _COOKIE_DISPLAY},
+        )
+        assert r2.status_code == 201, r2.text
+        assert r2.json()["es_default"] is False
+
+        lista = client.get(
+            "/api/cliente/facturacion/perfiles", headers={"Cookie": _COOKIE_DISPLAY},
+        ).json()
+        assert len(lista) == 2
+        defaults = [p for p in lista if p["es_default"]]
+        assert len(defaults) == 1
+        assert defaults[0]["cuit"] == self._CUIT_1
+
+    def test_marcar_default_desmarca_el_anterior(self, cliente_no_verificado_fixture, monkeypatch):
+        from fastapi.testclient import TestClient
+
+        monkeypatch.setattr(
+            "services.facturacion.padron.resolver_persona",
+            lambda cuit, conn: self._persona(cuit),
+        )
+        client = TestClient(main.app)
+        client.post(
+            "/api/cliente/facturacion/perfiles",
+            json={"cuit": self._CUIT_1},
+            headers={"Cookie": _COOKIE_DISPLAY},
+        )
+        p2 = client.post(
+            "/api/cliente/facturacion/perfiles",
+            json={"cuit": self._CUIT_2},
+            headers={"Cookie": _COOKIE_DISPLAY},
+        ).json()
+
+        r = client.patch(
+            f"/api/cliente/facturacion/perfiles/{p2['id']}/default",
+            headers={"Cookie": _COOKIE_DISPLAY},
+        )
+        assert r.status_code == 200, r.text
+
+        lista = client.get(
+            "/api/cliente/facturacion/perfiles", headers={"Cookie": _COOKIE_DISPLAY},
+        ).json()
+        defaults = [p for p in lista if p["es_default"]]
+        assert len(defaults) == 1
+        assert defaults[0]["cuit"] == self._CUIT_2
+
+    def test_marcar_default_de_perfil_ajeno_404(self, cliente_no_verificado_fixture):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(main.app)
+        r = client.patch(
+            "/api/cliente/facturacion/perfiles/999999/default",
+            headers={"Cookie": _COOKIE_DISPLAY},
+        )
+        assert r.status_code == 404, r.text
+
+
+class TestProductorasSoloLecturaDelCliente:
+    """`GET /api/cliente/productoras` (#1240) — solo lectura, devuelve
+    únicamente las productoras a las que el cliente autenticado está
+    vinculado (las crea/edita/vincula el admin, `routes/productoras.py`)."""
+
+    @pytest.fixture
+    def dos_clientes_y_productoras(self):
+        from database import get_db, init_db
+
+        init_db()
+        conn = get_db()
+        otro_id = CLIENTE_ID_DISPLAY + 1
+        try:
+            conn.execute("DELETE FROM clientes WHERE id IN (%s, %s)", (CLIENTE_ID_DISPLAY, otro_id))
+            conn.execute(
+                """INSERT INTO clientes (id, nombre, apellido, email)
+                   VALUES (%s, 'Ana Base', 'Gómez Base', 'display-db@test.com'),
+                          (%s, 'Otro', 'Cliente', 'otro-cliente@test.com')""",
+                (CLIENTE_ID_DISPLAY, otro_id),
+            )
+            conn.execute("DELETE FROM productoras WHERE cuit IN ('30500000001', '30500000002')")
+            conn.execute(
+                """INSERT INTO productoras (cuit, perfil_impuestos, razon_social)
+                   VALUES ('30500000001', 'responsable_inscripto', 'Productora Vinculada SA'),
+                          ('30500000002', 'responsable_inscripto', 'Productora Ajena SA')
+                   RETURNING id"""
+            )
+            ids = [
+                r["id"] for r in conn.execute(
+                    "SELECT id FROM productoras WHERE cuit IN ('30500000001', '30500000002') ORDER BY cuit"
+                ).fetchall()
+            ]
+            conn.execute(
+                "INSERT INTO productora_miembros (productora_id, cliente_id) VALUES (%s, %s)",
+                (ids[0], CLIENTE_ID_DISPLAY),
+            )
+            conn.execute(
+                "INSERT INTO productora_miembros (productora_id, cliente_id) VALUES (%s, %s)",
+                (ids[1], otro_id),
+            )
+            conn.commit()
+            yield
+        finally:
+            conn.execute("DELETE FROM productoras WHERE cuit IN ('30500000001', '30500000002')")
+            conn.execute("DELETE FROM clientes WHERE id IN (%s, %s)", (CLIENTE_ID_DISPLAY, otro_id))
+            conn.commit()
+            conn.close()
+
+    def test_solo_devuelve_las_productoras_del_cliente_autenticado(
+        self, dos_clientes_y_productoras,
+    ):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(main.app)
+        r = client.get("/api/cliente/productoras", headers={"Cookie": _COOKIE_DISPLAY})
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert len(body) == 1
+        assert body[0]["razon_social"] == "Productora Vinculada SA"

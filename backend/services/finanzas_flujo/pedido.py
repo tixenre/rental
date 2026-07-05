@@ -9,7 +9,7 @@ sabía manejarlo bien. Ahora hay un solo punto que arma el desglose para los 6
 consumidores reales: detalle admin, PDF/mail, portal cliente, y el motor de
 facturación (`services/facturacion/engine.py`).
 """
-from database import row_to_dict, to_datetime
+from database import to_datetime
 from services.precios import calcular_total, jornadas_periodo
 
 
@@ -37,9 +37,6 @@ def desglose_de_pedido(conn, pedido: dict) -> dict:
     ("pct"/"monto") + `pedido["descuento_manual_monto"]` son columnas directas
     del pedido (no un snapshot aparte — el override ES el valor persistido,
     igual que `descuento_pct`), leídas tal cual están en la fila.
-    `pedido["descuento_manual_activo"]` (Fase C-4, #1231) fuerza ese override
-    a ganar outright aunque valga 0 — única forma de forzar 0% en un pedido
-    puntual.
 
     Combos no acumulables (Fase C-3, #1219): `es_combo` por línea sale de
     `equipo_tipo` EN VIVO (join con `equipos.tipo` al armar `pedido["items"]`,
@@ -54,12 +51,20 @@ def desglose_de_pedido(conn, pedido: dict) -> dict:
     """
     perfil = pedido.get("cliente_perfil_impuestos")
     if perfil is None and pedido.get("cliente_id"):
-        row = conn.execute(
-            "SELECT perfil_impuestos FROM clientes WHERE id = %s",
-            (pedido["cliente_id"],),
-        ).fetchone()
-        if row:
-            perfil = row_to_dict(row).get("perfil_impuestos")
+        # #1240: si el pedido eligió una productora o un perfil personal alternativo
+        # (`productora_id`/`perfil_fiscal_id`, columnas reales de `alquileres`), ese
+        # target gana sobre el perfil default de `clientes` — mismo criterio que
+        # `services.pedidos_enriquecimiento._resolver_datos_fiscales_pedido`.
+        from services.pedidos_enriquecimiento import _resolver_datos_fiscales_pedido
+
+        c = _resolver_datos_fiscales_pedido(
+            conn,
+            pedido["cliente_id"],
+            pedido.get("perfil_fiscal_id"),
+            pedido.get("productora_id"),
+        )
+        if c:
+            perfil = c.get("perfil_impuestos")
             pedido["cliente_perfil_impuestos"] = perfil
 
     descuento_cliente_pct = pedido.get("descuento_cliente_pct") or 0.0
@@ -85,7 +90,6 @@ def desglose_de_pedido(conn, pedido: dict) -> dict:
     descuento_manual_pct = pedido.get("descuento_pct") or 0
     descuento_manual_tipo = pedido.get("descuento_manual_tipo") or "pct"
     descuento_manual_monto = pedido.get("descuento_manual_monto") or 0
-    descuento_manual_activo = bool(pedido.get("descuento_manual_activo"))
     desglose = calcular_total(
         items=items_para_total,
         jornadas=jornadas,
@@ -94,7 +98,6 @@ def desglose_de_pedido(conn, pedido: dict) -> dict:
         descuento_manual_pct=descuento_manual_pct,
         descuento_manual_tipo=descuento_manual_tipo,
         descuento_manual_monto=descuento_manual_monto,
-        descuento_manual_activo=descuento_manual_activo,
         perfil_impuestos=perfil,
     )
 
@@ -110,6 +113,6 @@ def desglose_de_pedido(conn, pedido: dict) -> dict:
     from descuentos.queries.decision import resolver_origen_pedido_monto
     pedido["descuento_origen"] = resolver_origen_pedido_monto(
         descuento_manual_tipo, descuento_manual_pct, descuento_manual_monto,
-        descuento_cliente_pct, descuento_jornadas_pct, descuento_manual_activo,
+        descuento_cliente_pct, descuento_jornadas_pct,
     )
     return pedido

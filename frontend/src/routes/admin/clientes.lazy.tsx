@@ -374,6 +374,14 @@ function ClienteHistorialSheet({
   const pedidos = pedidosQ.data ?? [];
   const totalGastado = pedidos.reduce((acc, p) => acc + (p.monto_total ?? 0), 0);
 
+  // #1240: solo lectura — perfiles fiscales personales + productoras vinculadas
+  // (la gestión real vive en el self-service del cliente y en /admin/productoras).
+  const perfilesFiscalesQ = useQuery({
+    queryKey: ["admin", "cliente-perfiles-fiscales", cliente?.id],
+    queryFn: () => adminApi.getClientePerfilesFiscales(cliente!.id),
+    enabled: !!cliente?.id,
+  });
+
   return (
     <>
       <BottomSheet
@@ -394,6 +402,47 @@ function ClienteHistorialSheet({
               <Info label="Dirección" value={cliente.direccion || "—"} className="col-span-2" />
               <Info label="Perfil" value={cliente.perfil_impuestos || "—"} />
             </div>
+
+            {/* #1240: perfiles fiscales personales + productoras vinculadas — solo
+              lectura (la gestión real vive en el self-service del cliente y en
+              /admin/productoras). */}
+            {!!(
+              perfilesFiscalesQ.data?.perfiles.length || perfilesFiscalesQ.data?.productoras.length
+            ) && (
+              <div className="space-y-2 rounded-lg border hairline p-3 text-sm">
+                {!!perfilesFiscalesQ.data?.perfiles.length && (
+                  <div>
+                    <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Perfiles fiscales personales
+                    </div>
+                    <ul className="space-y-0.5">
+                      {perfilesFiscalesQ.data.perfiles.map((p) => (
+                        <li key={p.id} className="text-ink">
+                          {p.etiqueta || p.razon_social || p.cuit} · {p.cuit}
+                          {p.es_default && (
+                            <span className="ml-1.5 text-xs text-muted-foreground">(default)</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {!!perfilesFiscalesQ.data?.productoras.length && (
+                  <div>
+                    <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Productoras vinculadas
+                    </div>
+                    <ul className="space-y-0.5">
+                      {perfilesFiscalesQ.data.productoras.map((pr) => (
+                        <li key={pr.id} className="text-ink">
+                          {pr.razon_social || pr.cuit} · {pr.cuit}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Identidad Didit */}
             {cliente.dni_validado_at ? (

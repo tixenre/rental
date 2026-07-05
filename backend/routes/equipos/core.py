@@ -279,6 +279,13 @@ def list_equipos(
     per_page:      int = Query(200, ge=1, le=500),
     desde:         Optional[str]  = Query(None, description="Fecha inicio (YYYY-MM-DD) para calcular disponibilidad"),
     hasta:         Optional[str]  = Query(None, description="Fecha fin (YYYY-MM-DD) para calcular disponibilidad"),
+    incluir_detalle: Optional[bool] = Query(
+        None,
+        description="Si false (solo admin — se ignora en catálogo público), "
+        "saltea kit/ficha/specs para vistas de listado que no los muestran "
+        "(ej. la tabla de búsqueda del admin). El detalle de un equipo puntual "
+        "(GET /equipos/{id}) los trae completos siempre, sin cambios.",
+    ),
 ):
     """Lista equipos con sort y filtros.
 
@@ -386,6 +393,11 @@ def list_equipos(
         base_sql += f" AND LOWER(COALESCE({MARCA_NOMBRE_EXPR}, '')) = LOWER(%s)"
         params.append(marca)
 
+    # El catálogo público SIEMPRE necesita el detalle completo (filtra/rankea
+    # por specs y kit client-side) — `incluir_detalle=false` solo lo puede
+    # pedir una sesión admin.
+    incluir_detalle_val = (incluir_detalle if incluir_detalle is not None else True) if is_admin else True
+
     with get_db() as conn:
         result = proyectar_lista(
             conn,
@@ -398,6 +410,7 @@ def list_equipos(
             desde=desde,
             hasta=hasta,
             is_admin=is_admin,
+            incluir_detalle=incluir_detalle_val,
         )
     # Cache: respuesta pública estable para un set dado de params;
     # admin recibe no-store (ve equipos no-visibles y filtros extra).
