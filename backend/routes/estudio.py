@@ -739,10 +739,13 @@ def reorder_fotos(body: ReorderBody, request: Request):
 
     with get_db() as conn:
         for f in body.fotos:
+            # El array llega completo en cada drag — el guard evita reescribir
+            # las fotos que no se movieron (antes: 1 foto movida = N updates).
             conn.execute(
                 "UPDATE estudio_fotos SET orden = %s, es_principal = %s "
-                "WHERE id = %s AND estudio_id = 1",
-                (f.orden, f.es_principal, f.id),
+                "WHERE id = %s AND estudio_id = 1 "
+                "AND (orden IS DISTINCT FROM %s OR es_principal IS DISTINCT FROM %s)",
+                (f.orden, f.es_principal, f.id, f.orden, f.es_principal),
             )
         conn.commit()
         fotos = _get_fotos(conn)
