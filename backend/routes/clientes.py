@@ -14,7 +14,7 @@ from auth.guards import require_admin
 from auth.commands import magic as magic_commands
 from busqueda import construir
 from config import settings
-from identity import merge
+from identity import merge, nombre_validado, direccion_validada
 
 router = APIRouter()
 
@@ -130,6 +130,10 @@ def list_clientes(
         for r in rows:
             d = row_to_dict(r)
             d.pop("_score", None)  # interno del ranking, no parte del contrato
+            # Mismo criterio que GET /api/cliente/me (routes/cliente_portal/cuenta.py):
+            # preferir RENAPER si está verificado, la ficha admin ya no lo recompone en TS.
+            d["nombre_legal"] = nombre_validado(d) or f"{d.get('nombre', '')} {d.get('apellido', '')}".strip()
+            d["direccion_legal"] = direccion_validada(d) or d.get("direccion")
             items.append(d)
         return {"total": total, "page": page, "per_page": per_page, "items": items}
 
@@ -243,7 +247,10 @@ def get_cliente(id: int, request: Request):
         row  = conn.execute("SELECT * FROM clientes WHERE id=%s", (id,)).fetchone()
         if not row:
             raise HTTPException(404, "Cliente no encontrado")
-        return row_to_dict(row)
+        d = row_to_dict(row)
+        d["nombre_legal"] = nombre_validado(d) or f"{d.get('nombre', '')} {d.get('apellido', '')}".strip()
+        d["direccion_legal"] = direccion_validada(d) or d.get("direccion")
+        return d
 
 
 @router.get("/clientes/{id}/pedidos")

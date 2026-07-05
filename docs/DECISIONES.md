@@ -2103,16 +2103,23 @@ cancel-in-progress` ya cancela corridas viejas.
   la creación/edición de pedidos, y un trace end-to-end de un pedido + estado del semáforo de
   reconciliación. Se verificó cada hallazgo contra el código real antes de documentarlo (grep directo,
   no solo confiar en el reporte del agente) — así se descubrió el hallazgo crítico de abajo.
-- **Descubrimiento crítico (de proceso, no de código nuevo).** El **PR #1181** — el fix ORIGINAL del bug
-  #405 (el editor de pedidos admin recotizaba contra el precio de catálogo de hoy en vez del precio de
-  línea ya persistido/congelado, mostrando "100% pagado" mientras la reconciliación mensual marcaba
-  "sobrepagado") — **nunca se mergeó a `dev` ni a `main`**. Sigue abierto (`state: open, merged: false`,
-  `mergeable_state: clean`). Confirmado con `git grep respetar_precio_item` sobre `origin/dev`/`origin/main`
-  y el checkout actual: cero resultados en todos — el símbolo solo existe en la rama del PR sin mergear
-  (`claude/payment-registration-issue-3mi8fk`). La entrada de `MEMORIA.md`/`DECISIONES.md` de la sesión
-  anterior lo registraba como ya shippeado ("PR #1181 (merged branch history...)") — era un error de
-  registro, no un revert; probablemente una confusión entre "el commit existe en una rama" y "esa rama está
-  mergeada". **Consecuencia: el bug #405 está potencialmente activo en producción hoy.** Prioridad
+- **Descubrimiento crítico (de proceso, no de código nuevo) — EN EL MOMENTO de esta auditoría.** El
+  **PR #1181** — el fix ORIGINAL del bug #405 (el editor de pedidos admin recotizaba contra el precio
+  de catálogo de hoy en vez del precio de línea ya persistido/congelado, mostrando "100% pagado"
+  mientras la reconciliación mensual marcaba "sobrepagado") — **no estaba mergeado a `dev` ni a `main`**
+  al momento de este chequeo. Confirmado con `git grep respetar_precio_item` sobre `origin/dev`/
+  `origin/main` y el checkout actual de ese momento: cero resultados en todos — el símbolo solo existía
+  en la rama del PR sin mergear (`claude/payment-registration-issue-3mi8fk`). La entrada de
+  `MEMORIA.md`/`DECISIONES.md` de la sesión anterior lo registraba como ya shippeado ("PR #1181 (merged
+  branch history...)") — era un error de registro, no un revert; probablemente una confusión entre "el
+  commit existe en una rama" y "esa rama está mergeada".
+  **Corrección (2026-07-05, verificado directo contra el repo):** el PR #1181 SÍ se mergeó a `dev` ese
+  mismo día, horas después de esta auditoría (`commit 9cc4924`, mergeado por el dueño a las 19:41 -03) —
+  `respetar_precio_item` está presente y activo hoy en `backend/routes/alquileres/cotizacion.py` en
+  `dev`. **El bug #405 está resuelto, no "potencialmente activo".** La lección de proceso sigue siendo
+  válida (siempre confirmar merge real con la API/git, no asumir por menciones en commits/PRs), pero la
+  consecuencia concreta de esta entrada quedó obsoleta apenas unas horas después de escribirse — prueba
+  de que un hallazgo de auditoría es una foto de un momento, no una verdad permanente. Prioridad
   recomendada: mergear #1181 antes que cualquier otro hallazgo de esta auditoría.
 - **Decisión — nuevo manual `docs/SISTEMA_PLATA.md`.** Cruza los ~6 motores de plata (precios, reservas,
   `alquiler_pagos`, `reportes/liquidacion`, `contabilidad`, `facturacion`) con una tabla "fuente única de
@@ -3031,3 +3038,26 @@ cancel-in-progress` ya cancela corridas viejas.
   `verificar_y_crear_perfil_fiscal`/`verificar_y_crear_productora`; un consumidor nuevo de datos
   fiscales de un pedido que no pase por `_resolver_datos_fiscales_pedido`; una tabla nueva con FK a
   `clientes` sin clasificar en `identity/merge.py`.
+
+### 2026-07-05 — `arca_fe` cruza el gate de "primera emisión real": arranca SemVer en 0.1.0
+
+- **Contexto.** Desde el diseño original del motor, `arca_fe/__init__.py` documentaba (solo como
+  comentario en el código, nunca registrado en la memoria) que `__version__` se quedaba FIJO en
+  `"0.0.0"` mientras la librería no hubiera emitido un comprobante real en producción — decisión
+  explícita del dueño para no bumpear por cada feature/cambio de superficie hasta que hubiera algo
+  real corriendo. `0.0.0` señalaba "sin versión todavía".
+- **Gate cruzado.** El dueño confirmó (en el marco de una auditoría de calidad de `arca_fe`/
+  `services/facturacion` + una pregunta de cobertura de features, mismo día) que ya hubo una
+  emisión real en producción con este motor. Corresponde arrancar el versionado SemVer de verdad.
+- **Primer número: `0.1.0`, no `1.0.0`.** Se evaluaron ambas opciones con el dueño. `1.0.0`
+  declararía el contrato público estable — pero la librería está a punto de sumar una superficie
+  nueva grande (WSFEXv1, Factura de Exportación) que todavía puede hacer evolucionar el diseño de
+  `modelos.py`/`__all__`. `0.1.0` es el arranque conservador: dentro de la serie `0.x` cualquier
+  cambio de superficie es aceptable sin comprometerse a compatibilidad estricta; `1.0.0` queda
+  reservado para cuando el contrato se declare estable de verdad.
+- **Qué cambia de acá en adelante.** Cada cambio de `__all__` bumpea MINOR (agregado
+  retrocompatible) o MAJOR (breaking) según corresponda — ya no se queda fijo. El mecanismo de
+  sincronización manual con `pyproject.toml` (sin build tooling automático) no cambia; el test
+  `test_portabilidad.py::test_pyproject_version_coincide_con_init` sigue siendo el candado.
+- **Consecuencia inmediata:** habilita versionar la próxima iniciativa grande (WSFEXv1) como un
+  bump MINOR real (`0.2.0` o el que corresponda) en vez de quedar indefinidamente en `0.0.0`.

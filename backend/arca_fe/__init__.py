@@ -8,15 +8,16 @@ y cryptography. El consumidor arma los modelos y llama a la API pública; el I/O
 En Rambla el adapter vive en `backend/services/facturacion/`. El día que se
 extraiga a un paquete pip propio, este directorio se levanta tal cual.
 
-Versionado: `__version__` se queda FIJO en `"0.0.0"` mientras la librería no haya emitido un
-comprobante real en producción — no se bumpea por feature ni por cambio de superficie (decisión
-explícita del dueño). `0.0.0` señala "sin versión todavía"; el día que cruce esa vara (primera
-emisión real en prod) arranca el versionado SemVer de verdad, y ahí sí cada cambio de `__all__`
-sube MINOR/MAJOR según corresponda. Un test de portabilidad verifica que el core nunca importe
-`backend.*`.
+Versionado: `__version__` se quedó FIJO en `"0.0.0"` mientras la librería no había emitido un
+comprobante real en producción (decisión explícita del dueño — no bumpear por feature ni por cambio
+de superficie hasta cruzar esa vara). El **2026-07-05** se confirmó la primera emisión real en
+producción → arranca el versionado SemVer de verdad en `"0.1.0"`. De acá en adelante, cada cambio de
+`__all__` sube MINOR (agregado retrocompatible) o MAJOR (breaking) según corresponda; `1.0.0` queda
+reservado para cuando el contrato público se declare estable. Un test de portabilidad verifica que el
+core nunca importe `backend.*`.
 """
 
-__version__ = "0.0.0"
+__version__ = "0.1.0"
 
 from .modelos import (
     CondicionIva,
