@@ -19,10 +19,13 @@ pytestmark = pytest.mark.unit
 @pytest.fixture(autouse=True)
 def _stub_sessions(monkeypatch):
     """Minteo de sesión sin DB (allowlist server-side stubbeada) — mismo patrón
-    que `test_staging_login.py`."""
+    que `test_staging_login.py`. `list_for_owner` (el chequeo de 2º factor de
+    `auth_callback`) default a "sin passkey" — los tests de esa rama lo
+    sobreescriben explícitamente (`TestAdminCallback2doFactor`)."""
     monkeypatch.setattr("auth.commands.sessions.create_session", lambda **kw: "stub-jti")
     monkeypatch.setattr("auth.queries.sessions.is_active",
                         lambda jti: {"jti": jti} if jti else None)
+    monkeypatch.setattr("auth.passkey.queries.list_for_owner", lambda *a, **k: [])
 
 
 @pytest.fixture(autouse=True)
