@@ -18,12 +18,13 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from typing import Mapping, Sequence
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
+from config import settings
 from database import to_datetime
 
 PRODID = "-//Rambla Rental//Reservas//ES"
-_UID_DOMAIN = "ramblarental.com.ar"
+_UID_DOMAIN = urlparse(settings.SITE_URL).netloc
 _TZID = "America/Argentina/Buenos_Aires"
 
 

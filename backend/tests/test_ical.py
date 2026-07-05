@@ -99,7 +99,7 @@ class TestReservaToVevent:
         assert "DTSTART;VALUE=DATE:20260610" in ve
         # fin 12 → DTEND exclusivo 13.
         assert "DTEND;VALUE=DATE:20260613" in ve
-        assert "UID:alquiler-5@ramblarental.com.ar" in ve
+        assert "UID:alquiler-5@rambla.house" in ve
         assert "Pedido #123" in ve
 
     def test_estudio_es_con_hora_y_lleva_prefijo(self):

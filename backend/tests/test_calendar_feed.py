@@ -107,7 +107,7 @@ class TestToken:
         assert resp.status_code == 200
         body = resp.body.decode("utf-8")
         assert "BEGIN:VCALENDAR" in body
-        assert "UID:alquiler-1@ramblarental.com.ar" in body
+        assert "UID:alquiler-1@rambla.house" in body
         assert "Pedido #50" in body
         assert conn.closed
 

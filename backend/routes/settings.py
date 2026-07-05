@@ -154,7 +154,7 @@ ALLOWED_SETTINGS_KEYS = {
     "apple_touch_icon_url",   # Ícono iOS derivado del isologo.
     "icon_512_url",           # Ícono cuadrado 512 derivado del isologo (no es el og:image).
     "whatsapp_phone",    # Teléfono del negocio para click-to-chat (formato +5492235852510).
-    "email_from",        # From address de mails ('Rambla <pedidos@rambla.com.uy>'). Pisado por env EMAIL_FROM.
+    "email_from",        # From address de mails ('Rambla <hola@rambla.house>'). Pisado por env EMAIL_FROM.
     "email_admin_to",    # Destinatario de notif al admin cuando entra un pedido. Pisado por env EMAIL_ADMIN_TO.
     "buffer_horas_alquiler",  # Horas de prep/revisión exigidas entre alquileres. Int >= 0.
     "antelacion_minima_horas",  # Lead-time: horas mín. de antelación para reservar online (#1126). Int >= 0. 0 = apagado.

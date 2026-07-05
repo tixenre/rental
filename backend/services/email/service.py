@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Optional, Sequence, TYPE_CHECKING
+from urllib.parse import urlparse
 
 if TYPE_CHECKING:
     from .base import Attachment
@@ -51,7 +52,7 @@ def _resolve_from(conn) -> str:
     ).fetchone()
     if row and row["value"]:
         return row["value"]
-    return "Rambla Rental <noreply@rambla.com.uy>"
+    return f"Rambla Rental <noreply@{urlparse(settings.SITE_URL).netloc}>"
 
 
 def get_admin_to() -> Optional[str]:
