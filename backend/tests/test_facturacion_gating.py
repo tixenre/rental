@@ -114,6 +114,8 @@ def test_gating_produccion_cuando_is_production(monkeypatch):
     assert cred.ambiente == "produccion"
     assert "wsaa.afip.gov.ar" in cred.endpoint_wsaa
     assert "homo" not in cred.endpoint_wsaa
+    assert "wsfexv1" in cred.endpoint_wsfex
+    assert "homo" not in cred.endpoint_wsfex
 
 
 def test_gating_homologacion_cuando_no_is_production(monkeypatch):
@@ -126,6 +128,8 @@ def test_gating_homologacion_cuando_no_is_production(monkeypatch):
     cred = credenciales("pablo", _FakeConn())
     assert cred.ambiente == "homologacion"
     assert "homo" in cred.endpoint_wsaa
+    assert "homo" in cred.endpoint_wsfex
+    assert "wsfexv1" in cred.endpoint_wsfex
 
 
 def test_gating_emisor_no_encontrado_levanta(monkeypatch):
