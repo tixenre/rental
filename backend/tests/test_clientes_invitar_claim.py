@@ -72,7 +72,7 @@ class _CtxConn:
 def test_invitar_crea_cuenta_nueva(monkeypatch):
     monkeypatch.setattr("routes.clientes.require_admin", lambda request: None)
     monkeypatch.setattr("routes.clientes.get_db", lambda: _InvitarConn(existing_id=None, new_id=42))
-    monkeypatch.setattr("routes.clientes.magic.crear", lambda **kw: "TOK")
+    monkeypatch.setattr("routes.clientes.magic_commands.crear", lambda **kw: "TOK")
     res = invitar_cliente(InvitarClienteIn(email="Nuevo@X.com", nombre="Ana"), request=object())
     assert res["cliente_id"] == 42 and res["ya_existia"] is False
     assert "TOK" in res["url"] and "/cliente/claim?t=" in res["url"]
@@ -81,7 +81,7 @@ def test_invitar_crea_cuenta_nueva(monkeypatch):
 def test_invitar_reusa_cuenta_sin_verificar(monkeypatch):
     monkeypatch.setattr("routes.clientes.require_admin", lambda request: None)
     monkeypatch.setattr("routes.clientes.get_db", lambda: _InvitarConn(existing_id=7, verificado=None))
-    monkeypatch.setattr("routes.clientes.magic.crear", lambda **kw: "T")
+    monkeypatch.setattr("routes.clientes.magic_commands.crear", lambda **kw: "T")
     res = invitar_cliente(InvitarClienteIn(email="ya@x.com"), request=object())
     assert res["cliente_id"] == 7 and res["ya_existia"] is True  # no duplica; sin verificar → OK
 
@@ -107,13 +107,13 @@ def test_invitar_email_invalido_400(monkeypatch):
 # ── claim / claim-info (públicas, por HTTP) ───────────────────────────────────
 
 def test_claim_info_invalido_400(monkeypatch):
-    monkeypatch.setattr("auth.magic.peek", lambda t, *, purpose: None)
+    monkeypatch.setattr("auth.queries.magic.peek", lambda t, *, purpose: None)
     r = _http.get("/api/cliente/claim-info?t=bad")
     assert r.status_code == 400  # pública (no 401) + token malo → 400
 
 
 def test_claim_info_ok(monkeypatch):
-    monkeypatch.setattr("auth.magic.peek", lambda t, *, purpose: {"cliente_id": 5, "email": "a@b.com"})
+    monkeypatch.setattr("auth.queries.magic.peek", lambda t, *, purpose: {"cliente_id": 5, "email": "a@b.com"})
     monkeypatch.setattr("routes.cliente_portal.cuenta.get_db", lambda: _CtxConn({"nombre": "Ana"}))
     r = _http.get("/api/cliente/claim-info?t=ok")
     assert r.status_code == 200
@@ -121,21 +121,21 @@ def test_claim_info_ok(monkeypatch):
 
 
 def test_claim_invalido_400(monkeypatch):
-    monkeypatch.setattr("auth.magic.consumir", lambda token, *, purpose: None)
+    monkeypatch.setattr("auth.commands.magic.consumir", lambda token, *, purpose: None)
     r = _http.post("/api/cliente/claim", json={"token": "x"})
     assert r.status_code == 400
 
 
 def test_claim_ok_mintea_sesion(monkeypatch):
     monkeypatch.setattr(
-        "auth.magic.consumir", lambda token, *, purpose: {"cliente_id": 5, "email": "a@b.com"}
+        "auth.commands.magic.consumir", lambda token, *, purpose: {"cliente_id": 5, "email": "a@b.com"}
     )
     monkeypatch.setattr(
         "routes.cliente_portal.cuenta.get_db", lambda: _CtxConn({"id": 5, "nombre": "Ana"})
     )
     linked = []
     monkeypatch.setattr(
-        "auth.identities_store.link_identity", lambda **kw: linked.append(kw) or "linked"
+        "auth.commands.identities.link_identity", lambda **kw: linked.append(kw) or "linked"
     )
     monkeypatch.setattr(
         "routes.cliente_portal.cuenta._make_session_response",

@@ -114,7 +114,7 @@ def cliente_registro(request: Request, data: RegistroCreate):
     # Registrar las llaves de login de la cuenta (idempotente): el mail (handle de
     # magic-link) y, si vino del callback de Google, su `sub` estable → la cuenta nace
     # con sus llaves en `login_identities`.
-    from auth.identities_store import link_identity  # perezoso: evita ciclo con auth/__init__
+    from auth.commands.identities import link_identity  # perezoso: evita ciclo con auth/__init__
     link_identity(cliente_id=cliente_id, method="email", identifier=email.lower(), verified=True)
     google_sub = payload.get("google_sub")
     if google_sub:
@@ -144,8 +144,8 @@ class ClaimIn(BaseModel):
 @limiter.limit("10/minute")
 def cliente_claim_info(request: Request, t: str):
     """Previsualiza una invitación SIN consumirla (para el landing)."""
-    from auth import magic
-    ctx = magic.peek(t, purpose="invitacion")
+    from auth.queries import magic as magic_queries
+    ctx = magic_queries.peek(t, purpose="invitacion")
     if not ctx:
         raise HTTPException(400, "Invitación inválida, vencida o ya usada.")
     with get_db() as conn:
@@ -161,8 +161,8 @@ def cliente_claim(request: Request, data: ClaimIn):
     """Reclama una cuenta invitada: CONSUME el magic-link (single-use), vincula el email
     como llave verificada y MINTEA la sesión. El cliente queda logueado → registra su
     passkey desde 'Métodos de acceso'."""
-    from auth import magic
-    ctx = magic.consumir(data.token, purpose="invitacion")
+    from auth.commands import magic as magic_commands
+    ctx = magic_commands.consumir(data.token, purpose="invitacion")
     if not ctx:
         raise HTTPException(400, "Invitación inválida, vencida o ya usada.")
     cliente_id, email = ctx["cliente_id"], ctx["email"]
@@ -171,7 +171,7 @@ def cliente_claim(request: Request, data: ClaimIn):
         if not row:
             raise HTTPException(404, "La cuenta de esta invitación ya no existe.")
         nombre = row_to_dict(row).get("nombre") or ""
-    from auth.identities_store import link_identity
+    from auth.commands.identities import link_identity
     link_identity(cliente_id=cliente_id, method="email", identifier=email, verified=True)
     return _make_session_response(
         email, nombre, extra={"role": "cliente", "cliente_id": cliente_id}, request=request,

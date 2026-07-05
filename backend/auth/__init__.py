@@ -17,6 +17,13 @@ Submódulos:
 - `queries.sessions` / `commands.sessions` / `sessions_routes` → allowlist de
   sesiones + revocación (logout real, "cerrar mis otras sesiones"). La cookie
   firmada lleva un `jti`; la tabla decide si sigue viva.
+- `queries.identities` / `commands.identities` → llaves de login del cliente
+  (Google/mail, tabla `login_identities`); `linking.py` las une con las passkeys
+  en "métodos de acceso".
+- `queries.account_merge` / `commands.account_merge` → unir dos cuentas cuando
+  son la misma persona (una absorbible, sin datos que perder).
+- `queries.magic` / `commands.magic` → magic-link single-use (invitación de
+  cuenta, atajo de recuperación).
 
 La superficie pública (símbolos + routers) se ensambla al final de este módulo.
 """

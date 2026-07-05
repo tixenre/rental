@@ -11,7 +11,7 @@ from urllib.parse import quote
 
 from database import get_db, row_to_dict
 from auth.guards import require_admin
-from auth import magic
+from auth.commands import magic as magic_commands
 from busqueda import construir
 from config import settings
 from identity import merge
@@ -227,7 +227,7 @@ def invitar_cliente(body: InvitarClienteIn, request: Request):
             )
             conn.commit()
             ya_existia = False
-    token = magic.crear(email=email, purpose="invitacion", cliente_id=cliente_id)
+    token = magic_commands.crear(email=email, purpose="invitacion", cliente_id=cliente_id)
     return {
         "ok": True,
         "cliente_id": cliente_id,

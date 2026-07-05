@@ -352,7 +352,8 @@ def _completar_link_google(request: Request, link_cid: int, sub: str | None, ema
     current = get_session(request)
     if not current or current.get("role") != "cliente" or current.get("cliente_id") != link_cid or not sub:
         return RedirectResponse(f"{base}&keys=error", status_code=303)
-    from auth.identities_store import link_identity, google_identity_for_cliente  # perezoso
+    from auth.commands.identities import link_identity  # perezoso
+    from auth.queries.identities import google_identity_for_cliente
     # Una cuenta = un Google: si ya hay un Google distinto vinculado, no sumamos otro.
     ya = google_identity_for_cliente(link_cid)
     if ya is not None and ya["identifier"] != sub:
@@ -372,8 +373,9 @@ def _merge_cuentas_por_google(request: Request, *, actual: int, sub: str):
     """El Google que se quiso vincular ya es de otra cuenta. Se unen si una de las dos es
     **absorbible** (liviana/vacía); si ambas tienen datos, no se auto-mergea → "taken"
     (el merge general con reasignación de datos es Fase 2)."""
-    from auth.identities_store import find_cliente_by_identity
-    from auth.account_merge import account_is_absorbable, merge_accounts
+    from auth.queries.identities import find_cliente_by_identity
+    from auth.queries.account_merge import account_is_absorbable
+    from auth.commands.account_merge import merge_accounts
     base = f"{FRONTEND_BASE}/cliente/portal?tab=perfil"
     otra = find_cliente_by_identity("google", sub)
     if otra is None or otra == actual:
@@ -472,7 +474,7 @@ def cliente_auth_callback(request: Request):
     # para las cuentas previas a `login_identities` (backfillea el sub). Que el ancla
     # sea el `sub` y no el mail = un cliente que cambió su mail en Google sigue entrando
     # a la misma cuenta.
-    from auth.identities_store import find_or_backfill_google  # perezoso: evita ciclo con auth/__init__
+    from auth.commands.identities import find_or_backfill_google  # perezoso: evita ciclo con auth/__init__
     sub = userinfo.get("sub") or userinfo.get("id")
 
     # ¿Es un LINK (vincular Google a una cuenta ya logueada), no un login? El
