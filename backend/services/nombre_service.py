@@ -122,12 +122,27 @@ def calcular_nombres_para(conn, equipo_id: int) -> tuple[str, str]:
 
 def actualizar_nombres_de(conn, equipo_id: int, *, commit: bool = True) -> tuple[str, str]:
     """Calcula y PERSISTE los nombres públicos de un equipo. Devuelve (corto, largo).
+    No escribe si ambos valores ya coinciden con los guardados — se llama desde
+    8 hooks distintos (setFicha, setCategorias, update_equipo, specs, ...) y la
+    mayoría de las veces el nombre no cambia; un UPDATE incondicional generaba
+    dead rows en `equipos` en cada guardado sin cambio real (mismo criterio que
+    ya usa `regenerar_nombres_todos` para decidir sus "cambios").
 
     Si `commit=True`, hace commit. Si False, deja la transacción abierta para
     que el caller decida (útil cuando este recálculo va dentro de otra
     transacción más grande).
     """
     corto, largo = calcular_nombres_para(conn, equipo_id)
+
+    actual = conn.execute(
+        "SELECT nombre_publico, nombre_publico_largo FROM equipos WHERE id = %s",
+        (equipo_id,),
+    ).fetchone()
+    if actual and (actual["nombre_publico"] or "") == corto and (actual["nombre_publico_largo"] or "") == largo:
+        if commit:
+            conn.commit()
+        return corto, largo
+
     conn.execute(
         "UPDATE equipos SET nombre_publico = %s, nombre_publico_largo = %s WHERE id = %s",
         (corto, largo, equipo_id),
