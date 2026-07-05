@@ -338,6 +338,10 @@ export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftO
     if (!pedido || !items || !serverRef.current) return;
     if (shallowItemsEq(items, serverRef.current.items)) return;
     if (items.length === 0) return;
+    // Línea personalizada recién agregada, todavía sin nombre (#805): no
+    // autoguardar todavía — dispararía el 422 "necesita un nombre" mientras
+    // el usuario recién hace foco en el input, antes de tipear una letra.
+    if (items.some((it) => it.equipo_id == null && !(it.nombre_libre ?? "").trim())) return;
     const t = setTimeout(() => {
       itemsMut.mutate(items);
     }, DEBOUNCE_MS);
