@@ -3038,3 +3038,26 @@ cancel-in-progress` ya cancela corridas viejas.
   `verificar_y_crear_perfil_fiscal`/`verificar_y_crear_productora`; un consumidor nuevo de datos
   fiscales de un pedido que no pase por `_resolver_datos_fiscales_pedido`; una tabla nueva con FK a
   `clientes` sin clasificar en `identity/merge.py`.
+
+### 2026-07-05 — `arca_fe` cruza el gate de "primera emisión real": arranca SemVer en 0.1.0
+
+- **Contexto.** Desde el diseño original del motor, `arca_fe/__init__.py` documentaba (solo como
+  comentario en el código, nunca registrado en la memoria) que `__version__` se quedaba FIJO en
+  `"0.0.0"` mientras la librería no hubiera emitido un comprobante real en producción — decisión
+  explícita del dueño para no bumpear por cada feature/cambio de superficie hasta que hubiera algo
+  real corriendo. `0.0.0` señalaba "sin versión todavía".
+- **Gate cruzado.** El dueño confirmó (en el marco de una auditoría de calidad de `arca_fe`/
+  `services/facturacion` + una pregunta de cobertura de features, mismo día) que ya hubo una
+  emisión real en producción con este motor. Corresponde arrancar el versionado SemVer de verdad.
+- **Primer número: `0.1.0`, no `1.0.0`.** Se evaluaron ambas opciones con el dueño. `1.0.0`
+  declararía el contrato público estable — pero la librería está a punto de sumar una superficie
+  nueva grande (WSFEXv1, Factura de Exportación) que todavía puede hacer evolucionar el diseño de
+  `modelos.py`/`__all__`. `0.1.0` es el arranque conservador: dentro de la serie `0.x` cualquier
+  cambio de superficie es aceptable sin comprometerse a compatibilidad estricta; `1.0.0` queda
+  reservado para cuando el contrato se declare estable de verdad.
+- **Qué cambia de acá en adelante.** Cada cambio de `__all__` bumpea MINOR (agregado
+  retrocompatible) o MAJOR (breaking) según corresponda — ya no se queda fijo. El mecanismo de
+  sincronización manual con `pyproject.toml` (sin build tooling automático) no cambia; el test
+  `test_portabilidad.py::test_pyproject_version_coincide_con_init` sigue siendo el candado.
+- **Consecuencia inmediata:** habilita versionar la próxima iniciativa grande (WSFEXv1) como un
+  bump MINOR real (`0.2.0` o el que corresponda) en vez de quedar indefinidamente en `0.0.0`.

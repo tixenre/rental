@@ -1020,6 +1020,16 @@ fiscales de un pedido que no pase por `_resolver_datos_fiscales_pedido`; una tab
 `clientes` sin clasificar en `identity/merge.py`. Cómo → docstrings de `services/facturacion/padron.py`
 y `services/pedidos_enriquecimiento.py`; tracking #1240.
 
+### 2026-07-05 — `arca_fe` cruza el gate de "primera emisión real": arranca SemVer en 0.1.0
+
+`arca_fe.__version__` estaba fijo en `"0.0.0"` a propósito hasta la primera emisión real en
+producción (política que solo vivía como comentario en el código, nunca registrada en la memoria).
+El dueño confirmó que esa emisión real ya pasó → arranca el versionado SemVer real en **`0.1.0`**
+(conservador, no `1.0.0` — la API puede seguir evolucionando mientras se suman features como WSFEXv1).
+De acá en adelante, todo cambio de `__all__` bumpea MINOR/MAJOR según corresponda; `1.0.0` queda
+reservado para cuando el contrato público se declare estable. `pyproject.toml` se sincroniza a mano
+(sin build tooling), verificado por `test_portabilidad.py`.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
