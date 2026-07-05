@@ -26,6 +26,8 @@ import {
 } from "@/lib/rental-dates";
 import { useHorarios } from "@/lib/horarios";
 import { useAntelacionMinimaHorasQuery } from "@/hooks/useSettings";
+import { useBusinessPhone } from "@/lib/business";
+import { whatsappLink } from "@/lib/whatsapp";
 import { apiGetDiasBloqueados } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -119,6 +121,13 @@ export function DateRangePickerModal({
     () => (leadTimeKnown ? earliestRetiro(now, leadTimeHoras) : undefined),
     [now, leadTimeHoras, leadTimeKnown],
   );
+  // Mismo helper que el disclaimer de urgencia del carrito (CartDrawer) — una
+  // sola forma de armar el link de WhatsApp, no una URL ad-hoc acá.
+  const businessPhone = useBusinessPhone();
+  const urgenciaWhatsappUrl = whatsappLink({
+    phone: businessPhone,
+    message: "¡Hola! Necesito reservar con menos anticipación de la mínima. ¿Me pueden ayudar?",
+  });
 
   // ── Días bloqueados (sin stock) ──────────────────────────────────────
   const ventanaDesde = ymd(today);
@@ -476,12 +485,33 @@ export function DateRangePickerModal({
             </p>
           )}
 
-          {/* Antelación mínima (#1126) — informativo, siempre visible si está
-              configurada; el piso real ya lo aplican el calendario y la hora. */}
+          {/* Antelación mínima (#1126) — siempre visible si está configurada (el
+              piso real ya lo aplican el calendario y la hora); mismo tratamiento
+              visual que las demás advertencias no bloqueantes, para que no pase
+              desapercibido por qué faltan horas cercanas a "ahora". */}
           {!allowPast && leadTimeHoras > 0 && (
-            <p className="flex items-center gap-1.5 text-2xs text-muted-foreground/80">
-              <Clock className="h-3 w-3 shrink-0" />
-              Retiro con al menos {leadTimeHoras} h de anticipación.
+            <p className="flex items-center gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
+              <Clock className="h-3.5 w-3.5 shrink-0 text-amber" />
+              <span>
+                Reservás online con al menos <strong>{leadTimeHoras} h de anticipación</strong> —
+                por eso no ves horas más cercanas a ahora.{" "}
+                {urgenciaWhatsappUrl ? (
+                  <>
+                    ¿Urgencia?{" "}
+                    <a
+                      href={urgenciaWhatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold underline underline-offset-2 hover:text-amber"
+                    >
+                      Escribinos por WhatsApp
+                    </a>
+                    .
+                  </>
+                ) : (
+                  "¿Urgencia? Escribinos para coordinar."
+                )}
+              </span>
             </p>
           )}
         </div>
