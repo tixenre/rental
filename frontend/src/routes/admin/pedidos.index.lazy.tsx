@@ -128,6 +128,7 @@ function PedidosPage() {
     search.f && search.f in DAY_FILTER_LABEL ? (search.f as DayFilter) : null;
 
   const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
   const [estadoF, setEstadoF] = useState<EstadoFilter>("todos");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
@@ -136,8 +137,8 @@ function PedidosPage() {
 
   // Lista de pedidos (per_page alto cubre el volumen real).
   const pedidosQ = useQuery({
-    queryKey: ["admin", "pedidos", { q }],
-    queryFn: () => adminApi.listPedidos({ q: q || undefined, per_page: 200 }),
+    queryKey: ["admin", "pedidos", { q: debouncedQ }],
+    queryFn: () => adminApi.listPedidos({ q: debouncedQ || undefined, per_page: 200 }),
     refetchInterval: 60_000,
     staleTime: 0,
   });
@@ -229,6 +230,8 @@ function PedidosPage() {
           <SearchInput
             value={q}
             onValueChange={setQ}
+            debounceMs={300}
+            onDebouncedChange={setDebouncedQ}
             placeholder="Buscar cliente o número…"
             wrapperClassName="md:max-w-sm flex-1"
           />
