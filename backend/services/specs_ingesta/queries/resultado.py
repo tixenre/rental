@@ -65,7 +65,16 @@ def build_result(*, marca: str, modelo: str, specs: dict, extras: dict,
     try:
         from services.specs_ingesta.queries.resolver import resolve_pairs
 
-        raw_pairs = [{"label": k, "value": v} for k, v in (secciones or {}).items() if v]
+        # `secciones` es dict[nombre_sección, list[{label, value}]] (BHSpecsParser
+        # + merge_jsonld_into_secciones) — aplanar los items de TODAS las
+        # secciones, no tratar la sección como el par (bug: el nombre de sección
+        # se pasaba como label y la lista de items como value).
+        raw_pairs = [
+            item
+            for items in (secciones or {}).values()
+            for item in items
+            if item.get("value")
+        ]
         _, unmatched = resolve_pairs(raw_pairs, categoria_sugerida)
     except Exception as exc:
         logger.warning("unmatched: no se pudo resolver pares de '%s': %s", categoria_sugerida, exc)
