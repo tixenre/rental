@@ -14,7 +14,11 @@ Reglas que NO se rompen:
   inline de 1 nivel ni "otra función parecida". `reservado_total` reemplazó a `directo + via_kit`.
 - **El candado es determinístico:** el gate (`gate.py::validar_stock`) lockea en **`ORDER BY id`**
   (sin deadlock). El `FOR UPDATE` / la transacción / el commit son **byte-idénticos** — no se tocan.
-- **`esencial` propaga conjuntivo:** lectura con `solo_esenciales=True`, gate estricto con `False`.
+- **`esencial` propaga conjuntivo:** lectura de catálogo con `solo_esenciales=True`, gate estricto con
+  `False`. Excepción a propósito: `calcular_disponibilidad_draft` (el "X libres" draft-aware del editor
+  de pedidos) es lectura pero **espeja al gate** (expansión estricta + derivación `incluir_best_effort`)
+  porque su único trabajo es PREDECIRLO — devuelve valores con signo (negativo = faltan unidades) y no
+  toma locks. El front no resta stock por su cuenta: pide este mapa y lo muestra.
 - **El Estudio reusa este motor sin tocarlo** (columna `tipo`, equipo centinela; buffer aplicado
   expandiendo el rango **afuera** del motor, nunca adentro). Ver `docs/DECISIONES.md` _2026-05-27_.
 
