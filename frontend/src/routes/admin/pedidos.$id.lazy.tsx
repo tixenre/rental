@@ -396,7 +396,7 @@ function PedidoEditorPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-0 lg:gap-0 min-h-0">
         {/* ── Columna de trabajo ── */}
-        <div className="px-4 md:px-6 py-5 space-y-5 lg:border-r hairline pb-28 lg:pb-5">
+        <div className="min-w-0 px-4 md:px-6 py-5 space-y-5 lg:border-r hairline pb-28 lg:pb-5">
           {/* Banner solicitud pendiente (deferido — solo aviso read-only) */}
           {p.tiene_solicitud_pendiente && (
             <div className="flex items-start gap-2 rounded-lg border border-amber/40 bg-amber/5 px-3 py-2.5 text-sm">
