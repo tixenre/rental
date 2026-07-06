@@ -96,10 +96,10 @@ function FaqPage() {
                     value={`${group.title}-${i}`}
                     className="border-0 px-4"
                   >
-                    <AccordionTrigger className="text-left text-sm font-medium text-ink hover:no-underline py-4">
+                    <AccordionTrigger className="text-left text-base font-medium text-ink hover:no-underline py-4">
                       {item.q}
                     </AccordionTrigger>
-                    <AccordionContent className="text-sm text-muted-foreground pb-4 leading-relaxed">
+                    <AccordionContent className="text-base text-muted-foreground pb-4 leading-relaxed">
                       {item.a}
                     </AccordionContent>
                   </AccordionItem>

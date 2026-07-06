@@ -618,8 +618,8 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
                 <dl className="border-t hairline pt-2">
                   {item.specs.map((s, i) => (
                     <div key={i} className="flex justify-between gap-4 border-b hairline py-2">
-                      <dt className="text-sm text-muted-foreground shrink-0">{s.label}</dt>
-                      <dd className="text-sm font-mono tabular-nums text-ink text-right">
+                      <dt className="text-base text-muted-foreground shrink-0">{s.label}</dt>
+                      <dd className="text-base font-mono tabular-nums text-ink text-right">
                         {s.value}
                       </dd>
                     </div>

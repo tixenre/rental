@@ -505,7 +505,7 @@ export function PedidoCard({
                 <section className="rounded-md border border-amber bg-amber-soft px-3.5 py-3 flex items-start gap-2.5">
                   <CircleCheckBig className="h-4 w-4 text-amber mt-0.5 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="font-sans text-sm font-semibold text-ink">
+                    <div className="font-sans text-base font-semibold text-ink">
                       ¡Recibimos tu solicitud!
                     </div>
                     <div className="font-sans text-xs text-ink/70 mt-0.5">
@@ -520,7 +520,7 @@ export function PedidoCard({
                 <section className="rounded-md border border-amber bg-amber-soft px-3.5 py-3 flex items-start gap-2.5">
                   <Clock className="h-4 w-4 text-amber mt-0.5 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="font-sans text-sm font-semibold text-ink">
+                    <div className="font-sans text-base font-semibold text-ink">
                       Solicitud de modificación pendiente
                     </div>
                     <div className="font-sans text-xs text-ink/70 mt-0.5">
@@ -567,7 +567,7 @@ export function PedidoCard({
                         <Info className="h-4 w-4 text-azul mt-0.5 shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="font-sans text-sm font-semibold text-ink">{titulo}</div>
+                        <div className="font-sans text-base font-semibold text-ink">{titulo}</div>
                         {ultimaResuelta.respuesta && (
                           <div className="font-sans text-xs text-ink/80 mt-0.5 whitespace-pre-wrap">
                             {isSystemCancel ? ultimaResuelta.respuesta : ultimaResuelta.respuesta}

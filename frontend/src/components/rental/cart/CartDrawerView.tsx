@@ -387,7 +387,7 @@ export function CartDrawerView({
                                   <div className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
                                     {it.brand}
                                   </div>
-                                  <div className="line-clamp-2 font-sans text-sm font-bold leading-tight">
+                                  <div className="line-clamp-2 font-sans text-base font-bold leading-tight">
                                     {it.name}
                                   </div>
                                   {it.includes && it.includes.length > 0 ? (
