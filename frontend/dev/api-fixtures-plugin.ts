@@ -16,14 +16,72 @@ import { jornadasFromISO } from "../src/lib/rental-dates";
  * `/api → :8000` falla con ECONNREFUSED: el catálogo queda vacío y el carrito
  * muestra $0, lo que impide ver el diseño con datos reales.
  *
- * Este plugin intercepta SOLO esos endpoints de lectura/cotización y responde
- * con los JSON generados desde la DB pública (ver dev/gen-fixtures.mjs) y un
- * cálculo de cotización que replica la regla del backend lo suficiente para el
- * diseño. Se activa únicamente con `apply: "serve"` (dev), así que NO afecta el
- * build de producción ni el resto de endpoints (auth, pedidos, etc. siguen
- * yendo al proxy real). Para desactivarlo, basta con borrar `dev/api-fixtures/`.
+ * Este plugin intercepta esos endpoints de lectura/cotización, pero **prueba
+ * primero el backend real** (`probeBackend`, timeout corto) — solo cae al JSON
+ * estático si esa prueba falla (backend caído/inalcanzable). Antes servía el
+ * fixture SIEMPRE que existiera `dev/api-fixtures/`, sin chequear si el backend
+ * estaba levantado: con el backend local corriendo igual, el catálogo salía
+ * del fixture viejo en vez de la BD real, y un equipo agregado desde su ficha
+ * (que sí pega al backend real) podía no existir en el fixture — el efecto de
+ * reconciliación de `rental.tsx` lo trataba como fantasma y vaciaba el carrito
+ * (falso positivo encontrado auditando el bug reportado, no un bug del carrito).
+ * Se activa únicamente con `apply: "serve"` (dev), así que NO afecta el build
+ * de producción ni el resto de endpoints (auth, pedidos, etc. siguen yendo al
+ * proxy real).
  */
 const FIXTURES_DIR = resolve(__dirname, "api-fixtures");
+
+// Mismo target que el proxy de `/api` en vite.config.ts.
+const BACKEND_URL = "http://localhost:8000";
+const BACKEND_PROBE_TIMEOUT_MS = 1500;
+
+/** Headers que no tiene sentido reenviar en un forward loopback simple. */
+const HOP_BY_HOP_REQUEST_HEADERS = new Set(["host", "connection", "content-length"]);
+const HOP_BY_HOP_RESPONSE_HEADERS = new Set([
+  "content-encoding",
+  "content-length",
+  "transfer-encoding",
+  "connection",
+]);
+
+/**
+ * Intenta resolver la request contra el backend real (mismo path+query que
+ * llegó a vite). Si el backend responde (con el status que sea — incluso un
+ * error de la app es "backend vivo"), reenvía esa respuesta tal cual y
+ * devuelve `true`. Si el fetch falla (ECONNREFUSED/timeout — backend
+ * inalcanzable), devuelve `false` sin tocar `res`, para que el caller sirva
+ * el fixture como fallback.
+ */
+async function probeBackend(
+  req: IncomingMessage,
+  res: ServerResponse,
+  body?: string,
+): Promise<boolean> {
+  const headers: Record<string, string> = {};
+  for (const [k, v] of Object.entries(req.headers)) {
+    if (typeof v === "string" && !HOP_BY_HOP_REQUEST_HEADERS.has(k.toLowerCase())) {
+      headers[k] = v;
+    }
+  }
+  try {
+    const backendRes = await fetch(`${BACKEND_URL}${req.url}`, {
+      method: req.method,
+      headers,
+      body,
+      signal: AbortSignal.timeout(BACKEND_PROBE_TIMEOUT_MS),
+    });
+    const text = await backendRes.text();
+    res.statusCode = backendRes.status;
+    backendRes.headers.forEach((value, key) => {
+      if (!HOP_BY_HOP_RESPONSE_HEADERS.has(key.toLowerCase())) res.setHeader(key, value);
+    });
+    res.setHeader("X-Rambla-Fixture-Probe", "backend-real");
+    res.end(text);
+    return true;
+  } catch {
+    return false; // backend caído/inalcanzable → el caller sirve el fixture
+  }
+}
 
 const GET_ROUTES: Record<string, string> = {
   "/api/equipos": "equipos.json",
@@ -177,19 +235,21 @@ function serveDevLoginPage(res: ServerResponse, role: string | undefined) {
   res.end(html);
 }
 
-function readBody(req: IncomingMessage): Promise<CotizarBody> {
+function readRawBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve) => {
     let data = "";
     req.on("data", (c: Buffer | string) => (data += c));
-    req.on("end", () => {
-      try {
-        resolve(data ? JSON.parse(data) : {});
-      } catch {
-        resolve({});
-      }
-    });
-    req.on("error", () => resolve({}));
+    req.on("end", () => resolve(data));
+    req.on("error", () => resolve(""));
   });
+}
+
+function parseBody(raw: string): CotizarBody {
+  try {
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
 }
 
 export function apiFixturesPlugin(): Plugin {
@@ -197,8 +257,9 @@ export function apiFixturesPlugin(): Plugin {
     name: "rambla-api-fixtures-dev",
     apply: "serve",
     configureServer(server) {
-      // Solo activamos los fixtures si la carpeta existe. Si un dev tiene el
-      // backend real corriendo y borra dev/api-fixtures/, el proxy toma el control.
+      // Solo activamos el middleware si la carpeta existe. Con el backend real
+      // levantado, probeBackend() gana en cada request — el fixture queda de
+      // reserva para cuando no hay backend (p. ej. preview de v0).
       if (!existsSync(FIXTURES_DIR)) return;
 
       const precios = loadPrecios();
@@ -245,9 +306,12 @@ export function apiFixturesPlugin(): Plugin {
 
         // ── Fin dev auth ────────────────────────────────────────────────────
 
-        // Cotización dinámica del carrito.
+        // Cotización dinámica del carrito. Prueba el backend real primero
+        // (probeBackend) — solo cae al cálculo aproximado si no responde.
         if (req.method === "POST" && pathname === "/api/cotizar") {
-          const body = await readBody(req);
+          const raw = await readRawBody(req);
+          if (await probeBackend(req, res, raw)) return;
+          const body = parseBody(raw);
           res.setHeader("Content-Type", "application/json");
           res.setHeader("X-Rambla-Fixture", "1");
           res.statusCode = 200;
@@ -255,11 +319,13 @@ export function apiFixturesPlugin(): Plugin {
           return;
         }
 
-        // GET de lectura del catálogo.
+        // GET de lectura del catálogo. Mismo criterio: backend real primero,
+        // fixture estático solo como fallback si no responde.
         if (req.method === "GET") {
           // Exact match primero
           const file = GET_ROUTES[pathname];
           if (file) {
+            if (await probeBackend(req, res)) return;
             const fixtureBody = loadFixture(file);
             if (fixtureBody != null) {
               res.setHeader("Content-Type", "application/json");
@@ -272,6 +338,7 @@ export function apiFixturesPlugin(): Plugin {
           // Prefix match para rutas dinámicas (ej. /api/talleres/{slug})
           for (const [prefix, prefixFile] of Object.entries(GET_PREFIX_ROUTES)) {
             if (pathname.startsWith(prefix)) {
+              if (await probeBackend(req, res)) return;
               const prefixBody = loadFixture(prefixFile);
               if (prefixBody != null) {
                 res.setHeader("Content-Type", "application/json");
