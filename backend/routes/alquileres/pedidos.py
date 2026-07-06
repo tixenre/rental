@@ -301,11 +301,13 @@ def update_alquiler_items(id: int, data: PedidoItemUpdate, request: Request):
             # Si el pedido está en estado que reserva stock, validar después de
             # aplicar los nuevos items. Sin esto el admin podía sumar cantidades
             # que excedieran el stock disponible y crear doble booking silencioso.
+            # `ESTADOS_QUE_RESERVAN` (mismo set que usa `update_pedido` arriba) —
+            # antes era un literal duplicado que podía desincronizarse en silencio.
             p = conn.execute(
                 "SELECT estado, fecha_desde, fecha_hasta FROM alquileres WHERE id=%s", (id,)
             ).fetchone()
             if (
-                p["estado"] in {"presupuesto", "confirmado", "retirado"}
+                p["estado"] in ESTADOS_QUE_RESERVAN
                 and p["fecha_desde"] and p["fecha_hasta"]
             ):
                 problemas = _check_stock(conn, id, p["fecha_desde"], p["fecha_hasta"])

@@ -10,8 +10,9 @@ Detecta el patrón SQL real (`FROM`/`JOIN kit_componentes`), no menciones en pro
 — así un comentario que nombre la tabla no genera falso positivo.
 
 EXCEPCIONES DOCUMENTADAS (no migradas en F2, a propósito): los consumidores del
-detalle de pedido `routes/alquileres/core.py::_get_alquiler_items` y
-`::_batch_get_alquiler_items` devuelven `kc.*` crudo y alimentan mails/cotización
+detalle de pedido `routes/alquileres/detalle.py::_get_alquiler_items` (movido de
+`core.py` en el split #1254) y `services/pedidos_enriquecimiento.py::
+_batch_get_alquiler_items` devuelven `kc.*` crudo y alimentan mails/cotización
 (superficie de plata); su consolidación es follow-up con test dedicado. NO están
 en la lista de abajo, por eso no los marca.
 """

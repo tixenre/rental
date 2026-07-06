@@ -106,6 +106,41 @@ class PedidoEstado(BaseModel):
     estado: str
 
 
+def _validar_descuento_pct(v):
+    """0-100 o None. Fuente única — la comparte `PedidoDatos` (acá abajo) con
+    `CotizarRequest` (routes/alquileres/cotizacion.py): antes estaban duplicados
+    byte a byte (el preview de cotización y el guardado real no deberían poder
+    rechazar cosas distintas)."""
+    if v is None:
+        return v
+    if v < 0 or v > 100:
+        raise ValueError("descuento_pct debe estar entre 0 y 100")
+    return v
+
+
+def _validar_descuento_manual_tipo(v):
+    """"pct" o "monto" (o None). Misma fuente única que `_validar_descuento_pct`."""
+    if v is None:
+        return v
+    if v not in ("pct", "monto"):
+        raise ValueError("descuento_manual_tipo debe ser 'pct' o 'monto'")
+    return v
+
+
+def _validar_descuento_manual_monto(v):
+    """`alquileres.descuento_manual_monto` es INTEGER — sin este tope, un valor
+    fuera de rango llega crudo a Postgres como `NumericValueOutOfRange` (mismo
+    gap que cerró la auditoría de contabilidad, 2026-07-02). Misma fuente única
+    que `_validar_descuento_pct`."""
+    if v is None:
+        return v
+    if v < 0:
+        raise ValueError("descuento_manual_monto no puede ser negativo")
+    if v >= 2_147_483_647:
+        raise ValueError("descuento_manual_monto demasiado alto")
+    return v
+
+
 class PedidoDatos(BaseModel):
     cliente_id:       Optional[int]   = None
     cliente_nombre:   Optional[str]   = None
@@ -144,34 +179,17 @@ class PedidoDatos(BaseModel):
     @field_validator("descuento_pct")
     @classmethod
     def validate_descuento(cls, v):
-        if v is None:
-            return v
-        if v < 0 or v > 100:
-            raise ValueError("descuento_pct debe estar entre 0 y 100")
-        return v
+        return _validar_descuento_pct(v)
 
     @field_validator("descuento_manual_tipo")
     @classmethod
     def validate_descuento_manual_tipo(cls, v):
-        if v is None:
-            return v
-        if v not in ("pct", "monto"):
-            raise ValueError("descuento_manual_tipo debe ser 'pct' o 'monto'")
-        return v
+        return _validar_descuento_manual_tipo(v)
 
     @field_validator("descuento_manual_monto")
     @classmethod
     def validate_descuento_manual_monto(cls, v):
-        if v is None:
-            return v
-        if v < 0:
-            raise ValueError("descuento_manual_monto no puede ser negativo")
-        # `alquileres.descuento_manual_monto` es INTEGER — sin este tope, un
-        # valor fuera de rango llega crudo a Postgres como `NumericValueOutOfRange`
-        # (mismo gap que cerró la auditoría de contabilidad, 2026-07-02).
-        if v >= 2_147_483_647:
-            raise ValueError("descuento_manual_monto demasiado alto")
-        return v
+        return _validar_descuento_manual_monto(v)
 
 
 class PedidoItemUpdate(BaseModel):
