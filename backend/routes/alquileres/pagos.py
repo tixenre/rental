@@ -110,37 +110,83 @@ def list_pagos(id: int, request: Request):
         return pagos
 
 
+def _agregar_pago(conn, id: int, data: PagoCreate, admin_email: str) -> dict:
+    """Lógica de `agregar_pago`, sin FastAPI/decorators — testable directo
+    (sin necesitar un `Request` real) y reusable si algún día hace falta desde
+    otro lado que no sea el endpoint HTTP.
+
+    `FOR UPDATE`: lockea la fila del pedido para toda la transacción — sin
+    esto, un `agregar_pago` y un `anular_pago` concurrentes sobre el MISMO
+    pedido pueden pisarse un lost-update en `monto_pagado` (el `UPDATE ...
+    SET monto_pagado = (subquery sobre alquiler_pagos)` de
+    `_recalcular_monto_pagado` no re-evalúa esa subquery si el segundo
+    escritor ya la había planeado antes de que el primero commiteara). Con el
+    lock, el segundo espera al primero — su subquery ve el estado ya
+    commiteado de `alquiler_pagos`. El caller (el endpoint) hace commit.
+    """
+    destinatario, metodo = _resolver_destino_metodo(data.destinatario, data.metodo)
+    p = conn.execute("SELECT estado FROM alquileres WHERE id=%s FOR UPDATE", (id,)).fetchone()
+    if not p:
+        raise HTTPException(404, "Pedido no encontrado")
+    if p["estado"] in ("cancelado",):
+        raise HTTPException(400, "No se pueden agregar pagos a un pedido cancelado")
+
+    fecha = data.fecha or now_ar().date().isoformat()
+    conn.execute("""
+        INSERT INTO alquiler_pagos (pedido_id, monto, concepto, destinatario, metodo, fecha, created_by)
+        VALUES (%s,%s,%s,%s,%s,%s,%s)
+    """, (id, data.monto, data.concepto, destinatario, metodo, fecha, admin_email))
+
+    _recalcular_monto_pagado(conn, id)
+    _maybe_finalizar(conn, id)
+    return _get_alquiler_detail(conn, id)
+
+
 @router.post("/alquileres/{id}/pagos", status_code=201)
 @limiter.limit(ADMIN_WRITE_LIMIT)
 @map_pg_errors
 def agregar_pago(id: int, data: PagoCreate, request: Request):
-    """Agrega una entrada de pago y recalcula monto_pagado."""
+    """Agrega una entrada de pago y recalcula monto_pagado. Ver `_agregar_pago`."""
     admin = require_admin(request)
-    destinatario, metodo = _resolver_destino_metodo(data.destinatario, data.metodo)
     with get_db() as conn:
         try:
-            p = conn.execute("SELECT estado FROM alquileres WHERE id=%s", (id,)).fetchone()
-            if not p:
-                raise HTTPException(404, "Pedido no encontrado")
-            if p["estado"] in ("cancelado",):
-                raise HTTPException(400, "No se pueden agregar pagos a un pedido cancelado")
-
-            fecha = data.fecha or now_ar().date().isoformat()
-            conn.execute("""
-                INSERT INTO alquiler_pagos (pedido_id, monto, concepto, destinatario, metodo, fecha, created_by)
-                VALUES (%s,%s,%s,%s,%s,%s,%s)
-            """, (id, data.monto, data.concepto, destinatario, metodo, fecha, admin.get("email")))
-
-            _recalcular_monto_pagado(conn, id)
-            _maybe_finalizar(conn, id)
+            pedido = _agregar_pago(conn, id, data, admin.get("email"))
             conn.commit()
-
-            pedido = _get_alquiler_detail(conn, id)
             return pedido
         except Exception:
             logger.error("Error agregando pago al pedido %s", id, exc_info=True)
             conn.rollback()
             raise
+
+
+def _anular_pago(conn, id: int, pago_id: int, motivo: str, admin_email: str) -> dict:
+    """Lógica de `anular_pago`, sin FastAPI/decorators — ver `_agregar_pago`.
+
+    `FOR UPDATE`: mismo motivo que `_agregar_pago` — serializa contra
+    cualquier otro escritor de `monto_pagado` del mismo pedido (agregar/anular
+    concurrentes). El caller (el endpoint) hace commit/rollback.
+    """
+    if not conn.execute("SELECT id FROM alquileres WHERE id=%s FOR UPDATE", (id,)).fetchone():
+        raise HTTPException(404, "Pedido no encontrado")
+    actualizado = conn.execute(
+        """UPDATE alquiler_pagos
+           SET anulado = TRUE, anulado_por = %s, anulado_at = CURRENT_TIMESTAMP,
+               anulado_motivo = %s
+           WHERE id = %s AND pedido_id = %s AND NOT anulado
+           RETURNING id""",
+        (admin_email, motivo, pago_id, id),
+    ).fetchone()
+    if not actualizado:
+        raise HTTPException(404, "Pago no encontrado (o ya estaba anulado)")
+
+    _recalcular_monto_pagado(conn, id)
+
+    # Si se anuló el pago, puede que ya no esté finalizado → revertir si aplica
+    p = conn.execute("SELECT estado, monto_total, monto_pagado FROM alquileres WHERE id=%s", (id,)).fetchone()
+    if p and p["estado"] == "finalizado" and (p["monto_pagado"] or 0) < (p["monto_total"] or 0):
+        conn.execute("UPDATE alquileres SET estado='devuelto' WHERE id=%s", (id,))
+
+    return _get_alquiler_detail(conn, id)
 
 
 @router.post("/alquileres/{id}/pagos/{pago_id}/anular", status_code=200)
@@ -152,35 +198,15 @@ def anular_pago(id: int, pago_id: int, data: AnularPagoBody, request: Request):
     Reemplaza el viejo `DELETE` (hard-delete, sin motivo, sin actor) — auditoría
     2026-07-02 (#1184): esta tabla alimenta todo el motor contable y no
     respetaba "la plata no se borra" que `movimientos` sí respeta. Mismo patrón
-    que `anular_movimiento`."""
+    que `anular_movimiento`. Ver `_anular_pago`."""
     admin = require_admin(request)
     motivo = (data.motivo or "").strip()
     if not motivo:
         raise HTTPException(400, "Para anular un pago hay que indicar un motivo.")
     with get_db() as conn:
         try:
-            if not conn.execute("SELECT id FROM alquileres WHERE id=%s", (id,)).fetchone():
-                raise HTTPException(404, "Pedido no encontrado")
-            actualizado = conn.execute(
-                """UPDATE alquiler_pagos
-                   SET anulado = TRUE, anulado_por = %s, anulado_at = CURRENT_TIMESTAMP,
-                       anulado_motivo = %s
-                   WHERE id = %s AND pedido_id = %s AND NOT anulado
-                   RETURNING id""",
-                (admin.get("email"), motivo, pago_id, id),
-            ).fetchone()
-            if not actualizado:
-                raise HTTPException(404, "Pago no encontrado (o ya estaba anulado)")
-
-            _recalcular_monto_pagado(conn, id)
-
-            # Si se anuló el pago, puede que ya no esté finalizado → revertir si aplica
-            p = conn.execute("SELECT estado, monto_total, monto_pagado FROM alquileres WHERE id=%s", (id,)).fetchone()
-            if p and p["estado"] == "finalizado" and (p["monto_pagado"] or 0) < (p["monto_total"] or 0):
-                conn.execute("UPDATE alquileres SET estado='devuelto' WHERE id=%s", (id,))
-
+            pedido = _anular_pago(conn, id, pago_id, motivo, admin.get("email"))
             conn.commit()
-            pedido = _get_alquiler_detail(conn, id)
             return pedido
         except HTTPException:
             conn.rollback()

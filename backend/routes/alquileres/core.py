@@ -321,8 +321,17 @@ def _recalcular_total_pedido(conn, id: int) -> None:
     cuando cambia el descuento de un cliente — pero solo alcanza presupuestos
     (columna `estado='presupuesto'` en su propio WHERE), así que el guard de
     acá nunca lo bloquea a él.
+
+    `FOR UPDATE`: lockea la fila del pedido para todo el resto de la
+    transacción — sin esto, dos escritores concurrentes sobre el MISMO pedido
+    (ej. `propagar_descuento_a_presupuestos` corriendo mientras un admin edita
+    ítems del mismo presupuesto a mano) podían pisarse un lost-update (el que
+    commitea último gana con datos parcialmente stale, sin error ni log).
+    Reentrante dentro de la misma transacción (`_apply_pedido_datos` ya puede
+    tener la fila lockeada al llamar acá — Postgres no deadlockea consigo
+    mismo). No es el motor de reservas (ese lockea `equipos`, tabla distinta).
     """
-    p = conn.execute("SELECT * FROM alquileres WHERE id=%s", (id,)).fetchone()
+    p = conn.execute("SELECT * FROM alquileres WHERE id=%s FOR UPDATE", (id,)).fetchone()
     if not p:
         return
     d0 = to_datetime(p["fecha_desde"]) if p["fecha_desde"] else None
@@ -416,8 +425,12 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos", es_admin: bool = Fal
     `es_admin=True` permite fecha de retiro en el pasado (carga retroactiva del
     back-office). Las propuestas del cliente (cliente_portal) usan el default
     `False` → el cliente sigue sin poder fechar en el pasado.
+
+    `FOR UPDATE`: lockea la fila del pedido — ver el mismo comentario en
+    `_recalcular_total_pedido` (que esta función llama más abajo; relockear la
+    misma fila en la misma transacción es reentrante, no deadlockea).
     """
-    p = conn.execute("SELECT * FROM alquileres WHERE id=%s", (id,)).fetchone()
+    p = conn.execute("SELECT * FROM alquileres WHERE id=%s FOR UPDATE", (id,)).fetchone()
     if not p:
         raise HTTPException(404, "Pedido no encontrado")
 
@@ -510,8 +523,12 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
 
     No valida stock — el caller debe llamar a `_check_stock` si corresponde.
     Lógica compartida entre admin y portal cliente.
+
+    `FOR UPDATE`: lockea la fila del pedido — mismo motivo que
+    `_recalcular_total_pedido` (evitar lost-update entre dos escritores
+    concurrentes del mismo pedido).
     """
-    p = conn.execute("SELECT * FROM alquileres WHERE id=%s", (id,)).fetchone()
+    p = conn.execute("SELECT * FROM alquileres WHERE id=%s FOR UPDATE", (id,)).fetchone()
     if not p:
         raise HTTPException(404, "Pedido no encontrado")
     if not items:
