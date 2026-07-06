@@ -70,6 +70,25 @@ jobs:
       # eslint corre prettier embebido (formato = error, reglas de React = aviso)
       - run: npm run lint
 
+  unit-tests:
+    name: Unit tests (node:test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      # node:test corriendo TS nativo vía --experimental-strip-types (Node ≥22.6) — el resto
+      # del frontend pinea Node 20 (setup-node de los otros jobs), este job va aparte a
+      # propósito para no forzar el bump global solo por esto.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run test:unit
+
   python-syntax:
     name: Python lint + syntax
     runs-on: ubuntu-latest
