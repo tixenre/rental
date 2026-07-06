@@ -6,6 +6,7 @@ import { es } from "date-fns/locale";
 
 import { Button } from "@/design-system/ui/button";
 import { Spinner } from "@/design-system/ui/spinner";
+import { RadioGroup, RadioGroupItem } from "@/design-system/ui/radio-group";
 import { formatARS } from "@/lib/format";
 import { descuentoLabel, type DescuentoOrigen } from "@/lib/cotizacion";
 import { PERFIL_IMPUESTOS_LABEL, facturaTipoLabel, type PerfilImpuestos } from "@/lib/iva";
@@ -371,43 +372,47 @@ export function CheckoutResumen({
                   <div className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
                     Facturar a nombre de
                   </div>
-                  <label className="flex items-center gap-2 text-sm text-ink">
-                    <input
-                      type="radio"
-                      name="facturacion-target"
-                      checked={!facturacionTarget.perfilFiscalId && !facturacionTarget.productoraId}
-                      onChange={() => setFacturacionTarget({})}
-                    />
-                    Mi cuenta (default)
-                  </label>
-                  {perfilesFiscales?.map((p) => (
-                    <label
-                      key={`perfil-${p.id}`}
-                      className="flex items-center gap-2 text-sm text-ink"
-                    >
-                      <input
-                        type="radio"
-                        name="facturacion-target"
-                        checked={facturacionTarget.perfilFiscalId === p.id}
-                        onChange={() => setFacturacionTarget({ perfilFiscalId: p.id })}
-                      />
-                      {p.etiqueta || p.razon_social || p.cuit}
+                  <RadioGroup
+                    value={
+                      facturacionTarget.perfilFiscalId
+                        ? `perfil-${facturacionTarget.perfilFiscalId}`
+                        : facturacionTarget.productoraId
+                          ? `productora-${facturacionTarget.productoraId}`
+                          : "default"
+                    }
+                    onValueChange={(v) => {
+                      if (v === "default") return setFacturacionTarget({});
+                      const [tipo, idStr] = v.split("-");
+                      const id = Number(idStr);
+                      return tipo === "perfil"
+                        ? setFacturacionTarget({ perfilFiscalId: id })
+                        : setFacturacionTarget({ productoraId: id });
+                    }}
+                    className="gap-1.5"
+                  >
+                    <label className="flex items-center gap-2 text-sm text-ink">
+                      <RadioGroupItem value="default" />
+                      Mi cuenta (default)
                     </label>
-                  ))}
-                  {productorasFiscales?.map((pr) => (
-                    <label
-                      key={`productora-${pr.id}`}
-                      className="flex items-center gap-2 text-sm text-ink"
-                    >
-                      <input
-                        type="radio"
-                        name="facturacion-target"
-                        checked={facturacionTarget.productoraId === pr.id}
-                        onChange={() => setFacturacionTarget({ productoraId: pr.id })}
-                      />
-                      {pr.razon_social || pr.cuit}
-                    </label>
-                  ))}
+                    {perfilesFiscales?.map((p) => (
+                      <label
+                        key={`perfil-${p.id}`}
+                        className="flex items-center gap-2 text-sm text-ink"
+                      >
+                        <RadioGroupItem value={`perfil-${p.id}`} />
+                        {p.etiqueta || p.razon_social || p.cuit}
+                      </label>
+                    ))}
+                    {productorasFiscales?.map((pr) => (
+                      <label
+                        key={`productora-${pr.id}`}
+                        className="flex items-center gap-2 text-sm text-ink"
+                      >
+                        <RadioGroupItem value={`productora-${pr.id}`} />
+                        {pr.razon_social || pr.cuit}
+                      </label>
+                    ))}
+                  </RadioGroup>
                 </div>
               )}
             </div>

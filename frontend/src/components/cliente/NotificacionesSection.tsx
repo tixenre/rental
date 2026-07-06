@@ -3,6 +3,7 @@
  * Extraído de ClientePortalHelpers.tsx.
  */
 import { Bell } from "lucide-react";
+import { EmptyState } from "@/design-system/composites/EmptyState";
 
 export function NotificacionesSection() {
   return (
@@ -12,16 +13,13 @@ export function NotificacionesSection() {
           notificaciones.
         </h2>
       </div>
-      <div className="rounded-xl border border-dashed hairline px-6 py-[60px] text-center">
-        <div className="mx-auto mb-3.5 grid h-14 w-14 place-items-center rounded-full bg-amber-soft text-amber">
-          <Bell className="h-6 w-6" strokeWidth={1.5} />
-        </div>
-        <div className="font-display text-xl font-black text-ink mb-1.5">Sin notificaciones</div>
-        <div className="font-sans text-sm text-muted-foreground max-w-[30ch] mx-auto">
-          Cuando haya novedades sobre tus pedidos o documentos aparecerán acá.
-        </div>
-        {/* TODO: conectar a /api/cliente/notificaciones cuando el endpoint esté disponible */}
-      </div>
+      <EmptyState
+        icon={<Bell className="h-6 w-6" strokeWidth={1.5} />}
+        title="Sin notificaciones"
+        sub="Cuando haya novedades sobre tus pedidos o documentos aparecerán acá."
+        className="rounded-xl border border-dashed hairline px-6 py-[60px]"
+      />
+      {/* TODO: conectar a /api/cliente/notificaciones cuando el endpoint esté disponible */}
     </div>
   );
 }

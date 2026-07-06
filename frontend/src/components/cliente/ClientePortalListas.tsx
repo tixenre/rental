@@ -30,6 +30,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Button } from "@/design-system/ui/button";
+import { EmptyState } from "@/design-system/composites/EmptyState";
 import { CompartirComposicionButton } from "@/components/rental/CompartirComposicionButton";
 import {
   AlertDialog,
@@ -85,24 +86,19 @@ export function ListasSection({
           ))}
         </div>
       ) : listas.length === 0 ? (
-        <div className="rounded-xl border border-dashed hairline px-6 py-[60px] text-center">
-          <div className="mx-auto mb-3.5 grid h-14 w-14 place-items-center rounded-full bg-amber-soft text-amber">
-            <ClipboardList className="h-6 w-6" strokeWidth={1.5} />
-          </div>
-          <div className="font-display text-xl font-black text-ink mb-1.5">
-            Todavía no tenés listas
-          </div>
-          <div className="font-sans text-sm text-muted-foreground max-w-[34ch] mx-auto mb-[18px]">
-            Armá un carrito con los equipos que más usás y guardalo como lista. La próxima vez lo
-            reservás de un toque.
-          </div>
+        <EmptyState
+          icon={<ClipboardList className="h-6 w-6" strokeWidth={1.5} />}
+          title="Todavía no tenés listas"
+          sub="Armá un carrito con los equipos que más usás y guardalo como lista. La próxima vez lo reservás de un toque."
+          className="rounded-xl border border-dashed hairline px-6 py-[60px]"
+        >
           <Link
             to="/rental"
             className="inline-flex items-center gap-1.5 rounded-full bg-ink px-5 py-2.5 font-sans text-sm font-bold text-amber transition hover:bg-amber hover:text-ink"
           >
             Explorar catálogo <ArrowRight className="h-3.5 w-3.5" />
           </Link>
-        </div>
+        </EmptyState>
       ) : (
         <div className="flex flex-col gap-2.5">
           {listas.map((lista) => (

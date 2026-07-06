@@ -52,6 +52,7 @@ import {
 } from "@/design-system/ui/dialog";
 import { Button } from "@/design-system/ui/button";
 import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
+import { EmptyState } from "@/design-system/composites/EmptyState";
 import { useBusinessPhone } from "@/lib/business";
 import { jornadasFromISO as jornadasEntre } from "@/lib/rental-dates";
 import { whatsappLink } from "@/lib/whatsapp";
@@ -261,12 +262,12 @@ export function PedidoEmpty({
 }) {
   const Icon = icon === "search" ? Search : ShoppingBag;
   return (
-    <div className="rounded-xl border border-dashed border-[var(--hairline)] px-6 py-[60px] text-center">
-      <div className="mx-auto mb-3.5 grid h-14 w-14 place-items-center rounded-full bg-amber-soft text-amber">
-        <Icon className="h-6 w-6" strokeWidth={1.5} />
-      </div>
-      <div className="font-display text-xl font-black text-ink mb-1.5">{title}</div>
-      <div className="font-sans text-sm text-muted-foreground mb-[18px]">{sub}</div>
+    <EmptyState
+      icon={<Icon className="h-6 w-6" strokeWidth={1.5} />}
+      title={title}
+      sub={sub}
+      className="rounded-xl border border-dashed hairline px-6 py-[60px]"
+    >
       {actionLabel && onAction ? (
         <button
           type="button"
@@ -285,7 +286,7 @@ export function PedidoEmpty({
           </Link>
         )
       )}
-    </div>
+    </EmptyState>
   );
 }
 
