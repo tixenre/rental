@@ -9,7 +9,8 @@ re-importa estos 8 nombres tal cual — `routes/alquileres/__init__.py` no cambi
 """
 from fastapi import HTTPException
 
-from database import row_to_dict, MARCA_SUBQUERY, marca_subquery
+from database import row_to_dict, MARCA_SUBQUERY
+from services.contenido import contenido_de_batch
 from services.pedidos_enriquecimiento import _enriquecer_pedido_con_cliente
 
 
@@ -54,29 +55,20 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
     if not items:
         return items
 
-    # Batch fetch de componentes de kits: 1 query agregada en lugar de N+1
-    # (antes hacía 1 query por cada item del pedido). Para pedidos con 10
-    # items con kits, baja de 11 queries a 2. Las líneas personalizadas (#805)
-    # no tienen equipo → se excluyen del set (equipo_id None).
+    # Componentes de kits vía la puerta única `services.contenido` (antes: SQL
+    # inline contra `kit_componentes` acá mismo — excepción documentada en
+    # `test_contenido_sql_safety.py`, migrada ahora). `solo_activos=False`:
+    # el detalle de un pedido ya hecho muestra TODOS los componentes que la
+    # receta referencia, incluso uno retirado después (mismo criterio que
+    # `documentos.py::_add_componentes`, ya en la puerta) — no el catálogo/
+    # ficha, que sí oculta lo retirado. Las líneas personalizadas (#805) no
+    # tienen equipo → se excluyen del batch (equipo_id None).
     equipo_ids = list({item["equipo_id"] for item in items if item["equipo_id"] is not None})
     for item in items:
         item.setdefault("componentes", [])
     if not equipo_ids:
         return items
-    placeholders = ",".join("%s" for _ in equipo_ids)
-    comp_rows = conn.execute(f"""
-        SELECT kc.*, ec.nombre, {marca_subquery('ec')}, ec.foto_url, ec.foto_url_sm, ec.foto_url_thumb, ec.cantidad AS stock_total,
-               ec.modelo, ec.serie, ec.valor_reposicion,
-               ec.nombre_publico, ec.nombre_publico_largo
-        FROM kit_componentes kc
-        JOIN equipos ec ON ec.id = kc.componente_id
-        WHERE kc.equipo_id IN ({placeholders})
-    """, equipo_ids).fetchall()
-    # Group by equipo_id
-    componentes_por_equipo: dict[int, list[dict]] = {}
-    for c in comp_rows:
-        d = row_to_dict(c)
-        componentes_por_equipo.setdefault(d["equipo_id"], []).append(d)
+    componentes_por_equipo = contenido_de_batch(conn, equipo_ids, solo_activos=False)
     for item in items:
         item["componentes"] = componentes_por_equipo.get(item["equipo_id"], [])
 
