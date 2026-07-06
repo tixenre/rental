@@ -1,9 +1,13 @@
-"""routes/alquileres/core.py — spine del paquete de alquileres (#501).
+"""routes/alquileres/core.py — spine del paquete de alquileres (#501; split #1254).
 
-El `router` compartido + los modelos del pedido + los helpers reusables
-(`create_pedido`, `_apply_pedido_*`, enriquecimiento, recálculo de total). Las
-superficies HTTP (pedidos CRUD, cotización, disponibilidad, pagos, documentos,
-descuentos) viven en submódulos que registran sus rutas sobre este router.
+El `router` compartido + la creación del pedido (`create_pedido`/`create_pedido_retry`,
+la puerta única con el advisory lock) + la plata (`_recalcular_total_pedido`,
+`propagar_descuento_a_presupuestos`) + la edición (`_apply_pedido_datos`,
+`_apply_pedido_items`). Los modelos Pydantic viven en `modelos.py`, la lectura del
+detalle en `detalle.py` y el armado de mails/ICS en `services/pedidos_notificaciones.py`
+— los tres re-exportados acá tal cual (issue #1254) para no romper los ~57 call-sites
+existentes. Las superficies HTTP (pedidos CRUD, cotización, disponibilidad, pagos,
+documentos, descuentos) viven en submódulos que registran sus rutas sobre este router.
 """
 
 import datetime
@@ -14,7 +18,6 @@ from typing import Optional
 import psycopg.errors
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from pydantic import BaseModel, field_validator, model_validator
 
 from database import get_db, row_to_dict, to_datetime, to_iso, MARCA_SUBQUERY, marca_subquery
 from clientes.queries.identidad import nombre_completo_cliente
@@ -33,10 +36,24 @@ from services.email import send_email, Attachment
 from services.email.service import get_admin_to
 from services.ical import build_vcalendar, google_calendar_url, reserva_to_vevent
 from services.precios import bruto_linea, calcular_total, jornadas_periodo, tipos_equipo_batch
-from services.fechas import validar_rango_fechas, validar_fecha_iso
+from services.fechas import validar_rango_fechas
 from descuentos.queries.jornadas import obtener_descuento_jornadas
 from descuentos.queries.cliente import obtener_descuento_cliente
 from config import SITE_URL
+
+# Modelos Pydantic del pedido: viven en `modelos.py` (split de este archivo, issue
+# de tracking #1254). Re-exportados acá TAL CUAL — `routes/alquileres/__init__.py`
+# los sigue importando de `core` sin cambiar una línea, y varios tests importan
+# `PedidoItem`/`PedidoCreate`/etc. o `_parse_precio` vía este paquete.
+from routes.alquileres.modelos import (
+    PedidoCreate,
+    PedidoDatos,
+    PedidoEstado,  # noqa: F401 — re-export, ver comentario arriba
+    PedidoItem,
+    PedidoItemUpdate,  # noqa: F401 — re-export, ver comentario arriba
+    _parse_precio,  # noqa: F401 — re-export, ver comentario arriba
+    _validar_fecha_iso,  # noqa: F401 — re-export, ver comentario arriba
+)
 
 # Motor de reservas: la fuente única vive en el paquete `reservas`. Acá se
 # importan solo los nombres que este módulo usa internamente (las transiciones
@@ -180,174 +197,6 @@ def _get_historial_modificaciones(conn, pedido_id: int) -> list[dict]:
         ORDER BY created_at DESC
     """, (pedido_id,)).fetchall()
     return [row_to_dict(r) for r in rows]
-
-
-# ── Modelos ──────────────────────────────────────────────────────────────────
-
-def _parse_precio(v) -> int:
-    """Acepta int, float o string con formato '$15.000' → 15000."""
-    if v is None:
-        return 0
-    s = str(v).replace("$", "").replace(".", "").replace(",", "").strip()
-    try:
-        return int(float(s)) if s else 0
-    except (ValueError, TypeError):
-        return 0
-
-
-# La validación de formato vive en la puerta única `services/fechas.py`. Se
-# mantiene el nombre `_validar_fecha_iso` como alias para los field_validators de
-# este módulo y la re-exportación de `routes/alquileres/__init__.py`.
-_validar_fecha_iso = validar_fecha_iso
-
-
-class PedidoItem(BaseModel):
-    # equipo_id None = línea personalizada (#805): no es del catálogo, no reserva
-    # stock; lleva `nombre_libre`. `cobro_modo`: 'jornada' (× jornadas, default) |
-    # 'fijo' (monto único).
-    equipo_id:      Optional[int] = None
-    cantidad:       int
-    precio_jornada: int = 0
-    nombre_libre:   Optional[str] = None
-    cobro_modo:     str = "jornada"
-
-    @field_validator("precio_jornada", mode="before")
-    @classmethod
-    def coerce_precio(cls, v):
-        return _parse_precio(v)
-
-    @field_validator("cantidad")
-    @classmethod
-    def validate_cantidad(cls, v: int) -> int:
-        if v is None or v < 1:
-            raise ValueError("cantidad debe ser >= 1")
-        if v > 999:
-            raise ValueError("cantidad demasiado alta (máx 999)")
-        return v
-
-    @field_validator("precio_jornada")
-    @classmethod
-    def validate_precio(cls, v):
-        if v is not None and v < 0:
-            raise ValueError("precio_jornada no puede ser negativo")
-        return v
-
-    @field_validator("cobro_modo")
-    @classmethod
-    def validate_cobro_modo(cls, v):
-        if v not in ("jornada", "fijo"):
-            raise ValueError("cobro_modo debe ser 'jornada' o 'fijo'")
-        return v
-
-    @model_validator(mode="after")
-    def validate_linea_libre(self):
-        # Una línea personalizada (sin equipo_id) necesita un nombre; una de
-        # catálogo no puede cobrarse 'fijo' (eso es solo para líneas libres).
-        if self.equipo_id is None:
-            if not (self.nombre_libre or "").strip():
-                raise ValueError("una línea personalizada necesita un nombre")
-        elif self.cobro_modo != "jornada":
-            raise ValueError("solo las líneas personalizadas pueden cobrarse 'fijo'")
-        return self
-
-
-class PedidoCreate(BaseModel):
-    cliente_nombre:   Optional[str] = ""
-    cliente_email:    Optional[str] = None
-    cliente_telefono: Optional[str] = None
-    cliente_id:       Optional[int] = None
-    notas:            Optional[str] = None
-    fecha_desde:      Optional[str] = None
-    fecha_hasta:      Optional[str] = None
-    items:            list[PedidoItem] = []
-    estado:           Optional[str] = "presupuesto"
-    # #1240: a nombre de quién se factura este pedido — mutuamente excluyentes
-    # (validado por el caller, ej. `cliente_crear_pedido`), NULL/NULL = perfil
-    # default de la cuenta. El admin (builder de pedidos) no los usa hoy.
-    perfil_fiscal_id: Optional[int] = None
-    productora_id:    Optional[int] = None
-
-    @field_validator("fecha_desde", "fecha_hasta")
-    @classmethod
-    def _v_fechas(cls, v):
-        return _validar_fecha_iso(v)
-
-
-class PedidoEstado(BaseModel):
-    estado: str
-
-
-class PedidoDatos(BaseModel):
-    from pydantic import field_validator
-    cliente_id:       Optional[int]   = None
-    cliente_nombre:   Optional[str]   = None
-    cliente_email:    Optional[str]   = None
-    cliente_telefono: Optional[str]   = None
-    fecha_desde:      Optional[str]   = None
-    fecha_hasta:      Optional[str]   = None
-    notas:            Optional[str]   = None
-    descuento_pct:    Optional[float] = None
-    # Override manual en % o en $ fijo (Fase C-2, #1219): mismo campo de la UI,
-    # un selector al lado. `descuento_manual_tipo` decide cuál de los dos
-    # honra la jerarquía — "pct" (default, usa `descuento_pct` de arriba) o
-    # "monto" (usa `descuento_manual_monto`, pesos fijos).
-    descuento_manual_tipo:  Optional[str]   = None
-    descuento_manual_monto: Optional[float] = None
-    # #1251: a nombre de quién se factura este pedido — mutuamente excluyentes
-    # (validado abajo + membership en `_apply_pedido_datos`). NULL/NULL = perfil
-    # default de la cuenta. El renter sigue siendo `cliente_id` — esto solo
-    # cambia a quién se factura, nunca quién alquila.
-    perfil_fiscal_id: Optional[int] = None
-    productora_id:    Optional[int] = None
-
-    @field_validator("fecha_desde", "fecha_hasta")
-    @classmethod
-    def _v_fechas(cls, v):
-        return _validar_fecha_iso(v)
-
-    @model_validator(mode="after")
-    def _v_fiscal_excluyente(self):
-        if self.perfil_fiscal_id and self.productora_id:
-            raise ValueError(
-                "Un pedido no puede facturar a un perfil personal y a una productora a la vez."
-            )
-        return self
-
-    @field_validator("descuento_pct")
-    @classmethod
-    def validate_descuento(cls, v):
-        if v is None:
-            return v
-        if v < 0 or v > 100:
-            raise ValueError("descuento_pct debe estar entre 0 y 100")
-        return v
-
-    @field_validator("descuento_manual_tipo")
-    @classmethod
-    def validate_descuento_manual_tipo(cls, v):
-        if v is None:
-            return v
-        if v not in ("pct", "monto"):
-            raise ValueError("descuento_manual_tipo debe ser 'pct' o 'monto'")
-        return v
-
-    @field_validator("descuento_manual_monto")
-    @classmethod
-    def validate_descuento_manual_monto(cls, v):
-        if v is None:
-            return v
-        if v < 0:
-            raise ValueError("descuento_manual_monto no puede ser negativo")
-        # `alquileres.descuento_manual_monto` es INTEGER — sin este tope, un
-        # valor fuera de rango llega crudo a Postgres como `NumericValueOutOfRange`
-        # (mismo gap que cerró la auditoría de contabilidad, 2026-07-02).
-        if v >= 2_147_483_647:
-            raise ValueError("descuento_manual_monto demasiado alto")
-        return v
-
-
-class PedidoItemUpdate(BaseModel):
-    items: list[PedidoItem]
 
 
 # ── Rutas de pedidos ─────────────────────────────────────────────────────────
