@@ -931,6 +931,16 @@ import { Skeleton } from "@/design-system/ui/skeleton";
 **Regla:** el skeleton **espeja el layout del componente real** (vía `className`)
 para no generar CLS (Content Layout Shift) al hidratar.
 
+**Regla de cuándo usar qué:** una **página/sección completa** cargando (fetch inicial,
+sin datos previos en pantalla) → `Skeleton` (o los presets `TableSkeleton`/`ListSkeleton`/
+`CardGridSkeleton` de `components/admin/skeletons.tsx`, el default de `QueryState`) con el
+shape del contenido real. Una **acción puntual** (submit de un form, un botón, un fetch
+chico dentro de una pantalla ya renderizada) → `Spinner` (`<Button loading={true}>` lo
+integra solo). **Nunca texto plano** ("Cargando…", "Cargando equipo…") como estado de
+carga de página — no comunica forma ni tamaño, y genera un salto de layout cuando llega
+la data real. El supervisor marca un "Cargando…" de texto plano reintroducido en un
+loading de página nuevo.
+
 ---
 
 ## Dark mode

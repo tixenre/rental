@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 
 import { PublicLayout } from "@/components/rental/shell/PublicLayout";
+import { Skeleton } from "@/design-system/ui/skeleton";
 import { EmptyImage } from "@/components/rental/EmptyImage";
 import { KitSection, BoxItemsSection } from "@/components/rental/KitSection";
 import { KeywordChips } from "@/components/rental/KeywordChips";
@@ -217,8 +218,8 @@ function EquipoPage() {
   if (isLoading) {
     return (
       <PublicLayout>
-        <div className="max-w-4xl mx-auto w-full px-6 py-10 text-center text-muted-foreground">
-          Cargando equipo…
+        <div className="max-w-7xl mx-auto w-full px-4 md:px-8 py-6 md:py-10">
+          <EquipoDetailSkeleton />
         </div>
       </PublicLayout>
     );
@@ -250,6 +251,29 @@ function EquipoPage() {
         <EquipmentDetailBody item={equipo} />
       </div>
     </PublicLayout>
+  );
+}
+
+// ── Skeleton — espeja el shape real (galería + precio a la izq., specs a la
+//    der. en desktop) para que la carga no salte de layout al llegar la data.
+function EquipoDetailSkeleton() {
+  return (
+    <div>
+      <Skeleton className="h-3 w-24 mb-3" />
+      <Skeleton className="h-9 w-2/3 mb-6" />
+      <div className="space-y-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-10 md:items-start">
+        <div className="space-y-6">
+          <Skeleton className="aspect-[4/3] w-full rounded-xl" />
+          <Skeleton className="h-16 w-full rounded-xl" />
+        </div>
+        <div className="space-y-3">
+          <Skeleton className="h-5 w-1/3" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+        </div>
+      </div>
+    </div>
   );
 }
 
