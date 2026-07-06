@@ -59,6 +59,7 @@ import {
 } from "@/design-system/ui/dropdown-menu";
 import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
 import { WhatsAppLinkButton } from "@/components/admin/WhatsAppLinkButton";
+import { GrupoCard } from "@/components/admin/ClientesDuplicadosDialog";
 
 import { adminApi, ESTADO_LABEL, type Cliente, type ClienteInput } from "@/lib/admin/api";
 import { usePadronLookup } from "@/lib/admin/usePadronLookup";
@@ -171,6 +172,16 @@ export function ClienteDetalleDialog({ open, onOpenChange, cliente, onSaved }: P
   const perfilesFiscalesQ = useQuery({
     queryKey: ["admin", "cliente-perfiles-fiscales", cliente?.id],
     queryFn: () => adminApi.getClientePerfilesFiscales(cliente!.id),
+    enabled: !!cliente?.id && open,
+  });
+
+  // Sugerencia de fusión (#1251 Fase 2) — si este cliente comparte CUIL
+  // verificado con otro, mostrar el mismo picker que la vista global de
+  // "Duplicados", pero inline en su propia ficha (antes solo se encontraba
+  // desde el botón global, desconectado de acá).
+  const duplicadosQ = useQuery({
+    queryKey: ["admin", "cliente-duplicados", cliente?.id],
+    queryFn: () => adminApi.getClienteDuplicados(cliente!.id),
     enabled: !!cliente?.id && open,
   });
 
@@ -292,6 +303,22 @@ export function ClienteDetalleDialog({ open, onOpenChange, cliente, onSaved }: P
                 }
               }}
             />
+          )}
+
+          {editing && duplicadosQ.data && (
+            <div className="space-y-2 rounded-lg border border-amber/40 bg-amber/8 p-3">
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+                <Users className="h-4 w-4 shrink-0" />
+                Posible cuenta duplicada — mismo CUIL verificado
+              </div>
+              <GrupoCard
+                grupo={duplicadosQ.data}
+                onMerged={() => {
+                  qc.invalidateQueries({ queryKey: ["admin", "clientes"] });
+                  onOpenChange(false);
+                }}
+              />
+            </div>
           )}
 
           <div className="grid grid-cols-2 gap-3">
@@ -435,12 +462,20 @@ export function ClienteDetalleDialog({ open, onOpenChange, cliente, onSaved }: P
                     <div key={pr.id} className="rounded-md border hairline p-3">
                       <div className="flex items-center gap-1.5 text-sm font-medium text-ink">
                         <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        {pr.razon_social || pr.cuit}
+                        {pr.nombre || pr.razon_social || pr.cuit}
+                        {!pr.cuit && (
+                          <span className="rounded-full bg-amber px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-ink">
+                            Borrador
+                          </span>
+                        )}
                       </div>
                       <div className="mt-0.5 text-xs text-muted-foreground">
-                        {pr.cuit} ·{" "}
-                        {PERFIL_IMPUESTOS_LABEL[pr.perfil_impuestos as PerfilImpuestos] ??
-                          pr.perfil_impuestos}
+                        {pr.cuit
+                          ? `${pr.cuit} · ${
+                              PERFIL_IMPUESTOS_LABEL[pr.perfil_impuestos as PerfilImpuestos] ??
+                              pr.perfil_impuestos
+                            }`
+                          : "Sin CUIT — no facturable todavía"}
                       </div>
                     </div>
                   ))}

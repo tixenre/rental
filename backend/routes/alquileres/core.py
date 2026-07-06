@@ -17,7 +17,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, field_validator, model_validator
 
 from database import get_db, row_to_dict, to_datetime, to_iso, MARCA_SUBQUERY, marca_subquery
-from routes.clientes import nombre_completo_cliente
+from clientes.queries.identidad import nombre_completo_cliente
 # _batch_get_alquiler_items/_enriquecer_pedido_con_cliente_fiscal/_enriquecer_pedido_con_cliente/
 # _enriquecer_pedidos_con_cliente viven en services.pedidos_enriquecimiento (auditoría cruzada de
 # plata, 2026-07-02) — reexportados acá tal cual para no tocar los ~8 call-sites existentes (este

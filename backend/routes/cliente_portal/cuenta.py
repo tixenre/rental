@@ -15,12 +15,13 @@ from itsdangerous import BadSignature, SignatureExpired
 
 from database import get_db, row_to_dict
 from auth.session import signer, _make_session_response
-from identity import nombre_validado, direccion_validada
 from identity.anchor import cuil_valido
 from identity.contacts import email_comunicacion, telefono_contacto
 from services.precios import es_responsable_inscripto
 from rate_limit import limiter
 from routes.cliente_portal.core import router, require_cliente, cliente_verificado
+from clientes.queries import identidad as queries_identidad
+from clientes.queries import fiscal as queries_fiscal
 
 logger = logging.getLogger(__name__)
 
@@ -205,13 +206,13 @@ def cliente_me(request: Request):
         # Vista resuelta para DISPLAY (checkout/portal/donde haga falta mostrar
         # "quién es" sin reimplementar la regla): mismo criterio que ya usan
         # contrato/remito — RENAPER si está verificado, si no el dato base
-        # (`nombre_validado`/`direccion_validada`, identity/__init__.py) — y el
+        # (`clientes.queries.identidad`, fuente única con el lado admin) — y el
         # contacto CANÓNICO (`email_comunicacion`/`telefono_contacto`,
         # identity/contacts.py: el teléfono verificado por Didit puede diferir
         # del autodeclarado). Los campos base de arriba siguen intactos para
         # los forms de edición (Contacto/Facturación) — esto es aditivo.
-        d["nombre_legal"] = nombre_validado(d) or f"{d.get('nombre', '')} {d.get('apellido', '')}".strip()
-        d["direccion_legal"] = direccion_validada(d) or d.get("direccion")
+        d["nombre_legal"] = queries_identidad.nombre_legal(d)
+        d["direccion_legal"] = queries_identidad.direccion_legal(d)
         d["email_comunicacion"] = email_comunicacion(conn, cliente_id)
         d["telefono_contacto"] = telefono_contacto(conn, cliente_id)
         return d
@@ -276,15 +277,7 @@ def cliente_listar_perfiles_fiscales(request: Request):
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
     with get_db() as conn:
-        rows = conn.execute(
-            """SELECT id, cuit, perfil_impuestos, razon_social, domicilio_fiscal,
-                      email_facturacion, etiqueta, es_default
-               FROM cliente_perfiles_fiscales
-               WHERE cliente_id = %s
-               ORDER BY es_default DESC, created_at ASC""",
-            (cliente_id,),
-        ).fetchall()
-    return [row_to_dict(r) for r in rows]
+        return queries_fiscal.perfiles_fiscales(conn, cliente_id)
 
 
 @router.post("/api/cliente/facturacion/perfiles", status_code=201)
@@ -360,15 +353,7 @@ def cliente_listar_productoras(request: Request):
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
     with get_db() as conn:
-        rows = conn.execute(
-            """SELECT p.id, p.cuit, p.perfil_impuestos, p.razon_social, p.domicilio_fiscal
-               FROM productoras p
-               JOIN productora_miembros pm ON pm.productora_id = p.id
-               WHERE pm.cliente_id = %s
-               ORDER BY p.razon_social NULLS LAST, p.id""",
-            (cliente_id,),
-        ).fetchall()
-    return [row_to_dict(r) for r in rows]
+        return queries_fiscal.productoras_vinculadas(conn, cliente_id, solo_facturables=True)
 
 
 class PerfilUpdate(BaseModel):

@@ -202,6 +202,9 @@ export const pedidosMethods = {
 
   // clientes — fusión de duplicados (mismo CUIL verificado)
   getClientesDuplicados: () => authedJson<GrupoDuplicado[]>(`/api/clientes/duplicados`),
+  // Sugerencia de fusión desde la propia ficha (#1251 Fase 2) — null si no hay duplicado.
+  getClienteDuplicados: (id: number) =>
+    authedJson<GrupoDuplicado | null>(`/api/clientes/${id}/duplicados`),
   mergeClientes: (source: number, target: number) =>
     authedPostJson<{ ok: boolean; merged_into: number }>(`/api/clientes/merge`, { source, target }),
 

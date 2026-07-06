@@ -10,7 +10,7 @@ from fastapi import Request, HTTPException
 from fastapi.responses import Response
 
 from database import get_db, row_to_dict
-from identity import direccion_validada, nombre_validado
+from clientes.queries.identidad import nombre_legal, direccion_legal
 from pdf import (
     _pedido_html, _albaran_html, _contrato_html, _packing_list_html,
     _render_pdf, _pedido_filename,
@@ -52,11 +52,11 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
     ).fetchone()
     if cli:
         c = row_to_dict(cli)
-        # Nombre/dirección: preferí RENAPER si está verificado (fuente única en identity).
-        pedido["cliente_nombre"] = nombre_validado(c) or f"{c.get('nombre', '')} {c.get('apellido', '')}".strip()
+        # Nombre/dirección: preferí RENAPER si está verificado (clientes.queries.identidad).
+        pedido["cliente_nombre"] = nombre_legal(c)
         pedido["cliente_email"] = c.get("email")
         pedido["cliente_telefono"] = c.get("telefono")
-        pedido["cliente_direccion"] = direccion_validada(c) or c.get("direccion")
+        pedido["cliente_direccion"] = direccion_legal(c)
         pedido["cliente_dni"] = c.get("dni")
 
     # Datos fiscales: #1240 — productora elegida > perfil personal elegido >

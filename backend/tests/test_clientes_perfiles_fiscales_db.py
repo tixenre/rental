@@ -104,3 +104,36 @@ def test_cliente_inexistente_404(admin_cookie):
     client = _client()
     r = client.get("/api/clientes/999999/perfiles-fiscales", cookies=admin_cookie)
     assert r.status_code == 404, r.text
+
+
+def test_productora_borrador_visible_en_ficha_admin_pero_no_facturable(datos, admin_cookie):
+    """#1251 Fase 3: la ficha admin (`resumen_fiscal`, sin `solo_facturables`)
+    ve TODAS las productoras, borrador incluido; `solo_facturables=True`
+    (el que consume el checkout) las excluye — probado directo contra la
+    query, no vía HTTP, porque el endpoint del portal exige sesión cliente."""
+    from clientes.queries.fiscal import productoras_vinculadas
+    from database import get_db
+
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO productoras (nombre) VALUES ('Borrador de Ana')",
+        )
+        borrador_id = conn.execute(
+            "SELECT id FROM productoras WHERE nombre = 'Borrador de Ana'"
+        ).fetchone()["id"]
+        conn.execute(
+            "INSERT INTO productora_miembros (productora_id, cliente_id) VALUES (%s, %s)",
+            (borrador_id, CLIENTE_ID),
+        )
+        conn.commit()
+        try:
+            todas = productoras_vinculadas(conn, CLIENTE_ID)
+            assert any(p["id"] == borrador_id for p in todas)
+
+            facturables = productoras_vinculadas(conn, CLIENTE_ID, solo_facturables=True)
+            assert all(p["id"] != borrador_id for p in facturables)
+            assert any(p["razon_social"] == "Productora Vinculada" for p in facturables)
+        finally:
+            conn.execute("DELETE FROM productora_miembros WHERE productora_id = %s", (borrador_id,))
+            conn.execute("DELETE FROM productoras WHERE id = %s", (borrador_id,))
+            conn.commit()

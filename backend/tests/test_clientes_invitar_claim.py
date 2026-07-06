@@ -9,6 +9,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 
 import main
 from routes.clientes import InvitarClienteIn, invitar_cliente
@@ -16,6 +17,16 @@ from routes.clientes import InvitarClienteIn, invitar_cliente
 pytestmark = pytest.mark.unit
 
 _http = TestClient(main.app, raise_server_exceptions=False)
+
+
+def _fake_request() -> Request:
+    """Request real (no `object()`) — `invitar_cliente` lleva `@limiter.limit`
+    (auditoría de #1251): slowapi exige una instancia genuina de
+    `starlette.requests.Request` (lee `.client`/`.headers` para la IP), un stub
+    crudo la rompe. Sin conexión real — alcanza con el scope ASGI mínimo."""
+    return Request(
+        {"type": "http", "method": "POST", "path": "/api/clientes/invitar", "headers": [], "client": ("127.0.0.1", 0)}
+    )
 
 
 class _Cur:
@@ -73,7 +84,7 @@ def test_invitar_crea_cuenta_nueva(monkeypatch):
     monkeypatch.setattr("routes.clientes.require_admin", lambda request: None)
     monkeypatch.setattr("routes.clientes.get_db", lambda: _InvitarConn(existing_id=None, new_id=42))
     monkeypatch.setattr("routes.clientes.magic_commands.crear", lambda **kw: "TOK")
-    res = invitar_cliente(InvitarClienteIn(email="Nuevo@X.com", nombre="Ana"), request=object())
+    res = invitar_cliente(request=_fake_request(), body=InvitarClienteIn(email="Nuevo@X.com", nombre="Ana"))
     assert res["cliente_id"] == 42 and res["ya_existia"] is False
     assert "TOK" in res["url"] and "/cliente/claim?t=" in res["url"]
 
@@ -82,7 +93,7 @@ def test_invitar_reusa_cuenta_sin_verificar(monkeypatch):
     monkeypatch.setattr("routes.clientes.require_admin", lambda request: None)
     monkeypatch.setattr("routes.clientes.get_db", lambda: _InvitarConn(existing_id=7, verificado=None))
     monkeypatch.setattr("routes.clientes.magic_commands.crear", lambda **kw: "T")
-    res = invitar_cliente(InvitarClienteIn(email="ya@x.com"), request=object())
+    res = invitar_cliente(request=_fake_request(), body=InvitarClienteIn(email="ya@x.com"))
     assert res["cliente_id"] == 7 and res["ya_existia"] is True  # no duplica; sin verificar → OK
 
 
@@ -93,14 +104,14 @@ def test_invitar_cuenta_verificada_se_rechaza(monkeypatch):
         "routes.clientes.get_db", lambda: _InvitarConn(existing_id=7, verificado="2026-06-29T12:00:00")
     )
     with pytest.raises(HTTPException) as ei:
-        invitar_cliente(InvitarClienteIn(email="verificado@x.com"), request=object())
+        invitar_cliente(request=_fake_request(), body=InvitarClienteIn(email="verificado@x.com"))
     assert ei.value.status_code == 400 and "verificada" in ei.value.detail
 
 
 def test_invitar_email_invalido_400(monkeypatch):
     monkeypatch.setattr("routes.clientes.require_admin", lambda request: None)
     with pytest.raises(HTTPException) as ei:
-        invitar_cliente(InvitarClienteIn(email="sinarroba"), request=object())
+        invitar_cliente(request=_fake_request(), body=InvitarClienteIn(email="sinarroba"))
     assert ei.value.status_code == 400
 
 

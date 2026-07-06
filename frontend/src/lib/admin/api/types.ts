@@ -862,9 +862,12 @@ export type ClientePerfilFiscalRow = {
 
 export type ClienteProductoraRow = {
   id: number;
-  cuit: string;
-  perfil_impuestos: string;
+  // Nullable (#1251 Fase 3): productora BORRADOR (creada solo con nombre, sin
+  // CUIT todavía) — no facturable hasta que se le asigne uno.
+  cuit: string | null;
+  perfil_impuestos: string | null;
   razon_social: string | null;
+  nombre: string | null;
 };
 
 export type ClientePerfilesFiscales = {

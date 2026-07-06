@@ -7,8 +7,7 @@ movido a `services.finanzas_flujo.pedido`). Move-verbatim: mismo comportamiento,
 lógica — `routes/alquileres/core.py` reexporta estos nombres para no tocar sus ~8 call-sites
 existentes (routes de alquileres/portal cliente); código nuevo debería importar de acá directo."""
 from database import row_to_dict, MARCA_SUBQUERY, marca_subquery
-from routes.clientes import nombre_completo_cliente
-from identity import nombre_validado
+from clientes.queries.identidad import nombre_legal
 
 
 def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dict]]:
@@ -131,8 +130,8 @@ def _aplicar_contacto_cliente(pedido: dict, c: dict) -> None:
     si el DNI fue verificado por RENAPER, y `cliente_dni_validado_at` para que el
     back-office pueda mostrar el aviso de identidad sin verificar.
     """
-    # Nombre: legal de RENAPER si está verificado (fuente única en identity), si no el base.
-    pedido["cliente_nombre"] = nombre_validado(c) or nombre_completo_cliente(c.get("nombre", ""), c.get("apellido", ""))
+    # Nombre: legal de RENAPER si está verificado, si no el base (clientes.queries.identidad).
+    pedido["cliente_nombre"] = nombre_legal(c)
     if c.get("email"):
         pedido["cliente_email"] = c["email"]
     if c.get("telefono"):
