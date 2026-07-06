@@ -1,4 +1,5 @@
 import { AdminSection } from "@/components/admin/AdminSection";
+import { Section as SectionComposite } from "@/design-system/composites/Section";
 
 function slugifyForStorage(s: string): string {
   return s
@@ -9,15 +10,21 @@ function slugifyForStorage(s: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-// Section/Field locales — Fase 2 (C27/C30) los reemplaza por los composites
-// del DS. Se mantienen acá, no en el DS, porque son un paso intermedio.
+// Field local — Fase 2 (C30) lo reemplaza por el composite del DS.
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   // Cada sección es colapsable y persiste su estado por título (slug).
   // Antes era un scroll lineal de ~900 líneas; ahora el dueño abre lo que
-  // necesita y deja el resto cerrado.
+  // necesita y deja el resto cerrado. AdminSection ya muestra el título en
+  // su propio toggle — el composite va con title="" para no duplicarlo.
   return (
     <AdminSection title={title} storageKey={`estudio:${slugifyForStorage(title)}`}>
-      <section className="rounded-2xl border hairline bg-surface p-5 space-y-4">{children}</section>
+      <SectionComposite
+        title=""
+        className="rounded-2xl bg-surface p-5"
+        contentClassName="space-y-4"
+      >
+        {children}
+      </SectionComposite>
     </AdminSection>
   );
 }

@@ -110,12 +110,12 @@ import {
   ItemRow,
   BackLink,
   SaveIndicator,
-  Section,
   FieldLabel,
   RailSection,
   BdRow,
   FacturacionTargetSection,
 } from "@/components/admin/pedido/PedidoPageHelpers";
+import { Section } from "@/design-system/composites/Section";
 
 export const Route = createLazyFileRoute("/admin/pedidos/$id")({
   component: PedidoEditorRoute,
@@ -412,7 +412,7 @@ function PedidoEditorPage() {
           )}
 
           {/* Cliente */}
-          <Section icon={User} title="Cliente">
+          <Section variant="card" tone="elevated" icon={User} title="Cliente">
             {/* Buscar ficha existente: al elegirla, el contacto y el descuento
                 se completan solos. También se puede tipear a mano abajo (pedido
                 sin ficha vinculada). */}
@@ -530,9 +530,11 @@ function PedidoEditorPage() {
 
           {/* Fechas — editables con re-validación de stock */}
           <Section
+            variant="card"
+            tone="elevated"
             icon={Calendar}
             title="Fechas del alquiler"
-            aside={
+            actions={
               !datos.fecha_desde || !datos.fecha_hasta ? (
                 <span className="inline-flex items-center gap-1 font-mono text-2xs uppercase tracking-[0.2em] text-destructive">
                   <AlertTriangle className="h-3 w-3" /> sin fechas
@@ -587,7 +589,7 @@ function PedidoEditorPage() {
           </Section>
 
           {/* Equipos */}
-          <Section icon={Box} title={`Equipos · ${items.length}`}>
+          <Section variant="card" tone="elevated" icon={Box} title={`Equipos · ${items.length}`}>
             {/* Buscador inline: resultados en dropdown debajo (no tapa el form) */}
             <EquipoComboSearch
               existing={items}
@@ -640,7 +642,7 @@ function PedidoEditorPage() {
           </Section>
 
           {/* Notas */}
-          <Section icon={FileText} title="Notas internas">
+          <Section variant="card" tone="elevated" icon={FileText} title="Notas internas">
             <Textarea
               value={datos.notas}
               placeholder="Notas para el equipo de Rambla…"

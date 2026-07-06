@@ -23,7 +23,8 @@ import { whatsappLink } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
 import { Pill } from "@/design-system/ui/Pill";
 import { AdminPage } from "@/components/admin/AdminPage";
-import { Kpi, Section, BarChart, RankList } from "@/components/admin/LiquidacionReporte";
+import { Kpi, BarChart, RankList } from "@/components/admin/LiquidacionReporte";
+import { Section } from "@/design-system/composites/Section";
 
 export const Route = createLazyFileRoute("/admin/carritos")({
   component: CarritosPage,

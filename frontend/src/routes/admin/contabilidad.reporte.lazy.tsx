@@ -17,6 +17,7 @@ import { AdminTable } from "@/components/admin/AdminTable";
 import { TableSkeleton } from "@/components/admin/skeletons";
 import { ErrorState } from "@/components/admin/ErrorState";
 import { EmptyState } from "@/design-system/composites/EmptyState";
+import { Section } from "@/design-system/composites/Section";
 import { adminApi, type CuentaSaldo } from "@/lib/admin/api";
 import { Input } from "@/design-system/ui/input";
 import { formatARS } from "@/lib/format";
@@ -100,7 +101,7 @@ function ReporteMensualPage() {
             </div>
 
             {/* Por socio: devengado vs percibido + movimientos del mes */}
-            <Section titulo="Por socio">
+            <Section variant="plain" title="Por socio">
               <AdminTable<string>
                 rows={["Pablo", "Tincho", "Rambla"]}
                 getRowKey={(s) => s}
@@ -151,7 +152,7 @@ function ReporteMensualPage() {
             </Section>
 
             {/* Gastos por categoría */}
-            <Section titulo="Gastos del mes">
+            <Section variant="plain" title="Gastos del mes">
               {r.gastos.por_categoria.length === 0 ? (
                 <EmptyState
                   icon={<Receipt className="h-6 w-6" />}
@@ -179,7 +180,7 @@ function ReporteMensualPage() {
             </Section>
 
             {/* Cuenta corriente al día */}
-            <Section titulo="Cuenta corriente de socios (al día de hoy)">
+            <Section variant="plain" title="Cuenta corriente de socios (al día de hoy)">
               <div className="grid gap-3 sm:grid-cols-2">
                 {r.cuenta_corriente.map((s) => (
                   <CuentaCorrienteMini key={s.id} socio={s} />
@@ -228,15 +229,6 @@ function CascadaRow({
         {value}
       </div>
     </div>
-  );
-}
-
-function Section({ titulo, children }: { titulo: string; children: React.ReactNode }) {
-  return (
-    <section className="space-y-3">
-      <div className="t-eyebrow">{titulo}</div>
-      {children}
-    </section>
   );
 }
 

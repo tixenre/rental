@@ -42,6 +42,7 @@ import {
   DialogDescription,
 } from "@/design-system/ui/dialog";
 import { useConfirm } from "@/components/admin/useConfirm";
+import { Section } from "@/design-system/composites/Section";
 
 export function LiquidacionReporte() {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -445,24 +446,6 @@ export function Kpi({
       </div>
       <div className="font-display text-2xl text-ink mt-1.5 truncate">{value}</div>
       {sub && <div className="text-xs text-muted-foreground tabular-nums">{sub}</div>}
-    </div>
-  );
-}
-
-export function Section({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-lg border hairline bg-background p-4">
-      <h2 className="font-display text-lg text-ink">{title}</h2>
-      {subtitle && <p className="text-xs text-muted-foreground mb-3">{subtitle}</p>}
-      <div className="mt-2">{children}</div>
     </div>
   );
 }

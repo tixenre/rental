@@ -400,7 +400,7 @@ Utilidades canónicas en `frontend/src/design-system/styles/utilities.css` para 
 | **Componentes de aplicación (`rental/`)**          | `frontend/src/components/rental/*` | EquipmentCard, TopBar/Footer (`shell/`), CartMiniBar (`cart/`) integrados con queries + estado.                                                            |
 | **Componentes admin**                              | `frontend/src/components/admin/*`  | Tablas, modales, sidebar del back-office.                                                                                              |
 | **Piezas de marca** (en `ui/`)                     | `frontend/src/design-system/ui/*`     | `Pill`, `EstadoBadge`, `PagoBadge`, `ClienteAvatar`, `Field` (+ `types.ts`). Presentacionales con paleta de marca; viven planas junto a los primitivos shadcn (antes en `kit/`, **disuelto en `ui/`**). `EstadoBadge` es la única fuente del repo. |
-| **Composites** (`composites/`)                     | `frontend/src/design-system/composites/*` | Combinaciones genéricas y reusables, **sin dominio**: `EmptyState` (estado "nada para mostrar"). La capa entre primitivos y organismos de negocio. |
+| **Composites** (`composites/`)                     | `frontend/src/design-system/composites/*` | Combinaciones genéricas y reusables, **sin dominio**: `EmptyState` (estado "nada para mostrar"), `Chequeos` (lista de validaciones ok/falla), `Section` (encabezado + contenido de panel). La capa entre primitivos y organismos de negocio. |
 | **Otras presentacionales** (`rental/`)             | `frontend/src/components/rental/*`     | Con dominio de equipos: `AddonPills`, `PriceBlock` (`equipment/shared/`), `ViewToggle`, `StatCard`. No son librería pura. |
 
 ### Button (`frontend/src/design-system/ui/button.tsx`)
@@ -583,6 +583,30 @@ import { QtyInput } from "@/design-system/ui/qty-input";
 <QtyInput value={cant} onChange={setCant} min={1} max={stock} error={cant > stock} />
 // size="sm" (h-7, compacto para solicitudes) | "md" (h-9, default)
 ```
+
+### Section (`frontend/src/design-system/composites/Section.tsx`)
+
+Encabezado + contenido único para paneles admin — consolida los 6 wrappers locales
+"Section" (`LiquidacionReporte`, `contabilidad.reporte`, `marca.lazy`, `estudio`,
+`PedidoPageHelpers` + variantes) que habían aparecido con formas ligeramente
+distintas de lo mismo.
+
+```tsx
+import { Section } from "@/design-system/composites/Section";
+
+<Section title="Cliente" subtitle="Datos de contacto">…</Section>
+// variant="plain": sin chrome propio (para páginas ya envueltas en su card)
+<Section variant="plain" title="Assets canónicos">…</Section>
+// tone="elevated" (solo variant="card"): header en tira separada, para paneles
+// dentro de una página ya densa (ej. el editor de pedidos)
+<Section variant="card" tone="elevated" icon={User} title="Cliente" actions={<Badge />}>…</Section>
+// title="" suprime el header propio — para cuando un wrapper externo (ej.
+// AdminSection, colapsable) ya lo muestra
+<Section title="" className="bg-surface" contentClassName="space-y-4">…</Section>
+```
+
+`StudioBookingForm` (wizard numerado, público) queda como excepción documentada —
+es un patrón distinto (paso numerado, no un panel admin).
 
 ### Componentes presentacionales (`frontend/src/components/rental/`)
 

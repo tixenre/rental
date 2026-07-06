@@ -20,7 +20,8 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { cn } from "@/lib/utils";
 import { fmtArs } from "@/lib/format";
 import { AdminPage } from "@/components/admin/AdminPage";
-import { Kpi, Section, BarChart, RankList } from "@/components/admin/LiquidacionReporte";
+import { Kpi, BarChart, RankList } from "@/components/admin/LiquidacionReporte";
+import { Section } from "@/design-system/composites/Section";
 import { CardGridSkeleton, TableSkeleton } from "@/components/admin/skeletons";
 import { ErrorState } from "@/components/admin/ErrorState";
 
