@@ -67,6 +67,10 @@ export type DraftDatos = {
    *  ($ fijo), mismo campo de la UI con un selector al lado. */
   descuento_manual_tipo: "pct" | "monto";
   descuento_manual_monto: number;
+  /** A nombre de quién se factura este pedido (#1251) — mutuamente excluyentes,
+   *  null/null = perfil default de la cuenta. El renter sigue siendo `cliente_id`. */
+  perfil_fiscal_id: number | null;
+  productora_id: number | null;
 };
 
 export type PedidoMode = "admin" | "cliente";
@@ -89,6 +93,8 @@ function pedidoToDatos(p: Pedido, keepDateTime = false): DraftDatos {
     descuento_pct: p.descuento_pct ?? 0,
     descuento_manual_tipo: p.descuento_manual_tipo ?? "pct",
     descuento_manual_monto: p.descuento_manual_monto ?? 0,
+    perfil_fiscal_id: p.perfil_fiscal_id ?? null,
+    productora_id: p.productora_id ?? null,
   };
 }
 
@@ -120,7 +126,9 @@ function shallowDatosEq(a: DraftDatos, b: DraftDatos): boolean {
     a.notas === b.notas &&
     a.descuento_pct === b.descuento_pct &&
     a.descuento_manual_tipo === b.descuento_manual_tipo &&
-    a.descuento_manual_monto === b.descuento_manual_monto
+    a.descuento_manual_monto === b.descuento_manual_monto &&
+    a.perfil_fiscal_id === b.perfil_fiscal_id &&
+    a.productora_id === b.productora_id
   );
 }
 
@@ -205,6 +213,8 @@ export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftO
         descuento_pct: d.descuento_pct || 0,
         descuento_manual_tipo: d.descuento_manual_tipo,
         descuento_manual_monto: d.descuento_manual_monto || 0,
+        perfil_fiscal_id: d.perfil_fiscal_id,
+        productora_id: d.productora_id,
       }),
     onSuccess: (p) => {
       qc.setQueryData(["admin", "pedido", p.id], p);

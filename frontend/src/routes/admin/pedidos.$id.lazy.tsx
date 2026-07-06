@@ -114,6 +114,7 @@ import {
   FieldLabel,
   RailSection,
   BdRow,
+  FacturacionTargetSection,
 } from "@/components/admin/pedido/PedidoPageHelpers";
 
 export const Route = createLazyFileRoute("/admin/pedidos/$id")({
@@ -513,6 +514,19 @@ function PedidoEditorPage() {
               </div>
             )}
           </Section>
+
+          {/* Facturar a nombre de (#1251) — solo si el cliente tiene perfiles
+              fiscales personales o productoras vinculadas para elegir. */}
+          <FacturacionTargetSection
+            clienteId={datos.cliente_id}
+            perfilFiscalId={datos.perfil_fiscal_id}
+            productoraId={datos.productora_id}
+            onChange={({ perfilFiscalId, productoraId }) =>
+              setDatos(
+                (d) => d && { ...d, perfil_fiscal_id: perfilFiscalId, productora_id: productoraId },
+              )
+            }
+          />
 
           {/* Fechas — editables con re-validación de stock */}
           <Section

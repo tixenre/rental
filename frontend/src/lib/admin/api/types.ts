@@ -1108,6 +1108,10 @@ export type Pedido = {
   cliente_telefono: string | null;
   cliente_perfil_impuestos: string | null;
   cliente_dni_validado_at?: string | null;
+  /** A nombre de quién se factura este pedido (#1251) — mutuamente excluyentes,
+   *  NULL/NULL = perfil default de la cuenta. El renter sigue siendo `cliente_id`. */
+  perfil_fiscal_id?: number | null;
+  productora_id?: number | null;
   fecha_desde: string | null;
   fecha_hasta: string | null;
   estado: PedidoEstado;
@@ -1186,6 +1190,8 @@ export type PedidoDatosInput = {
   descuento_pct: number | null;
   descuento_manual_tipo?: "pct" | "monto" | null;
   descuento_manual_monto?: number | null;
+  perfil_fiscal_id?: number | null;
+  productora_id?: number | null;
 };
 
 // ── Estudio (singleton E1) ───────────────────────────────────────────────────

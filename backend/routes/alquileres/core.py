@@ -293,11 +293,25 @@ class PedidoDatos(BaseModel):
     # "monto" (usa `descuento_manual_monto`, pesos fijos).
     descuento_manual_tipo:  Optional[str]   = None
     descuento_manual_monto: Optional[float] = None
+    # #1251: a nombre de quién se factura este pedido — mutuamente excluyentes
+    # (validado abajo + membership en `_apply_pedido_datos`). NULL/NULL = perfil
+    # default de la cuenta. El renter sigue siendo `cliente_id` — esto solo
+    # cambia a quién se factura, nunca quién alquila.
+    perfil_fiscal_id: Optional[int] = None
+    productora_id:    Optional[int] = None
 
     @field_validator("fecha_desde", "fecha_hasta")
     @classmethod
     def _v_fechas(cls, v):
         return _validar_fecha_iso(v)
+
+    @model_validator(mode="after")
+    def _v_fiscal_excluyente(self):
+        if self.perfil_fiscal_id and self.productora_id:
+            raise ValueError(
+                "Un pedido no puede facturar a un perfil personal y a una productora a la vez."
+            )
+        return self
 
     @field_validator("descuento_pct")
     @classmethod
@@ -546,6 +560,26 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
     # (el único except de abajo es `DeadlockDetected`) → 500 crudo en vez de 400.
     if data.perfil_fiscal_id and data.productora_id:
         raise HTTPException(400, "Un pedido no puede facturar a un perfil personal y a una productora a la vez.")
+    # Mismo defense-in-depth que la excluyencia de arriba: `cliente_crear_pedido`
+    # ya valida membership antes de llamar acá, pero esta es la ÚNICA puerta
+    # real — sin esto, el builder admin podría apuntar un pedido a la
+    # productora/perfil de OTRO cliente por un bug de UI.
+    if data.perfil_fiscal_id or data.productora_id:
+        with get_db() as _conn:
+            if data.perfil_fiscal_id:
+                propio = _conn.execute(
+                    "SELECT 1 FROM cliente_perfiles_fiscales WHERE id = %s AND cliente_id = %s",
+                    (data.perfil_fiscal_id, data.cliente_id),
+                ).fetchone()
+                if not propio:
+                    raise HTTPException(404, "Perfil fiscal no encontrado para este cliente.")
+            if data.productora_id:
+                vinculado = _conn.execute(
+                    "SELECT 1 FROM productora_miembros WHERE productora_id = %s AND cliente_id = %s",
+                    (data.productora_id, data.cliente_id),
+                ).fetchone()
+                if not vinculado:
+                    raise HTTPException(404, "Productora no encontrada para este cliente.")
 
     cliente_nombre   = data.cliente_nombre
     cliente_email    = data.cliente_email
@@ -838,6 +872,35 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos", es_admin: bool = Fal
             # cliente se resuelve en vivo en `_recalcular_total_pedido`. Si el
             # pedido ya tenía un override explícito, asignar OTRO cliente no
             # debería resetearlo solo — el admin lo cambia a mano si quiere.
+
+    if "perfil_fiscal_id" in payload or "productora_id" in payload:
+        # Selección tipo radio (una sola forma activa a la vez): si se manda
+        # uno no-nulo, el otro se limpia solo aunque el caller no lo mande
+        # explícito — evita dejar la fila con ambos apuntando a algo (#1251).
+        if payload.get("perfil_fiscal_id"):
+            payload["productora_id"] = None
+        elif payload.get("productora_id"):
+            payload["perfil_fiscal_id"] = None
+
+        cliente_efectivo = payload.get("cliente_id") or p["cliente_id"]
+        if payload.get("perfil_fiscal_id") and not cliente_efectivo:
+            raise HTTPException(400, "El pedido necesita un cliente antes de elegir un perfil fiscal.")
+        if payload.get("productora_id") and not cliente_efectivo:
+            raise HTTPException(400, "El pedido necesita un cliente antes de elegir una productora.")
+        if payload.get("perfil_fiscal_id"):
+            propio = conn.execute(
+                "SELECT 1 FROM cliente_perfiles_fiscales WHERE id = %s AND cliente_id = %s",
+                (payload["perfil_fiscal_id"], cliente_efectivo),
+            ).fetchone()
+            if not propio:
+                raise HTTPException(404, "Perfil fiscal no encontrado para este cliente.")
+        if payload.get("productora_id"):
+            vinculado = conn.execute(
+                "SELECT 1 FROM productora_miembros WHERE productora_id = %s AND cliente_id = %s",
+                (payload["productora_id"], cliente_efectivo),
+            ).fetchone()
+            if not vinculado:
+                raise HTTPException(404, "Productora no encontrada para este cliente.")
 
     if "fecha_desde" in payload or "fecha_hasta" in payload:
         nueva_desde = payload.get("fecha_desde") or p["fecha_desde"]

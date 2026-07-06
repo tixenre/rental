@@ -1,5 +1,5 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Check, ChevronLeft, GripVertical, Tag, X } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, Building2, Check, ChevronLeft, GripVertical, Tag, X } from "lucide-react";
 import { toast } from "sonner";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -270,6 +270,73 @@ export function Section({
       </div>
       <div className="p-4">{children}</div>
     </section>
+  );
+}
+
+/** "Facturar a nombre de" (#1251) — el renter sigue siendo `cliente_id`; esto
+ * solo elige a quién se factura: la cuenta default, un perfil fiscal personal,
+ * o una productora vinculada al cliente. Mismo patrón que el selector del
+ * checkout (`CheckoutResumen.tsx`), reusado acá para el admin. Solo se
+ * renderiza si el pedido tiene cliente Y ese cliente tiene más de una opción
+ * (si no hay nada para elegir, no tiene sentido mostrar el selector). */
+export function FacturacionTargetSection({
+  clienteId,
+  perfilFiscalId,
+  productoraId,
+  onChange,
+}: {
+  clienteId: number | null;
+  perfilFiscalId: number | null;
+  productoraId: number | null;
+  onChange: (v: { perfilFiscalId: number | null; productoraId: number | null }) => void;
+}) {
+  const q = useQuery({
+    queryKey: ["admin", "cliente-perfiles-fiscales", clienteId],
+    queryFn: () => adminApi.getClientePerfilesFiscales(clienteId!),
+    enabled: !!clienteId,
+  });
+  const perfiles = q.data?.perfiles ?? [];
+  // Excluye productoras BORRADOR (sin CUIT, #1251 Fase 3) — no son facturables,
+  // mismo criterio que `productoras_vinculadas(solo_facturables=True)` del checkout.
+  const productoras = (q.data?.productoras ?? []).filter((pr) => pr.cuit);
+  if (!clienteId || perfiles.length + productoras.length === 0) return null;
+
+  return (
+    <Section icon={Building2} title="Facturar a nombre de">
+      <div className="space-y-2">
+        <label className="flex items-center gap-2 text-sm text-ink">
+          <input
+            type="radio"
+            name="pedido-facturacion-target"
+            checked={!perfilFiscalId && !productoraId}
+            onChange={() => onChange({ perfilFiscalId: null, productoraId: null })}
+          />
+          Cuenta del cliente (default)
+        </label>
+        {perfiles.map((p) => (
+          <label key={`perfil-${p.id}`} className="flex items-center gap-2 text-sm text-ink">
+            <input
+              type="radio"
+              name="pedido-facturacion-target"
+              checked={perfilFiscalId === p.id}
+              onChange={() => onChange({ perfilFiscalId: p.id, productoraId: null })}
+            />
+            {p.etiqueta || p.razon_social || p.cuit}
+          </label>
+        ))}
+        {productoras.map((pr) => (
+          <label key={`productora-${pr.id}`} className="flex items-center gap-2 text-sm text-ink">
+            <input
+              type="radio"
+              name="pedido-facturacion-target"
+              checked={productoraId === pr.id}
+              onChange={() => onChange({ perfilFiscalId: null, productoraId: pr.id })}
+            />
+            {pr.nombre || pr.razon_social || pr.cuit}
+          </label>
+        ))}
+      </div>
+    </Section>
   );
 }
 
