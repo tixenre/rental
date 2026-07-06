@@ -86,9 +86,7 @@ function FaqPage() {
         <div className="mt-10 space-y-10">
           {groups.map((group) => (
             <section key={group.title}>
-              <h2 className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-3">
-                {group.title}
-              </h2>
+              <h2 className="t-section mb-3">{group.title}</h2>
               <Accordion type="multiple" className="rounded-lg border hairline divide-y hairline">
                 {group.items.map((item, i) => (
                   <AccordionItem

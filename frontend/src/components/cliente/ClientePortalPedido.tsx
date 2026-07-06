@@ -583,9 +583,7 @@ export function PedidoCard({
           {/* ── Timeline: card propia, full width ── */}
           <section className="[grid-area:timeline] rounded-lg border border-[var(--hairline)] bg-card px-5 pt-[18px] pb-4">
             <div className="flex items-baseline justify-between gap-3 mb-3.5">
-              <h3 className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground">
-                Estado del pedido
-              </h3>
+              <h3 className="t-section">Estado del pedido</h3>
               {tlCurrent && (
                 <div className="font-sans text-xs text-muted-foreground text-right flex-1 min-w-0 leading-[1.4]">
                   <strong className="text-ink font-semibold">{tlCurrent.label}</strong>
@@ -632,9 +630,7 @@ export function PedidoCard({
             </section>
 
             <section>
-              <h3 className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground mb-2">
-                Equipos ({pedido.items.length})
-              </h3>
+              <h3 className="t-section mb-2">Equipos ({pedido.items.length})</h3>
               <ul>
                 {pedido.items.map((item, i) => {
                   const display = item.nombre_publico || item.nombre;
@@ -783,7 +779,7 @@ export function PedidoCard({
                   borderColor: "color-mix(in oklch, var(--amber) 35%, transparent)",
                 }}
               >
-                <h3 className="font-mono text-2xs uppercase tracking-[0.22em] text-ink/70 mb-2">
+                <h3 className="font-mono text-xs uppercase tracking-[0.18em] text-ink/70 mb-2">
                   Documentos
                 </h3>
                 <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
@@ -896,9 +892,7 @@ export function PedidoCard({
 
             {pedido.pagos && pedido.pagos.length > 0 && (
               <section>
-                <h3 className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground mb-2">
-                  Pagos
-                </h3>
+                <h3 className="t-section mb-2">Pagos</h3>
                 <ul className="flex flex-col gap-1">
                   {pedido.pagos.map((pg, i) => (
                     <li
@@ -920,9 +914,7 @@ export function PedidoCard({
 
             {pedido.notas && (
               <section>
-                <h3 className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground mb-2">
-                  Notas
-                </h3>
+                <h3 className="t-section mb-2">Notas</h3>
                 <div className="rounded-md border border-[color-mix(in_oklch,var(--amber)_40%,transparent)] bg-amber-soft px-3.5 py-3 font-sans text-xs text-ink leading-[1.5] whitespace-pre-wrap">
                   {pedido.notas}
                 </div>

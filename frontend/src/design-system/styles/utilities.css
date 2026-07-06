@@ -180,6 +180,17 @@
     text-transform: uppercase;
     color: var(--color-muted-foreground);
   }
+  /* Heading de sección real (h2/h3) con el lenguaje visual del eyebrow —
+     mono/uppercase/tracked — pero en var(--text-xs) (13px), no 10px: un
+     heading real no puede resolver como un label decorativo. t-eyebrow
+     sigue siendo el único que va a 10px (uso puramente decorativo). */
+  .t-section {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-muted-foreground);
+  }
 
   /* ── Safe area (iOS sticky bars) ───────────────────────── */
   .safe-t {

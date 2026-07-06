@@ -564,9 +564,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           {/* Descripción */}
           {desc && (
             <section className="space-y-2">
-              <h2 className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                Descripción
-              </h2>
+              <h2 className="t-section">Descripción</h2>
               <p className="text-base leading-relaxed text-foreground/90 whitespace-pre-line">
                 {shownDesc}
               </p>
@@ -606,7 +604,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
                 aria-expanded={specsOpen}
                 className="flex w-full items-center justify-between gap-3 py-1 text-left transition hover:text-ink"
               >
-                <h2 className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+                <h2 className="t-section">
                   Ficha técnica
                   <span className="ml-2 text-ink/40">({item.specs.length})</span>
                 </h2>
@@ -701,9 +699,7 @@ function CartButtons({
 function FichaPillSection({ title, items }: { title: string; items: string[] }) {
   return (
     <section className="space-y-2">
-      <h2 className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-        {title}
-      </h2>
+      <h2 className="t-section">{title}</h2>
       <div className="flex flex-wrap gap-1.5">
         {items.map((it, i) => (
           <span
