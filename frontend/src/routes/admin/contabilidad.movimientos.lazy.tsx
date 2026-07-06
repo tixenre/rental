@@ -233,7 +233,7 @@ function MovimientosPage() {
   return (
     <AdminPage
       title="Movimientos"
-      maxW="max-w-5xl"
+      maxW="list"
       description="Toda la plata de las cajas: los cobros de pedidos (que entran solos, una línea por mes) más los gastos, transferencias, retiros y aportes."
       backTo={{ to: "/admin/contabilidad", label: "Tablero" }}
     >

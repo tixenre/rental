@@ -100,7 +100,7 @@ function UnidadesPage() {
     <AdminPage
       title="Unidades"
       eyebrow="Inventario"
-      maxW="max-w-4xl"
+      maxW="detail"
       description="Catálogo global de unidades (lm, K, V…). Las specs tipo tabla con columnas valor+unidad pueden referenciar este catálogo para mostrar listas cerradas en lugar de input libre."
       actions={
         <Button onClick={() => setEditing("new")}>

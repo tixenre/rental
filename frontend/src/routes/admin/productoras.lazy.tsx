@@ -12,7 +12,7 @@ function ProductorasPage() {
   return (
     <AdminPage
       title="Productoras"
-      maxW="max-w-6xl"
+      maxW="list"
       description="Entidades fiscales compartidas — vinculá cuentas de cliente que facturan a nombre de una productora."
     >
       <ProductorasSection />

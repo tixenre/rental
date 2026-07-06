@@ -108,7 +108,7 @@ function PagosLogPage() {
       title="Cobros de pedidos"
       eyebrow="Finanzas"
       backTo={{ to: "/admin/contabilidad/movimientos", label: "Movimientos" }}
-      maxW="max-w-5xl"
+      maxW="list"
       description={
         <>
           Registro de todos los cobros de pedidos (la fuente única de "pagado"). Cada cobro lleva a

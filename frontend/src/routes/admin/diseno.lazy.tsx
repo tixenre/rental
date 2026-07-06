@@ -16,7 +16,7 @@ function DisenoPage() {
   return (
     <AdminPage
       title="Assets y diseño"
-      maxW="max-w-4xl"
+      maxW="detail"
       description="Tu marca y la librería de diseño de Rambla, en un solo lugar."
     >
       <Tabs defaultValue="assets">

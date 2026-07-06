@@ -42,7 +42,6 @@ function EstadisticasPage() {
   return (
     <AdminPage
       title="Estadísticas"
-      maxW="max-w-7xl"
       description="Métricas del negocio. El reporte de liquidación ahora vive en Finanzas."
     >
       <div className="space-y-6">

@@ -40,7 +40,7 @@ function AdminDashboard() {
   const conSaldo = saldoQ.data?.total ?? 0;
 
   return (
-    <AdminPage title="Dashboard" maxW="max-w-6xl">
+    <AdminPage title="Dashboard" maxW="list">
       {isLoading && (
         <CardGridSkeleton count={4} className="grid-cols-2 md:grid-cols-4 gap-3 md:gap-4" />
       )}

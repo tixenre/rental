@@ -13,7 +13,7 @@ export const Route = createFileRoute("/admin/novedades")({
 
 function NovedadesPage() {
   return (
-    <AdminPage title="Novedades" maxW="max-w-3xl" description="Cambios recientes en el sistema.">
+    <AdminPage title="Novedades" maxW="form" description="Cambios recientes en el sistema.">
       <ol className="space-y-4 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-px before:bg-border before:hairline">
         {changelog.map((entry) => (
           <EntryCard key={entry.number} entry={entry} />

@@ -24,7 +24,7 @@ function SettingsPage() {
   return (
     <AdminPage
       title="Settings"
-      maxW="max-w-4xl"
+      maxW="detail"
       description="Configuración del sistema y herramientas de mantenimiento."
     >
       <div className="space-y-6">

@@ -171,7 +171,7 @@ function DataIoPage() {
   return (
     <AdminPage
       title="Datos y backups"
-      maxW="max-w-4xl"
+      maxW="detail"
       description="Guardá una copia de tus datos, restaurala cuando quieras, o borrá todo para arrancar de cero."
     >
       <div className="space-y-8">

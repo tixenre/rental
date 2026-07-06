@@ -42,7 +42,7 @@ function CalidadPage() {
   return (
     <AdminPage
       title="Calidad del inventario"
-      maxW="max-w-3xl"
+      maxW="form"
       description="Qué equipos tienen datos faltantes. Solo lectura — los CTAs para completar llegan en una segunda iteración (#350)."
     >
       <QueryState

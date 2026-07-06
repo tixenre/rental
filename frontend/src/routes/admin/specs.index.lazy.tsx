@@ -52,7 +52,7 @@ function SpecsConsolidadasPage() {
   return (
     <AdminPage
       title="Specs"
-      maxW="max-w-6xl"
+      maxW="list"
       description="Definiciones de specs por categoría raíz. Marcá favoritos para que aparezcan en card, mini-ficha, lateral y pills de la ficha. Arrastrá para reordenar."
     >
       <div className="space-y-6">

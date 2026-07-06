@@ -13,7 +13,7 @@ function CategoriasPage() {
   return (
     <AdminPage
       title="Categorías"
-      maxW="max-w-4xl"
+      maxW="detail"
       description="Árbol jerárquico de categorías y cómo aparecen en el catálogo público."
     >
       <div className="space-y-6">

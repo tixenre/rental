@@ -191,7 +191,7 @@ export const pagesSection: CatalogSection = {
       name: "AdminPage",
       files: ["components/admin/AdminPage.tsx"],
       blurb:
-        "El chrome único de página del back-office: eyebrow + título + descripción + acciones + back-link. Absorbe el header que estaba copy-pasteado en ~26 rutas.",
+        "El chrome único de página del back-office: eyebrow + título + descripción + acciones + back-link. maxW=form|detail|list|wide (presets, default wide). layout=fullHeight para master-detail (ocupa el viewport, sin maxW).",
       render: () => (
         <div className="overflow-hidden rounded-lg border hairline bg-background">
           <AdminPage

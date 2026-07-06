@@ -46,7 +46,7 @@ function ReporteMensualPage() {
   return (
     <AdminPage
       title="Reporte mensual"
-      maxW="max-w-4xl"
+      maxW="detail"
       description="El mes de Rambla, completo: lo facturado, lo que se llevan los dueños de los equipos, los gastos, y lo que realmente le queda a Rambla. Todo sale del mismo motor — no hay un peso sumado dos veces."
       backTo={{ to: "/admin/contabilidad", label: "Tablero" }}
       actions={

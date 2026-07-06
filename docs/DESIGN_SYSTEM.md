@@ -584,6 +584,23 @@ import { QtyInput } from "@/design-system/ui/qty-input";
 // size="sm" (h-7, compacto para solicitudes) | "md" (h-9, default)
 ```
 
+### AdminPage (`frontend/src/components/admin/AdminPage.tsx`)
+
+Chrome único de página del back-office: eyebrow (del grupo de la ruta en
+`adminNav` por default) + `t-h1` + descripción + acciones + back-link.
+
+```tsx
+import { AdminPage } from "@/components/admin/AdminPage";
+
+<AdminPage title="Unidades" actions={<Button>Nueva</Button>}>…</AdminPage>
+// maxW: preset de ancho — form (3xl) · detail (4xl) · list (6xl) · wide (7xl, default)
+<AdminPage title="Reporte mensual" maxW="detail">…</AdminPage>
+// layout="fullHeight": ocupa el viewport bajo el topbar (flex column, header
+// shrink-0, children en flex-1 min-h-0 con su propio scroll) — para
+// master-detail. NO aplica maxW (ancho completo).
+<AdminPage title="Pedidos" layout="fullHeight">…</AdminPage>
+```
+
 ### Section (`frontend/src/design-system/composites/Section.tsx`)
 
 Encabezado + contenido único para paneles admin — consolida los 6 wrappers locales

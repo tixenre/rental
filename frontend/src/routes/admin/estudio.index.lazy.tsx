@@ -42,7 +42,7 @@ function EstudioAdminPage() {
   return (
     <AdminPage
       title="Estudio"
-      maxW="max-w-3xl"
+      maxW="form"
       description="Configuración del espacio, precios y galería de fotos."
     >
       <div className="space-y-8">

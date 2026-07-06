@@ -50,7 +50,7 @@ function CuentasPage() {
   return (
     <AdminPage
       title="Cuentas"
-      maxW="max-w-4xl"
+      maxW="detail"
       description="La cuenta corriente de cada socio (quién le debe a quién) y las cajas con la plata real del negocio."
       backTo={{ to: "/admin/contabilidad", label: "Tablero" }}
     >

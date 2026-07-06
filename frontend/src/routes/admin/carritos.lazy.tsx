@@ -69,7 +69,7 @@ function CarritosPage() {
   return (
     <AdminPage
       title="Carritos activos"
-      maxW="max-w-6xl"
+      maxW="list"
       description="Clientes armando pedidos ahora mismo. Se actualiza cada 30 segundos."
       actions={
         <div className="flex items-center gap-2 text-xs text-muted-foreground">

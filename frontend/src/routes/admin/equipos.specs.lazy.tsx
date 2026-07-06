@@ -13,7 +13,7 @@ function SpecsPage() {
     <AdminPage
       title="Specs por categoría"
       eyebrow="Equipos"
-      maxW="max-w-4xl"
+      maxW="detail"
       description="Define qué campos técnicos pide cada categoría. Estos labels también guían la IA al importar."
     >
       <SpecTemplatesSection />

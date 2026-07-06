@@ -14,7 +14,7 @@ function MarcaPage() {
   return (
     <AdminPage
       title="Identidad de marca"
-      maxW="max-w-4xl"
+      maxW="detail"
       description={
         <>
           Hub canónico de marca. Los contenidos con{" "}

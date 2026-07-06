@@ -34,7 +34,7 @@ function ContabilidadTablero() {
   return (
     <AdminPage
       title="Tablero"
-      maxW="max-w-5xl"
+      maxW="list"
       description="Cuánta plata hay y dónde. Los cobros de clientes ya entran solos a la caja de quien los cobró."
       actions={
         <Button asChild variant="outline" className="shrink-0">

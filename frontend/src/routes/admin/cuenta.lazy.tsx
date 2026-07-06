@@ -16,7 +16,7 @@ function CuentaPage() {
   return (
     <AdminPage
       title="Mi cuenta"
-      maxW="max-w-4xl"
+      maxW="detail"
       description="Seguridad y acceso de TU cuenta de admin — separado de la configuración del negocio (eso vive en Settings)."
     >
       <div className="space-y-6">
