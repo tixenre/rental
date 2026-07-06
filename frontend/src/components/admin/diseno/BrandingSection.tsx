@@ -20,7 +20,12 @@ import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 import { adminApi } from "@/lib/admin/api";
 import { authedJson } from "@/lib/authedFetch";
-import { HERO_TAGLINES_DEFAULT, parseHeroTaglines, type HeroTagline } from "@/lib/hero-taglines";
+import {
+  HERO_TAGLINES_DEFAULT,
+  HERO_TAGLINES_QUERY_KEY,
+  parseHeroTaglines,
+  type HeroTagline,
+} from "@/lib/hero-taglines";
 
 type Setting = { key: string; value: string; updated_at: string | null; updated_by: string | null };
 
@@ -88,8 +93,12 @@ export function BrandingSection() {
   const phoneChanged = phoneInput.trim() !== (phoneQ.data ?? "").trim();
 
   // ── Hero taglines ─────────────────────────────────────────────────
+  // Key propia (["admin",...]) — distinta de la que usa el público
+  // (HERO_TAGLINES_QUERY_KEY, ya parseada a HeroTagline[]): acá el shape es
+  // el string crudo tal cual lo guarda /api/settings. Evita la colisión de
+  // shapes que compartían ["settings","hero_taglines"].
   const taglinesQ = useQuery({
-    queryKey: ["settings", "hero_taglines"],
+    queryKey: ["admin", "settings", "hero_taglines"],
     queryFn: () => fetchSetting("hero_taglines"),
     staleTime: 0,
   });
@@ -103,7 +112,8 @@ export function BrandingSection() {
       adminApi.updateSetting("hero_taglines", JSON.stringify(rows)),
     onSuccess: (data) => {
       toast.success("Taglines guardados");
-      qc.setQueryData(["settings", "hero_taglines"], data.value);
+      qc.setQueryData(["admin", "settings", "hero_taglines"], data.value);
+      qc.invalidateQueries({ queryKey: HERO_TAGLINES_QUERY_KEY });
       qc.invalidateQueries({ queryKey: ["settings", "list"] });
     },
     onError: (e: Error) => toast.error(e.message),

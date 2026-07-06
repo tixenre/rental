@@ -10,7 +10,6 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { CatalogoMovil } from "@/components/rental/mobile/CatalogoMovil";
 import { LayoutGrid, List, ArrowRight, Search, X, Check, Heart, SearchX } from "lucide-react";
 import { ViewToggle } from "@/components/rental/ViewToggle";
@@ -33,7 +32,7 @@ import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
 import { useEquipos, useCategorias, useMarcas } from "@/hooks/useEquipos";
 import { useFavoritos } from "@/hooks/useFavoritos";
 import type { BackendMarca, BackendCategoria } from "@/lib/api";
-import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
+import { useHeroTaglines } from "@/lib/hero-taglines";
 import { useCart } from "@/lib/cart-store";
 import { toast } from "sonner";
 import { type Equipment } from "@/data/equipment";
@@ -233,21 +232,7 @@ function Index() {
   const { data: backendCats = [] } = useCategorias();
   const { data: marcasData } = useMarcas();
 
-  const { data: taglinesData } = useQuery({
-    queryKey: ["settings", "hero_taglines"],
-    queryFn: async () => {
-      try {
-        const res = await fetch("/api/settings/hero_taglines");
-        if (!res.ok) return HERO_TAGLINES_DEFAULT;
-        const d = await res.json();
-        return parseHeroTaglines(d.value as string);
-      } catch {
-        return HERO_TAGLINES_DEFAULT;
-      }
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-  const taglines = taglinesData ?? HERO_TAGLINES_DEFAULT;
+  const taglines = useHeroTaglines();
   const taglineIdx = useMemo(() => Math.floor(Math.random() * 4), []);
   const tagline = taglines[taglineIdx % taglines.length];
 

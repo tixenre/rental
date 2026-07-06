@@ -19,7 +19,6 @@ import {
 import { BottomSheet } from "@/components/mobile/BottomSheet";
 import { Button } from "@/design-system/ui/button";
 import { useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { formatARS } from "@/lib/format";
 import { type Equipment } from "@/data/equipment";
@@ -30,7 +29,7 @@ import { FavButton } from "@/components/rental/equipment/shared/FavButton";
 import { ShareButton } from "@/components/rental/equipment/shared/ShareButton";
 import { createOrder } from "@/lib/orders";
 import { CheckoutResumen, type FacturacionTarget } from "@/components/rental/CheckoutResumen";
-import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
+import { useHeroTaglines } from "@/lib/hero-taglines";
 import { useHeroPhotos, heroImgProps } from "@/lib/studio/hero-photos";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
 import { BUSINESS_PHONE } from "@/lib/business";
@@ -116,21 +115,7 @@ export function HeroBanner({
     return () => clearInterval(id);
   }, [photos.length]);
 
-  const { data: taglinesData } = useQuery({
-    queryKey: ["settings", "hero_taglines"],
-    queryFn: async () => {
-      try {
-        const res = await fetch("/api/settings/hero_taglines");
-        if (!res.ok) return HERO_TAGLINES_DEFAULT;
-        const d = await res.json();
-        return parseHeroTaglines(d.value as string);
-      } catch {
-        return HERO_TAGLINES_DEFAULT;
-      }
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-  const taglines = taglinesData ?? HERO_TAGLINES_DEFAULT;
+  const taglines = useHeroTaglines();
 
   const taglineIdx = useMemo(() => Math.floor(Math.random() * 4), []);
   const tagline = taglines[taglineIdx % taglines.length];
