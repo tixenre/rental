@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { SITE_URL } from "@/lib/site";
 import { useHeroPhotos } from "@/lib/studio/hero-photos";
-import { Logo } from "@/components/rental/Logo";
+import { Logo } from "@/components/rental/shell/Logo";
 
 export const Route = createFileRoute("/")({
   head: () => ({

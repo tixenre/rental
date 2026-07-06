@@ -2,8 +2,8 @@ import { Outlet, createRootRouteWithContext } from "@tanstack/react-router";
 import { QueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Toaster } from "@/design-system/ui/sonner";
-import { PublicLayout } from "@/components/rental/PublicLayout";
-import { FaviconSync } from "@/components/rental/FaviconSync";
+import { PublicLayout } from "@/components/rental/shell/PublicLayout";
+import { FaviconSync } from "@/components/rental/shell/FaviconSync";
 import { useCartHeartbeat } from "@/hooks/useCartHeartbeat";
 import { Component, type ReactNode } from "react";
 

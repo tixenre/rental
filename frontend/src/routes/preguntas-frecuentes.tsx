@@ -8,7 +8,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/design-system/ui/accordion";
-import { PublicLayout } from "@/components/rental/PublicLayout";
+import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { useFaqGroups } from "@/data/faq";
 import { whatsappUrl } from "@/data/contact";
 import { SITE_URL } from "@/lib/site";

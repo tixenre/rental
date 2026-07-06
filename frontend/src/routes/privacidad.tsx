@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 
-import { PublicLayout } from "@/components/rental/PublicLayout";
+import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { LAST_UPDATED, PRIVACY_SECTIONS } from "@/data/legal";
 import { SITE_URL } from "@/lib/site";
 

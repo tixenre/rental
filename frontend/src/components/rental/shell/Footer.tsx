@@ -3,7 +3,7 @@ import { Instagram, MessageCircle, MapPin, Phone, Mail, Clock } from "lucide-rea
 
 import { CONTACT, whatsappUrl } from "@/data/contact";
 import { useBusinessContact } from "@/hooks/useBusinessContact";
-import { Logo } from "@/components/rental/Logo";
+import { Logo } from "@/components/rental/shell/Logo";
 
 /**
  * Footer público — usado en home, catálogo, estudio, FAQ, portal cliente.

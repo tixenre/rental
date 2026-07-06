@@ -4,8 +4,8 @@ import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon, Search, SlidersHorizontal } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
 import type { Equipment } from "@/data/equipment";
-import { RentalDateModal } from "./RentalDateModal";
-import { DiscoverySheet } from "./DiscoverySheet";
+import { RentalDateModal } from "@/components/rental/dates/RentalDateModal";
+import { DiscoverySheet } from "@/components/rental/DiscoverySheet";
 
 type Props = {
   allEquipos: Equipment[];

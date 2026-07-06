@@ -29,7 +29,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-import { PublicLayout } from "@/components/rental/PublicLayout";
+import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { Button, buttonVariants } from "@/design-system/ui/button";
 import {
   AlertDialog,

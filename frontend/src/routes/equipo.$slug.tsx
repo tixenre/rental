@@ -23,7 +23,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-import { PublicLayout } from "@/components/rental/PublicLayout";
+import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { EmptyImage } from "@/components/rental/EmptyImage";
 import { KitSection, BoxItemsSection } from "@/components/rental/KitSection";
 import { KeywordChips } from "@/components/rental/KeywordChips";

@@ -7,7 +7,7 @@ import { formatARS } from "@/lib/format";
 import { type CotizacionLinea } from "@/lib/cotizacion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/design-system/ui/button";
-import { EmptyImage } from "./EmptyImage";
+import { EmptyImage } from "@/components/rental/EmptyImage";
 
 /** Un ítem ya resuelto del preview (equipo del catálogo + cantidad). */
 export type CartPreviewItem = { equipo: Equipment; qty: number };

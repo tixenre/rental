@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
 import { EquipmentRow } from "@/components/rental/EquipmentRow";
-import { CartMiniBar } from "@/components/rental/CartMiniBar";
+import { CartMiniBar } from "@/components/rental/cart/CartMiniBar";
 import { Spinner } from "@/design-system/ui/spinner";
 import { type Equipment } from "@/data/equipment";
 import { SearchEmptyState } from "./SearchEmptyState";
@@ -9,7 +9,7 @@ import { SearchEmptyState } from "./SearchEmptyState";
 // Lazy: solo visibles tras interacción (preview lateral desktop, animación de
 // fly-to-cart) — fuera del bundle inicial de la ruta.
 const FlyToCartLayer = lazy(() =>
-  import("@/components/rental/FlyToCartLayer").then((m) => ({ default: m.FlyToCartLayer })),
+  import("@/components/rental/cart/FlyToCartLayer").then((m) => ({ default: m.FlyToCartLayer })),
 );
 const PreviewPane = lazy(() =>
   import("@/components/rental/PreviewPane").then((m) => ({ default: m.PreviewPane })),

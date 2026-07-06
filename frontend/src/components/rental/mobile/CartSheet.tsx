@@ -7,7 +7,7 @@ import { formatARS } from "@/lib/format";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
 import { createOrder } from "@/lib/orders";
-import { CheckoutResumen, type FacturacionTarget } from "@/components/rental/CheckoutResumen";
+import { CheckoutResumen, type FacturacionTarget } from "@/components/rental/cart/CheckoutResumen";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
 import { BUSINESS_PHONE } from "@/lib/business";
 import { useClienteSession } from "@/lib/iva";

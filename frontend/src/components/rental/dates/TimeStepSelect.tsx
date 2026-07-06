@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { snapTo30 } from "./time-utils";
+import { snapTo30 } from "@/lib/time-utils";
 
 const SLOTS: string[] = (() => {
   const out: string[] = [];

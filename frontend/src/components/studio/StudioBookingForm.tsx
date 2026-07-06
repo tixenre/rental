@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { formatARS } from "@/lib/format";
 import { authedFetch } from "@/lib/authedFetch";
 import { iniciarVerificacionIdentidad } from "@/lib/verificacion";
-import { VerificacionRequeridaPanel } from "@/components/rental/VerificacionRequeridaPanel";
+import { VerificacionRequeridaPanel } from "@/components/rental/account/VerificacionRequeridaPanel";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
 import { apiGetEstudioDisponibilidad, apiCrearReservaEstudio } from "@/lib/api";
 

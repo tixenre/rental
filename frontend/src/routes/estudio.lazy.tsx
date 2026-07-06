@@ -8,7 +8,7 @@ import { STUDIO, STUDIO_PHONE } from "@/data/studio";
 import { apiGetEstudio, type EstudioTrabajo, type EstudioMedia } from "@/lib/api";
 import { formatARS } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { PublicLayout } from "@/components/rental/PublicLayout";
+import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { Button } from "@/design-system/ui/button";
 
 export const Route = createLazyFileRoute("/estudio")({

@@ -18,7 +18,7 @@ import { useFavoritos } from "@/hooks/useFavoritos";
 import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { authedFetch } from "@/lib/authedFetch";
 import { clienteApi } from "@/lib/cliente/api";
-import { TopBar } from "@/components/rental/TopBar";
+import { TopBar } from "@/components/rental/shell/TopBar";
 import { StatCard } from "@/components/rental/StatCard";
 import {
   ArrowRight,

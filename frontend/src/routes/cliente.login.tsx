@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
 import { useEffect, useState } from "react";
-import { TopBar } from "@/components/rental/TopBar";
+import { TopBar } from "@/components/rental/shell/TopBar";
 import { authedFetch } from "@/lib/authedFetch";
 import {
   loginWithPasskey,

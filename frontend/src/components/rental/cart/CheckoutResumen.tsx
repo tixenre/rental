@@ -22,9 +22,9 @@ import { firmarConPasskey, listPasskeys, passkeyErrorMessage } from "@/lib/passk
 import {
   VerificacionRequeridaPanel,
   type VerificacionPanelEstado,
-} from "@/components/rental/VerificacionRequeridaPanel";
-import { FacturacionModal } from "@/components/rental/FacturacionModal";
-import { TerminosModal } from "@/components/rental/TerminosModal";
+} from "@/components/rental/account/VerificacionRequeridaPanel";
+import { FacturacionModal } from "@/components/rental/account/FacturacionModal";
+import { TerminosModal } from "@/components/rental/account/TerminosModal";
 import { ContratoPreviewModal } from "@/components/rental/ContratoPreviewModal";
 import { DOC_DESCRIPTION, DOC_LABEL } from "@/components/cliente/ClientePortalTypes";
 

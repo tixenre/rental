@@ -8,7 +8,7 @@
  */
 import type { ReactNode } from "react";
 
-import { Logo } from "@/components/rental/Logo";
+import { Logo } from "@/components/rental/shell/Logo";
 
 export function BackOfficeAuthCard({
   title,

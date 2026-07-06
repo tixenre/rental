@@ -92,7 +92,7 @@ import { useDisponibilidadDraft } from "@/components/admin/pedido/useDisponibili
 import { ClienteAutocomplete } from "@/components/admin/pedido/ClienteAutocomplete";
 import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
-import { DateRangePickerModal } from "@/components/rental/DateRangePickerModal";
+import { DateRangePickerModal } from "@/components/rental/dates/DateRangePickerModal";
 import { computeJornadas, parseDateTimeParts, toLocalISO } from "@/lib/rental-dates";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";

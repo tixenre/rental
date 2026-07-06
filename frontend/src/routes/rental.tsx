@@ -14,14 +14,14 @@ import { CatalogoMovil } from "@/components/rental/mobile/CatalogoMovil";
 import { LayoutGrid, List, Search, X, Check, Heart } from "lucide-react";
 import { ViewToggle } from "@/components/rental/ViewToggle";
 import { Link } from "@tanstack/react-router";
-import { PublicLayout } from "@/components/rental/PublicLayout";
+import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { logSearch } from "@/lib/search-log";
 import { filtrarOrdenar } from "@/lib/search/normalize";
 import { SITE_URL } from "@/lib/site";
-import { HeroSection } from "@/components/rental/HeroSection";
-import { RentalDateModal } from "@/components/rental/RentalDateModal";
+import { HeroSection } from "@/components/rental/landing/HeroSection";
+import { RentalDateModal } from "@/components/rental/dates/RentalDateModal";
 import { useClienteSession } from "@/lib/iva";
-import { MobileStickyBar } from "@/components/rental/MobileStickyBar";
+import { MobileStickyBar } from "@/components/rental/cart/MobileStickyBar";
 import { GridMode } from "@/components/rental/catalog/GridMode";
 import { ListMode } from "@/components/rental/catalog/ListMode";
 import { useEquipos, useCategorias, useMarcas } from "@/hooks/useEquipos";
@@ -37,7 +37,7 @@ import { Skeleton } from "@/design-system/ui/skeleton";
 // Lazy: estos componentes solo son visibles tras interacción del usuario.
 // Sacarlos del bundle inicial reduce ~24KB de parse/exec en la carga inicial.
 const CartDrawer = lazy(() =>
-  import("@/components/rental/CartDrawer").then((m) => ({ default: m.CartDrawer })),
+  import("@/components/rental/cart/CartDrawer").then((m) => ({ default: m.CartDrawer })),
 );
 const ViewIntroDialog = lazy(() =>
   import("@/components/rental/ViewIntroDialog").then((m) => ({ default: m.ViewIntroDialog })),
@@ -48,16 +48,16 @@ const ViewIntroDialog = lazy(() =>
 // mobile sin usarlo. Lazy → fuera del critical path; como están bajo el fold, su
 // carga diferida no genera CLS.
 const ComoFunciona = lazy(() =>
-  import("@/components/rental/ComoFunciona").then((m) => ({ default: m.ComoFunciona })),
+  import("@/components/rental/landing/ComoFunciona").then((m) => ({ default: m.ComoFunciona })),
 );
 const EstudioBand = lazy(() =>
-  import("@/components/rental/EstudioBand").then((m) => ({ default: m.EstudioBand })),
+  import("@/components/rental/landing/EstudioBand").then((m) => ({ default: m.EstudioBand })),
 );
 const TalleresBand = lazy(() =>
-  import("@/components/rental/TalleresBand").then((m) => ({ default: m.TalleresBand })),
+  import("@/components/rental/landing/TalleresBand").then((m) => ({ default: m.TalleresBand })),
 );
 const FaqTeaser = lazy(() =>
-  import("@/components/rental/FaqTeaser").then((m) => ({ default: m.FaqTeaser })),
+  import("@/components/rental/landing/FaqTeaser").then((m) => ({ default: m.FaqTeaser })),
 );
 
 const POPULAR_CHIPS = [

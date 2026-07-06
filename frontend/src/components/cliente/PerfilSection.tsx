@@ -5,8 +5,8 @@
  */
 import { LogOut } from "lucide-react";
 import { nombreCliente } from "@/lib/cliente-nombre";
-import { AccessMethods } from "@/components/rental/AccessMethods";
-import { SessionManager } from "@/components/rental/SessionManager";
+import { AccessMethods } from "@/components/rental/account/AccessMethods";
+import { SessionManager } from "@/components/rental/account/SessionManager";
 import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { Bloque } from "./primitives";
 import { IdentidadSection } from "./IdentidadSection";

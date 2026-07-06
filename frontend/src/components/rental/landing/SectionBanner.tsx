@@ -1,4 +1,4 @@
-import { Logo } from "@/components/rental/Logo";
+import { Logo } from "@/components/rental/shell/Logo";
 import { AREAS, type AreaKey } from "@/data/areas";
 
 // Eyebrow editorial del banner (copy propio; el resto —label y color— sale de
