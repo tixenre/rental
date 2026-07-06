@@ -72,9 +72,7 @@ export function FilterControls({
   return (
     <div className="space-y-6">
       <section>
-        <div className="mb-2 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Marca
-        </div>
+        <div className="mb-2 t-eyebrow">Marca</div>
         <BrandSelect
           brands={brands}
           selectedBrand={selectedBrand}
@@ -84,9 +82,7 @@ export function FilterControls({
       </section>
 
       <section>
-        <div className="mb-2 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Categorías
-        </div>
+        <div className="mb-2 t-eyebrow">Categorías</div>
         <div className="flex flex-wrap gap-1.5">
           {categories.map((c) => (
             <CategoryChip

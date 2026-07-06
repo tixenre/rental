@@ -839,9 +839,7 @@ function MobileBookBar({ priceLabel }: { priceLabel: string }) {
     >
       <div className="flex items-center gap-3 border-t hairline bg-background/95 backdrop-blur-xl px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="min-w-0 flex-1">
-          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Reservar el estudio
-          </div>
+          <div className="t-eyebrow">Reservar el estudio</div>
           <div className="truncate text-sm font-medium">{priceLabel}</div>
         </div>
         <Button
@@ -1056,9 +1054,7 @@ function EstudioPage() {
               <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {visibles.map((f) => (
                   <div key={f.label} className="card p-3.5">
-                    <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1">
-                      {f.label}
-                    </div>
+                    <div className="t-eyebrow mb-1">{f.label}</div>
                     <div className="font-semibold text-15">{f.value}</div>
                   </div>
                 ))}

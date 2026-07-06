@@ -74,9 +74,7 @@ function FaqPage() {
   return (
     <PublicLayout>
       <div className="px-6 lg:px-12 py-12 max-w-3xl mx-auto w-full">
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Ayuda
-        </div>
+        <div className="t-eyebrow">Ayuda</div>
         <h1 className="mt-2 wordmark text-5xl text-ink">Preguntas frecuentes</h1>
         <p className="mt-3 text-muted-foreground">
           Todo lo que solés preguntar antes de reservar. Si tu duda no está acá, escribinos por

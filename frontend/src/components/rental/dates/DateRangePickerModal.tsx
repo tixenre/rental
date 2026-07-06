@@ -311,9 +311,7 @@ export function DateRangePickerModal({
           style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
         >
           <div>
-            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Fechas del alquiler
-            </div>
+            <div className="t-eyebrow">Fechas del alquiler</div>
             <h2 className="font-display text-xl sm:text-2xl text-ink leading-tight">
               Elegí tus fechas
             </h2>
@@ -341,9 +339,7 @@ export function DateRangePickerModal({
                   : "border-dashed hairline", // vacío: borde dashed
               )}
             >
-              <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1.5">
-                Retiro
-              </div>
+              <div className="t-eyebrow mb-1.5">Retiro</div>
               <div className="flex items-center justify-between gap-3">
                 {hasStart ? (
                   <>
@@ -373,9 +369,7 @@ export function DateRangePickerModal({
                  demás cards del grid, para igualar alto con Retiro. */}
             <div className="rounded-xl border border-ink/15 bg-amber-soft/40 px-3.5 py-2 sm:py-3">
               <div className="flex items-center justify-between gap-2 sm:block">
-                <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground sm:mb-1.5">
-                  Jornadas
-                </div>
+                <div className="t-eyebrow sm:mb-1.5">Jornadas</div>
                 <div className="flex items-center gap-2 sm:justify-between">
                   <button
                     onClick={decJornada}
@@ -392,9 +386,7 @@ export function DateRangePickerModal({
                     >
                       {hasStart ? jornadas : "—"}
                     </span>
-                    <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                      {jornadas === 1 ? "jornada" : "jornadas"}
-                    </span>
+                    <span className="t-eyebrow">{jornadas === 1 ? "jornada" : "jornadas"}</span>
                   </div>
                   <button
                     onClick={incJornada}
@@ -430,9 +422,7 @@ export function DateRangePickerModal({
             >
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1">
-                    Devolución
-                  </div>
+                  <div className="t-eyebrow mb-1">Devolución</div>
                   <div className="flex items-center gap-1.5 leading-none">
                     <span
                       className={cn(

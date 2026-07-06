@@ -52,7 +52,7 @@ export function StatCard({
     <div
       className={cn("rounded-lg border", TONE_CONTAINER[tone], lg ? "px-4 py-3" : "p-3", className)}
     >
-      <div className="flex items-center gap-1.5 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+      <div className="flex items-center gap-1.5 t-eyebrow">
         {Icon && <Icon className={cn("h-3.5 w-3.5 shrink-0", TONE_ICON[tone])} />}
         <span className="truncate">{label}</span>
       </div>

@@ -349,9 +349,7 @@ export function LiquidacionReporte() {
             >
               <div className="space-y-4">
                 <div>
-                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1.5">
-                    Equipos
-                  </div>
+                  <div className="t-eyebrow mb-1.5">Equipos</div>
                   <RankList
                     icon={Package}
                     items={d.equipos.map((eq) => ({
@@ -362,9 +360,7 @@ export function LiquidacionReporte() {
                   />
                 </div>
                 <div>
-                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1.5">
-                    Pedidos
-                  </div>
+                  <div className="t-eyebrow mb-1.5">Pedidos</div>
                   <RankList
                     icon={Receipt}
                     items={(d.pedidos_detalle ?? []).map((p) => ({

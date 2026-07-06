@@ -72,9 +72,7 @@ function Section({
   return (
     <section className={cn("rounded-2xl border hairline bg-surface p-5 sm:p-6", className)}>
       <header className="flex items-baseline gap-2 mb-4">
-        <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground tabular">
-          {pad(step)}
-        </span>
+        <span className="t-eyebrow tabular">{pad(step)}</span>
         <h3 className="font-display text-lg sm:text-xl">{title}</h3>
       </header>
       {children}
@@ -436,9 +434,7 @@ export function StudioBookingForm({
             role="radiogroup"
             aria-label="¿Qué reservás?"
           >
-            <legend className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-2 sm:col-span-2">
-              ¿Qué reservás?
-            </legend>
+            <legend className="t-eyebrow mb-2 sm:col-span-2">¿Qué reservás?</legend>
 
             {/* Card A — Solo el estudio */}
             <label
@@ -633,9 +629,7 @@ export function StudioBookingForm({
               </div>
             )}
             <div className="mt-2 flex items-baseline justify-between border-t hairline pt-2">
-              <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                Total estimado
-              </span>
+              <span className="t-eyebrow">Total estimado</span>
               <span className="font-semibold tabular">
                 {total > 0 ? formatARS(total) : "A consultar"}
               </span>

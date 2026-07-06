@@ -80,7 +80,7 @@ export function CartMiniBarView({
           aria-hidden="true"
         >
           <div className="mx-auto max-w-7xl px-4 py-2 lg:px-12">
-            <div className="mb-1 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="mb-1 t-eyebrow">
               En tu rental ({count} {count === 1 ? "ítem" : "ítems"})
             </div>
             <div className="max-h-[240px] overflow-y-auto">
@@ -118,16 +118,14 @@ export function CartMiniBarView({
             <div className="text-sm font-semibold">
               {isEmpty ? "Carrito vacío" : `${count} ${count === 1 ? "ítem" : "ítems"}`}
             </div>
-            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="t-eyebrow">
               {isEmpty ? "Sumá equipos" : `${days} ${days === 1 ? "jornada" : "jornadas"}`}
             </div>
           </div>
         </div>
 
         <div className="ml-auto text-right leading-tight">
-          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            {hayFechas ? "Total" : "/ jornada"}
-          </div>
+          <div className="t-eyebrow">{hayFechas ? "Total" : "/ jornada"}</div>
           <div className="text-base font-semibold tabular sm:text-lg">
             {formatARS(totalNeto)}
             {conIva && <span className="text-xs font-normal text-muted-foreground"> + IVA</span>}

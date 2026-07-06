@@ -90,9 +90,7 @@ export function GridMode({
       {isFiltered && (
         <div className="px-4 lg:px-12">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Filtrando por
-            </span>
+            <span className="t-eyebrow">Filtrando por</span>
             {selectedBrand && (
               <button
                 onClick={() => onBrandSelect(null)}
@@ -154,7 +152,7 @@ export function GridMode({
           <section className="px-4 lg:px-12">
             <div className="mb-4 flex items-end justify-between gap-3">
               <h2 className="font-display text-2xl sm:text-3xl">Resultados</h2>
-              <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground tabular">
+              <span className="t-eyebrow tabular">
                 {filtered.length} {filtered.length === 1 ? "equipo" : "equipos"}
               </span>
             </div>
@@ -184,7 +182,7 @@ export function GridMode({
               >
                 <div className="mb-4 flex items-end justify-between gap-3">
                   <h2 className="font-display text-2xl sm:text-3xl">{c}</h2>
-                  <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground tabular">
+                  <span className="t-eyebrow tabular">
                     {items.length} {items.length === 1 ? "equipo" : "equipos"}
                   </span>
                 </div>

@@ -190,9 +190,7 @@ export default function ClienteRegistroPage() {
       <div className="min-h-screen bg-background grid place-items-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 rounded-full border-2 border-amber border-t-transparent animate-spin" />
-          <p className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Verificando…
-          </p>
+          <p className="t-eyebrow">Verificando…</p>
         </div>
       </div>
     );
@@ -218,9 +216,7 @@ export default function ClienteRegistroPage() {
 
           {/* Heading */}
           <div className="mb-7">
-            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1.5">
-              Un paso más
-            </div>
+            <div className="t-eyebrow mb-1.5">Un paso más</div>
             <h1 className="font-display text-4xl leading-[0.95] text-ink lowercase">
               completá tu perfil.
             </h1>
@@ -286,9 +282,7 @@ export default function ClienteRegistroPage() {
 
                 {/* Dirección estructurada */}
                 <div className="space-y-2.5 card px-3.5 py-3.5">
-                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-0.5">
-                    Dirección
-                  </div>
+                  <div className="t-eyebrow mb-0.5">Dirección</div>
                   <Field
                     label="Calle y número *"
                     value={form.dir_calle}

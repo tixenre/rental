@@ -50,9 +50,7 @@ export function Field({
   return (
     <div className="space-y-1.5">
       <label className="block">
-        <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          {label}
-        </span>
+        <span className="t-eyebrow">{label}</span>
         {hint && <span className="block text-xs text-muted-foreground/80 mt-0.5">{hint}</span>}
       </label>
       {children}

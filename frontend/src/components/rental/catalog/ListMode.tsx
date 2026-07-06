@@ -155,16 +155,13 @@ export function ListMode({
                 ))}
               </div>
               {hasMore && (
-                <div
-                  ref={sentinelRef}
-                  className="flex items-center justify-center py-6 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground"
-                >
+                <div ref={sentinelRef} className="flex items-center justify-center py-6 t-eyebrow">
                   <Spinner size="sm" className="mr-2" />
                   Cargando más equipos…
                 </div>
               )}
               {!hasMore && filtered.length > PAGE_SIZE && (
-                <div className="py-6 text-center font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+                <div className="py-6 text-center t-eyebrow">
                   Fin del catálogo · {filtered.length} equipos
                 </div>
               )}

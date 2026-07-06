@@ -220,9 +220,7 @@ export function CartDrawerView({
             {/* Header sticky */}
             <div className="flex items-center justify-between gap-3 border-b hairline px-5 py-4 sm:px-6">
               <div className="min-w-0">
-                <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                  Tu pedido
-                </div>
+                <div className="t-eyebrow">Tu pedido</div>
                 <h2 id={titleId} className="font-display text-2xl leading-tight">
                   Cotización
                 </h2>

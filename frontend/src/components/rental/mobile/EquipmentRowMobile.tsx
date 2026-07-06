@@ -193,9 +193,7 @@ export function EquipmentRowMobile({
           {/* Includes — 2 columnas */}
           {eq.includes && eq.includes.length > 0 && (
             <div className="mb-2">
-              <div className="mb-1.5 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                Incluye
-              </div>
+              <div className="mb-1.5 t-eyebrow">Incluye</div>
               <div className="grid grid-cols-2 gap-1">
                 {eq.includes.map((item, i) => (
                   <span
