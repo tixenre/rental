@@ -18,6 +18,7 @@ import { Caption, Row, Sample, Stack } from "../catalog-kit";
 import { Field } from "@/design-system/ui/Field";
 import { Label } from "@/design-system/ui/label";
 import { Input } from "@/design-system/ui/input";
+import { SearchInput } from "@/design-system/ui/search-input";
 import { Textarea } from "@/design-system/ui/textarea";
 import { Checkbox } from "@/design-system/ui/checkbox";
 import { Switch } from "@/design-system/ui/switch";
@@ -185,6 +186,28 @@ export const formsSection: CatalogSection = {
           </Sample>
         </Stack>
       ),
+    },
+    {
+      name: "SearchInput",
+      files: ["design-system/ui/search-input.tsx"],
+      blurb:
+        "Buscador único: lupa + Input + limpiar opcional. Consolida las 9 copias que había en el repo. debounceMs/onDebouncedChange para drivear una query sin una por tecla.",
+      render: () => {
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const [q, setQ] = useState("");
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const [q2, setQ2] = useState("equipos");
+        return (
+          <Stack className="max-w-xs gap-3">
+            <Sample label="default">
+              <SearchInput value={q} onValueChange={setQ} placeholder="Buscar…" />
+            </Sample>
+            <Sample label="clearable">
+              <SearchInput value={q2} onValueChange={setQ2} clearable placeholder="Buscar…" />
+            </Sample>
+          </Stack>
+        );
+      },
     },
     {
       name: "Textarea",

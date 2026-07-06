@@ -2,20 +2,11 @@ import { useState } from "react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createLazyFileRoute } from "@tanstack/react-router";
-import {
-  Plus,
-  Search,
-  Trash2,
-  Eye,
-  MoreHorizontal,
-  ShieldCheck,
-  Users,
-  UserPlus,
-} from "lucide-react";
+import { Plus, Trash2, Eye, MoreHorizontal, ShieldCheck, Users, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
-import { Input } from "@/design-system/ui/input";
+import { SearchInput } from "@/design-system/ui/search-input";
 import {
   Table,
   TableBody,
@@ -100,15 +91,11 @@ function ClientesPage() {
       }
     >
       <div className="space-y-6">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar por nombre, apellido, email o CUIT…"
-            className="pl-9 text-base sm:text-sm"
-          />
-        </div>
+        <SearchInput
+          value={q}
+          onValueChange={setQ}
+          placeholder="Buscar por nombre, apellido, email o CUIT…"
+        />
 
         <QueryState
           query={listQ}

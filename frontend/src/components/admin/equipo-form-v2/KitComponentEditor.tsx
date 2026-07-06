@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Search, GripVertical, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Plus, Trash2, GripVertical, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
@@ -26,7 +26,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-import { Input } from "@/design-system/ui/input";
+import { SearchInput } from "@/design-system/ui/search-input";
 import { Label } from "@/design-system/ui/label";
 import { Button } from "@/design-system/ui/button";
 import { Badge } from "@/design-system/ui/badge";
@@ -81,22 +81,20 @@ export function KitComponentEditor({ equipoId, mode }: { equipoId: number; mode:
     void load(); /* eslint-disable-next-line */
   }, [equipoId]);
 
-  useEffect(() => {
-    if (!search.trim() || search.trim().length < 2) {
+  const buscarComponentes = async (query: string) => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
       setResults([]);
       return;
     }
-    const t = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const r = await adminApi.listEquipos({ q: search.trim(), per_page: 15 });
-        setResults(r.items.filter((e) => e.id !== equipoId));
-      } finally {
-        setSearching(false);
-      }
-    }, 250);
-    return () => clearTimeout(t);
-  }, [search, equipoId]);
+    setSearching(true);
+    try {
+      const r = await adminApi.listEquipos({ q: trimmed, per_page: 15 });
+      setResults(r.items.filter((e) => e.id !== equipoId));
+    } finally {
+      setSearching(false);
+    }
+  };
 
   const add = async (componente_id: number) => {
     setBusy(componente_id);
@@ -175,12 +173,13 @@ export function KitComponentEditor({ equipoId, mode }: { equipoId: number; mode:
   return (
     <div className="space-y-3">
       <div className="relative">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-        <Input
+        <SearchInput
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onValueChange={setSearch}
+          debounceMs={250}
+          onDebouncedChange={buscarComponentes}
           placeholder={cfg.placeholder}
-          className="pl-8"
+          className="pr-8"
         />
         {searching && (
           <Spinner

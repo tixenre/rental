@@ -9,12 +9,11 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search } from "lucide-react";
 import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
-import { Input } from "@/design-system/ui/input";
+import { SearchInput } from "@/design-system/ui/search-input";
 import {
   Dialog,
   DialogContent,
@@ -111,15 +110,11 @@ export function AddEquiposToCategoriaDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nombre, marca o modelo…"
-            className="pl-9"
-          />
-        </div>
+        <SearchInput
+          value={search}
+          onValueChange={setSearch}
+          placeholder="Buscar por nombre, marca o modelo…"
+        />
 
         <div className="flex-1 min-h-0 overflow-y-auto rounded-md border hairline">
           {equiposQ.isLoading ? (

@@ -646,9 +646,34 @@ una sola forma consistente en los tiles compactos de los dialogs de equipos.
   `SegmentedControl` del `ui/`: este tiene animación de slider, ese tiene fondo ink sólido).
 
 El primitivo `Input` vive en **`frontend/src/design-system/ui/input.tsx`**.
-**No existe** un `SearchInput` en el repo. **`FieldLabel` existe** como función local en
-`pagos.lazy.tsx` y en `StudioBookingForm` — todavía no es una pieza única del DS (es un
-`<label className="block t-eyebrow">`). `PedidoPageHelpers` ya usa `Field` del DS (`ui/Field`).
+**`FieldLabel` existe** como función local en `pagos.lazy.tsx` y en `StudioBookingForm` —
+todavía no es una pieza única del DS (es un `<label className="block t-eyebrow">`).
+`PedidoPageHelpers` ya usa `Field` del DS (`ui/Field`).
+
+### SearchInput (`frontend/src/design-system/ui/search-input.tsx`)
+
+Buscador único: lupa a la izquierda + `Input` del DS + botón de limpiar opcional —
+consolida las 9 copias que habían aparecido en el repo con variantes ligeramente
+distintas de icono/padding/posición.
+
+```tsx
+import { SearchInput } from "@/design-system/ui/search-input";
+
+<SearchInput value={q} onValueChange={setQ} placeholder="Buscar…" />
+<SearchInput value={q} onValueChange={setQ} clearable placeholder="Buscar…" />
+// debounceMs + onDebouncedChange: drivea una query sin una por cada tecla
+// (value/onValueChange siguen siendo instantáneos para el input visible)
+<SearchInput
+  value={search}
+  onValueChange={setSearch}
+  debounceMs={250}
+  onDebouncedChange={runSearch}
+  placeholder="Buscar…"
+/>
+// wrapperClassName va al <div> contenedor (ej. flex-1 en una toolbar);
+// className sigue yendo al <input>, como en Input
+<SearchInput value={q} onValueChange={setQ} wrapperClassName="flex-1" />
+```
 
 > **Patrón de lista de pedidos (Booqable-inspired, 2026-06):** una fila se lee de
 > un vistazo con **avatar (`ClienteAvatar`) + nombre + `EstadoBadge` + `PagoBadge`

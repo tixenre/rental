@@ -2,7 +2,6 @@ import { createLazyFileRoute, useNavigate, useSearch } from "@tanstack/react-rou
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Search,
   Plus,
   PanelLeft,
   Pencil,
@@ -27,7 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/design-system/ui/alert-dialog";
-import { Input } from "@/design-system/ui/input";
+import { SearchInput } from "@/design-system/ui/search-input";
 import { Skeleton } from "@/design-system/ui/skeleton";
 import { adminApi, ESTADO_LABEL, type Pedido } from "@/lib/admin/api";
 import { nextStep, type EstadoPedido } from "@/lib/pedido-estados";
@@ -226,15 +225,12 @@ function PedidosPage() {
 
         {/* Búsqueda + chips de estado */}
         <div className="flex flex-col md:flex-row md:items-center gap-2 mt-3 md:mt-4">
-          <div className="relative md:max-w-sm flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar cliente o número…"
-              className="pl-9"
-            />
-          </div>
+          <SearchInput
+            value={q}
+            onValueChange={setQ}
+            placeholder="Buscar cliente o número…"
+            wrapperClassName="md:max-w-sm flex-1"
+          />
           {dayFilter ? (
             // Atajo del día activo (vino del Dashboard) — mostrar y permitir limpiar.
             <button

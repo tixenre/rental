@@ -10,11 +10,12 @@ import { createLazyFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Ruler, Search, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Ruler } from "lucide-react";
 
 import { Button } from "@/design-system/ui/button";
 import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 import { Input } from "@/design-system/ui/input";
+import { SearchInput } from "@/design-system/ui/search-input";
 import { Label } from "@/design-system/ui/label";
 import {
   AlertDialog,
@@ -121,25 +122,13 @@ function UnidadesPage() {
       >
         {() => (
           <div className="space-y-3">
-            <div className="relative max-w-md">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar por símbolo, nombre o dimensión…"
-                className="pl-7"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch("")}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-ink"
-                  aria-label="Limpiar"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
+            <SearchInput
+              value={search}
+              onValueChange={setSearch}
+              clearable
+              placeholder="Buscar por símbolo, nombre o dimensión…"
+              wrapperClassName="max-w-md"
+            />
 
             {grupos.length === 0 && (
               <div className="rounded-md border hairline border-dashed p-6 text-center text-sm text-muted-foreground">

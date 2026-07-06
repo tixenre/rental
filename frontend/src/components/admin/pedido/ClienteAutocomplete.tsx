@@ -10,10 +10,9 @@
  */
 
 import { useState } from "react";
-import { Search } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
-import { Input } from "@/design-system/ui/input";
+import { SearchInput } from "@/design-system/ui/search-input";
 import { adminApi, type Cliente } from "@/lib/admin/api";
 import { nombreCliente } from "@/lib/cliente-nombre";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -40,22 +39,20 @@ export function ClienteAutocomplete({
   return (
     <div className={className}>
       <div className="relative">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <Input
+        <SearchInput
           value={q}
           role="combobox"
           aria-expanded={open && q.trim().length > 0}
           aria-haspopup="listbox"
           aria-autocomplete="list"
           aria-controls="cliente-autocomplete-list"
-          onChange={(e) => {
-            setQ(e.target.value);
+          onValueChange={(v) => {
+            setQ(v);
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           placeholder={placeholder}
-          className="pl-9 text-base sm:text-sm"
         />
         {open && q.trim().length > 0 && (
           <div

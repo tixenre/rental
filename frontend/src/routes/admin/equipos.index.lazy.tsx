@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   Plus,
-  Search,
   Pencil,
   Trash2,
   Eye,
@@ -16,13 +15,12 @@ import {
   Copy,
   BarChart3,
   RotateCcw,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
 import { Pill } from "@/design-system/ui/Pill";
-import { Input } from "@/design-system/ui/input";
+import { SearchInput } from "@/design-system/ui/search-input";
 import { Checkbox } from "@/design-system/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { useUsdRate, calcularPrecioJornada } from "@/hooks/useSettings";
@@ -381,25 +379,13 @@ function EquiposPage() {
         )}
 
         <div className="flex flex-col md:flex-row md:flex-wrap gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Buscar (nombre, marca, modelo, serie, specs, keywords…)"
-              className="pl-9 pr-9 text-base sm:text-sm"
-            />
-            {searchInput && (
-              <button
-                type="button"
-                onClick={() => setSearchInput("")}
-                aria-label="Limpiar búsqueda"
-                className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-ink"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
+          <SearchInput
+            value={searchInput}
+            onValueChange={setSearchInput}
+            clearable
+            placeholder="Buscar (nombre, marca, modelo, serie, specs, keywords…)"
+            wrapperClassName="flex-1"
+          />
           <Select
             value={categoria || "__all"}
             onValueChange={(v) => setCategoria(v === "__all" ? "" : v)}
