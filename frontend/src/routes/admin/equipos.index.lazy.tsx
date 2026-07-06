@@ -74,9 +74,9 @@ import {
   RoiInline,
   PrecioJornadaInline,
   CategoriaInline,
-  KpiCard,
   FaltaBanner,
 } from "@/components/admin/equipos-mgmt/EquiposTableHelpers";
+import { StatCard } from "@/design-system/composites/StatCard";
 
 export const Route = createLazyFileRoute("/admin/equipos/")({
   component: EquiposPage,
@@ -357,17 +357,17 @@ function EquiposPage() {
       <div className="space-y-6">
         {/* KPI strip (handoff): inventario de un vistazo. */}
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          <KpiCard label="Total" value={kpisQ.data?.total ?? total} meta="equipos en catálogo" />
-          <KpiCard
+          <StatCard label="Total" value={kpisQ.data?.total ?? total} meta="equipos en catálogo" />
+          <StatCard
             label="En uso hoy"
             value={kpisQ.data?.en_uso_hoy ?? 0}
             meta="unidades alquiladas ahora"
           />
-          <KpiCard
+          <StatCard
             label="Mantenimiento"
             value={kpisQ.data?.mantenimiento ?? 0}
             meta="bloqueando stock hoy"
-            warn={(kpisQ.data?.mantenimiento ?? 0) > 0}
+            tone={(kpisQ.data?.mantenimiento ?? 0) > 0 ? "warn" : "default"}
           />
         </div>
 

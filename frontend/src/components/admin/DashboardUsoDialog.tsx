@@ -32,6 +32,7 @@ import { formatARS } from "@/lib/format";
 import { Monto } from "@/components/admin/Monto";
 import { TableSkeleton } from "@/components/admin/skeletons";
 import { ErrorState } from "@/components/admin/ErrorState";
+import { StatCard } from "@/design-system/composites/StatCard";
 
 const fmtMoneda = (n: number | null | undefined) => {
   if (n == null) return "—";
@@ -94,25 +95,29 @@ export function DashboardUsoDialog({
           <div className="space-y-5">
             {/* Stats globales */}
             <section className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <Stat
-                icon={<BarChart3 className="h-3.5 w-3.5" />}
+              <StatCard
+                icon={BarChart3}
                 label="Equipos activos"
                 value={dataQ.data.totales.total_equipos}
+                size="md"
               />
-              <Stat
-                icon={<BarChart3 className="h-3.5 w-3.5" />}
+              <StatCard
+                icon={BarChart3}
                 label="Visibles"
                 value={dataQ.data.totales.total_visibles}
+                size="md"
               />
-              <Stat
-                icon={<TrendingUp className="h-3.5 w-3.5" />}
+              <StatCard
+                icon={TrendingUp}
                 label="Pedidos"
                 value={dataQ.data.totales.total_pedidos}
+                size="md"
               />
-              <Stat
-                icon={<DollarSign className="h-3.5 w-3.5" />}
+              <StatCard
+                icon={DollarSign}
                 label="Revenue"
                 value={fmtMoneda(dataQ.data.totales.revenue_total)}
+                size="md"
               />
             </section>
 
@@ -541,24 +546,5 @@ export function DashboardUsoDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function Stat({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string | number;
-}) {
-  return (
-    <div className="rounded-md border hairline bg-muted/20 p-3">
-      <div className="text-2xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-        {icon} {label}
-      </div>
-      <div className="text-lg font-medium tabular-nums mt-0.5">{value}</div>
-    </div>
   );
 }

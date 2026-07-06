@@ -17,6 +17,7 @@ import { AdminPage } from "@/components/admin/AdminPage";
 import { CalendarioWidget } from "@/components/admin/CalendarioWidget";
 import { CardGridSkeleton } from "@/components/admin/skeletons";
 import { ErrorState } from "@/components/admin/ErrorState";
+import { StatCard } from "@/design-system/composites/StatCard";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export const Route = createLazyFileRoute("/admin/")({
@@ -51,23 +52,21 @@ function AdminDashboard() {
       {data && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-            <Stat
+            <StatCard
               label="Pendientes"
               value={data.pendientes}
-              icon={<ClipboardList className="h-4 w-4" />}
-              tone="amber"
+              icon={ClipboardList}
+              tone="warn"
+              size="md"
             />
-            <Stat label="Activos" value={data.activos} icon={<Package className="h-4 w-4" />} />
-            <Stat
+            <StatCard label="Activos" value={data.activos} icon={Package} size="md" />
+            <StatCard
               label="Ingresos mes"
               value={formatARS(Number(data.ingresos_mes ?? 0))}
-              icon={<DollarSign className="h-4 w-4" />}
+              icon={DollarSign}
+              size="md"
             />
-            <Stat
-              label="Clientes"
-              value={data.total_clientes}
-              icon={<Users className="h-4 w-4" />}
-            />
+            <StatCard label="Clientes" value={data.total_clientes} icon={Users} size="md" />
           </div>
 
           {/* Atajos a Pedidos — entran a la lista ya filtrada (?f=). Reemplazan los
@@ -161,37 +160,6 @@ function AtajoPedidos({
       {label}
       <span className="font-mono text-2xs tabular-nums text-muted-foreground">{n}</span>
     </Link>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: number | string;
-  icon: React.ReactNode;
-  tone?: "amber";
-}) {
-  return (
-    <div
-      className={`rounded-xl border hairline px-4 py-4 bg-surface ${
-        tone === "amber" ? "ring-1 ring-amber/30" : ""
-      }`}
-    >
-      <div className="flex items-center justify-between">
-        <div className="t-eyebrow">{label}</div>
-        <div className="text-muted-foreground">{icon}</div>
-      </div>
-      <div
-        className="mt-2 font-display text-xl sm:text-2xl text-ink truncate"
-        title={String(value)}
-      >
-        {value}
-      </div>
-    </div>
   );
 }
 

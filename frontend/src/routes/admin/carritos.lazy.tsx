@@ -23,8 +23,9 @@ import { whatsappLink } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
 import { Pill } from "@/design-system/ui/Pill";
 import { AdminPage } from "@/components/admin/AdminPage";
-import { Kpi, BarChart, RankList } from "@/components/admin/LiquidacionReporte";
+import { BarChart, RankList } from "@/components/admin/LiquidacionReporte";
 import { Section } from "@/design-system/composites/Section";
+import { StatCard } from "@/design-system/composites/StatCard";
 
 export const Route = createLazyFileRoute("/admin/carritos")({
   component: CarritosPage,
@@ -96,24 +97,24 @@ function CarritosPage() {
         {/* KPIs del funnel */}
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Kpi icon={ShoppingCart} label="Carritos activos" value={String(stats.activos)} />
-            <Kpi
+            <StatCard icon={ShoppingCart} label="Carritos activos" value={String(stats.activos)} />
+            <StatCard
               icon={DollarSign}
               label="En juego"
               value={fmtArs(stats.pipeline_ars)}
-              sub="Pipeline estimado"
+              meta="Pipeline estimado"
             />
-            <Kpi
+            <StatCard
               icon={TrendingUp}
               label="Conversión 7d"
               value={`${stats.conversion_pct}%`}
-              sub={`${stats.confirmados_7d}/${stats.creados_7d} confirmados`}
+              meta={`${stats.confirmados_7d}/${stats.creados_7d} confirmados`}
             />
-            <Kpi
+            <StatCard
               icon={Users}
               label="Identificados"
               value={String(stats.identificados)}
-              sub={`${stats.anonimos} anónimos`}
+              meta={`${stats.anonimos} anónimos`}
             />
           </div>
         )}

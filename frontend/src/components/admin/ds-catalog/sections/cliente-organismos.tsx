@@ -13,7 +13,7 @@ import { useState } from "react";
 import { type CatalogSection } from "../types";
 import { Caption, Sample, Stack } from "../catalog-kit";
 
-import { StatCard } from "@/components/rental/StatCard";
+import { StatCard } from "@/design-system/composites/StatCard";
 import { PedidoCard, PedidoTimeline } from "@/components/cliente/ClientePortalPedido";
 import { IdentidadSection } from "@/components/cliente/IdentidadSection";
 import { ListasSection } from "@/components/cliente/ClientePortalListas";
@@ -60,9 +60,9 @@ export const clienteOrganismosSection: CatalogSection = {
   specimens: [
     {
       name: "StatCard",
-      files: ["components/rental/StatCard.tsx"],
+      files: ["design-system/composites/StatCard.tsx"],
       blurb:
-        "Tarjeta de métrica del panel: rótulo mono + número grande tabular. valueClassName tiñe el valor (ej. facturado en verde-ink).",
+        "Tarjeta de métrica del panel: rótulo mono + número grande tabular. valueClassName tiñe el valor (ej. facturado en verde-ink). Acá en su uso de dominio (panel del cliente); la ficha genérica vive en Layout & Estructura.",
       render: () => (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard label="Pedidos activos" value="2" meta="1 sin confirmar" />

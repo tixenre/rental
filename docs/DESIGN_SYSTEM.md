@@ -400,8 +400,8 @@ Utilidades canónicas en `frontend/src/design-system/styles/utilities.css` para 
 | **Componentes de aplicación (`rental/`)**          | `frontend/src/components/rental/*` | EquipmentCard, TopBar/Footer (`shell/`), CartMiniBar (`cart/`) integrados con queries + estado.                                                            |
 | **Componentes admin**                              | `frontend/src/components/admin/*`  | Tablas, modales, sidebar del back-office.                                                                                              |
 | **Piezas de marca** (en `ui/`)                     | `frontend/src/design-system/ui/*`     | `Pill`, `EstadoBadge`, `PagoBadge`, `ClienteAvatar`, `Field` (+ `types.ts`). Presentacionales con paleta de marca; viven planas junto a los primitivos shadcn (antes en `kit/`, **disuelto en `ui/`**). `EstadoBadge` es la única fuente del repo. |
-| **Composites** (`composites/`)                     | `frontend/src/design-system/composites/*` | Combinaciones genéricas y reusables, **sin dominio**: `EmptyState` (estado "nada para mostrar"), `Chequeos` (lista de validaciones ok/falla), `Section` (encabezado + contenido de panel). La capa entre primitivos y organismos de negocio. |
-| **Otras presentacionales** (`rental/`)             | `frontend/src/components/rental/*`     | Con dominio de equipos: `AddonPills`, `PriceBlock` (`equipment/shared/`), `ViewToggle`, `StatCard`. No son librería pura. |
+| **Composites** (`composites/`)                     | `frontend/src/design-system/composites/*` | Combinaciones genéricas y reusables, **sin dominio**: `EmptyState` (estado "nada para mostrar"), `Chequeos` (lista de validaciones ok/falla), `Section` (encabezado + contenido de panel), `StatCard` (label + valor grande + meta). La capa entre primitivos y organismos de negocio. |
+| **Otras presentacionales** (`rental/`)             | `frontend/src/components/rental/*`     | Con dominio de equipos: `AddonPills`, `PriceBlock` (`equipment/shared/`), `ViewToggle`. No son librería pura. |
 
 ### Button (`frontend/src/design-system/ui/button.tsx`)
 
@@ -608,18 +608,42 @@ import { Section } from "@/design-system/composites/Section";
 `StudioBookingForm` (wizard numerado, público) queda como excepción documentada —
 es un patrón distinto (paso numerado, no un panel admin).
 
+### StatCard (`frontend/src/design-system/composites/StatCard.tsx`)
+
+Label + valor grande + meta opcional, para KPIs de dashboards admin y del portal
+cliente — consolida las 8 variantes locales que habían aparecido en el repo
+(`rental/StatCard`, `media.lazy`, `admin/index.lazy`, `LiquidacionReporte::Kpi`,
+`EquiposTableHelpers::KpiCard`, y los `Stat` de `MantenimientoEquipoDialog` /
+`HistorialEquipoDialog` / `DashboardUsoDialog`).
+
+```tsx
+import { StatCard } from "@/design-system/composites/StatCard";
+
+<StatCard label="Facturado 2026" value="$1.240.000" meta="pedido R-1039" />
+// icon: ComponentType (como Section), NO un nodo ya renderizado
+<StatCard icon={DollarSign} label="En juego" value={fmtArs(pipeline)} meta="Pipeline estimado" />
+// tone: default | warn (amber) | destructive (rojo, ej. mantenimiento vencido)
+<StatCard label="Huérfanos" value={n} tone={n > 0 ? "warn" : "default"} />
+// size: "lg" (default, dashboards) | "md" (tile compacto dentro de un dialog)
+<StatCard label="Eventos" value={total} size="md" />
+```
+
+El valor converge a `font-display font-black text-3xl` en `size="lg"` (antes esto
+variaba entre `text-base`/`text-lg`/`text-2xl`/`text-3xl` según el archivo) — un
+achique deliberado de la variante `size="md"` (antes hasta `text-2xl`) a cambio de
+una sola forma consistente en los tiles compactos de los dialogs de equipos.
+
 ### Componentes presentacionales (`frontend/src/components/rental/`)
 
 > **OJO — ubicación.** Estas piezas viven en `frontend/src/components/rental/`
 > (una, en `equipment/shared/`), **no en la librería pura** (`ui/` / `composites/`)
-> porque tienen dominio de equipos. (`EmptyState`, que era genérico, se movió a
-> `design-system/composites/`.)
+> porque tienen dominio de equipos. (`EmptyState`/`StatCard`, que eran genéricos,
+> se movieron a `design-system/composites/`.)
 
 - `AddonPills` (`rental/AddonPills.tsx`) — items "incluye" sobre rows de equipo.
 - `PriceBlock` (`rental/equipment/shared/PriceBlock.tsx`) — precio + tarifa display.
 - `ViewToggle` (`rental/ViewToggle.tsx`) — segmented control con pill deslizante (diferente al
   `SegmentedControl` del `ui/`: este tiene animación de slider, ese tiene fondo ink sólido).
-- `StatCard` (`rental/StatCard.tsx`) — número grande para dashboards.
 
 El primitivo `Input` vive en **`frontend/src/design-system/ui/input.tsx`**.
 **No existe** un `SearchInput` en el repo. **`FieldLabel` existe** como función local en

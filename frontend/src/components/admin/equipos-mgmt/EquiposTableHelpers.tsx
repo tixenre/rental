@@ -12,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/design-system/ui/select";
-import { cn } from "@/lib/utils";
 import { useUsdRate, calcularPrecioJornada } from "@/hooks/useSettings";
 
 import {
@@ -368,37 +367,6 @@ const FALTA_LABELS: Record<FaltaField, string> = {
   serie: "sin número de serie",
   valor_reposicion: "sin valor de reposición",
 };
-
-export function KpiCard({
-  label,
-  value,
-  meta,
-  warn = false,
-}: {
-  label: string;
-  value: number;
-  meta: string;
-  warn?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border bg-card px-3.5 py-3 sm:px-4 sm:py-3.5",
-        warn
-          ? "border-[color-mix(in_oklch,var(--amber)_45%,transparent)] bg-amber-soft/40"
-          : "hairline",
-      )}
-    >
-      <div className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground">
-        {label}
-      </div>
-      <div className="font-display text-2xl sm:text-3xl font-black text-ink tabular-nums leading-none mt-1">
-        {value}
-      </div>
-      <div className="font-sans text-xs text-muted-foreground mt-1">{meta}</div>
-    </div>
-  );
-}
 
 export function FaltaBanner({
   falta,

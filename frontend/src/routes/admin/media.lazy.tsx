@@ -11,6 +11,7 @@ import { CardGridSkeleton } from "@/components/admin/skeletons";
 import { useConfirm } from "@/components/admin/useConfirm";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { cn } from "@/lib/utils";
+import { StatCard } from "@/design-system/composites/StatCard";
 
 export const Route = createLazyFileRoute("/admin/media")({
   component: MediaDashboardPage,
@@ -21,28 +22,6 @@ function formatBytes(bytes: number): string {
   const units = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
-}
-
-function StatCard({
-  label,
-  value,
-  warn,
-}: {
-  label: string;
-  value: string | number;
-  warn?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border hairline p-4",
-        warn ? "border-amber/50 bg-amber/10" : "bg-card",
-      )}
-    >
-      <div className="text-2xl font-mono font-semibold text-ink">{value}</div>
-      <div className="text-xs text-muted-foreground mt-1">{label}</div>
-    </div>
-  );
 }
 
 function GcResultView({ result }: { result: GcResult }) {
@@ -140,15 +119,21 @@ function MediaDashboardPage() {
         <CardGridSkeleton count={6} />
       ) : stats ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <StatCard label="Assets" value={stats.total_assets} />
-          <StatCard label="Variantes" value={stats.total_variants} />
-          <StatCard label="Almacenamiento" value={formatBytes(stats.total_bytes)} />
-          <StatCard label="Con LQIP" value={stats.assets_with_lqip} />
-          <StatCard label="Huérfanos" value={stats.orphans} warn={stats.orphans > 0} />
+          <StatCard label="Assets" value={stats.total_assets} size="md" />
+          <StatCard label="Variantes" value={stats.total_variants} size="md" />
+          <StatCard label="Almacenamiento" value={formatBytes(stats.total_bytes)} size="md" />
+          <StatCard label="Con LQIP" value={stats.assets_with_lqip} size="md" />
+          <StatCard
+            label="Huérfanos"
+            value={stats.orphans}
+            size="md"
+            tone={stats.orphans > 0 ? "warn" : "default"}
+          />
           <StatCard
             label="Sin variantes"
             value={stats.assets_no_variants}
-            warn={stats.assets_no_variants > 0}
+            size="md"
+            tone={stats.assets_no_variants > 0 ? "warn" : "default"}
           />
         </div>
       ) : null}
