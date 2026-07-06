@@ -15,7 +15,7 @@ import { Caption, Sample, Stack } from "../catalog-kit";
 
 import { StatCard } from "@/components/rental/StatCard";
 import { PedidoCard, PedidoTimeline } from "@/components/cliente/ClientePortalPedido";
-import { IdentidadSection } from "@/components/cliente/ClientePortalHelpers";
+import { IdentidadSection } from "@/components/cliente/IdentidadSection";
 import { ListasSection } from "@/components/cliente/ClientePortalListas";
 import { type Pedido } from "@/components/cliente/ClientePortalTypes";
 
@@ -109,7 +109,7 @@ export const clienteOrganismosSection: CatalogSection = {
     },
     {
       name: "IdentidadSection",
-      files: ["components/cliente/ClientePortalHelpers.tsx"],
+      files: ["components/cliente/IdentidadSection.tsx"],
       blurb:
         "El bloque de identidad del perfil: badge de estado + CTA para verificar con RENAPER. Verificado, sin verificar y rechazado (con motivo).",
       render: () => (

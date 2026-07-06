@@ -54,12 +54,9 @@ import type {
   DocTipo,
   Filtro,
 } from "@/components/cliente/ClientePortalTypes";
-import {
-  SidebarNavItem,
-  BottomNavItem,
-  NotificacionesSection,
-  PerfilSection,
-} from "@/components/cliente/ClientePortalHelpers";
+import { SidebarNavItem, BottomNavItem } from "@/components/cliente/nav";
+import { NotificacionesSection } from "@/components/cliente/NotificacionesSection";
+import { PerfilSection } from "@/components/cliente/PerfilSection";
 import {
   PedidoEmpty,
   PedidoCard,
