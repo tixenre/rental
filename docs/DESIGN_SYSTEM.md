@@ -197,20 +197,29 @@ La escala genérica `amber-NNN` de Tailwind (`text-amber-700`, etc.) **también 
 --font-mono: "JetBrains Mono", ui-monospace, monospace;
 ```
 
-**Escala extendida** (en `tokens/typography.css`, además de la escala default de
-Tailwind `text-xs`…). Cubre tamaños frecuentes del codebase que antes iban como
-`text-[Npx]` mágico:
+**Escala base subida (2026-07)** — la app se sentía chica comparada con la
+competencia. `tokens/typography.css` redefine la escala default de Tailwind:
+
+```css
+--text-xs: 0.8125rem; /* 13px (antes 12) */
+--text-xs--line-height: calc(1.125 / 0.8125); /* 18px absolutos */
+--text-sm: 0.9375rem; /* 15px (antes 14) */
+--text-sm--line-height: calc(1.25 / 0.9375); /* 20px absolutos — igual que antes, cero drift vertical */
+```
+
+**Escala extendida** (mismo archivo). Cubre tamaños frecuentes del codebase que
+antes iban como `text-[Npx]` mágico:
 
 ```css
 --text-3xs: 0.5625rem; /* 9px  — micro-labels: counts, badges → text-3xs */
 --text-2xs: 0.625rem; /* 10px — el px más frecuente del codebase → text-2xs */
---text-15: 0.9375rem; /* 15px — product names, CTAs (entre text-sm y text-base) → text-15 */
+--text-15: 0.9375rem; /* 15px — ahora IDÉNTICO a text-sm; alias óptico legado de los call sites existentes → text-15 */
 --text-22: 1.375rem; /* 22px — display headings (entre text-xl y text-2xl) → text-22 */
 ```
 
-> Sin token para 11px (usá `text-xs`) ni 13px (usá `text-sm`): el 1px es
-> imperceptible a toda DPI. La escala se consume como utility Tailwind (`text-2xs`,
-> `text-15`, …) — la genera Tailwind v4 de estos tokens.
+> Sin token para 11px: usá `text-xs` (13px, imperceptible a toda DPI). La
+> escala se consume como utility Tailwind (`text-2xs`, `text-15`, …) — la
+> genera Tailwind v4 de estos tokens.
 
 **Reglas:**
 
@@ -350,7 +359,7 @@ Defined as utility classes en `frontend/src/design-system/styles/utilities.css`:
 .t-h2          /* TT Commons 700, 24px (1.5rem) */
 .t-h3          /* TT Commons 600, 18px (1.125rem) */
 .t-body        /* TT Commons 400, 16px, lh 1.55 */
-.t-small       /* TT Commons 400, 14px, muted */
+.t-small       /* TT Commons 400, 15px, muted */
 .t-mono        /* JetBrains Mono, tabular-nums */
 .t-eyebrow     /* JetBrains Mono 500, 10px, tracking 0.2em, uppercase, muted */
 .tabular       /* font-variant-numeric: tabular-nums */
@@ -383,7 +392,7 @@ Utilidades canónicas en `frontend/src/design-system/styles/utilities.css` para 
 | Categoría                                          | Dónde vive                | Notas                                                                                                                                  |
 | -------------------------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | **Primitivas UI** (Button, Input, Card, Dialog, …) | `frontend/src/design-system/ui/*`     | shadcn/Radix base + variants de marca (`primary`, `amber`). Naming shadcn: `default` no se renombra (ver Button abajo).                |
-| **Componentes de aplicación (`rental/`)**          | `frontend/src/components/rental/*` | EquipmentCard, TopBar, Footer, CartMiniBar integrados con queries + estado.                                                            |
+| **Componentes de aplicación (`rental/`)**          | `frontend/src/components/rental/*` | EquipmentCard, TopBar/Footer (`shell/`), CartMiniBar (`cart/`) integrados con queries + estado.                                                            |
 | **Componentes admin**                              | `frontend/src/components/admin/*`  | Tablas, modales, sidebar del back-office.                                                                                              |
 | **Piezas de marca** (en `ui/`)                     | `frontend/src/design-system/ui/*`     | `Pill`, `EstadoBadge`, `PagoBadge`, `ClienteAvatar`, `Field` (+ `types.ts`). Presentacionales con paleta de marca; viven planas junto a los primitivos shadcn (antes en `kit/`, **disuelto en `ui/`**). `EstadoBadge` es la única fuente del repo. |
 | **Composites** (`composites/`)                     | `frontend/src/design-system/composites/*` | Combinaciones genéricas y reusables, **sin dominio**: `EmptyState` (estado "nada para mostrar"). La capa entre primitivos y organismos de negocio. |

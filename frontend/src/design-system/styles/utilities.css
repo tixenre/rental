@@ -164,7 +164,7 @@
   .t-small {
     font-family: var(--font-sans);
     font-weight: 400;
-    font-size: 0.875rem;
+    font-size: 0.9375rem; /* 15px — igual que text-sm tras la subida de escala (2026-07) */
     line-height: 1.5;
     color: var(--color-muted-foreground);
   }

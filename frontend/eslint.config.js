@@ -20,8 +20,8 @@ const GENERIC_COLOR_MSG =
   "Ver docs/DESIGN_SYSTEM.md → Tiers de color.";
 
 // Guardrail tipográfico: prohíbe tamaños de fuente mágicos (text-[Npx]).
-// Usá las utilidades del DS: text-3xs (9px), text-2xs (10px), text-xs (12px),
-// text-sm (14px), text-15 (15px), text-base (16px), text-22 (22px) etc.
+// Usá las utilidades del DS: text-3xs (9px), text-2xs (10px), text-xs (13px),
+// text-sm (15px), text-15 (15px, alias legado de text-sm), text-base (16px), text-22 (22px) etc.
 // Tamaños sin equivalente en el scale → eslint-disable-line + comentario del por qué.
 // Atrapa px Y rem/em arbitrarios (text-[13px], text-[0.8125rem], text-[1.2em]) —
 // el codemod tipográfico migró los rem residuales a tokens; el guardrail cierra el boquete.
