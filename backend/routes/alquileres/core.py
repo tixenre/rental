@@ -275,6 +275,22 @@ def create_pedido_retry(data: PedidoCreate, background: Optional[BackgroundTasks
     raise HTTPException(503, "No se pudo crear el pedido")
 
 
+def _resolver_descuentos_snapshot_o_vivo(conn, p, jornadas: int) -> tuple[float, float]:
+    """Descuento de jornadas + de cliente: en vivo mientras el pedido sigue en
+    `presupuesto`, snapshot ya persistido en la fila una vez que avanzó.
+
+    Fuente ÚNICA de este guard — antes vivía duplicado, idéntico, en
+    `_recalcular_total_pedido` y `_apply_pedido_items` (mismo invariante de
+    "plata congelada" escrito dos veces, con el riesgo de que una copia se
+    actualizara y la otra no). `p` es la fila de `alquileres` ya leída por el
+    caller (`estado`, `descuento_jornadas_pct`, `descuento_cliente_pct`,
+    `cliente_id`).
+    """
+    if p["estado"] == "presupuesto":
+        return obtener_descuento_jornadas(conn, jornadas), obtener_descuento_cliente(conn, p["cliente_id"])
+    return p["descuento_jornadas_pct"] or 0, p["descuento_cliente_pct"] or 0
+
+
 def _recalcular_total_pedido(conn, id: int) -> None:
     """Recalcula y persiste el total de un pedido desde su estado YA guardado.
 
@@ -325,12 +341,7 @@ def _recalcular_total_pedido(conn, id: int) -> None:
             jornadas,
         )
         conn.execute("UPDATE alquiler_items SET subtotal=%s WHERE id=%s", (sub, it["id"]))
-    if p["estado"] == "presupuesto":
-        descuento_jornadas_pct = obtener_descuento_jornadas(conn, jornadas)
-        descuento_cliente_pct = obtener_descuento_cliente(conn, p["cliente_id"])
-    else:
-        descuento_jornadas_pct = p["descuento_jornadas_pct"] or 0
-        descuento_cliente_pct = p["descuento_cliente_pct"] or 0
+    descuento_jornadas_pct, descuento_cliente_pct = _resolver_descuentos_snapshot_o_vivo(conn, p, jornadas)
     # `es_combo` (Fase C-3, #1219): resuelve qué líneas quedan afuera del
     # descuento global de cliente/jornadas/manual — ya traen el suyo propio.
     tipos = tipos_equipo_batch(conn, [it["equipo_id"] for it in items if it["equipo_id"]])
@@ -564,16 +575,12 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
     # editar ítems perdía el descuento por jornadas (#500). Acá se calcula
     # desde los ítems en memoria (los que estamos por insertar), no desde la base.
     #
-    # Mismo guard que `_recalcular_total_pedido`: una vez que el pedido pasa de
+    # Mismo guard que `_recalcular_total_pedido` (misma fuente única,
+    # `_resolver_descuentos_snapshot_o_vivo`): una vez que el pedido pasa de
     # `presupuesto`, el % de cliente/jornadas queda CONGELADO (se reusa el
     # snapshot ya persistido) — editar ítems de un pedido confirmado no debe
     # poder cambiar el % de descuento, solo el bruto/monto que ese % multiplica.
-    if p["estado"] == "presupuesto":
-        descuento_jornadas_pct = obtener_descuento_jornadas(conn, jornadas)
-        descuento_cliente_pct = obtener_descuento_cliente(conn, p["cliente_id"])
-    else:
-        descuento_jornadas_pct = p["descuento_jornadas_pct"] or 0
-        descuento_cliente_pct = p["descuento_cliente_pct"] or 0
+    descuento_jornadas_pct, descuento_cliente_pct = _resolver_descuentos_snapshot_o_vivo(conn, p, jornadas)
     total_desglose = calcular_total(
         items=lineas,  # incluye cobro_modo por línea (líneas 'fijo' no × jornadas)
         jornadas=jornadas,
