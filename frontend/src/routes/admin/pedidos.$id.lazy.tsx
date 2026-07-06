@@ -82,7 +82,7 @@ import {
   type Equipo,
   type Factura,
 } from "@/lib/admin/api";
-import { FacturaBadge } from "@/components/kit/FacturaBadge";
+import { FacturaBadge } from "@/design-system/ui/FacturaBadge";
 import {
   usePedidoDraft,
   nuevoUidLinea,
