@@ -26,12 +26,17 @@ def perfiles_fiscales(conn, cliente_id: int) -> list[dict]:
     return [row_to_dict(r) for r in rows]
 
 
-def productoras_vinculadas(conn, cliente_id: int) -> list[dict]:
+def productoras_vinculadas(conn, cliente_id: int, solo_facturables: bool = False) -> list[dict]:
+    """`solo_facturables=True` excluye productoras BORRADOR (sin CUIT — #1251
+    Fase 3): no se pueden facturar, así que no tienen que aparecer como opción
+    en el selector "Facturar a nombre de" del checkout. La ficha admin (que no
+    pasa este flag) sigue viendo todas, borrador incluido."""
+    filtro_cuit = "AND p.cuit IS NOT NULL" if solo_facturables else ""
     rows = conn.execute(
-        """SELECT p.id, p.cuit, p.perfil_impuestos, p.razon_social, p.domicilio_fiscal
+        f"""SELECT p.id, p.cuit, p.perfil_impuestos, p.razon_social, p.domicilio_fiscal, p.nombre
            FROM productoras p
            JOIN productora_miembros pm ON pm.productora_id = p.id
-           WHERE pm.cliente_id = %s
+           WHERE pm.cliente_id = %s {filtro_cuit}
            ORDER BY p.razon_social NULLS LAST, p.id""",
         (cliente_id,),
     ).fetchall()

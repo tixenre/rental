@@ -38,12 +38,23 @@ export function ProductorasSection() {
   const [notas, setNotas] = useState("");
   const [nombre, setNombre] = useState("");
   const cuitOk = cuit.trim() === "" || cuitValido(cuit);
+  // CUIT opcional (#1251 Fase 3): sin CUIT crea un borrador, que necesita
+  // nombre para ser identificable — con CUIT, el nombre sigue siendo opcional.
+  const puedeCrear = cuit.trim() ? cuitOk : nombre.trim() !== "";
 
   const crearMut = useMutation({
     mutationFn: () =>
-      productorasApi.crear(cuit.trim(), notas.trim() || undefined, nombre.trim() || undefined),
+      productorasApi.crear(
+        cuit.trim() || undefined,
+        notas.trim() || undefined,
+        nombre.trim() || undefined,
+      ),
     onSuccess: (p) => {
-      toast.success(`Productora "${p.nombre || p.razon_social || p.cuit}" verificada y creada`);
+      toast.success(
+        p.cuit
+          ? `Productora "${p.nombre || p.razon_social || p.cuit}" verificada y creada`
+          : `Productora borrador "${p.nombre}" creada — asignale un CUIT cuando lo tengas.`,
+      );
       setCuit("");
       setNotas("");
       setNombre("");
@@ -114,20 +125,36 @@ export function ProductorasSection() {
     onError: () => toast.error("No se pudo actualizar"),
   });
 
+  // Asignar CUIT a un borrador (#1251 Fase 3) — completa la MISMA fila, no
+  // crea una productora nueva.
+  const [asignarCuit, setAsignarCuit] = useState("");
+  const asignarCuitOk = cuitValido(asignarCuit);
+  const asignarCuitMut = useMutation({
+    mutationFn: (id: number) => productorasApi.actualizar(id, { cuit: asignarCuit.trim() }),
+    onSuccess: (p) => {
+      toast.success(`CUIT verificado — "${p.nombre || p.razon_social || p.cuit}" ya es facturable`);
+      setAsignarCuit("");
+      void qc.invalidateQueries({ queryKey: ["admin", "productoras"] });
+    },
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : "AFIP no pudo confirmar este CUIT.");
+    },
+  });
+
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
       <div className="space-y-4">
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (!cuitOk || !cuit.trim() || crearMut.isPending) return;
+            if (!puedeCrear || crearMut.isPending) return;
             crearMut.mutate();
           }}
           className="flex flex-wrap items-end gap-2 rounded-md border hairline p-3"
         >
           <div className="flex-1 min-w-[180px]">
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
-              CUIT de la productora
+              CUIT (opcional — sin CUIT queda como borrador)
             </label>
             <Input
               value={cuit}
@@ -139,7 +166,7 @@ export function ProductorasSection() {
           </div>
           <div className="flex-1 min-w-[180px]">
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
-              Nombre (opcional)
+              Nombre {cuit.trim() ? "(opcional)" : ""}
             </label>
             <Input
               value={nombre}
@@ -157,12 +184,21 @@ export function ProductorasSection() {
               placeholder="Ref: rodaje X"
             />
           </div>
-          <Button type="submit" disabled={!cuitOk || !cuit.trim() || crearMut.isPending}>
+          <Button type="submit" disabled={!puedeCrear || crearMut.isPending}>
             <Plus className="mr-1.5 h-4 w-4" />
-            {crearMut.isPending ? "Verificando…" : "Verificar y crear"}
+            {crearMut.isPending
+              ? "Verificando…"
+              : cuit.trim()
+                ? "Verificar y crear"
+                : "Crear borrador"}
           </Button>
         </form>
         {!cuitOk && <p className="text-xs text-destructive">CUIT inválido — revisá el número.</p>}
+        {cuitOk && !cuit.trim() && !nombre.trim() && (
+          <p className="text-xs text-muted-foreground">
+            Sin CUIT, necesitás al menos un nombre para crear el borrador.
+          </p>
+        )}
 
         <Input
           value={search}
@@ -189,11 +225,18 @@ export function ProductorasSection() {
               )}
             >
               <div>
-                <div className="text-sm font-medium text-ink">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-ink">
                   {p.nombre || p.razon_social || p.cuit}
+                  {!p.cuit && (
+                    <span className="rounded-full bg-amber px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-ink">
+                      Borrador
+                    </span>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {p.cuit} · {PERFIL_IMPUESTOS_LABEL[p.perfil_impuestos]}
+                  {p.cuit
+                    ? `${p.cuit} · ${PERFIL_IMPUESTOS_LABEL[p.perfil_impuestos!]}`
+                    : "Sin CUIT — no facturable todavía"}
                 </div>
               </div>
               <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -212,14 +255,21 @@ export function ProductorasSection() {
         ) : detalleQ.data ? (
           <div className="space-y-4">
             <div>
-              <div className="text-sm font-semibold text-ink">
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-ink">
                 {detalleQ.data.nombre || detalleQ.data.razon_social || detalleQ.data.cuit}
+                {!detalleQ.data.cuit && (
+                  <span className="rounded-full bg-amber px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-ink">
+                    Borrador
+                  </span>
+                )}
               </div>
               {detalleQ.data.nombre && detalleQ.data.razon_social && (
                 <div className="text-xs text-muted-foreground">{detalleQ.data.razon_social}</div>
               )}
               <div className="text-xs text-muted-foreground">
-                {detalleQ.data.cuit} · {PERFIL_IMPUESTOS_LABEL[detalleQ.data.perfil_impuestos]}
+                {detalleQ.data.cuit
+                  ? `${detalleQ.data.cuit} · ${PERFIL_IMPUESTOS_LABEL[detalleQ.data.perfil_impuestos!]}`
+                  : "Sin CUIT — no facturable ni visible en el checkout hasta asignarle uno"}
               </div>
               {detalleQ.data.domicilio_fiscal && (
                 <div className="text-xs text-muted-foreground">
@@ -247,16 +297,44 @@ export function ProductorasSection() {
                   {detalleQ.data.notas}
                 </div>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2"
-                disabled={reverificarMut.isPending}
-                onClick={() => reverificarMut.mutate(detalleQ.data.id)}
-              >
-                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-                Reverificar contra ARCA
-              </Button>
+              {detalleQ.data.cuit ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  disabled={reverificarMut.isPending}
+                  onClick={() => reverificarMut.mutate(detalleQ.data.id)}
+                >
+                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                  Reverificar contra ARCA
+                </Button>
+              ) : (
+                <div className="mt-2 flex flex-wrap items-end gap-2">
+                  <div className="min-w-[160px] flex-1">
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                      Asignar CUIT
+                    </label>
+                    <Input
+                      value={asignarCuit}
+                      onChange={(e) =>
+                        setAsignarCuit(e.target.value.replace(/[^\d-]/g, "").slice(0, 13))
+                      }
+                      placeholder="30-12345678-9"
+                      aria-invalid={asignarCuit.trim() !== "" && !asignarCuitOk}
+                      className={cn(
+                        asignarCuit.trim() !== "" && !asignarCuitOk && "border-destructive",
+                      )}
+                    />
+                  </div>
+                  <Button
+                    size="sm"
+                    disabled={!asignarCuitOk || asignarCuitMut.isPending}
+                    onClick={() => asignarCuitMut.mutate(detalleQ.data.id)}
+                  >
+                    {asignarCuitMut.isPending ? "Verificando…" : "Verificar y asignar"}
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2 border-t hairline pt-3">

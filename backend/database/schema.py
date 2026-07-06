@@ -2377,13 +2377,13 @@ def _init_db_schema(conn):
     conn.execute("""
         CREATE TABLE IF NOT EXISTS productoras (
             id                SERIAL PRIMARY KEY,
-            cuit              TEXT NOT NULL UNIQUE,
-            perfil_impuestos  TEXT NOT NULL,
+            cuit              TEXT UNIQUE,
+            perfil_impuestos  TEXT,
             razon_social      TEXT,
             domicilio_fiscal  TEXT,
             email_facturacion TEXT,
             notas             TEXT,
-            verificado_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+            verificado_at     TIMESTAMPTZ,
             created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
         )
@@ -2393,6 +2393,14 @@ def _init_db_schema(conn):
     # de AFIP para cierto tipo de CUIT.
     conn.execute("ALTER TABLE productoras ADD COLUMN IF NOT EXISTS nombre TEXT")
     conn.execute("ALTER TABLE productoras ADD COLUMN IF NOT EXISTS redes_sociales TEXT")
+    # Borrador sin CUIT (#1251 Fase 3): "podemos crear una productora sin el CUIT,
+    # solo el nombre" — cuit/perfil_impuestos/verificado_at pasan a NULLABLE (antes
+    # NOT NULL). Una productora sin CUIT NO es facturable — la excluye
+    # `clientes.queries.fiscal.productoras_vinculadas(solo_facturables=True)`, que
+    # alimenta el selector de checkout; la ficha admin sigue viendo el borrador.
+    conn.execute("ALTER TABLE productoras ALTER COLUMN cuit DROP NOT NULL")
+    conn.execute("ALTER TABLE productoras ALTER COLUMN perfil_impuestos DROP NOT NULL")
+    conn.execute("ALTER TABLE productoras ALTER COLUMN verificado_at DROP NOT NULL")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS productora_miembros (
             productora_id  INTEGER NOT NULL REFERENCES productoras(id) ON DELETE CASCADE,

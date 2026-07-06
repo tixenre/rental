@@ -323,3 +323,34 @@ def verificar_y_crear_productora(
         ),
     )
     return persona
+
+
+def verificar_y_asignar_cuit(productora_id: int, cuit: str, conn):
+    """Completa una productora BORRADOR (creada solo con `nombre`, sin CUIT
+    — #1251 Fase 3, "podemos crear una productora sin el CUIT") con un CUIT
+    recién verificado contra ARCA.
+
+    A diferencia de `verificar_y_crear_productora` (upsert POR CUIT — usado
+    para alta nueva o re-verificar el cuit YA asignado), esto resuelve por
+    `id`: completa LA MISMA fila borrador en vez de insertar una fila nueva
+    separada. El caller (`routes/productoras.py`) garantiza que la fila no
+    tenga cuit todavía — reasignar el cuit de una productora YA verificada
+    no es un caso soportado (cambiaría su identidad fiscal)."""
+    persona = resolver_persona(cuit, conn)
+    if not persona.condicion_iva:
+        raise RuntimeError(
+            f"AFIP no pudo clasificar la condición IVA del CUIT {cuit} — no se "
+            "puede confirmar el CUIT de esta productora sin esa clasificación."
+        )
+    conn.execute(
+        """UPDATE productoras SET
+               cuit             = %s,
+               perfil_impuestos = %s,
+               razon_social     = %s,
+               domicilio_fiscal = %s,
+               verificado_at    = now(),
+               updated_at       = now()
+           WHERE id = %s""",
+        (cuit, persona.condicion_iva, persona.razon_social or None, persona.domicilio or None, productora_id),
+    )
+    return persona

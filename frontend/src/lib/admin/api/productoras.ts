@@ -8,8 +8,10 @@ import type { PerfilImpuestos } from "@/lib/iva";
 
 export type Productora = {
   id: number;
-  cuit: string;
-  perfil_impuestos: PerfilImpuestos;
+  // Nullable (#1251 Fase 3): una productora puede nacer BORRADOR con solo
+  // `nombre`, sin CUIT — no facturable hasta que se le asigne uno.
+  cuit: string | null;
+  perfil_impuestos: PerfilImpuestos | null;
   razon_social: string | null;
   domicilio_fiscal: string | null;
   email_facturacion: string | null;
@@ -31,7 +33,8 @@ export const productorasApi = {
   listar: (q?: string) =>
     authedJson<Productora[]>(`/api/admin/productoras${q ? `?q=${encodeURIComponent(q)}` : ""}`),
   // Alta bloqueante: 422 si ARCA no confirma el CUIT (ver services.facturacion.padron).
-  crear: (cuit: string, notas?: string, nombre?: string, redes_sociales?: string) =>
+  // `cuit` opcional (#1251 Fase 3) — sin CUIT crea un borrador (necesita `nombre`).
+  crear: (cuit: string | undefined, notas?: string, nombre?: string, redes_sociales?: string) =>
     authedPostJson<Productora>("/api/admin/productoras", { cuit, notas, nombre, redes_sociales }),
   obtener: (id: number) => authedJson<ProductoraDetalle>(`/api/admin/productoras/${id}`),
   reverificar: (id: number) =>
@@ -41,8 +44,13 @@ export const productorasApi = {
       body: JSON.stringify({ reverificar: true }),
     }),
   // Edita nombre/redes_sociales/notas SIN reverificar contra ARCA (esos 3 son
-  // manuales, a diferencia de razón social/domicilio/condición IVA).
-  actualizar: (id: number, data: { nombre?: string; redes_sociales?: string; notas?: string }) =>
+  // manuales, a diferencia de razón social/domicilio/condición IVA). `cuit`
+  // solo tiene efecto si la productora todavía no tiene uno (completa un
+  // borrador — #1251 Fase 3); reasignar un CUIT ya verificado no está soportado.
+  actualizar: (
+    id: number,
+    data: { nombre?: string; redes_sociales?: string; notas?: string; cuit?: string },
+  ) =>
     authedJson<Productora>(`/api/admin/productoras/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

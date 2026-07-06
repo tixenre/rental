@@ -353,7 +353,7 @@ def cliente_listar_productoras(request: Request):
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
     with get_db() as conn:
-        return queries_fiscal.productoras_vinculadas(conn, cliente_id)
+        return queries_fiscal.productoras_vinculadas(conn, cliente_id, solo_facturables=True)
 
 
 class PerfilUpdate(BaseModel):

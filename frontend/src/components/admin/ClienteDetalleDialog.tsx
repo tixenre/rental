@@ -462,12 +462,20 @@ export function ClienteDetalleDialog({ open, onOpenChange, cliente, onSaved }: P
                     <div key={pr.id} className="rounded-md border hairline p-3">
                       <div className="flex items-center gap-1.5 text-sm font-medium text-ink">
                         <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        {pr.razon_social || pr.cuit}
+                        {pr.nombre || pr.razon_social || pr.cuit}
+                        {!pr.cuit && (
+                          <span className="rounded-full bg-amber px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-ink">
+                            Borrador
+                          </span>
+                        )}
                       </div>
                       <div className="mt-0.5 text-xs text-muted-foreground">
-                        {pr.cuit} ·{" "}
-                        {PERFIL_IMPUESTOS_LABEL[pr.perfil_impuestos as PerfilImpuestos] ??
-                          pr.perfil_impuestos}
+                        {pr.cuit
+                          ? `${pr.cuit} · ${
+                              PERFIL_IMPUESTOS_LABEL[pr.perfil_impuestos as PerfilImpuestos] ??
+                              pr.perfil_impuestos
+                            }`
+                          : "Sin CUIT — no facturable todavía"}
                       </div>
                     </div>
                   ))}
