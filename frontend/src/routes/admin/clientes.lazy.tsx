@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createLazyFileRoute } from "@tanstack/react-router";
 import {
@@ -54,13 +55,7 @@ function ClientesPage() {
   useDocumentTitle("Clientes · Back Office");
   const qc = useQueryClient();
   const [q, setQ] = useState("");
-  // Debounce real (mismo patrón que el selector de clientes del pedido): cada
-  // tecla cancela el timer anterior → una sola búsqueda al frenar, no por tecla.
-  const [debouncedQ, setDebouncedQ] = useState("");
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(q.trim()), 250);
-    return () => clearTimeout(t);
-  }, [q]);
+  const debouncedQ = useDebouncedValue(q.trim(), 250);
   const [detalle, setDetalle] = useState<Cliente | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<Cliente | null>(null);

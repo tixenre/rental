@@ -1,6 +1,7 @@
 import { createLazyFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   Plus,
   Search,
@@ -134,12 +135,12 @@ function EquiposPage() {
   // el admin deja de tipear.
   const [searchInput, setSearchInput] = useState(q);
   useEffect(() => setSearchInput(q), [q]);
+  const debouncedSearchInput = useDebouncedValue(searchInput, 300);
   useEffect(() => {
-    if (searchInput === q) return;
-    const t = setTimeout(() => updateFilters({ q: searchInput }), 300);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce: solo re-dispara por texto tipeado, no por q/updateFilters
-  }, [searchInput]);
+    if (debouncedSearchInput === q) return;
+    updateFilters({ q: debouncedSearchInput });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce: solo re-dispara por texto debounced, no por q/updateFilters
+  }, [debouncedSearchInput]);
 
   const setQ = (v: string) => updateFilters({ q: v });
   const setCategoria = (v: string) => updateFilters({ categoria: v });
