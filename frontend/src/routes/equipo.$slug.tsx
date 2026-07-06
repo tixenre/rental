@@ -25,6 +25,7 @@ import {
 
 import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { Skeleton } from "@/design-system/ui/skeleton";
+import { Button } from "@/design-system/ui/button";
 import { EmptyImage } from "@/components/rental/EmptyImage";
 import { KitSection, BoxItemsSection } from "@/components/rental/KitSection";
 import { KeywordChips } from "@/components/rental/KeywordChips";
@@ -444,14 +445,16 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
         </div>
         <div className="flex items-start justify-between gap-3">
           <h1 className="font-display text-3xl md:text-4xl text-ink leading-tight">{item.name}</h1>
-          <button
+          <Button
+            variant="outline"
+            shape="pill"
             onClick={handleShare}
-            className="flex items-center justify-center gap-1.5 rounded-full border hairline px-3 py-1.5 text-xs hover:border-foreground/40 transition shrink-0 min-h-11 min-w-11 sm:min-w-0"
+            className="min-h-11 min-w-11 h-auto py-1.5 text-xs sm:min-w-0"
             aria-label="Compartir"
           >
             {copied ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
             <span className="hidden sm:inline">{copied ? "Copiado" : "Compartir"}</span>
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -698,13 +701,14 @@ function CartButtons({
 }) {
   if (qty === 0) {
     return (
-      <button
+      <Button
+        variant="primary"
         onClick={() => !sinStock && onAdd()}
         disabled={sinStock}
-        className="inline-flex items-center justify-center gap-1.5 min-h-11 rounded-md bg-ink px-4 py-2.5 text-sm font-medium uppercase tracking-wider text-[var(--area-accent)] transition hover:bg-foreground disabled:cursor-not-allowed disabled:opacity-40"
+        className="min-h-11 uppercase tracking-wider text-[var(--area-accent)] hover:bg-foreground hover:text-[var(--area-accent)]"
       >
         <Plus className="h-4 w-4" /> {sinStock ? "Sin stock" : "Agregar"}
-      </button>
+      </Button>
     );
   }
   // Stepper canónico de la librería (equipment/shared) — el único de la web.

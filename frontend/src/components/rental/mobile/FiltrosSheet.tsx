@@ -33,14 +33,16 @@ export function FiltrosSheet({
       showClose
       footer={
         <div className="flex gap-2">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            shape="pill"
             onClick={onClearAll}
             disabled={activeFiltersCount === 0}
-            className="flex-1 py-3 rounded-full border-[1.5px] border-hairline font-sans text-sm font-semibold text-ink transition hover:border-ink hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 h-auto py-3 font-sans text-sm font-semibold"
           >
             Limpiar
-          </button>
+          </Button>
           <Button
             type="button"
             variant="primary"

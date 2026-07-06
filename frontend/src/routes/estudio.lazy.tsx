@@ -932,12 +932,15 @@ function EstudioPage() {
           className="flex items-center justify-between gap-3 bg-destructive/10 border-b border-destructive/30 px-4 py-3 text-sm text-destructive"
         >
           <span>No se pudo cargar la info actualizada del estudio. Mostrando datos guardados.</span>
-          <button
+          <Button
+            variant="outline"
+            size="sm"
+            shape="pill"
             onClick={() => refetch()}
-            className="shrink-0 rounded-full border border-destructive/40 px-3 py-1 text-xs font-medium hover:bg-destructive/10 transition"
+            className="shrink-0 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
           >
             Reintentar
-          </button>
+          </Button>
         </div>
       )}
 

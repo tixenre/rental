@@ -4,6 +4,7 @@ import { CategoryMosaic } from "@/components/rental/CategoryMosaic";
 import { BrandCarousel } from "@/components/rental/BrandCarousel";
 import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { CarouselRow } from "@/components/rental/CarouselRow";
+import { Button } from "@/design-system/ui/button";
 import { type Equipment } from "@/data/equipment";
 import type { BackendMarca } from "@/lib/api";
 import { SearchEmptyState } from "./SearchEmptyState";
@@ -108,15 +109,18 @@ export function GridMode({
                 {c}
               </span>
             ))}
-            <button
+            <Button
+              variant="outline"
+              size="sm"
+              shape="pill"
+              className="ml-1"
               onClick={() => {
                 onClearCats();
                 onBrandSelect(null);
               }}
-              className="ml-1 rounded-full border hairline px-3 py-1 text-xs text-muted-foreground hover:border-ink hover:text-ink"
             >
               Ver todo
-            </button>
+            </Button>
           </div>
         </div>
       )}
