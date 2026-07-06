@@ -40,6 +40,11 @@ _NOISE_LABELS = frozenset({
         "Box Dimensions (LxWxH)",
         "Box Dimensions",
         "Shipping Weight",
+        # #1072: "Type"/"Item Type" es el label genérico de los Item
+        # Specifics de eBay — sin valor de spec propio (siempre presente,
+        # nunca informativo: "Type: Lens", "Type: Camera").
+        "Type",
+        "Item Type",
     )
 })
 

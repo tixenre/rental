@@ -90,7 +90,8 @@ CAT = CategoriaRegistry(
         peso_g(prioridad=110, ayuda="Peso del fixture solo, sin accesorios"),
         # ─── Energía / consumo ────────────────────────────────────────
         SpecDef(key="battery", label="Batería", tipo="string",
-                prioridad=125, ayuda="Modelo de batería compatible (V-mount, NP-F970, etc.)"),
+                prioridad=125, ayuda="Modelo de batería compatible (V-mount, NP-F970, etc.)",
+                aliases=["Battery Type", "Battery Pack", "Battery Model"]),
         SpecDef(key="power_pass_thru", label="Power pass-thru", tipo="bool",
                 prioridad=130,
                 ayuda="Permite operar con AC + batería como respaldo simultáneo"),

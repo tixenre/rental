@@ -72,6 +72,13 @@ def autofocus(
 
     Aliases: unión de Cámaras (Auto Focus, Autofocus System, Focus System)
     + Lentes (sin aliases propios).
+
+    NO se agrega "Focus Type" (#1072) acá a propósito: el valor real de B&H
+    para ese label es texto ("Autofocus"/"Manual Focus"/"Autofocus & Manual
+    Focus"), no yes/no — `_coerce_bool` (commands/coerce.py) no lo reconoce,
+    así que matchearía en la extracción (falsa confianza) y se descartaría
+    en silencio al persistir. Requiere una spec de tipo string/enum propia
+    o extender `_coerce_bool`, no un alias ciego a un bool existente.
     en_filtros=True en ambas categorías — hardcodeado.
     """
     return SpecDef(
