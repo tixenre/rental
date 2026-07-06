@@ -9,11 +9,13 @@ volver a la puerta.
 Detecta el patrón SQL real (`FROM`/`JOIN kit_componentes`), no menciones en prosa
 — así un comentario que nombre la tabla no genera falso positivo.
 
-EXCEPCIONES DOCUMENTADAS (no migradas en F2, a propósito): los consumidores del
-detalle de pedido `routes/alquileres/core.py::_get_alquiler_items` y
-`::_batch_get_alquiler_items` devuelven `kc.*` crudo y alimentan mails/cotización
-(superficie de plata); su consolidación es follow-up con test dedicado. NO están
-en la lista de abajo, por eso no los marca.
+EXCEPCIÓN DOCUMENTADA (no migrada en F2, a propósito): `services/
+pedidos_enriquecimiento.py::_batch_get_alquiler_items` devuelve `kc.*` crudo y
+alimenta mails/cotización (superficie de plata); su consolidación es follow-up
+con test dedicado. NO está en la lista de abajo, por eso no la marca.
+
+`routes/alquileres/detalle.py::_get_alquiler_items` (movido de `core.py` en el
+split #1254) migró a la puerta única — ver `_MIGRADAS` abajo.
 """
 import inspect
 
@@ -21,6 +23,7 @@ import pytest
 
 from database import equipos as db_equipos
 from routes.alquileres import documentos as rutas_docs
+from routes.alquileres import detalle as rutas_detalle
 from routes.equipos import core as rutas_core
 from routes.equipos import kit as rutas_kit
 
@@ -33,6 +36,7 @@ _MIGRADAS = [
     rutas_kit.get_kit,
     rutas_core.get_equipo,
     rutas_docs._add_componentes,
+    rutas_detalle._get_alquiler_items,
 ]
 
 

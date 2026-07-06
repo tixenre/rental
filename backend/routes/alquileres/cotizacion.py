@@ -24,6 +24,13 @@ from services.precios import (
 from descuentos.queries.decision import resolver_origen_pedido_monto
 from descuentos.queries.jornadas import obtener_descuento_jornadas
 from routes.alquileres.core import router
+# Validadores de descuento: fuente única compartida con `PedidoDatos`
+# (routes/alquileres/modelos.py) — antes estaban duplicados byte a byte acá.
+from routes.alquileres.modelos import (
+    _validar_descuento_manual_monto,
+    _validar_descuento_manual_tipo,
+    _validar_descuento_pct,
+)
 
 
 class CotizarItem(BaseModel):
@@ -66,40 +73,25 @@ class CotizarRequest(BaseModel):
     perfil_fiscal_id: Optional[int] = None
     productora_id: Optional[int] = None
 
-    # Mismo validador que `PedidoDatos.descuento_pct` (routes/alquileres/core.py)
+    # Mismo validador que `PedidoDatos.descuento_pct` (routes/alquileres/modelos.py)
     # — este override vivía sin cota de rango (hallazgo de la Fase A del split
     # de descuentos/, #1184): un admin podía mandar un negativo al preview en
-    # vivo sin que nada lo rechazara.
+    # vivo sin que nada lo rechazara. Ahora es la MISMA función (no una copia):
+    # preview y guardado no pueden divergir en qué rechazan.
     @field_validator("descuento_pct")
     @classmethod
     def validate_descuento(cls, v):
-        if v is None:
-            return v
-        if v < 0 or v > 100:
-            raise ValueError("descuento_pct debe estar entre 0 y 100")
-        return v
+        return _validar_descuento_pct(v)
 
     @field_validator("descuento_manual_tipo")
     @classmethod
     def validate_descuento_manual_tipo(cls, v):
-        if v is None:
-            return v
-        if v not in ("pct", "monto"):
-            raise ValueError("descuento_manual_tipo debe ser 'pct' o 'monto'")
-        return v
+        return _validar_descuento_manual_tipo(v)
 
     @field_validator("descuento_manual_monto")
     @classmethod
     def validate_descuento_manual_monto(cls, v):
-        if v is None:
-            return v
-        if v < 0:
-            raise ValueError("descuento_manual_monto no puede ser negativo")
-        # Mismo tope que `PedidoDatos` (routes/alquileres/core.py) — preview y
-        # guardado no deberían divergir en qué rechazan.
-        if v >= 2_147_483_647:
-            raise ValueError("descuento_manual_monto demasiado alto")
-        return v
+        return _validar_descuento_manual_monto(v)
 
 
 @router.post("/cotizar")
