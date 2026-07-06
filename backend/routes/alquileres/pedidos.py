@@ -5,6 +5,10 @@ baja, transición de estado y edición de datos/ítems. La lógica reusable
 (`create_pedido`, `_apply_pedido_*`, enriquecimiento, recálculo de total) vive en
 `core` y se importa; acá quedan solo los handlers que registran sus rutas sobre el
 router compartido del paquete `routes.alquileres`.
+
+Incluye también el disparador on-demand de recordatorios de retiro (mudado de
+`disponibilidad.py`, issue #1254 — no tenía relación temática con disponibilidad;
+es un trigger admin sobre el ciclo de vida del pedido, calza acá).
 """
 import logging
 from typing import Optional
@@ -320,3 +324,20 @@ def update_alquiler_items(id: int, data: PedidoItemUpdate, request: Request):
             logger.error("Error actualizando items del pedido %s", id, exc_info=True)
             conn.rollback()
             raise
+
+
+@router.post("/admin/recordatorios/retiro/run")
+def run_recordatorios_retiro(request: Request, dry_run: bool = Query(True)):
+    """Dispara on-demand el barrido de recordatorios de retiro — para probar en
+    staging sin esperar al scheduler diario. `dry_run=true` (default) NO manda
+    nada: solo devuelve qué pedidos recibirían el recordatorio mañana. Pasar
+    `dry_run=false` manda de verdad (gateado igual por el canal de mail activo).
+
+    Import perezoso de `jobs.recordatorios` para no crear ciclo (ese módulo
+    importa helpers de este paquete).
+    """
+    require_admin(request)
+    from jobs.recordatorios import enviar_recordatorios_retiro
+
+    with get_db() as conn:
+        return enviar_recordatorios_retiro(conn, dry_run=dry_run)

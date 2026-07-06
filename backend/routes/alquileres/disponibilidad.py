@@ -1,15 +1,17 @@
-"""Disponibilidad + recordatorios (#501 — extraído del god-module `routes/alquileres.py`).
+"""Disponibilidad (#501 — extraído del god-module `routes/alquileres.py`).
 
 Endpoints finos de lectura de disponibilidad (delegan en la fuente única
-`reservas.calcular_disponibilidad` / `dias_no_disponibles`), la validación de
-horarios habilitados del cliente, y el disparador on-demand de recordatorios de
-retiro. Registra sus rutas sobre el router compartido del paquete
-`routes.alquileres`.
+`reservas.calcular_disponibilidad` / `dias_no_disponibles`) y la validación de
+horarios habilitados del cliente. Registra sus rutas sobre el router
+compartido del paquete `routes.alquileres`.
+
+(El disparador on-demand de recordatorios de retiro vivía acá sin ninguna
+relación temática — se mudó a `pedidos.py` en la auditoría de duplicación/
+superposición del módulo, issue #1254.)
 """
-from fastapi import Request, HTTPException, Query
+from fastapi import HTTPException, Query
 
 from database import get_db
-from auth.guards import require_admin
 from reservas import (
     calcular_disponibilidad as _calcular_disponibilidad,
     calcular_disponibilidad_draft as _calcular_disponibilidad_draft,
@@ -107,20 +109,3 @@ def get_disponibilidad(
                 conn, fecha_desde, fecha_hasta, _parse_items_draft(items), exclude_pedido_id
             )
         return _calcular_disponibilidad(conn, fecha_desde, fecha_hasta, exclude_pedido_id)
-
-
-@router.post("/admin/recordatorios/retiro/run")
-def run_recordatorios_retiro(request: Request, dry_run: bool = Query(True)):
-    """Dispara on-demand el barrido de recordatorios de retiro — para probar en
-    staging sin esperar al scheduler diario. `dry_run=true` (default) NO manda
-    nada: solo devuelve qué pedidos recibirían el recordatorio mañana. Pasar
-    `dry_run=false` manda de verdad (gateado igual por el canal de mail activo).
-
-    Import perezoso de `jobs.recordatorios` para no crear ciclo (ese módulo
-    importa helpers de este).
-    """
-    require_admin(request)
-    from jobs.recordatorios import enviar_recordatorios_retiro
-
-    with get_db() as conn:
-        return enviar_recordatorios_retiro(conn, dry_run=dry_run)
