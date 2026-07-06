@@ -30,7 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/design-system/ui/select";
-import { Slider } from "@/design-system/ui/slider";
 import {
   Form,
   FormControl,
@@ -311,16 +310,6 @@ export const formsSection: CatalogSection = {
             <SelectItem value="audio">Audio</SelectItem>
           </SelectContent>
         </Select>
-      ),
-    },
-    {
-      name: "Slider",
-      files: ["design-system/ui/slider.tsx"],
-      blurb: "Selección de un valor en un rango continuo (Radix). defaultValue es un array.",
-      render: () => (
-        <div className="max-w-xs pt-2">
-          <Slider defaultValue={[40]} max={100} step={1} />
-        </div>
       ),
     },
     {

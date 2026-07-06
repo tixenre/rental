@@ -1,10 +1,10 @@
 /**
  * Sección Navegación & Estructura — cómo se ordena el contenido en pantalla.
- * Tabs/Accordion/Collapsible reparten contenido; Separator/ScrollArea lo enmarcan;
+ * Tabs/Accordion/Collapsible reparten contenido; Separator lo enmarca;
  * Sidebar es el bloque de navegación entero del back-office.
  */
 import { type CatalogSection } from "../types";
-import { Caption, Sample, Stack } from "../catalog-kit";
+import { Sample, Stack } from "../catalog-kit";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/design-system/ui/tabs";
 import {
   Accordion,
@@ -18,7 +18,6 @@ import {
   CollapsibleTrigger,
 } from "@/design-system/ui/collapsible";
 import { Separator } from "@/design-system/ui/separator";
-import { ScrollArea } from "@/design-system/ui/scroll-area";
 import {
   Sidebar,
   SidebarContent,
@@ -33,25 +32,6 @@ import {
 } from "@/design-system/ui/sidebar";
 import { Button } from "@/design-system/ui/button";
 import { Calendar, ChevronDown, FileText, Package, Settings, Users } from "lucide-react";
-
-/** Lista larga para mostrar el scroll real del ScrollArea. */
-const EQUIPOS = [
-  "Sony FX6",
-  "Canon C70",
-  "Blackmagic 6K Pro",
-  "DJI RS3 Pro",
-  "Aputure 600d",
-  "Aputure 300x",
-  "Nanlite PavoTube",
-  "Sennheiser MKH 416",
-  "Rode NTG5",
-  "Tascam DR-70D",
-  "Manfrotto 504X",
-  "Tripode Sachtler FSB 8",
-  "SmallHD Indie 7",
-  "Atomos Ninja V",
-  "Tarjeta CFexpress 512GB",
-];
 
 export const navigationSection: CatalogSection = {
   id: "navegacion",
@@ -153,26 +133,6 @@ export const navigationSection: CatalogSection = {
             </div>
           </Sample>
         </Stack>
-      ),
-    },
-    {
-      name: "ScrollArea",
-      files: ["design-system/ui/scroll-area.tsx"],
-      blurb:
-        "Contenedor de alto fijo con scrollbar estilizada propia. Para listas largas que no deben empujar el layout.",
-      render: () => (
-        <ScrollArea className="h-48 w-full max-w-xs card">
-          <div className="p-3">
-            <Caption>Equipos disponibles</Caption>
-            <ul className="mt-2 space-y-2">
-              {EQUIPOS.map((eq) => (
-                <li key={eq} className="text-sm text-ink">
-                  {eq}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </ScrollArea>
       ),
     },
     {

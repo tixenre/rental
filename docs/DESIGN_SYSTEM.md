@@ -396,7 +396,7 @@ Utilidades canónicas en `frontend/src/design-system/styles/utilities.css` para 
 
 | Categoría                                          | Dónde vive                | Notas                                                                                                                                  |
 | -------------------------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Primitivas UI** (Button, Input, Card, Dialog, …) | `frontend/src/design-system/ui/*`     | shadcn/Radix base + variants de marca (`primary`, `amber`). Naming shadcn: `default` no se renombra (ver Button abajo).                |
+| **Primitivas UI** (Button, Input, Dialog, …) | `frontend/src/design-system/ui/*`     | shadcn/Radix base + variants de marca (`primary`, `amber`). Naming shadcn: `default` no se renombra (ver Button abajo). El panel/card es la **utility** `card`/`card-elevated` (abajo), no un componente `Card` — se podó (0 adopción real, era solo la vitrina).                |
 | **Componentes de aplicación (`rental/`)**          | `frontend/src/components/rental/*` | EquipmentCard, TopBar/Footer (`shell/`), CartMiniBar (`cart/`) integrados con queries + estado.                                                            |
 | **Componentes admin**                              | `frontend/src/components/admin/*`  | Tablas, modales, sidebar del back-office.                                                                                              |
 | **Piezas de marca** (en `ui/`)                     | `frontend/src/design-system/ui/*`     | `Pill`, `EstadoBadge`, `PagoBadge`, `ClienteAvatar`, `Field` (+ `types.ts`). Presentacionales con paleta de marca; viven planas junto a los primitivos shadcn (antes en `kit/`, **disuelto en `ui/`**). `EstadoBadge` es la única fuente del repo. |
@@ -438,6 +438,22 @@ import { Button } from "@/design-system/ui/button";
 > `variant="on-accent"` es para CTAs sobre fondos con color fuerte (ink o accent):
 > fondo bone (`bg-background shadow-sm`) + texto ink, hover invierte a ink/bone.
 > Ejemplo: CartMiniBar sobre fondo ink, botones en heroes de marketing.
+
+### Pill (`frontend/src/design-system/ui/Pill.tsx`) — frontera con `count-badge`
+
+**Fuente única** de la forma pill (`rounded-full border`, tonos semánticos vía prop
+`tone`). `EstadoBadge`/`PagoBadge` derivan de acá — cualquier badge nuevo también,
+nunca copiar las clases a mano.
+
+**Frontera Pill vs. `count-badge`/botón:** `Pill` renderiza un `<span>` — **display
+puro**, sin `onClick`/foco/teclado. Úsalo para un **estado semántico pasivo**
+(badge de estado, tag informativo) que el usuario no clickea. Si el chip necesita
+ser **clickeable/seleccionable** (un filtro, un toggle, un selector), no lo envuelvas
+en `Pill` — perdés semántica de foco/teclado — usá `<Button>` (con `variant`/`size`/
+`shape` overrideados vía `className` si hace falta calzar la forma) o, si es un
+contador circular compacto tipo badge de carrito, `count-badge` (abajo). El
+supervisor marca un `Pill` con `onClick` agregado a mano, o un chip clickeable
+implementado como `<span>` en vez de `<button>`/`Button`.
 
 ### EstadoBadge
 
@@ -698,6 +714,18 @@ import { FieldLabel } from "@/design-system/ui/Field";
   <Input type="date" value={desde} onChange={...} />
 </div>
 ```
+
+### Form (`frontend/src/design-system/ui/form.tsx`) — huérfano intencional
+
+Wrapper `react-hook-form` + `zod` (`FormItem`/`FormLabel`/`FormControl`/
+`FormDescription`/`FormMessage`, pinta el error solo en `destructive`). **0
+consumidores hoy** — casi todo el back-office usa `useState` + `Field` (la
+molécula label+control+hint/error, más liviana para el volumen de forms chicos
+del repo) — y eso está bien, **no** es deuda a resolver. Se mantiene como el
+**default documentado** para el día que aparezca un form grande con validación
+cruzada de campos donde RHF+zod realmente paguen (ver "Nada de hotfixes" / no
+migrar forms existentes solo para adoptarlo). Tiene specimen en la vitrina
+(`ds-catalog`) — por eso no lo agarra el radar de huérfanos-sin-uso.
 
 ### SearchInput (`frontend/src/design-system/ui/search-input.tsx`)
 
@@ -992,7 +1020,10 @@ ocasionalmente.
    Las fuentes vendoreadas en `frontend/src/assets/fonts/` son las del manual oficial
    de marca.
 2. **Champ Black sólo para display.** No para headings de UI, no para
-   labels, no para body, no para botones.
+   labels, no para body, no para botones. Mapeo explícito del h1: el h1 de una
+   página **admin** es `t-h1` (TT Commons, vía `AdminPage`) — "headings de UI";
+   el h1 de una página **pública** (catálogo, ficha, landing) es `font-display`
+   (Champ Black) — "display". No hay una tercera forma.
 3. **Nunca hardcodear hex.** Siempre `var(--amber)`, `bg-amber`,
    `text-ink`. Si el color que necesitás no tiene token, hablalo antes
    de inventar.
