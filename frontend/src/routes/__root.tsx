@@ -7,10 +7,26 @@ import { FaviconSync } from "@/components/rental/FaviconSync";
 import { useCartHeartbeat } from "@/hooks/useCartHeartbeat";
 import { Component, type ReactNode } from "react";
 
+// Los nombres de archivo de los chunks llevan hash de build — tras un deploy,
+// una pestaña que quedó abierta desde antes intenta traer un chunk que ya no
+// existe. Se arregla solo con un reload (trae el manifest nuevo); no es un bug
+// de la app. El guard en sessionStorage evita un loop si el reload no alcanza.
+const CHUNK_ERROR_PATTERN = /Failed to fetch dynamically imported module|Importing a module script failed/;
+const CHUNK_RELOAD_GUARD_KEY = "rambla:chunk-reload-attempted";
+
 class RootErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null };
   static getDerivedStateFromError(error: Error) {
     return { error };
+  }
+  componentDidCatch(error: Error) {
+    if (
+      CHUNK_ERROR_PATTERN.test(error.message) &&
+      !sessionStorage.getItem(CHUNK_RELOAD_GUARD_KEY)
+    ) {
+      sessionStorage.setItem(CHUNK_RELOAD_GUARD_KEY, "1");
+      window.location.reload();
+    }
   }
   render() {
     if (this.state.error) {
