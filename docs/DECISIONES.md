@@ -3061,3 +3061,49 @@ cancel-in-progress` ya cancela corridas viejas.
   `test_portabilidad.py::test_pyproject_version_coincide_con_init` sigue siendo el candado.
 - **Consecuencia inmediata:** habilita versionar la próxima iniciativa grande (WSFEXv1) como un
   bump MINOR real (`0.2.0` o el que corresponda) en vez de quedar indefinidamente en `0.0.0`.
+
+### 2026-07-05 — El front no calcula stock: el "X libres" del editor sale del motor (draft-aware, con signo)
+
+- **Contexto.** El dueño encontró en prod que el editor de pedidos admin mostraba "2 libres" para el
+  Maffer (stock 5) en un pedido que ya tenía 3× Maffer + 1× Brazo Mágico — un kit cuya receta lleva
+  2× Maffer. La verdad era 0 (5 − 3 directas − 2 vía kit). La raíz: el front calculaba el badge por
+  su cuenta (`libres_del_endpoint − cantidad_de_la_línea`) sin expandir la composición de los kits
+  del MISMO draft, en 4 lugares (fila del editor, card mobile, y los dos buscadores de equipos).
+  **No había sobreventa**: el gate (`validar_stock`, expansión recursiva C4 #635) siempre contó bien
+  y rechazaba al guardar — pero el número invitaba a comprometer stock inexistente y el error
+  aparecía recién al guardar, sin que el admin pudiera confiar en lo que veía.
+- **Decisión.** Generalizar _El front no calcula plata (2026-06-29)_ al stock: la resta de un draft
+  la hace el MOTOR, el front pide el mapa y lo muestra. Nueva función de lectura
+  `reservas.calcular_disponibilidad_draft(conn, fd, fh, items, exclude_pedido_id)`:
+  comparte el pipeline con `calcular_disponibilidad` (extraído verbatim a `_libres_crudos`, el
+  clásico queda conducta-idéntico) y resta la demanda del draft expandida con la MISMA pieza que el
+  gate (`expandir_demanda`, `solo_esenciales=False`). Devuelve valores **con signo** (negativo =
+  cuántas unidades faltan → overstock antes de que el gate rechace). La **derivación** de compuestos
+  en este camino es **estricta** (`incluir_best_effort=True`): el gate expande estricto, así que la
+  línea de un kit hereda también el faltante de una hoja best-effort — si no, el badge del kit diría
+  "libres" y el gate igual rechazaría (hallazgo de la revisión adversarial pre-push). El camino
+  clásico del catálogo mantiene C2 sin cambios (best-effort no limita).
+- **Transporte.** `GET /api/disponibilidad` acepta `items="id:qty,..."` (los duplicados se SUMAN,
+  como consolida el gate — issue #102; distinto a propósito del MAX de `/disponibilidad-dias`). El
+  wrapper del portal cliente (`/api/cliente/pedidos/{id}/disponibilidad`) lo pasa tal cual, con su
+  guard de ownership intacto — el editor de modificación del cliente tenía el mismo bug.
+- **Gotcha (bug bloqueante cazado por la revisión adversarial antes de pushear).**
+  `get_disponibilidad` también se llama **directo como helper** desde `routes/estudio.py` (3 args
+  posicionales). Un default `items: str = Query(None)` deja el OBJETO `Query` (truthy) en las
+  llamadas directas → activaba el camino draft y rompía la reserva del Estudio con 500. El default
+  es **None plano**; candado: `test_endpoint_llamado_directo_sin_items_va_al_camino_clasico`.
+- **Front.** Hook único `useDisponibilidadDraft` (`components/admin/pedido/`): serializa el draft
+  (orden estable — el drag-reorder no refetchea), pega al endpoint según modo admin/cliente, expone
+  `stockMap: Record<string, number>` (con signo) y `hasOverstock` (alguna línea del draft en
+  negativo — el faltante de una hoja burbujea a la línea del kit vía la derivación estricta, así que
+  mirar las líneas alcanza). Los dos editores (ruta admin `pedidos.$id.lazy.tsx` y el editor de
+  modificación del cliente `PedidoPage.tsx`) y los dos buscadores consumen el mapa SIN volver a
+  restar; el fallback naive (stock total − cargado) queda solo para cuando no hay fechas (sin mapa).
+- **Consecuencias.** Candados: 10 tests unit (FakeConn, incluye el escenario exacto del dueño, el
+  signo, best-effort y el parser) + `test_disponibilidad_draft_db.py` (Postgres real, opt-in:
+  paridad badge↔gate con `validar_stock_hipotetico`). Verificado end-to-end por curl con sesión
+  admin real (staging-login) y en staging deployado. El supervisor marca una resta de disponibilidad
+  recalculada en el front, o un editor/buscador de pedido que no consuma el hook único. Follow-up
+  conocido (menor, sin issue todavía): el catálogo del cliente capea el stepper con la
+  disponibilidad por equipo sin descontar los kits del propio carrito — el checkout igual lo frena
+  (dry-run del gate); es UX, no sobreventa. Commits `06d837bf` + `effafdac` (dev).

@@ -1030,6 +1030,18 @@ De acá en adelante, todo cambio de `__all__` bumpea MINOR/MAJOR según correspo
 reservado para cuando el contrato público se declare estable. `pyproject.toml` se sincroniza a mano
 (sin build tooling), verificado por `test_portabilidad.py`.
 
+### 2026-07-05 — El front no calcula stock: el "X libres" del editor sale del motor (draft-aware, con signo)
+
+Generaliza _El front no calcula plata (2026-06-29)_ al stock: **ninguna resta de disponibilidad se hace
+en el front**. El "X libres" del editor de pedidos (admin y modificación del cliente) sale de
+`reservas.calcular_disponibilidad_draft` — resta TODO el draft con la MISMA expansión del gate
+(estricta: incluye best-effort, a diferencia del catálogo C2) y devuelve valores CON SIGNO (negativo =
+cuántas faltan) — vía `items=` de `/api/disponibilidad` y el hook único `useDisponibilidadDraft`. Raíz:
+kit + componente en el mismo pedido no se descontaban entre sí ("2 libres" con 0 reales, bug 2026-07-05).
+Gotcha: `get_disponibilidad` se llama DIRECTO desde `routes/estudio.py` → el default de `items` es None
+plano, NUNCA `Query(None)` (truthy → rompía el Estudio con 500). El supervisor marca una resta de
+disponibilidad recalculada en el front, o un editor/buscador de pedido que no consuma el hook único.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
