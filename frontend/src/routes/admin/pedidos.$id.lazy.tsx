@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft,
+  ChevronDown,
   User,
   Calendar,
   Box,
@@ -104,7 +105,13 @@ import { nombreCliente } from "@/lib/cliente-nombre";
 import { EquipoComboSearch } from "@/components/admin/pedido/EquipoComboSearch";
 import { EnviarDocsDialog, DOCS_PEDIDO } from "@/components/admin/pedido/EnviarDocsDialog";
 import { RegistrarPagoModal } from "@/components/admin/pedido/RegistrarPagoModal";
-import { FLOW, transiciones, nextStep } from "@/lib/pedido-estados";
+import { FLOW, transiciones, nextStep, otrosDestinos } from "@/lib/pedido-estados";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/design-system/ui/dropdown-menu";
 import {
   PagoRow,
   ItemRow,
@@ -238,6 +245,7 @@ function PedidoEditorPage() {
 
   const { datos, setDatos, items, setItems, saveStatus, estadoMut } = draft;
   const ns = nextStep(p);
+  const otrosDestinosPedido = otrosDestinos(p);
 
   const clienteSinVerificar = !!p.cliente_id && !p.cliente_dni_validado_at;
   const ESTADOS_CON_AVISO: PedidoEstado[] = ["confirmado", "retirado"];
@@ -666,6 +674,31 @@ function PedidoEditorPage() {
                 <ArrowRight className="h-4 w-4 mr-1" />
                 {ns.blocked ? `Falta: ${ns.blocked}` : ns.label}
               </Button>
+            )}
+            {otrosDestinosPedido.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full mt-1 text-muted-foreground"
+                    disabled={estadoMut.isPending}
+                  >
+                    Cambiar a otro estado
+                    <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="center"
+                  className="w-full min-w-[--radix-dropdown-menu-trigger-width]"
+                >
+                  {otrosDestinosPedido.map((estado) => (
+                    <DropdownMenuItem key={estado} onClick={() => handleNextStep(estado)}>
+                      {ESTADO_LABEL[estado]}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </RailSection>
 
