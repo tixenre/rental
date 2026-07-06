@@ -48,7 +48,11 @@ from routes.equipos.kit import KitItem, _crea_ciclo_kit
 # exacta donde importa (antes de registrar su ruta wildcard `/equipos/{id_or_slug}`,
 # ver el comentario ahí). Importarla también acá sería inofensivo (Python
 # cachea el módulo) pero confuso — dejaría dos lugares "responsables" del orden.
+# `busqueda_fotos`/`specs_extraccion` sí pueden ir acá — sus paths no tienen
+# el problema de shadowing de `disponibilidad` (ninguno es un wildcard).
+from routes.equipos import busqueda_fotos as _busqueda_fotos
+from routes.equipos import specs_extraccion as _specs_extraccion
 from routes.equipos import mantenimiento as _mantenimiento
 from routes.equipos import taxonomia as _taxonomia
 
-_SUBMODULOS = (_mantenimiento, _taxonomia)
+_SUBMODULOS = (_busqueda_fotos, _specs_extraccion, _mantenimiento, _taxonomia)
