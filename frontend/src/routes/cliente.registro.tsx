@@ -228,7 +228,7 @@ export default function ClienteRegistroPage() {
 
           {/* Google account verified card */}
           {info && (
-            <div className="mb-7 flex items-center gap-3 rounded-xl border hairline bg-surface px-3.5 py-3">
+            <div className="mb-7 flex items-center gap-3 card px-3.5 py-3">
               <div className="h-10 w-10 shrink-0 rounded-full bg-amber grid place-items-center font-display text-base font-black text-ink">
                 {info.email[0].toUpperCase()}
               </div>
@@ -285,7 +285,7 @@ export default function ClienteRegistroPage() {
                 />
 
                 {/* Dirección estructurada */}
-                <div className="space-y-2.5 rounded-xl border hairline bg-surface px-3.5 py-3.5">
+                <div className="space-y-2.5 card px-3.5 py-3.5">
                   <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-0.5">
                     Dirección
                   </div>

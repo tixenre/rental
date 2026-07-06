@@ -496,7 +496,7 @@ export function CartDrawerView({
 
                       {/* Notas opcionales */}
                       {showNotas && (
-                        <div className="mt-4 space-y-2 rounded-lg border hairline bg-surface p-4">
+                        <div className="mt-4 space-y-2 card p-4">
                           <div className="font-mono text-2xs uppercase tracking-widest text-muted-foreground mb-1">
                             Notas para nosotros (opcional)
                           </div>

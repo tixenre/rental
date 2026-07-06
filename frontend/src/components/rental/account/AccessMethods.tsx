@@ -149,7 +149,7 @@ function AccessKeyRow({ k, isOnly }: { k: AccessKey; isOnly: boolean }) {
   });
 
   return (
-    <li className="flex items-center gap-3 rounded-md border hairline bg-background px-3 py-2.5">
+    <li className="flex items-center gap-3 card px-3 py-2.5">
       <span className="shrink-0">
         {k.kind === "google" ? (
           <GoogleIcon />

@@ -169,7 +169,7 @@ export function PhotoGallery({
       )}
 
       {fotos.length === 0 && !uploading && (
-        <div className="flex flex-col items-center gap-2 rounded-xl border hairline bg-surface py-8 text-muted-foreground">
+        <div className="flex flex-col items-center gap-2 card py-8 text-muted-foreground">
           <ImageIcon className="h-8 w-8 opacity-30" />
           <p className="text-sm">Sin fotos todavía</p>
         </div>

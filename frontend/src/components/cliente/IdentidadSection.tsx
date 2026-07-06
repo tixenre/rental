@@ -57,7 +57,7 @@ export function IdentidadSection({
 
       {/* Badge de estado */}
       {confirmando && !verificado ? (
-        <div className="flex items-center gap-3 rounded-xl border hairline bg-surface px-4 py-4 mb-6">
+        <div className="flex items-center gap-3 card px-4 py-4 mb-6">
           <ShieldCheck className="h-7 w-7 text-muted-foreground shrink-0 animate-pulse" />
           <div>
             <div className="font-sans font-semibold text-15 text-ink">

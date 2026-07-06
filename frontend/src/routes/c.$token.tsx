@@ -161,7 +161,7 @@ function CompartidoBody({
       </header>
 
       {/* Card con la composición */}
-      <div className="overflow-hidden rounded-xl border hairline bg-surface">
+      <div className="overflow-hidden card">
         <div className="flex items-center justify-between gap-3 border-b border-dashed hairline px-portal py-3">
           <span className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
             {data.items.length} {data.items.length === 1 ? "equipo" : "equipos"}

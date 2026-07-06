@@ -724,7 +724,7 @@ function Index() {
           </div>
         )
       ) : isError ? (
-        <div className="mx-4 rounded-lg border hairline bg-surface px-6 py-20 text-center mt-6 lg:mx-12 flex flex-col items-center gap-4">
+        <div className="mx-4 card px-6 py-20 text-center mt-6 lg:mx-12 flex flex-col items-center gap-4">
           <div className="font-display text-2xl text-ink">No se pudo cargar el catálogo</div>
           <p className="text-sm text-muted-foreground max-w-xs">
             Revisá tu conexión e intentá de nuevo.

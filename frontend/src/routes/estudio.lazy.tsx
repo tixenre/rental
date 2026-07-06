@@ -1055,7 +1055,7 @@ function EstudioPage() {
               </h2>
               <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {visibles.map((f) => (
-                  <div key={f.label} className="rounded-xl border hairline bg-background p-3.5">
+                  <div key={f.label} className="card p-3.5">
                     <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1">
                       {f.label}
                     </div>
@@ -1159,10 +1159,7 @@ function EstudioPage() {
               {faq
                 .filter((f) => f.q.trim() && f.a.trim())
                 .map((item) => (
-                  <details
-                    key={item.q}
-                    className="group rounded-xl border hairline bg-surface overflow-hidden"
-                  >
+                  <details key={item.q} className="group card overflow-hidden">
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3.5 font-semibold text-15 select-none">
                       {item.q}
                       <span className="text-muted-foreground shrink-0 transition-transform group-open:rotate-180">

@@ -525,7 +525,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           )}
 
           {/* Precio + agregar (desktop — en la col visual) */}
-          <div className="hidden md:flex items-center justify-between gap-3 rounded-xl border hairline bg-surface px-4 py-3">
+          <div className="hidden md:flex items-center justify-between gap-3 card px-4 py-3">
             <PriceBlock perDay={item.pricePerDay} jornadas={jornadas} conIva={conIva} size="lg" />
             <CartButtons
               qty={qty}
@@ -704,7 +704,7 @@ function FichaPillSection({ title, items }: { title: string; items: string[] }) 
         {items.map((it, i) => (
           <span
             key={`${title}-${i}`}
-            className="inline-flex items-center rounded-md border hairline bg-background px-2 py-1 text-xs text-ink/90"
+            className="inline-flex items-center card px-2 py-1 text-xs text-ink/90"
           >
             {it}
           </span>

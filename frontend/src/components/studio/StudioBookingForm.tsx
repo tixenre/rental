@@ -403,7 +403,7 @@ export function StudioBookingForm({
           {/* Duración */}
           <div>
             <FieldLabel>Duración · mín {minHours}h</FieldLabel>
-            <div className="mt-1.5 flex h-11 items-center gap-1 rounded-md border hairline bg-background px-1">
+            <div className="mt-1.5 flex h-11 items-center gap-1 card px-1">
               <button
                 type="button"
                 onClick={() => setHours((h) => Math.max(minHours, h - 1))}
@@ -619,7 +619,7 @@ export function StudioBookingForm({
               Usamos los datos de tu cuenta — no te pedimos formularios.
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-xl border hairline bg-surface px-4 py-3 text-sm">
+          <div className="card px-4 py-3 text-sm">
             <div className="font-medium text-ink">{dateLabelFull}</div>
             <div className="mt-1 text-muted-foreground">
               <span className="font-medium text-ink tabular">

@@ -34,10 +34,7 @@ export function SpecsGrid({ item, max = 6 }: SpecsGridProps) {
       </h2>
       <dl className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {destacados.map((s, i) => (
-          <div
-            key={`${s.label}-${i}`}
-            className="rounded-lg border hairline bg-surface px-3 py-2.5"
-          >
+          <div key={`${s.label}-${i}`} className="card px-3 py-2.5">
             <dt className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
               {s.label}
             </dt>

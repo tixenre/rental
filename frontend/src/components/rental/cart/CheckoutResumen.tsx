@@ -294,7 +294,7 @@ export function CheckoutResumen({
         </button>
 
         <div className="space-y-3">
-          <div className="rounded-lg border hairline bg-surface p-3">
+          <div className="card p-3">
             <div className="mb-1 font-mono text-2xs uppercase tracking-widest text-muted-foreground">
               Fechas
             </div>
@@ -326,7 +326,7 @@ export function CheckoutResumen({
             borde/padding propio sumaba altura sin aportar separación real:
             son ambos "tu info para este pedido"). */}
           {clienteNombre && (
-            <div className="space-y-0.5 rounded-lg border hairline bg-surface p-3">
+            <div className="space-y-0.5 card p-3">
               <div className="mb-0.5 font-mono text-2xs uppercase tracking-widest text-muted-foreground">
                 Tus datos
               </div>
@@ -418,7 +418,7 @@ export function CheckoutResumen({
             su portal apenas confirme, para que sepa bien qué esperar (no solo
             el contrato). El contrato sigue siendo el único leíble ACÁ, antes
             de confirmar — por eso conserva su link propio en la fila. */}
-          <div className="space-y-2 rounded-lg border hairline bg-surface p-3">
+          <div className="space-y-2 card p-3">
             <div className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
               Documentos de tu pedido
             </div>
