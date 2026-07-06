@@ -9,6 +9,7 @@
 export * from "./types";
 export { estudioAdminApi, trabajosAdminApi } from "./estudio";
 export { descuentosJornadaApi } from "./estudio";
+export { talleresAdminApi } from "./talleres";
 export { facturacionApi } from "./facturacion";
 export type {
   EmisorArca,

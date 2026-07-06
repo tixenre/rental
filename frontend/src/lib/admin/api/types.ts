@@ -1351,3 +1351,63 @@ export type EstudioPackEquipoCurado = {
 // ── Descuentos por jornadas ──────────────────────────────────────────────────
 
 export type DescuentoJornada = { id: number; jornadas: number; pct: number };
+
+// ── Talleres ──────────────────────────────────────────────────────────────────
+
+export type ClaseBody = { fecha: string; hora_inicio: number; hora_fin: number };
+
+export type EdicionAdmin = {
+  id: number;
+  taller_id: number;
+  numero_edicion: number;
+  slug: string;
+  tipo_taller: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  horario: string;
+  cupos_total: number;
+  cupos_confirmados: number;
+  cupos_disponibles: number;
+  precio_total: number;
+  precio_sena: number;
+  pago_alias: string;
+  pago_cbu: string;
+  pago_banco: string;
+  direccion: string;
+  activo: boolean;
+  frozen_at: string | null;
+  clases: ClaseBody[];
+};
+
+export type TallerConcepto = {
+  id: number;
+  slug_base: string;
+  nombre: string;
+  subtitulo: string;
+  instructor_nombre: string;
+  instructor_bio: string;
+  instructor_proyectos: string;
+  descripcion: string;
+  publico_objetivo: string;
+  programa_teorica: string[];
+  programa_practica: string[];
+  instructor_foto_url: string;
+  instructor_media_id: number | null;
+  notif_email: string;
+  ediciones: EdicionAdmin[];
+};
+
+export type Inscripcion = {
+  id: number;
+  nombre: string;
+  email: string;
+  telefono: string;
+  experiencia: string | null;
+  comprobante_url: string | null;
+  en_lista_espera: boolean;
+  estado: string | null;
+  edicion_id: number | null;
+  numero_edicion: number | null;
+  edicion_slug: string | null;
+  created_at: string | null;
+};

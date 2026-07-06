@@ -18,7 +18,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { authedFetch, authedJson } from "@/lib/authedFetch";
+import { talleresAdminApi } from "@/lib/admin/api/talleres";
+import type { ClaseBody, EdicionAdmin, TallerConcepto, Inscripcion } from "@/lib/admin/api/types";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
@@ -51,66 +52,6 @@ import { EmptyState } from "@/design-system/composites/EmptyState";
 export const Route = createLazyFileRoute("/admin/talleres/")({
   component: TalleresAdminPage,
 });
-
-// ── Types ────────────────────────────────────────────────────────────────────
-
-type ClaseBody = { fecha: string; hora_inicio: number; hora_fin: number };
-
-type EdicionAdmin = {
-  id: number;
-  taller_id: number;
-  numero_edicion: number;
-  slug: string;
-  tipo_taller: string;
-  fecha_inicio: string;
-  fecha_fin: string;
-  horario: string;
-  cupos_total: number;
-  cupos_confirmados: number;
-  cupos_disponibles: number;
-  precio_total: number;
-  precio_sena: number;
-  pago_alias: string;
-  pago_cbu: string;
-  pago_banco: string;
-  direccion: string;
-  activo: boolean;
-  frozen_at: string | null;
-  clases: ClaseBody[];
-};
-
-type TallerConcepto = {
-  id: number;
-  slug_base: string;
-  nombre: string;
-  subtitulo: string;
-  instructor_nombre: string;
-  instructor_bio: string;
-  instructor_proyectos: string;
-  descripcion: string;
-  publico_objetivo: string;
-  programa_teorica: string[];
-  programa_practica: string[];
-  instructor_foto_url: string;
-  instructor_media_id: number | null;
-  notif_email: string;
-  ediciones: EdicionAdmin[];
-};
-
-type Inscripcion = {
-  id: number;
-  nombre: string;
-  email: string;
-  telefono: string;
-  experiencia: string | null;
-  comprobante_url: string | null;
-  en_lista_espera: boolean;
-  estado: string | null;
-  edicion_id: number | null;
-  numero_edicion: number | null;
-  edicion_slug: string | null;
-  created_at: string | null;
-};
 
 // ── Cache helpers ─────────────────────────────────────────────────────────────
 
@@ -441,11 +382,7 @@ function ClasesSection({ edicion }: { edicion: EdicionAdmin }) {
 
   const mut = useMutation({
     mutationFn: (body: { tipo_taller: string; clases: ClaseBody[] }) =>
-      authedJson<EdicionAdmin>(`/api/admin/ediciones/${edicion.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
+      talleresAdminApi.updateEdicionClases(edicion.id, body),
     onSuccess: (updated) => {
       toast.success("Clases guardadas");
       setEditing(false);
@@ -521,11 +458,7 @@ function PreciosSection({ edicion }: { edicion: EdicionAdmin }) {
 
   const mut = useMutation({
     mutationFn: (body: { precio_total: number; precio_sena: number; cupos_total: number }) =>
-      authedJson<EdicionAdmin>(`/api/admin/ediciones/${edicion.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
+      talleresAdminApi.updateEdicion(edicion.id, body),
     onSuccess: (updated) => {
       toast.success("Precios actualizados");
       updateEdicionInCache(qc, updated);
@@ -621,12 +554,7 @@ function PagosSection({ edicion }: { edicion: EdicionAdmin }) {
   }, [edicion.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mut = useMutation({
-    mutationFn: (body: typeof form) =>
-      authedJson<EdicionAdmin>(`/api/admin/ediciones/${edicion.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
+    mutationFn: (body: typeof form) => talleresAdminApi.updateEdicion(edicion.id, body),
     onSuccess: (updated) => {
       toast.success("Guardado");
       updateEdicionInCache(qc, updated);
@@ -674,14 +602,7 @@ function FotoSection({ concepto }: { concepto: TallerConcepto }) {
   async function handleUpload(file: File) {
     setUploading(true);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await authedFetch(`/api/admin/talleres/${concepto.id}/upload-foto-instructor`, {
-        method: "POST",
-        body: fd,
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json?.detail ?? `Error ${res.status}`);
+      await talleresAdminApi.uploadFotoInstructor(concepto.id, file);
       toast.success("Foto actualizada");
       qc.invalidateQueries({ queryKey: ["admin", "talleres"] });
     } catch (e) {
@@ -770,12 +691,7 @@ function ContenidoSection({ concepto }: { concepto: TallerConcepto }) {
   }, [concepto.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mut = useMutation({
-    mutationFn: (body: object) =>
-      authedJson<TallerConcepto>(`/api/admin/talleres/${concepto.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
+    mutationFn: (body: object) => talleresAdminApi.updateConcepto(concepto.id, body),
     onSuccess: (updated) => {
       toast.success("Guardado");
       updateConceptoInCache(qc, updated);
@@ -886,10 +802,7 @@ function InscripcionesSection({
   const espera = inscripciones.filter((i) => i.en_lista_espera);
 
   const eliminarMut = useMutation({
-    mutationFn: (insId: number) =>
-      authedJson<{ ok: boolean }>(`/api/admin/talleres/${concepto.id}/inscripciones/${insId}`, {
-        method: "DELETE",
-      }),
+    mutationFn: (insId: number) => talleresAdminApi.eliminarInscripcion(concepto.id, insId),
     onSuccess: () => {
       toast.success("Inscripción eliminada");
       qc.invalidateQueries({ queryKey: ["admin", "ediciones", edicion.id, "inscripciones"] });
@@ -899,11 +812,7 @@ function InscripcionesSection({
   });
 
   const confirmarMut = useMutation({
-    mutationFn: (insId: number) =>
-      authedJson<{ ok: boolean }>(
-        `/api/admin/talleres/${concepto.id}/inscripciones/${insId}/confirmar`,
-        { method: "POST" },
-      ),
+    mutationFn: (insId: number) => talleresAdminApi.confirmarInscripcion(concepto.id, insId),
     onSuccess: () => {
       toast.success("Inscripción confirmada");
       qc.invalidateQueries({ queryKey: ["admin", "ediciones", edicion.id, "inscripciones"] });
@@ -913,15 +822,7 @@ function InscripcionesSection({
   });
 
   const notificarMut = useMutation({
-    mutationFn: (mensaje: string) =>
-      authedJson<{ enviados: number; fallidos: number }>(
-        `/api/admin/talleres/${concepto.id}/notificar-cambios`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mensaje: mensaje || undefined }),
-        },
-      ),
+    mutationFn: (mensaje: string) => talleresAdminApi.notificarCambios(concepto.id, mensaje),
     onSuccess: (r) => {
       toast.success(`Notificaciones enviadas: ${r.enviados} ok, ${r.fallidos} fallidas`);
       setNotifOpen(false);
@@ -932,7 +833,7 @@ function InscripcionesSection({
 
   async function handleCsvDownload() {
     try {
-      const res = await authedFetch(`/api/admin/talleres/${concepto.id}/inscripciones/export-csv`);
+      const res = await talleresAdminApi.exportInscripcionesCsv(concepto.id);
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -1156,18 +1057,13 @@ function EdicionSubRow({
 
   const { data: inscripciones = [], isLoading: loadingIns } = useQuery({
     queryKey: ["admin", "ediciones", edicion.id, "inscripciones"],
-    queryFn: () => authedJson<Inscripcion[]>(`/api/admin/ediciones/${edicion.id}/inscripciones`),
+    queryFn: () => talleresAdminApi.listInscripciones(edicion.id),
     enabled: expanded && activeTab === "inscripciones",
     staleTime: 0,
   });
 
   const toggleActivoMut = useMutation({
-    mutationFn: (activo: boolean) =>
-      authedJson<EdicionAdmin>(`/api/admin/ediciones/${edicion.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activo }),
-      }),
+    mutationFn: (activo: boolean) => talleresAdminApi.updateEdicion(edicion.id, { activo }),
     onSuccess: (updated) => {
       toast.success(updated.activo ? "Edición activada" : "Edición desactivada");
       updateEdicionInCache(qc, updated);
@@ -1176,8 +1072,7 @@ function EdicionSubRow({
   });
 
   const deleteMut = useMutation({
-    mutationFn: () =>
-      authedJson<{ ok: boolean }>(`/api/admin/ediciones/${edicion.id}`, { method: "DELETE" }),
+    mutationFn: () => talleresAdminApi.deleteEdicion(edicion.id),
     onSuccess: () => {
       toast.success("Edición eliminada");
       onDelete(edicion.id);
@@ -1514,12 +1409,7 @@ function NuevoConceptoDialog({
   }, [open]);
 
   const mut = useMutation({
-    mutationFn: (body: object) =>
-      authedJson<TallerConcepto>("/api/admin/talleres", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
+    mutationFn: (body: object) => talleresAdminApi.createConcepto(body),
     onSuccess: (created) => {
       toast.success(`Taller creado: ${created.nombre}`);
       onSuccess(created);
@@ -1699,12 +1589,7 @@ function NuevaEdicionDialog({
   }, [open]);
 
   const mut = useMutation({
-    mutationFn: (body: object) =>
-      authedJson<EdicionAdmin>(`/api/admin/talleres/${concepto!.id}/ediciones`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
+    mutationFn: (body: object) => talleresAdminApi.createEdicion(concepto!.id, body),
     onSuccess: (created) => {
       toast.success(`Edición #${created.numero_edicion} creada`);
       onSuccess(created);
@@ -1834,7 +1719,7 @@ function TalleresAdminPage() {
     refetch,
   } = useQuery({
     queryKey: ["admin", "talleres"],
-    queryFn: () => authedJson<TallerConcepto[]>("/api/admin/talleres"),
+    queryFn: () => talleresAdminApi.list(),
     staleTime: 0,
   });
 
