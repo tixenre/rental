@@ -231,6 +231,11 @@ antes iban como `text-[Npx]` mágico:
   ancho. _`CATÁLOGO · 187 EQUIPOS · MAR DEL PLATA`_.
 - **Numbers** tabulares siempre que aparezcan (precios, fechas, counts,
   IDs). Tailwind: `tabular-nums` o nuestra utility `.tabular`.
+- **`text-2xs`/`text-3xs` (10px/9px) solo para micro-labels decorativos, NO
+  interactivos** (badges de conteo, eyebrows puntuales, chips de marca). Un
+  valor que se lee, un warning, o el texto de un botón/acción nunca va acá —
+  sube a `text-xs` como mínimo (ver `Pill` más abajo: default `text-xs`,
+  `size="compact"` es la excepción para tablas muy densas).
 
 **Guardrail tipográfico (CI):** `eslint.config.js` bloquea los tamaños de fuente
 mágicos en `className` — `text-[Npx]`, `text-[Nrem]` y `text-[Nem]` (regla
