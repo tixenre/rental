@@ -205,8 +205,8 @@ function FacturasPage() {
                       <div className="flex items-center gap-1.5">
                         <FacturaBadge estado={f.estado} />
                         {f.ambiente === "homologacion" && (
-                          // eslint-disable-next-line no-restricted-syntax -- text-[9px]: menor que text-2xs, sin equiv DS; amber: paleta categórica homologación (Tier 3)
-                          <span className="font-mono text-[9px] text-amber-600 border border-amber-400/50 rounded px-1">
+                          // eslint-disable-next-line no-restricted-syntax -- amber: paleta categórica homologación (Tier 3)
+                          <span className="font-mono text-3xs text-amber-600 border border-amber-400/50 rounded px-1">
                             TEST
                           </span>
                         )}
