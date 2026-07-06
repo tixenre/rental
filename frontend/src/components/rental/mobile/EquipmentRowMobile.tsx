@@ -38,11 +38,12 @@ export function EquipmentRowMobile({
   const pocoStock = eq.cantidad != null && eq.cantidad > 0 && eq.cantidad <= 2;
   const reachedMax = eq.cantidad != null && inCart >= eq.cantidad;
 
-  // Evita el "— Nombre" cuando el equipo no tiene marca (brand vacío o "—").
-  const nombrePublico = [eq.brand, eq.name]
-    .filter((p) => p && p.trim() && p.trim() !== "—")
-    .join(" ")
-    .trim();
+  // Nombre público: `eq.name` ya es el nombre público canónico —
+  // `backendToEquipment` lo deriva vía `buildPublicName` (single source of
+  // truth: usa `nombre_publico` del backend, que ya incluye la marca, con
+  // fallback al nombre interno). No re-concatenar `eq.brand` acá: duplicaba
+  // la marca en los equipos con template configurado.
+  const nombrePublico = eq.name;
 
   const quickFacts = (
     eq.specsDestacados && eq.specsDestacados.length > 0
