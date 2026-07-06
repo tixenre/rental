@@ -224,6 +224,17 @@ def auth_callback(request: Request):
         _record_fail(ip)
         return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=not_allowed", status_code=303)
 
+    # 2º factor obligatorio para admin (#1098 extensión, criterio del dueño): si esta cuenta
+    # YA tiene una passkey enrolada, Google solo NO alcanza — no minteamos sesión acá, mandamos
+    # a confirmar con la passkey (el login discoverable ya existente la mintea de verdad). Sin
+    # passkey todavía: Google alcanza HOY, pero `AdminLayout` fuerza el enrolamiento on-the-fly
+    # apenas entra (mismo primitivo `registerPasskey`, sin código nuevo de ese lado).
+    from auth.passkey import queries as passkey_queries
+    if passkey_queries.list_for_owner("admin", owner_email=email):
+        res = RedirectResponse(f"{FRONTEND_BASE}/admin/login?paso=passkey", status_code=303)
+        res.delete_cookie("oauth_state")
+        return res
+
     res = _make_session_response(email, name, redirect=POST_LOGIN_URL, request=request)
     # Limpiar cookie de state
     res.delete_cookie("oauth_state")

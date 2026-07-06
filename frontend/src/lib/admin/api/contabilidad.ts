@@ -6,6 +6,8 @@ import type {
   CuentaInput,
   Movimiento,
   MovimientoInput,
+  CambioDivisaInput,
+  CambioDivisaResult,
   CobroMensual,
   GastoCategoria,
   GastosPorCategoria,
@@ -68,6 +70,8 @@ export const contabilidadMethods = {
     authedJson<{ beneficiarios: string[] }>("/api/admin/contabilidad/beneficiarios"),
   createMovimiento: (data: MovimientoInput) =>
     authedPostJson<Movimiento>("/api/admin/contabilidad/movimientos", data),
+  createCambioDivisa: (data: CambioDivisaInput) =>
+    authedPostJson<CambioDivisaResult>("/api/admin/contabilidad/cambio-divisa", data),
   updateMovimiento: (id: number, data: Partial<MovimientoInput>) =>
     authedJson<Movimiento>(`/api/admin/contabilidad/movimientos/${id}`, {
       method: "PATCH",

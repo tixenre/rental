@@ -1339,6 +1339,17 @@ def _init_db_schema(conn):
     # beneficiario: a quién / para qué es el movimiento (ej. "Jimena") — etiqueta
     # parseable y reutilizable (migración e5f6a7b8c9d0).
     conn.execute("ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS beneficiario TEXT")
+    # Cambio de divisa (comprar/vender USD con ARS): dos `ajuste` atados. `cotizacion`
+    # guarda los pesos por dólar usados (informativo, no recalculado); `movimiento_par_id`
+    # linkea la pata origen↔destino entre sí (self-FK, se completa después de insertar
+    # ambas filas — no hay forma de conocer el id de la otra pata al insertar la primera).
+    # `commands/movimientos.py::crear_cambio_divisa` es la única puerta que las escribe
+    # (migración z9y8x7w6v5u4).
+    conn.execute("ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS cotizacion NUMERIC(12,4)")
+    conn.execute(
+        "ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS movimiento_par_id INTEGER "
+        "REFERENCES movimientos(id)"
+    )
     # Cierres contables (#809, Fase 6): congelan un mes (foto + traba la edición de
     # movimientos de ese mes). Espejo de la migración b2c3d4e5f6a7.
     conn.execute("""

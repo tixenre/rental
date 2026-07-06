@@ -23,6 +23,8 @@ import {
   type MovimientoInput,
   type TipoMovimiento,
 } from "@/lib/admin/api";
+import { CambioDivisaForm } from "@/components/admin/contabilidad/CambioDivisaForm";
+import { CuentaSelect, Field } from "@/components/admin/contabilidad/fields";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { AdminTable, type Column } from "@/components/admin/AdminTable";
 import { QueryState } from "@/components/admin/QueryState";
@@ -52,8 +54,15 @@ function descMovimiento(m: Movimiento): string {
       return `Retiro de ${o}`;
     case "aporte":
       return `Aporte a ${d}`;
-    default:
+    default: {
+      // Cambio de divisa: cada pata es un `ajuste` con una sola cuenta y
+      // `cotizacion` seteada (ver CambioDivisaForm / commands/movimientos.py).
+      if (m.cotizacion != null) {
+        const cta = o !== "—" ? o : d;
+        return `Cambio de divisa · ${o !== "—" ? "sale de" : "entra a"} ${cta} (cotización ${m.cotizacion})`;
+      }
       return [o !== "—" ? o : null, d !== "—" ? d : null].filter(Boolean).join(" → ") || "Ajuste";
+    }
   }
 }
 
@@ -97,6 +106,7 @@ function MovimientosPage() {
   const qc = useQueryClient();
   const [tipoFiltro, setTipoFiltro] = useState<string>("");
   const [beneficiarioFiltro, setBeneficiarioFiltro] = useState<string>("");
+  const [modoRegistro, setModoRegistro] = useState<"movimiento" | "cambio_divisa">("movimiento");
   // Mes del cobro expandido (muestra los pagos individuales inline). Uno a la vez.
   const [expandedMes, setExpandedMes] = useState<string | null>(null);
 
@@ -228,7 +238,33 @@ function MovimientosPage() {
       backTo={{ to: "/admin/contabilidad", label: "Tablero" }}
     >
       <div className="space-y-6">
-        <NuevoMovimientoForm onCreated={invalidar} />
+        <div className="flex flex-wrap gap-1">
+          {(
+            [
+              ["movimiento", "Nuevo movimiento"],
+              ["cambio_divisa", "Cambio de divisa"],
+            ] as const
+          ).map(([val, lbl]) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => setModoRegistro(val)}
+              className={cn(
+                "rounded-md border px-2.5 py-1.5 text-xs font-medium transition",
+                modoRegistro === val
+                  ? "border-ink bg-ink text-background"
+                  : "border-muted-foreground/30 text-muted-foreground hover:border-ink hover:text-ink",
+              )}
+            >
+              {lbl}
+            </button>
+          ))}
+        </div>
+        {modoRegistro === "movimiento" ? (
+          <NuevoMovimientoForm onCreated={invalidar} />
+        ) : (
+          <CambioDivisaForm onCreated={invalidar} />
+        )}
 
         {/* Filtro por tipo */}
         <div className="flex flex-wrap gap-1">
@@ -603,39 +639,5 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
         </Button>
       </div>
     </form>
-  );
-}
-
-function CuentaSelect({
-  cuentas,
-  value,
-  onChange,
-}: {
-  cuentas: Cuenta[];
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-9 rounded-md border hairline bg-surface-elevated px-2 text-sm"
-    >
-      <option value="">Elegir…</option>
-      {cuentas.map((c) => (
-        <option key={c.id} value={c.id}>
-          {c.nombre}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="space-y-1">
-      <span className="block t-eyebrow">{label}</span>
-      {children}
-    </label>
   );
 }

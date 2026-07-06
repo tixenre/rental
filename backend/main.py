@@ -48,6 +48,12 @@ if _sentry_dsn:
         traces_sample_rate=0.1,
         environment=settings.RAILWAY_ENVIRONMENT or "production",
         send_default_pii=False,
+        # HTTPException = "ya manejado" en esta app (mismo criterio que
+        # _global_exception_handler más abajo, que la re-propaga sin loguearla
+        # como error): 4xx/5xx de negocio (sin stock, URL externa que rechaza
+        # la descarga) ya le devuelven al cliente una respuesta clara. Sin este
+        # filtro, cada rechazo esperado aparece en Sentry como si fuera un bug.
+        ignore_errors=[HTTPException],
     )
 
 from database import init_db, get_db, row_to_dict, FRONT, FRONT_NEW, MARCA_SUBQUERY

@@ -169,6 +169,34 @@ def tipos_equipo_batch(conn, equipo_ids) -> dict[int, str]:
     return {r["id"]: r["tipo"] for r in rows}
 
 
+def precios_efectivos_batch(conn, equipo_ids) -> dict[int, int]:
+    """Precio por jornada EFECTIVO de varios equipos en UNA sola tanda de queries
+    (evita N+1) — mismo cálculo que `precio_jornada_efectivo`, fila por fila:
+    kit/simple → su `precio_jornada` propio; combo → `precios_combo_batch`. Un id
+    inexistente/soft-deleted no aparece en el resultado (igual que
+    `precio_jornada_efectivo` devuelve `None` para ese caso) — el caller decide
+    el fallback.
+
+    Usa `= ANY(%s)` (mismo patrón ya probado de `precios_combo_batch`/
+    `tipos_equipo_batch`), NO un `IN (...)` armado a mano — ese fue el patrón que
+    #643 revirtió en `/api/cotizar` (devolvió el mapa de precios vacío en prod,
+    total $0). Dos queries totales sin importar cuántos ids, en vez de 1-2 por
+    ítem."""
+    ids = list(equipo_ids)
+    if not ids:
+        return {}
+    rows = conn.execute(
+        "SELECT id, precio_jornada, tipo FROM equipos WHERE id = ANY(%s) AND eliminado_at IS NULL",
+        (ids,),
+    ).fetchall()
+    combo_ids = [r["id"] for r in rows if r["tipo"] == "combo"]
+    combo_precios = precios_combo_batch(conn, combo_ids) if combo_ids else {}
+    return {
+        r["id"]: combo_precios.get(r["id"], 0) if r["tipo"] == "combo" else int(r["precio_jornada"] or 0)
+        for r in rows
+    }
+
+
 def precio_jornada_efectivo(conn, equipo_id: int) -> Optional[int]:
     """Precio por jornada EFECTIVO de un equipo, resuelto en UN solo lugar: para un
     COMBO se deriva en vivo de sus componentes (`precio_combo`, C3 #635); un kit/simple

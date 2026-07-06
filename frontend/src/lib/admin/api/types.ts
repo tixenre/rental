@@ -736,6 +736,8 @@ export interface Movimiento {
   cuenta_destino_nombre: string | null;
   categoria_nombre: string | null;
   moneda: string;
+  cotizacion: number | null;
+  movimiento_par_id: number | null;
 }
 export interface MovimientoInput {
   tipo: TipoMovimiento;
@@ -747,6 +749,20 @@ export interface MovimientoInput {
   fecha?: string | null;
   nota?: string | null;
   beneficiario?: string | null;
+}
+export interface CambioDivisaInput {
+  cuenta_origen_id: number;
+  cuenta_destino_id: number;
+  monto_origen?: number | null;
+  monto_destino?: number | null;
+  cotizacion?: number | null;
+  fecha?: string | null;
+  nota?: string | null;
+}
+export interface CambioDivisaResult {
+  origen: Movimiento;
+  destino: Movimiento;
+  cotizacion: number;
 }
 export interface GastosPorCategoria {
   por_categoria: { categoria: string; monto: number }[];

@@ -13,6 +13,7 @@ def listar_movimientos(conn, *, tipo=None, cuenta_id=None, categoria_id=None,
                m.categoria_id, m.metodo, m.fecha, m.nota, m.beneficiario,
                m.comprobante_url, m.es_rendicion, m.rendicion_mes,
                m.anulado, m.anulado_motivo, m.created_by, m.created_at,
+               m.cotizacion, m.movimiento_par_id,
                co.nombre AS cuenta_origen_nombre,
                cd.nombre AS cuenta_destino_nombre,
                COALESCE(co.moneda, cd.moneda) AS moneda,
@@ -54,7 +55,8 @@ def obtener_movimiento(conn, mov_id: int) -> dict | None:
     row = conn.execute(
         """SELECT id, tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id,
                   metodo, fecha, nota, beneficiario, comprobante_url, comprobante_key, es_rendicion,
-                  rendicion_mes, anulado, anulado_motivo, created_by, created_at
+                  rendicion_mes, anulado, anulado_motivo, created_by, created_at,
+                  cotizacion, movimiento_par_id
            FROM movimientos WHERE id = %s""",
         (mov_id,),
     ).fetchone()

@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
-import { Logo } from "@/components/rental/Logo";
+import { BackOfficeAuthCard } from "@/components/admin/BackOfficeAuthCard";
 import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
 import { loginWithPasskey, passkeyLoginErrorMessage, passkeySupported } from "@/lib/passkey";
 import { KeyRound } from "lucide-react";
@@ -10,6 +10,18 @@ export const Route = createFileRoute("/admin/login")({
   head: () => ({
     meta: [{ title: "Login · Back Office" }, { name: "robots", content: "noindex, nofollow" }],
   }),
+  // Sin esto, TanStack Router descarta cualquier search param no declarado al
+  // normalizar la URL — incluido `paso`, que llega desde el redirect de
+  // /auth/callback (2º factor) y necesita sobrevivir al primer render.
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { error?: string; denied?: string; paso?: string } => {
+    const out: { error?: string; denied?: string; paso?: string } = {};
+    if (typeof search.error === "string") out.error = search.error;
+    if (typeof search.denied === "string") out.denied = search.denied;
+    if (typeof search.paso === "string") out.paso = search.paso;
+    return out;
+  },
   component: AdminLoginPage,
 });
 
@@ -29,6 +41,10 @@ function AdminLoginPage() {
   const [googleEnabled, setGoogleEnabled] = useState(true);
   const [supported] = useState(() => passkeySupported());
   const [passkeyBusy, setPasskeyBusy] = useState(false);
+  // 2º factor obligatorio: Google ya verificó, pero esta cuenta tiene una passkey
+  // enrolada → no hay sesión todavía, hace falta confirmar con ella (backend no
+  // minteó nada en /auth/callback, ver auth/google.py).
+  const [pasoPasskey, setPasoPasskey] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -40,6 +56,10 @@ function AdminLoginPage() {
     // en Google pero su email no está en ADMIN_EMAILS.
     if (params.get("denied") === "1") {
       setError(ERROR_MESSAGES.not_allowed);
+    }
+    if (params.get("paso") === "passkey") {
+      setPasoPasskey(true);
+      return; // no hay sesión todavía — no chequear /auth/me
     }
 
     authedFetch("/auth/me").then(async (r) => {
@@ -80,62 +100,77 @@ function AdminLoginPage() {
     }
   }
 
-  return (
-    <div className="min-h-dvh bg-background flex flex-col">
-      <header className="border-b hairline px-4 py-3 md:px-6 flex items-center">
-        <Logo size="md" linkTo="/" />
-      </header>
-      <div className="flex-1 grid place-items-center px-4 py-12">
-        <div className="w-full max-w-sm rounded-2xl border hairline bg-surface p-8 shadow-sm space-y-6">
-          <div>
-            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Back-office
-            </div>
-            <h1 className="mt-1 font-display text-2xl text-ink">Acceso admin</h1>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {devMode
-                ? "Modo desarrollo — sin OAuth requerido."
-                : "Ingresá con tu cuenta de Google autorizada."}
-            </p>
+  if (pasoPasskey) {
+    // Bug real (encontrado en revisión): esta pantalla no chequeaba `supported`
+    // — en un navegador sin WebAuthn, mostraba el botón igual y el error al
+    // clickearlo era el genérico de "no encontramos tu clave" (falso acá: el
+    // problema es el navegador, no que falte registrarla). Una vez que la
+    // cuenta tiene 2º factor, Google solo ya no alcanza — no hay vuelta atrás
+    // desde ESTE dispositivo, así que al menos el mensaje tiene que ser honesto.
+    return (
+      <BackOfficeAuthCard
+        title="Confirmá tu identidad"
+        description="Tu cuenta de Google es correcta. Como segundo factor, confirmá con tu clave de acceso para entrar."
+        error={error}
+      >
+        {supported ? (
+          <button
+            onClick={handlePasskeyLogin}
+            disabled={passkeyBusy}
+            className="w-full flex items-center justify-center gap-3 rounded-md border hairline bg-background py-2.5 text-sm font-medium text-ink transition hover:bg-surface active:scale-[0.98] disabled:opacity-60"
+          >
+            <KeyRound className="h-4 w-4" />
+            {passkeyBusy ? "Verificando…" : "Confirmar con mi clave de acceso"}
+          </button>
+        ) : (
+          <div className="rounded-md border border-amber/30 bg-amber/10 px-3 py-2 text-xs text-ink">
+            Este navegador no soporta claves de acceso. Entrá desde el dispositivo donde la
+            registraste (celular, u otra compu con Face ID/Touch ID/Windows Hello).
           </div>
+        )}
+      </BackOfficeAuthCard>
+    );
+  }
 
-          {error && (
-            <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-              {error}
-            </div>
-          )}
+  return (
+    <BackOfficeAuthCard
+      title="Acceso admin"
+      description={
+        devMode
+          ? "Modo desarrollo — sin OAuth requerido."
+          : "Ingresá con tu cuenta de Google autorizada."
+      }
+      error={error}
+    >
+      {devMode && (
+        <button
+          onClick={handleDevLogin}
+          className="w-full flex items-center justify-center gap-3 rounded-md border hairline bg-amber/10 border-amber/30 py-2.5 text-sm font-medium text-ink transition hover:bg-amber/15 active:scale-[0.98]"
+        >
+          Entrar en modo desarrollo
+        </button>
+      )}
 
-          {devMode && (
-            <button
-              onClick={handleDevLogin}
-              className="w-full flex items-center justify-center gap-3 rounded-md border hairline bg-amber/10 border-amber/30 py-2.5 text-sm font-medium text-ink transition hover:bg-amber/15 active:scale-[0.98]"
-            >
-              Entrar en modo desarrollo
-            </button>
-          )}
+      {googleEnabled && (
+        <button
+          onClick={handleGoogleLogin}
+          className="w-full flex items-center justify-center gap-3 rounded-md border hairline bg-background py-2.5 text-sm font-medium text-ink transition hover:bg-surface active:scale-[0.98]"
+        >
+          <GoogleIcon />
+          Entrar con Google
+        </button>
+      )}
 
-          {googleEnabled && (
-            <button
-              onClick={handleGoogleLogin}
-              className="w-full flex items-center justify-center gap-3 rounded-md border hairline bg-background py-2.5 text-sm font-medium text-ink transition hover:bg-surface active:scale-[0.98]"
-            >
-              <GoogleIcon />
-              Entrar con Google
-            </button>
-          )}
-
-          {supported && (
-            <button
-              onClick={handlePasskeyLogin}
-              disabled={passkeyBusy}
-              className="w-full flex items-center justify-center gap-3 rounded-md border hairline bg-background py-2.5 text-sm font-medium text-ink transition hover:bg-surface active:scale-[0.98] disabled:opacity-60"
-            >
-              <KeyRound className="h-4 w-4" />
-              {passkeyBusy ? "Verificando…" : "Entrar con clave de acceso"}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
+      {supported && (
+        <button
+          onClick={handlePasskeyLogin}
+          disabled={passkeyBusy}
+          className="w-full flex items-center justify-center gap-3 rounded-md border hairline bg-background py-2.5 text-sm font-medium text-ink transition hover:bg-surface active:scale-[0.98] disabled:opacity-60"
+        >
+          <KeyRound className="h-4 w-4" />
+          {passkeyBusy ? "Verificando…" : "Entrar con clave de acceso"}
+        </button>
+      )}
+    </BackOfficeAuthCard>
   );
 }

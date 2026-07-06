@@ -15,6 +15,7 @@ import {
   Copy,
   BarChart3,
   RotateCcw,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,6 +50,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/design-system/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/design-system/ui/dropdown-menu";
 
 import { adminApi, type Equipo, type EquipoInput, type FaltaField } from "@/lib/admin/api";
 import { stashEquiposReturnSearch } from "@/lib/admin/equiposReturnSearch";
@@ -64,6 +72,7 @@ import {
   StockInline,
   RoiInline,
   PrecioJornadaInline,
+  CategoriaInline,
   KpiCard,
   FaltaBanner,
 } from "@/components/admin/equipos-mgmt/EquiposTableHelpers";
@@ -119,6 +128,19 @@ function EquiposPage() {
     } as never);
   }
 
+  // Input de búsqueda: texto local + debounce antes de tocar la URL (y disparar
+  // el refetch fuzzy contra el backend). Sin esto, cada letra tipeada navegaba
+  // y re-consultaba — con el texto local, sólo se dispara 300ms después de que
+  // el admin deja de tipear.
+  const [searchInput, setSearchInput] = useState(q);
+  useEffect(() => setSearchInput(q), [q]);
+  useEffect(() => {
+    if (searchInput === q) return;
+    const t = setTimeout(() => updateFilters({ q: searchInput }), 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce: solo re-dispara por texto tipeado, no por q/updateFilters
+  }, [searchInput]);
+
   const setQ = (v: string) => updateFilters({ q: v });
   const setCategoria = (v: string) => updateFilters({ categoria: v });
   const setMarca = (v: string) => updateFilters({ marca: v });
@@ -134,7 +156,7 @@ function EquiposPage() {
   const [openDashboard, setOpenDashboard] = useState(false);
   const [openComboBuilder, setOpenComboBuilder] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [tab, setTab] = useState<"todos" | "combos" | "sin-foto">("todos");
+  const [tab, setTab] = useState<"todos" | "combos" | "kits" | "ocultos" | "sin-foto">("todos");
 
   const equiposQ = useQuery({
     queryKey: ["admin", "equipos", { q, categoria, marca, soloIncompletos, vistaPapelera, falta }],
@@ -265,18 +287,25 @@ function EquiposPage() {
   // viven en su propio tab. El resto de los tabs operan sobre el inventario FÍSICO
   // (equipos + kits), sin combos.
   const esCombo = (eq: Equipo) => eq.tipo === "combo";
+  const esKit = (eq: Equipo) => eq.tipo === "kit";
   const fisicos = allItems.filter((e) => !esCombo(e));
   const tabCounts = {
     todos: fisicos.length,
     combos: allItems.filter(esCombo).length,
+    kits: fisicos.filter(esKit).length,
+    ocultos: fisicos.filter((e) => !e.visible_catalogo).length,
     "sin-foto": fisicos.filter((e) => !e.foto_url).length,
   };
   const items =
     tab === "combos"
       ? allItems.filter(esCombo)
-      : tab === "sin-foto"
-        ? fisicos.filter((e) => !e.foto_url)
-        : fisicos;
+      : tab === "kits"
+        ? fisicos.filter(esKit)
+        : tab === "ocultos"
+          ? fisicos.filter((e) => !e.visible_catalogo)
+          : tab === "sin-foto"
+            ? fisicos.filter((e) => !e.foto_url)
+            : fisicos;
 
   /** Categorías raíz para el dropdown (no incluye hijos). El backend acepta
    *  el nombre de la raíz y matchea descendientes vía CTE recursiva. */
@@ -354,11 +383,21 @@ function EquiposPage() {
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Buscar (nombre, marca, modelo, serie, specs, keywords…)"
-              className="pl-9 text-base sm:text-sm"
+              className="pl-9 pr-9 text-base sm:text-sm"
             />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => setSearchInput("")}
+                aria-label="Limpiar búsqueda"
+                className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-ink"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
           <Select
             value={categoria || "__all"}
@@ -594,6 +633,8 @@ function EquiposPage() {
             [
               ["todos", "Todos"],
               ["combos", "Combos"],
+              ["kits", "Kits"],
+              ["ocultos", "Ocultos"],
               ["sin-foto", "Sin foto"],
             ] as const
           ).map(([id, label]) => (
@@ -699,8 +740,12 @@ function EquiposPage() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                    {eq.categorias?.[0]?.nombre ?? "—"}
+                  <TableCell className="hidden lg:table-cell w-40">
+                    <CategoriaInline
+                      equipo={eq}
+                      categorias={categoriasQ.data ?? []}
+                      onSaved={invalidate}
+                    />
                   </TableCell>
                   <TableCell>
                     {eq.visible_catalogo ? (
@@ -747,7 +792,7 @@ function EquiposPage() {
                     />
                   </TableCell>
                   <TableCell className="text-right">
-                    {/* Mobile: un botón → ActionMenu */}
+                    {/* Mobile: un botón → ActionMenu (bottom sheet) */}
                     <Button
                       size="icon"
                       variant="ghost"
@@ -757,80 +802,74 @@ function EquiposPage() {
                     >
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
-                    {/* Desktop: botones individuales */}
-                    <div className="hidden sm:inline-flex gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        title={eq.visible_catalogo ? "Ocultar del catálogo" : "Mostrar en catálogo"}
-                        onClick={() => toggleVisibleMut.mutate(eq)}
-                      >
-                        {eq.visible_catalogo ? (
-                          <Eye className="h-4 w-4" />
+                    {/* Desktop: mismo menú, como dropdown (#DS pattern — ver MarcasSection) */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="hidden sm:inline-flex"
+                          aria-label={`Acciones de ${eq.nombre}`}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuItem onClick={() => toggleVisibleMut.mutate(eq)}>
+                          {eq.visible_catalogo ? (
+                            <EyeOff className="mr-2 h-4 w-4" />
+                          ) : (
+                            <Eye className="mr-2 h-4 w-4" />
+                          )}
+                          {eq.visible_catalogo ? "Ocultar del catálogo" : "Mostrar en catálogo"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setHistorialEquipo(eq)}>
+                          <History className="mr-2 h-4 w-4" />
+                          Historial de alquileres
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setMantenimientoEquipo(eq)}>
+                          <Wrench className="mr-2 h-4 w-4" />
+                          Mantenimiento
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            stashReturnSearch();
+                            navigate({
+                              to: "/admin/equipos/$id/editar",
+                              params: { id: String(eq.id) },
+                            });
+                          }}
+                        >
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => duplicateMut.mutate(eq.id)}
+                          disabled={duplicateMut.isPending}
+                        >
+                          <Copy className="mr-2 h-4 w-4" />
+                          Duplicar
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {eq.eliminado_at ? (
+                          <DropdownMenuItem
+                            onClick={() => restoreMut.mutate(eq.id)}
+                            disabled={restoreMut.isPending}
+                          >
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                            Restaurar
+                          </DropdownMenuItem>
                         ) : (
-                          <EyeOff className="h-4 w-4" />
+                          <DropdownMenuItem
+                            onClick={() => setDeleting(eq)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Eliminar
+                          </DropdownMenuItem>
                         )}
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        title="Historial de alquileres"
-                        onClick={() => setHistorialEquipo(eq)}
-                      >
-                        <History className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        title="Mantenimiento"
-                        onClick={() => setMantenimientoEquipo(eq)}
-                      >
-                        <Wrench className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        title="Editar"
-                        onClick={() => {
-                          stashReturnSearch();
-                          navigate({
-                            to: "/admin/equipos/$id/editar",
-                            params: { id: String(eq.id) },
-                          });
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        title="Duplicar (clona ficha, categorías y kit — serie vacía)"
-                        onClick={() => duplicateMut.mutate(eq.id)}
-                        disabled={duplicateMut.isPending}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      {eq.eliminado_at ? (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          title="Restaurar"
-                          onClick={() => restoreMut.mutate(eq.id)}
-                          disabled={restoreMut.isPending}
-                        >
-                          <RotateCcw className="h-4 w-4 text-ink" />
-                        </Button>
-                      ) : (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          aria-label="Eliminar equipo"
-                          onClick={() => setDeleting(eq)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}

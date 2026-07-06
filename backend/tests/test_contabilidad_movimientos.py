@@ -7,7 +7,7 @@ La parte SQL (alta/anulación/saldos) se ejerce en `test_contabilidad_db.py`.
 import pytest
 
 from contabilidad.constants import TIPOS_MOVIMIENTO
-from contabilidad.commands.movimientos import validar_estructura_movimiento
+from contabilidad.commands.movimientos import derivar_cambio_divisa, validar_estructura_movimiento
 from contabilidad.commands.categorias import validar_categoria
 
 
@@ -82,6 +82,66 @@ class TestValidarEstructura:
 
     def test_todos_los_tipos_existen(self):
         assert set(TIPOS_MOVIMIENTO) == {"gasto", "transferencia", "retiro", "aporte", "ajuste"}
+
+
+class TestDerivarCambioDivisa:
+    """`derivar_cambio_divisa` — la aritmética pura de comprar/vender USD con
+    ARS (bug/feature: no había flujo soportado, DECISIONES.md 2026-06-07)."""
+
+    def test_pesos_mas_cotizacion_deriva_dolares(self):
+        # "x pesos a x cambio = x dólares" — comprar dólares, origen ARS.
+        origen, destino, cotiz = derivar_cambio_divisa(
+            "ARS", "USD", monto_origen=125_000, cotizacion=1250,
+        )
+        assert (origen, destino, cotiz) == (125_000, 100, 1250.0)
+
+    def test_pesos_mas_dolares_deriva_cotizacion(self):
+        # "x pesos me dieron x dólares = x cambio" — cotización derivada.
+        origen, destino, cotiz = derivar_cambio_divisa(
+            "ARS", "USD", monto_origen=125_000, monto_destino=100,
+        )
+        assert (origen, destino, cotiz) == (125_000, 100, 1250.0)
+
+    def test_venta_de_dolares_pesos_mas_cotizacion(self):
+        # Dirección inversa: origen USD, destino ARS (vender dólares).
+        origen, destino, cotiz = derivar_cambio_divisa(
+            "USD", "ARS", monto_origen=100, cotizacion=1250,
+        )
+        assert (origen, destino, cotiz) == (100, 125_000, 1250.0)
+
+    def test_venta_de_dolares_ambos_montos_deriva_cotizacion(self):
+        origen, destino, cotiz = derivar_cambio_divisa(
+            "USD", "ARS", monto_origen=100, monto_destino=125_000,
+        )
+        assert (origen, destino, cotiz) == (100, 125_000, 1250.0)
+
+    def test_dolares_mas_cotizacion_deriva_pesos(self):
+        # Cotización + el lado en pesos ya sabido, pero al revés: acá se conoce
+        # el destino (ARS) — se deriva el origen (USD).
+        origen, destino, cotiz = derivar_cambio_divisa(
+            "USD", "ARS", monto_destino=125_000, cotizacion=1250,
+        )
+        assert (origen, destino, cotiz) == (100, 125_000, 1250.0)
+
+    def test_misma_moneda_falla(self):
+        with pytest.raises(ValueError):
+            derivar_cambio_divisa("ARS", "ARS", monto_origen=1000, monto_destino=1000)
+
+    def test_sin_lado_ars_falla(self):
+        with pytest.raises(ValueError):
+            derivar_cambio_divisa("USD", "USD", monto_origen=100, monto_destino=100)
+
+    def test_faltan_dos_datos_falla(self):
+        with pytest.raises(ValueError):
+            derivar_cambio_divisa("ARS", "USD", cotizacion=1250)
+
+    def test_monto_no_positivo_falla(self):
+        with pytest.raises(ValueError):
+            derivar_cambio_divisa("ARS", "USD", monto_origen=0, monto_destino=100)
+
+    def test_cotizacion_no_positiva_falla(self):
+        with pytest.raises(ValueError):
+            derivar_cambio_divisa("ARS", "USD", monto_origen=1000, cotizacion=0)
 
 
 class TestValidarCategoria:

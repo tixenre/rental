@@ -468,6 +468,84 @@ def test_transferencia_entre_monedas_distintas_falla(conn):
         )
 
 
+def test_cambio_divisa_compra_dolares_ok(conn):
+    """Comprar USD con ARS: dos `ajuste` atados, cada uno en su caja/moneda."""
+    from contabilidad.commands.movimientos import crear_cambio_divisa
+
+    efectivo_id = _cuenta_id(conn, "Efectivo")   # ARS
+    dolares_id = _cuenta_id(conn, "Dólares")     # USD
+    saldo_ars_antes = _saldo(conn, "Efectivo")
+    saldo_usd_antes = _saldo(conn, "Dólares")
+
+    r = crear_cambio_divisa(
+        conn, cuenta_origen_id=efectivo_id, cuenta_destino_id=dolares_id,
+        monto_origen=125_000, cotizacion=1250, por="test",
+    )
+
+    assert r["origen"]["tipo"] == "ajuste" and r["origen"]["monto"] == 125_000
+    assert r["origen"]["cuenta_origen_id"] == efectivo_id
+    assert r["destino"]["tipo"] == "ajuste" and r["destino"]["monto"] == 100
+    assert r["destino"]["cuenta_destino_id"] == dolares_id
+    assert r["cotizacion"] == 1250.0
+    # Cada pata guarda la cotización y apunta a la otra por `movimiento_par_id`.
+    assert r["origen"]["cotizacion"] == 1250.0
+    assert r["origen"]["movimiento_par_id"] == r["destino"]["id"]
+    assert r["destino"]["movimiento_par_id"] == r["origen"]["id"]
+    # Efecto real en los saldos: sale de la caja ARS, entra a la caja USD.
+    assert _saldo(conn, "Efectivo") == saldo_ars_antes - 125_000
+    assert _saldo(conn, "Dólares") == saldo_usd_antes + 100
+
+
+def test_cambio_divisa_venta_de_dolares_deriva_cotizacion(conn):
+    """Vender USD por ARS (dirección inversa) dando ambos montos — sin
+    cotización explícita, se deriva."""
+    from contabilidad.commands.movimientos import crear_cambio_divisa
+
+    dolares_id = _cuenta_id(conn, "Dólares")
+    efectivo_id = _cuenta_id(conn, "Efectivo")
+
+    r = crear_cambio_divisa(
+        conn, cuenta_origen_id=dolares_id, cuenta_destino_id=efectivo_id,
+        monto_origen=50, monto_destino=62_500, por="test",
+    )
+
+    assert r["origen"]["monto"] == 50 and r["origen"]["cuenta_origen_id"] == dolares_id
+    assert r["destino"]["monto"] == 62_500 and r["destino"]["cuenta_destino_id"] == efectivo_id
+    assert r["cotizacion"] == 1250.0
+
+
+def test_cambio_divisa_misma_moneda_falla(conn):
+    from contabilidad.commands.movimientos import crear_cambio_divisa
+
+    with pytest.raises(ValueError):
+        crear_cambio_divisa(
+            conn, cuenta_origen_id=_cuenta_id(conn, "Efectivo"),
+            cuenta_destino_id=_cuenta_id(conn, "Banco"),
+            monto_origen=1000, monto_destino=1000, por="test",
+        )
+
+
+def test_cambio_divisa_mes_cerrado_falla(conn):
+    # Mes propio ("2026-09", no usado por otros tests) y cerrar_mes/reabrir_mes
+    # comitean de verdad (no se descartan con el rollback del fixture) — mismo
+    # try/finally que `test_cierre_traba_la_edicion_del_mes`.
+    from contabilidad.commands.cierres import cerrar_mes, reabrir_mes
+    from contabilidad.commands.movimientos import crear_cambio_divisa
+
+    MES = "2026-09"
+    reabrir_mes(conn, MES)
+    try:
+        cerrar_mes(conn, MES, "test")
+        with pytest.raises(ValueError, match="cerrado"):
+            crear_cambio_divisa(
+                conn, cuenta_origen_id=_cuenta_id(conn, "Efectivo"),
+                cuenta_destino_id=_cuenta_id(conn, "Dólares"),
+                monto_origen=10_000, cotizacion=1250, fecha=f"{MES}-15", por="test",
+            )
+    finally:
+        reabrir_mes(conn, MES)
+
+
 def test_crear_y_desactivar_cuenta_vacia(conn):
     from contabilidad.commands.cuentas import crear_cuenta, desactivar_cuenta
 

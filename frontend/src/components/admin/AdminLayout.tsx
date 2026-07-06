@@ -5,7 +5,7 @@
  * Visitors del catálogo público nunca lo descargan.
  */
 
-import { Outlet, useNavigate } from "@tanstack/react-router";
+import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 
@@ -14,15 +14,24 @@ import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminCommandPalette } from "@/components/admin/AdminCommandPalette";
 import { ConfirmProvider } from "@/components/admin/useConfirm";
 import { SidebarProvider, SidebarTrigger } from "@/design-system/ui/sidebar";
+import { EnrolarPasskeyGate } from "@/components/admin/EnrolarPasskeyGate";
 
 type Session = { email?: string; name?: string; is_admin?: boolean };
 
 export function AdminLayout() {
   const navigate = useNavigate();
+  // /admin/login es hija de esta ruta (layout), pero maneja su PROPIO flujo de
+  // auth (incluido "sin sesión todavía" mientras espera el 2º factor con
+  // passkey, `?paso=passkey`). Sin este chequeo, el `navigate({to:"/admin/login"})`
+  // de abajo pisaba ese query param en cada 401 — mandaba siempre a la pantalla
+  // por defecto en vez de la de confirmar/registrar passkey.
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isLoginPage = pathname === "/admin/login";
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(isLoginPage ? false : true);
 
   useEffect(() => {
+    if (isLoginPage) return;
     let alive = true;
     authedFetch("/auth/me")
       .then(async (r) => {
@@ -46,7 +55,9 @@ export function AdminLayout() {
     return () => {
       alive = false;
     };
-  }, [navigate]);
+  }, [navigate, isLoginPage]);
+
+  if (isLoginPage) return <Outlet />;
 
   if (loading) {
     return (
@@ -57,6 +68,22 @@ export function AdminLayout() {
   }
   if (!session) return <Outlet />;
 
+  // 2º factor obligatorio para admin: sin ninguna passkey enrolada todavía, se
+  // fuerza el enrolamiento on-the-fly antes de dejar entrar al resto del back-office
+  // (criterio del dueño). El modo dev-bypass (ADMIN_BYPASS_AUTH, nunca en prod) lo
+  // saltea para no meterle fricción a la iteración local.
+  if (session.email !== "bypass@local") {
+    return (
+      <EnrolarPasskeyGate>
+        <AdminShell session={session} />
+      </EnrolarPasskeyGate>
+    );
+  }
+
+  return <AdminShell session={session} />;
+}
+
+function AdminShell({ session }: { session: Session }) {
   return (
     <ConfirmProvider>
       <SidebarProvider>
