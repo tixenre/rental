@@ -164,6 +164,21 @@ export const specsMethods = {
       unmatched?: { label: string; value: string }[];
       categoria_sugerida?: string | null;
     }>(`/api/admin/equipos/${id}/re-extract-specs`, { method: "POST" }),
+  /** Hermano JSON de upload-html-source (#1051 Stream B): mismo extractor,
+   *  pero recibe el HTML pegado como texto (no un archivo) y NO lo persiste
+   *  en R2 ni toca `html_source_url` — para cuando el HTML se consigue
+   *  pegando texto (Chrome MCP, portapapeles) en vez de un Cmd+S. */
+  enriquecerFromHtml: (id: number, html: string, categoriaHint?: string | null) =>
+    authedJson<{
+      specs?: { label: string; value: string; spec_key?: string }[];
+      unmatched?: { label: string; value: string }[];
+      categoria_sugerida?: string | null;
+      foto_candidates?: string[];
+    }>(`/api/admin/equipos/${id}/enriquecer-from-html`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ html, categoria_hint: categoriaHint ?? null }),
+    }),
 
   // ── Observatorio de specs (relevamiento de scrapes reales) ─────────
   recomputeObservatorio: () =>
