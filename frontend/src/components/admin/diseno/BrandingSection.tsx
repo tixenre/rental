@@ -19,24 +19,13 @@ import { toast } from "sonner";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 import { adminApi } from "@/lib/admin/api";
-import { authedJson } from "@/lib/authedFetch";
+import { fetchSetting } from "@/lib/settings";
 import {
   HERO_TAGLINES_DEFAULT,
   HERO_TAGLINES_QUERY_KEY,
   parseHeroTaglines,
   type HeroTagline,
 } from "@/lib/hero-taglines";
-
-type Setting = { key: string; value: string; updated_at: string | null; updated_by: string | null };
-
-async function fetchSetting(key: string): Promise<string | null> {
-  try {
-    const s = await authedJson<Setting>(`/api/settings/${key}`);
-    return s.value;
-  } catch {
-    return null;
-  }
-}
 
 export function BrandingSection() {
   const qc = useQueryClient();

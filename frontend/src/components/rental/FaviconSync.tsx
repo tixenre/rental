@@ -9,17 +9,7 @@
  * como follow-up (necesita prerender/SSR), no se resuelve por swap en runtime.
  */
 import { useEffect } from "react";
-
-async function fetchSetting(key: string): Promise<string | null> {
-  try {
-    const r = await fetch(`/api/settings/${key}`);
-    if (!r.ok) return null;
-    const j = (await r.json()) as { value?: string };
-    return j.value?.trim() || null;
-  } catch {
-    return null;
-  }
-}
+import { fetchSetting } from "@/lib/settings";
 
 function setLink(rel: string, href: string) {
   let el = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
