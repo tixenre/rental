@@ -186,6 +186,13 @@ function PedidoEditorPage() {
     descuentoPct: draft.datos?.descuento_pct ?? null,
     descuentoTipo: draft.datos?.descuento_manual_tipo ?? null,
     descuentoMonto: draft.datos?.descuento_manual_monto ?? null,
+    // Pedido ya existente: el total en vivo tiene que coincidir con lo que
+    // persiste el guardado (`_recalcular_total_pedido`, que usa el precio de
+    // línea congelado) — no con el precio de catálogo de hoy. Regresión: este
+    // flag se agregó en #1181 (commit 21642e70) pero se perdió al tocar este
+    // mismo bloque en la Fase C de descuentos (#1219) — el editor volvió a
+    // mostrar el precio de catálogo en vivo en vez del congelado.
+    respetarPrecioItem: true,
     // Defensa en profundidad (sumado a `key={id}` en `PedidoEditorRoute`,
     // arriba): aunque este panel ya se remonta al cambiar de pedido, el hook
     // en sí queda protegido para cualquier otro consumidor que no lo haga.
