@@ -107,7 +107,9 @@ _ADMIN_EXIST = [
     ("POST", "/api/admin/categorias/reorder"),
     ("POST", "/api/admin/equipos/1/upload-foto-from-url"),
     ("POST", "/api/admin/equipos/1/fotos/from-url"),
+    ("POST", "/api/admin/equipos/1/fotos/from-urls"),
     ("PATCH", "/api/admin/equipos/1/fotos/orden"),
+    ("POST", "/api/admin/equipos/1/enriquecer-from-html"),
     # specs.py
     ("GET", "/api/admin/spec-definitions"),
     ("GET", "/api/admin/specs/por-categoria"),

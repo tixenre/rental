@@ -81,16 +81,41 @@ async def admin_upload_html_source(
             conn.rollback()
             raise
 
-    try:
-        from services.specs_ingesta import extract_from_html
-        result = extract_from_html(html_content, categoria_hint=categoria_hint)
-    except Exception:
-        logger.exception("Error extrayendo specs del HTML (equipo %d)", id)
-        raise HTTPException(500, "No se pudo procesar el HTML")
-
-    _proponer_no_reconocidos(id, result)
+    result = _extraer_specs_y_proponer(id, html_content, categoria_hint)
 
     return {"html_source_url": html_source_url, **result}
+
+
+class EnriquecerFromHtmlBody(BaseModel):
+    html: str
+    categoria_hint: Optional[str] = None
+
+
+@router.post("/admin/equipos/{id}/enriquecer-from-html")
+def admin_enriquecer_from_html(id: int, body: EnriquecerFromHtmlBody, request: Request) -> dict:
+    """Hermano JSON de upload-html-source (#1051 Stream B): mismo extractor
+    (`extract_from_html`), mismo aprendizaje (#1203) — pero NO persiste nada
+    en R2 ni toca `html_source_url`. Para cuando el HTML se consigue pegando
+    texto (Chrome MCP, portapapeles) en vez de subir un archivo Cmd+S; el
+    admin decide después si además quiere `upload-html-source` para dejarlo
+    guardado.
+
+    Returns: AutocompletarResult (mismo shape que upload-html-source, sin
+    `html_source_url`).
+    """
+    require_admin(request)
+
+    with get_db() as conn:
+        if not conn.execute("SELECT id FROM equipos WHERE id=%s", (id,)).fetchone():
+            raise HTTPException(404, "Equipo no encontrado")
+
+    html_content = (body.html or "").strip()
+    if not html_content:
+        raise HTTPException(400, "HTML vacío")
+    if len(html_content) > 5_000_000:
+        raise HTTPException(400, "HTML demasiado grande (máx 5MB)")
+
+    return _extraer_specs_y_proponer(id, html_content, body.categoria_hint)
 
 
 @router.post("/admin/equipos/{id}/re-extract-specs")
@@ -126,16 +151,24 @@ def admin_re_extract_specs(id: int, request: Request, categoria_hint: Optional[s
     except Exception:
         raise HTTPException(400, "HTML guardado inválido (no es UTF-8)")
 
+    result = _extraer_specs_y_proponer(id, html_content, categoria_hint)
+
+    return {"html_source_url": html_source_url, **result}
+
+
+def _extraer_specs_y_proponer(equipo_id: int, html_content: str, categoria_hint: Optional[str]) -> dict:
+    """Corre `extract_from_html` + encola no-reconocidos (#1203). Fuente única
+    para los 3 endpoints que procesan HTML de un equipo (upload-html-source,
+    re-extract-specs, enriquecer-from-html) — mismo motor, mismo aprendizaje."""
     try:
         from services.specs_ingesta import extract_from_html
         result = extract_from_html(html_content, categoria_hint=categoria_hint)
     except Exception:
-        logger.exception("Error re-extrayendo specs del HTML guardado (equipo %d)", id)
-        raise HTTPException(500, "No se pudo procesar el HTML guardado")
+        logger.exception("Error extrayendo specs del HTML (equipo %d)", equipo_id)
+        raise HTTPException(500, "No se pudo procesar el HTML")
 
-    _proponer_no_reconocidos(id, result)
-
-    return {"html_source_url": html_source_url, **result}
+    _proponer_no_reconocidos(equipo_id, result)
+    return result
 
 
 def _proponer_no_reconocidos(equipo_id: int, result: dict) -> None:
@@ -855,6 +888,20 @@ class EquipoFotoFromUrlBody(BaseModel):
     url: str
 
 
+def _agregar_foto_desde_url(conn, equipo_id: int, url: str, cfg_pub: str) -> dict:
+    """Descarga una URL externa, la sube a R2 y la agrega a la galería.
+    Fuente única para el endpoint singular y el batch (#1051 Stream B)."""
+    if cfg_pub and url.startswith(cfg_pub + "/"):
+        raise HTTPException(400, "La URL ya está en el bucket — subí el archivo directamente")
+
+    with media_http():
+        _validate_external_image_url(url)
+        raw, _raw_ctype = _download_image_bytes(url)
+        asset = store_upload(raw, kind="equipo", derive_specs=EQUIPO_DERIVE_SPECS, conn=conn)
+    display = asset.variant("display")
+    return _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
+
+
 @router.post("/admin/equipos/{equipo_id}/fotos/from-url", status_code=201)
 def upload_equipo_foto_from_url(equipo_id: int, body: EquipoFotoFromUrlBody, request: Request):
     """Descarga URL externa y la agrega a la galería del equipo."""
@@ -865,27 +912,64 @@ def upload_equipo_foto_from_url(equipo_id: int, body: EquipoFotoFromUrlBody, req
         raise HTTPException(400, "URL vacía")
 
     cfg_pub = (os.getenv("R2_PUBLIC_BASE") or "").rstrip("/")
-    if cfg_pub and url.startswith(cfg_pub + "/"):
-        raise HTTPException(400, "La URL ya está en el bucket — subí el archivo directamente")
-
-    with media_http():
-        _validate_external_image_url(url)
-        raw, _raw_ctype = _download_image_bytes(url)
 
     with get_db() as conn:
         try:
             eq = conn.execute("SELECT id FROM equipos WHERE id = %s", (equipo_id,)).fetchone()
             if not eq:
                 raise HTTPException(404, "Equipo no encontrado")
-            with media_http():
-                asset = store_upload(raw, kind="equipo", derive_specs=EQUIPO_DERIVE_SPECS, conn=conn)
-            display = asset.variant("display")
-            foto = _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
+            foto = _agregar_foto_desde_url(conn, equipo_id, url, cfg_pub)
         except Exception:
             conn.rollback()
             raise
 
     return foto
+
+
+class EquipoFotosFromUrlsBody(BaseModel):
+    urls: list[str]
+
+
+@router.post("/admin/equipos/{equipo_id}/fotos/from-urls", status_code=201)
+def upload_equipo_fotos_from_urls(equipo_id: int, body: EquipoFotosFromUrlsBody, request: Request):
+    """Batch de `fotos/from-url` (#1051 Stream B): agrega hasta 20 fotos de un
+    saque — típicamente la galería completa de un HTML recién enriquecido
+    (`enriquecer-from-html` devuelve `foto_candidates`). Best-effort por URL
+    (mismo criterio que `/admin/equipos/buscar-fotos`): una que falla no
+    aborta el resto — se reporta en `fallidas` en vez de perder el batch entero.
+
+    Returns: {agregadas: EquipoFoto[], fallidas: [{url, error}]}
+    """
+    require_admin(request)
+
+    urls = [u.strip() for u in (body.urls or []) if u and u.strip()]
+    if not urls:
+        raise HTTPException(400, "Sin URLs")
+    if len(urls) > 20:
+        raise HTTPException(400, "Máximo 20 URLs por batch")
+
+    cfg_pub = (os.getenv("R2_PUBLIC_BASE") or "").rstrip("/")
+    agregadas: list[dict] = []
+    fallidas: list[dict] = []
+
+    with get_db() as conn:
+        eq = conn.execute("SELECT id FROM equipos WHERE id = %s", (equipo_id,)).fetchone()
+        if not eq:
+            raise HTTPException(404, "Equipo no encontrado")
+
+        for url in urls:
+            try:
+                foto = _agregar_foto_desde_url(conn, equipo_id, url, cfg_pub)
+                agregadas.append(foto)
+            except HTTPException as e:
+                conn.rollback()
+                fallidas.append({"url": url, "error": str(e.detail)})
+            except Exception as exc:
+                conn.rollback()
+                logger.warning("fotos/from-urls: fallo con %s: %s", url, exc)
+                fallidas.append({"url": url, "error": "no se pudo descargar/procesar"})
+
+    return {"agregadas": agregadas, "fallidas": fallidas}
 
 
 @router.delete("/admin/equipos/{equipo_id}/fotos/{foto_id}")
