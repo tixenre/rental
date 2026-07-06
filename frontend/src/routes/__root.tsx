@@ -11,7 +11,8 @@ import { Component, type ReactNode } from "react";
 // una pestaña que quedó abierta desde antes intenta traer un chunk que ya no
 // existe. Se arregla solo con un reload (trae el manifest nuevo); no es un bug
 // de la app. El guard en sessionStorage evita un loop si el reload no alcanza.
-const CHUNK_ERROR_PATTERN = /Failed to fetch dynamically imported module|Importing a module script failed/;
+const CHUNK_ERROR_PATTERN =
+  /Failed to fetch dynamically imported module|Importing a module script failed/;
 const CHUNK_RELOAD_GUARD_KEY = "rambla:chunk-reload-attempted";
 
 class RootErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
