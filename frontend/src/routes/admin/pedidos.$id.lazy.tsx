@@ -110,12 +110,12 @@ import {
   ItemRow,
   BackLink,
   SaveIndicator,
-  FieldLabel,
   RailSection,
   BdRow,
   FacturacionTargetSection,
 } from "@/components/admin/pedido/PedidoPageHelpers";
 import { Section } from "@/design-system/composites/Section";
+import { FieldLabel } from "@/design-system/ui/Field";
 
 export const Route = createLazyFileRoute("/admin/pedidos/$id")({
   component: PedidoEditorRoute,
@@ -485,23 +485,26 @@ function PedidoEditorPage() {
                   O cargá el contacto a mano abajo (pedido sin ficha vinculada).
                 </p>
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <FieldLabel label="Nombre">
+                  <div className="space-y-1">
+                    <FieldLabel>Nombre</FieldLabel>
                     <Input
                       value={datos.cliente_nombre}
                       onChange={(e) =>
                         setDatos((d) => d && { ...d, cliente_nombre: e.target.value })
                       }
                     />
-                  </FieldLabel>
-                  <FieldLabel label="Teléfono">
+                  </div>
+                  <div className="space-y-1">
+                    <FieldLabel>Teléfono</FieldLabel>
                     <Input
                       value={datos.cliente_telefono}
                       onChange={(e) =>
                         setDatos((d) => d && { ...d, cliente_telefono: e.target.value })
                       }
                     />
-                  </FieldLabel>
-                  <FieldLabel label="Email" className="sm:col-span-2">
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <FieldLabel>Email</FieldLabel>
                     <Input
                       value={datos.cliente_email}
                       placeholder="—"
@@ -509,7 +512,7 @@ function PedidoEditorPage() {
                         setDatos((d) => d && { ...d, cliente_email: e.target.value })
                       }
                     />
-                  </FieldLabel>
+                  </div>
                 </div>
               </div>
             )}

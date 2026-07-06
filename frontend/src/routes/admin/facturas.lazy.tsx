@@ -14,6 +14,7 @@ import { facturacionApi, type FacturaEstado } from "@/lib/admin/api";
 import { formatARS, formatFechaDisplay } from "@/lib/format";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { FacturaBadge } from "@/design-system/ui/FacturaBadge";
+import { FieldLabel } from "@/design-system/ui/Field";
 import { cn } from "@/lib/utils";
 
 export const Route = createLazyFileRoute("/admin/facturas")({
@@ -265,14 +266,6 @@ function FacturasPage() {
 }
 
 // ── Helpers de UI ─────────────────────────────────────────────────────────────
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
-      {children}
-    </div>
-  );
-}
 
 function Segment({
   label,

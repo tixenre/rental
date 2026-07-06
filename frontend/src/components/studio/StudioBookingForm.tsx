@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "@/design-system/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/design-system/ui/popover";
+import { FieldLabel } from "@/design-system/ui/Field";
 import { cn } from "@/lib/utils";
 import { formatARS } from "@/lib/format";
 import { authedFetch } from "@/lib/authedFetch";
@@ -78,14 +79,6 @@ function Section({
       </header>
       {children}
     </section>
-  );
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-      {children}
-    </label>
   );
 }
 

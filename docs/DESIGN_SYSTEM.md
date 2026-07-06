@@ -646,9 +646,25 @@ una sola forma consistente en los tiles compactos de los dialogs de equipos.
   `SegmentedControl` del `ui/`: este tiene animación de slider, ese tiene fondo ink sólido).
 
 El primitivo `Input` vive en **`frontend/src/design-system/ui/input.tsx`**.
-**`FieldLabel` existe** como función local en `pagos.lazy.tsx` y en `StudioBookingForm` —
-todavía no es una pieza única del DS (es un `<label className="block t-eyebrow">`).
-`PedidoPageHelpers` ya usa `Field` del DS (`ui/Field`).
+
+### FieldLabel (`frontend/src/design-system/ui/Field.tsx`)
+
+Label suelto en voz eyebrow (mono/uppercase/tracked) — para cuando un form denso
+(filtros, grillas compactas) quiere esa voz en vez del `label` plano que ya trae
+`Field`. Consolida las 4 copias locales que habían aparecido en el repo
+(`StudioBookingForm`, `pagos.lazy`, `facturas.lazy` — este último con un `<div>`
+y tracking `0.15em`, convergido — y `PedidoPageHelpers`, que envolvía el control
+con una API distinta, `<FieldLabel label="...">`).
+
+```tsx
+import { FieldLabel } from "@/design-system/ui/Field";
+
+// sin envolver el control — sibling, no wrapper
+<div className="space-y-1">
+  <FieldLabel>Desde</FieldLabel>
+  <Input type="date" value={desde} onChange={...} />
+</div>
+```
 
 ### SearchInput (`frontend/src/design-system/ui/search-input.tsx`)
 

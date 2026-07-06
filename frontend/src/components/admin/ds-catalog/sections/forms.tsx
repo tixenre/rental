@@ -15,7 +15,7 @@ import { type DateRange } from "react-day-picker";
 
 import { type CatalogSection } from "../types";
 import { Caption, Row, Sample, Stack } from "../catalog-kit";
-import { Field } from "@/design-system/ui/Field";
+import { Field, FieldLabel } from "@/design-system/ui/Field";
 import { Label } from "@/design-system/ui/label";
 import { Input } from "@/design-system/ui/input";
 import { SearchInput } from "@/design-system/ui/search-input";
@@ -150,6 +150,18 @@ export const formsSection: CatalogSection = {
           <Field label="Email" htmlFor="demo-field-err" required error="El email es obligatorio.">
             <Input id="demo-field-err" placeholder="cliente@correo.com" />
           </Field>
+        </Stack>
+      ),
+    },
+    {
+      name: "FieldLabel",
+      files: ["design-system/ui/Field.tsx"],
+      blurb:
+        "Label suelto en voz eyebrow (mono/uppercase/tracked) — para forms densos que quieren esa voz en vez del label plano de Field. Sibling del control, no lo envuelve.",
+      render: () => (
+        <Stack className="max-w-xs gap-1.5">
+          <FieldLabel>Desde</FieldLabel>
+          <Input type="date" />
         </Stack>
       ),
     },

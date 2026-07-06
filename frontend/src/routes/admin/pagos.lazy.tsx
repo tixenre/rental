@@ -15,6 +15,7 @@ import { formatARS, formatFechaDisplay } from "@/lib/format";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Badge } from "@/design-system/ui/badge";
 import { Input } from "@/design-system/ui/input";
+import { FieldLabel } from "@/design-system/ui/Field";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { AdminTable, type Column } from "@/components/admin/AdminTable";
 import { QueryState } from "@/components/admin/QueryState";
@@ -189,8 +190,4 @@ function PagosLogPage() {
       </div>
     </AdminPage>
   );
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <label className="block t-eyebrow">{children}</label>;
 }

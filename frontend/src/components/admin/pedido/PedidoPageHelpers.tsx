@@ -319,23 +319,6 @@ export function FacturacionTargetSection({
   );
 }
 
-export function FieldLabel({
-  label,
-  className,
-  children,
-}: {
-  label: string;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className={cn("block", className)}>
-      <span className="block t-eyebrow mb-1">{label}</span>
-      {children}
-    </label>
-  );
-}
-
 export function RailSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
