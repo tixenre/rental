@@ -44,6 +44,10 @@ from routes.equipos.dashboard import admin_dashboard_uso, admin_equipos_sin_seri
 from routes.equipos.ficha import FichaUpdate
 from routes.equipos.fotos import UploadFotoFromUrlInput
 from routes.equipos.kit import KitItem, _crea_ciclo_kit
+# `disponibilidad` NO se importa acá — `core.py` ya la importa en la posición
+# exacta donde importa (antes de registrar su ruta wildcard `/equipos/{id_or_slug}`,
+# ver el comentario ahí). Importarla también acá sería inofensivo (Python
+# cachea el módulo) pero confuso — dejaría dos lugares "responsables" del orden.
 from routes.equipos import mantenimiento as _mantenimiento
 from routes.equipos import taxonomia as _taxonomia
 

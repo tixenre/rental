@@ -100,7 +100,7 @@ def test_calendario_hoja_refleja_combo_anidado(nested_setup):
     """Con el COMBO X reservado, el calendario de la HOJA Z marca 0 libres en los
     días del rango. La versión vieja (overlap a 1 nivel) mostraba 1 → overbooking."""
     from database import get_db
-    from routes.equipos.core import get_equipo_calendario
+    from routes.equipos.disponibilidad import get_equipo_calendario
 
     conn = get_db()
     try:
@@ -118,7 +118,7 @@ def test_calendario_hoja_refleja_combo_anidado(nested_setup):
 
 def test_calendario_sin_reserva_todo_libre(nested_setup):
     """Sanity: sin pedidos, todos los días del mes muestran el stock completo."""
-    from routes.equipos.core import get_equipo_calendario
+    from routes.equipos.disponibilidad import get_equipo_calendario
 
     cal = get_equipo_calendario(Z, year=2026, month=9)
     assert all(v == 1 for v in cal.values()), cal
