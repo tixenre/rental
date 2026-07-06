@@ -9,7 +9,7 @@ import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 import { CardGridSkeleton } from "@/components/admin/skeletons";
 import { useConfirm } from "@/components/admin/useConfirm";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { cn } from "@/lib/utils";
 
 export const Route = createLazyFileRoute("/admin/media")({

@@ -31,7 +31,7 @@ import { QueryState } from "@/components/admin/QueryState";
 import { TableSkeleton } from "@/components/admin/skeletons";
 import { EmptyState } from "@/design-system/composites/EmptyState";
 import { formatMoney, formatFechaDisplay } from "@/lib/format";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Badge } from "@/design-system/ui/badge";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";

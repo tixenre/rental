@@ -44,7 +44,7 @@ import { EmptyState } from "@/design-system/composites/EmptyState";
 import { ClienteDetalleDialog } from "@/components/admin/ClienteDetalleDialog";
 import { ClientesDuplicadosDialog } from "@/components/admin/ClientesDuplicadosDialog";
 import { InvitarClienteDialog } from "@/components/admin/InvitarClienteDialog";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { PERFIL_IMPUESTOS_LABEL, type PerfilImpuestos } from "@/lib/iva";
 
 export const Route = createLazyFileRoute("/admin/clientes")({

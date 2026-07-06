@@ -25,7 +25,7 @@ import {
 import { AdminPage } from "@/components/admin/AdminPage";
 import { PrecioUnidad } from "@/components/admin/Monto";
 import { QueryState } from "@/components/admin/QueryState";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export const Route = createLazyFileRoute("/admin/equipos/calidad")({
   component: CalidadPage,

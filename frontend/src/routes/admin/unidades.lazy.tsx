@@ -28,7 +28,7 @@ import {
 } from "@/design-system/ui/alert-dialog";
 
 import { adminApi, type Unidad, type UnidadInput } from "@/lib/admin/api";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { QueryState } from "@/components/admin/QueryState";
 import { TableSkeleton } from "@/components/admin/skeletons";

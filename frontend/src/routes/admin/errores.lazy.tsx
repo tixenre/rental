@@ -7,7 +7,7 @@ import { AlertTriangle, ChevronDown, ChevronRight, RefreshCw } from "lucide-reac
 
 import { adminApi } from "@/lib/admin/api";
 import type { ServerError } from "@/lib/admin/api/errores";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { QueryState } from "@/components/admin/QueryState";
 import { ListSkeleton } from "@/components/admin/skeletons";
 import { EmptyState } from "@/design-system/composites/EmptyState";

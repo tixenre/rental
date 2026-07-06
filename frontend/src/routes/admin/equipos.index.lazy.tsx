@@ -68,7 +68,7 @@ import { MantenimientoEquipoDialog } from "@/components/admin/MantenimientoEquip
 import { HistorialEquipoDialog } from "@/components/admin/HistorialEquipoDialog";
 import { DashboardUsoDialog } from "@/components/admin/DashboardUsoDialog";
 import { ComboBuilderDialog } from "@/components/admin/ComboBuilderDialog";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
   StockInline,
   RoiInline,

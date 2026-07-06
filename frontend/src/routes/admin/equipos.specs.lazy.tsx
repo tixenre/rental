@@ -1,7 +1,7 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { SpecTemplatesSection } from "@/components/admin/specs/SpecTemplatesSection";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export const Route = createLazyFileRoute("/admin/equipos/specs")({
   component: SpecsPage,

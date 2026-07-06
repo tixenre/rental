@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { Megaphone } from "lucide-react";
 import { AdminPage } from "@/components/admin/AdminPage";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export const Route = createLazyFileRoute("/admin/marca")({
   component: MarcaPage,

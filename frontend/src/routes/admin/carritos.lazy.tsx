@@ -17,7 +17,7 @@ import {
 
 import { adminApi } from "@/lib/admin/api";
 import type { Carrito } from "@/lib/admin/api/carritos";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { fmtArs, formatFechaCorta } from "@/lib/format";
 import { whatsappLink } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";

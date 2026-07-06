@@ -39,7 +39,7 @@ import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { RegistrarPagoModal } from "@/components/admin/pedido/RegistrarPagoModal";
 import { EnviarDocsDialog } from "@/components/admin/pedido/EnviarDocsDialog";
 import { AdminCard, FAB } from "@/components/mobile";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
 
 export const Route = createLazyFileRoute("/admin/pedidos/")({

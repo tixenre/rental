@@ -1,6 +1,6 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { AdminSection } from "@/components/admin/AdminSection";
 import { PasskeysSection } from "@/components/admin/settings/PasskeysSection";

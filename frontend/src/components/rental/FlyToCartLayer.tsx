@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { useFlyToCart } from "@/lib/fly-to-cart-store";
-import { useReducedMotion } from "@/lib/use-reduced-motion";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 /**
  * Capa global que anima un "+1" desde donde se tocó "Agregar"

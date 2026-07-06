@@ -40,7 +40,7 @@ import { Button } from "@/design-system/ui/button";
 import { Spinner } from "@/design-system/ui/spinner";
 import { Input } from "@/design-system/ui/input";
 import { dataioAdminApi } from "@/lib/admin/api/dataio";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 const RESET_CONFIRMATION = "BORRAR TODO";
 

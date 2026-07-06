@@ -4,7 +4,7 @@ import { Calendar, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/design-system/ui/button";
 import { useHeroPhotos, heroImgProps } from "@/lib/studio/hero-photos";
-import { useReducedMotion } from "@/lib/use-reduced-motion";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 interface HeroSectionProps {
   tagline: [string, string];

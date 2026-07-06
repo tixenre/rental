@@ -26,7 +26,7 @@ import {
 
 import { facturacionApi, type EmisorArca } from "@/lib/admin/api";
 import { usePadronLookup, type PadronImpuesto } from "@/lib/admin/usePadronLookup";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,

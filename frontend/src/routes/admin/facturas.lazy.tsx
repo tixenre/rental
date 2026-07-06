@@ -12,7 +12,7 @@ import { toast } from "sonner";
 
 import { facturacionApi, type FacturaEstado } from "@/lib/admin/api";
 import { formatARS, formatFechaDisplay } from "@/lib/format";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { FacturaBadge } from "@/design-system/ui/FacturaBadge";
 import { cn } from "@/lib/utils";
 

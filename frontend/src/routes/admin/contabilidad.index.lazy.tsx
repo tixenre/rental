@@ -13,7 +13,7 @@ import { AdminPage } from "@/components/admin/AdminPage";
 import { CardGridSkeleton } from "@/components/admin/skeletons";
 import { ErrorState } from "@/components/admin/ErrorState";
 import { formatARS, formatMoney } from "@/lib/format";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Badge } from "@/design-system/ui/badge";
 import { Button } from "@/design-system/ui/button";
 

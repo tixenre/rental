@@ -2,7 +2,7 @@ import { createLazyFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { estudioAdminApi } from "@/lib/admin/api";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { ListSkeleton } from "@/components/admin/skeletons";
 import { ErrorState } from "@/components/admin/ErrorState";

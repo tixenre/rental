@@ -20,7 +20,7 @@ import { EmptyState } from "@/design-system/composites/EmptyState";
 import { adminApi, type CuentaSaldo } from "@/lib/admin/api";
 import { Input } from "@/design-system/ui/input";
 import { formatARS } from "@/lib/format";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export const Route = createLazyFileRoute("/admin/contabilidad/reporte")({
   component: ReporteMensualPage,

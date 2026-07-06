@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 import { adminApi } from "@/lib/admin/api";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { cn } from "@/lib/utils";
 import { fmtArs } from "@/lib/format";
 import { AdminPage } from "@/components/admin/AdminPage";

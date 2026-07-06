@@ -98,7 +98,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
 import { SegmentedControl } from "@/design-system/ui/segmented-control";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { fmtArs } from "@/lib/format";
 import { nombreCliente } from "@/lib/cliente-nombre";
 import { EquipoComboSearch } from "@/components/admin/pedido/EquipoComboSearch";

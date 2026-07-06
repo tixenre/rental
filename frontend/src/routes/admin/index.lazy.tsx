@@ -17,7 +17,7 @@ import { AdminPage } from "@/components/admin/AdminPage";
 import { CalendarioWidget } from "@/components/admin/CalendarioWidget";
 import { CardGridSkeleton } from "@/components/admin/skeletons";
 import { ErrorState } from "@/components/admin/ErrorState";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export const Route = createLazyFileRoute("/admin/")({
   component: AdminDashboard,

@@ -5,7 +5,7 @@ import { BrandSvgSection } from "@/components/admin/diseno/BrandSvgSection";
 import { BrandingSection } from "@/components/admin/diseno/BrandingSection";
 import { ContactoSection } from "@/components/admin/diseno/ContactoSection";
 import { DsCatalog } from "@/components/admin/ds-catalog";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export const Route = createLazyFileRoute("/admin/diseno")({
   component: DisenoPage,

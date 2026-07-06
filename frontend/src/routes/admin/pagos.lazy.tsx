@@ -12,7 +12,7 @@ import { Receipt } from "lucide-react";
 
 import { adminApi, DESTINATARIOS_PAGO, METODOS_PAGO } from "@/lib/admin/api";
 import { formatARS, formatFechaDisplay } from "@/lib/format";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Badge } from "@/design-system/ui/badge";
 import { Input } from "@/design-system/ui/input";
 import { AdminPage } from "@/components/admin/AdminPage";

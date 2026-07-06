@@ -5,7 +5,7 @@ import { Plus, Users } from "lucide-react";
 
 import { talleresAdminApi } from "@/lib/admin/api/talleres";
 import type { EdicionAdmin, TallerConcepto } from "@/lib/admin/api/types";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Button } from "@/design-system/ui/button";
 import { ListSkeleton } from "@/components/admin/skeletons";
 import { ErrorState } from "@/components/admin/ErrorState";

@@ -18,7 +18,7 @@ import { useState } from "react";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { Badge } from "@/design-system/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/design-system/ui/tabs";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { adminApi } from "@/lib/admin/api";
 import {
   CategoriaPanel,
