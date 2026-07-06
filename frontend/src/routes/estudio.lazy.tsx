@@ -204,8 +204,8 @@ function LightboxSlide({
 
           {first?.kind === "instagram" && (
             <div
-              className="relative w-full"
-              style={{ height: igClipH, overflow: "hidden", backgroundColor: "rgb(244 244 245)" }}
+              className="relative w-full bg-muted"
+              style={{ height: igClipH, overflow: "hidden" }}
             >
               <IgEmbed key={first.url} url={first.url} />
               <a

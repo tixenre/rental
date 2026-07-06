@@ -63,8 +63,7 @@ function SoldOutModal({
   const labelProxima = ordinalEdicion(proxima.numero_edicion);
   return (
     <ModalBackdrop
-      className="z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
-      style={{ background: "oklch(0.15 0 0 / 65%)" }}
+      className="z-50 flex items-end sm:items-center justify-center bg-scrim p-4 sm:p-6"
       onClose={onDismiss}
     >
       <div className="relative w-full max-w-sm rounded-2xl bg-background border border-border/60 p-7 shadow-2xl">

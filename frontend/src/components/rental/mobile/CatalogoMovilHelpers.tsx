@@ -401,8 +401,7 @@ export function CartSheet({
   return (
     <>
       <div
-        className="fixed inset-0 z-[60] animate-in fade-in duration-200"
-        style={{ background: "rgba(20,16,12,0.5)" }}
+        className="fixed inset-0 z-[60] bg-scrim animate-in fade-in duration-200"
         onClick={onClose}
       />
       <div
@@ -700,8 +699,7 @@ export function FichaSheet({
   return (
     <>
       <div
-        className="fixed inset-0 z-[60] animate-in fade-in duration-200"
-        style={{ background: "rgba(20,16,12,0.5)" }}
+        className="fixed inset-0 z-[60] bg-scrim animate-in fade-in duration-200"
         onClick={onClose}
       />
       <div

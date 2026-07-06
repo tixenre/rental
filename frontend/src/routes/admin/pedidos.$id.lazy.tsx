@@ -1361,11 +1361,11 @@ function FacturacionRailSection({
           </div>
 
           <div
-            className="relative h-full shrink-0 overflow-hidden bg-[#e5e5e5]"
+            className="relative h-full shrink-0 overflow-hidden bg-muted"
             style={{ aspectRatio: LAYOUT_ASPECT[layout] ?? LAYOUT_ASPECT.simplificada }}
           >
             {!facturaHtmlError && (!facturaBlobUrl || !facturaIframeReady) && (
-              <div className="absolute inset-0 flex items-center justify-center gap-2 bg-[#e5e5e5] text-sm text-muted-foreground">
+              <div className="absolute inset-0 flex items-center justify-center gap-2 bg-muted text-sm text-muted-foreground">
                 <Spinner size="sm" />
                 Armando la factura…
               </div>
