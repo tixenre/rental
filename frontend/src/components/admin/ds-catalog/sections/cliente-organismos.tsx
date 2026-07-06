@@ -4,8 +4,7 @@
  * tarjetas de stat del panel, el bloque de identidad (verificado / sin verificar)
  * y la sección de listas guardadas.
  *
- * Estas piezas viven en `routes/ClientePortal*` (son organismos a nivel de ruta,
- * no hay un components/cliente/). Acá se muestran con los escenarios demo
+ * Estas piezas viven en `components/cliente/ClientePortal*`. Acá se muestran con los escenarios demo
  * canónicos: el mismo pedido en tres momentos de plata, el cliente en tres
  * estados de identidad. Reciben todo por props (datos demo + callbacks no-op).
  */
@@ -15,10 +14,10 @@ import { type CatalogSection } from "../types";
 import { Caption, Sample, Stack } from "../catalog-kit";
 
 import { StatCard } from "@/components/rental/StatCard";
-import { PedidoCard, PedidoTimeline } from "@/routes/ClientePortalPedido";
-import { IdentidadSection } from "@/routes/ClientePortalHelpers";
-import { ListasSection } from "@/routes/ClientePortalListas";
-import { type Pedido } from "@/routes/ClientePortalTypes";
+import { PedidoCard, PedidoTimeline } from "@/components/cliente/ClientePortalPedido";
+import { IdentidadSection } from "@/components/cliente/ClientePortalHelpers";
+import { ListasSection } from "@/components/cliente/ClientePortalListas";
+import { type Pedido } from "@/components/cliente/ClientePortalTypes";
 
 import {
   pedidoPresupuesto,
@@ -75,7 +74,7 @@ export const clienteOrganismosSection: CatalogSection = {
     },
     {
       name: "PedidoCard",
-      files: ["routes/ClientePortalPedido.tsx"],
+      files: ["components/cliente/ClientePortalPedido.tsx"],
       blurb:
         "El card del pedido en el portal: número, estado, fechas, total y saldo. Click expande el detalle (ítems, timeline, documentos, acciones). Las tres etapas de plata.",
       render: () => (
@@ -94,7 +93,7 @@ export const clienteOrganismosSection: CatalogSection = {
     },
     {
       name: "PedidoTimeline",
-      files: ["routes/ClientePortalPedido.tsx"],
+      files: ["components/cliente/ClientePortalPedido.tsx"],
       blurb:
         "La línea de tiempo del pedido: solicitado → confirmado → retirado → devuelto. Marca el paso actual según el estado.",
       render: () => (
@@ -110,7 +109,7 @@ export const clienteOrganismosSection: CatalogSection = {
     },
     {
       name: "IdentidadSection",
-      files: ["routes/ClientePortalHelpers.tsx"],
+      files: ["components/cliente/ClientePortalHelpers.tsx"],
       blurb:
         "El bloque de identidad del perfil: badge de estado + CTA para verificar con RENAPER. Verificado, sin verificar y rechazado (con motivo).",
       render: () => (
@@ -129,7 +128,7 @@ export const clienteOrganismosSection: CatalogSection = {
     },
     {
       name: "ListasSection",
-      files: ["routes/ClientePortalListas.tsx"],
+      files: ["components/cliente/ClientePortalListas.tsx"],
       blurb:
         'La tab "mis listas": composiciones guardadas que se reservan de un toque. El contenido se resuelve en vivo del catálogo (acá, de los equipos demo).',
       render: () => (

@@ -46,7 +46,7 @@ import { useCart } from "@/lib/cart-store";
 import { useEquipos } from "@/hooks/useEquipos";
 import { getCompartido, type CompartidoData, type CompartirItem } from "@/lib/compartir";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
-import { fmt } from "./ClientePortalTypes";
+import { fmt } from "@/components/cliente/ClientePortalTypes";
 import { cn } from "@/lib/utils";
 import type { Equipment } from "@/data/equipment";
 

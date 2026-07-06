@@ -46,16 +46,26 @@ import {
   HIST_STATES,
   DOC_NOTIFICABLE,
   TAB_OPTIONS,
-} from "./ClientePortalTypes";
-import type { Perfil, Pedido, PortalTab, DocTipo, Filtro } from "./ClientePortalTypes";
+} from "@/components/cliente/ClientePortalTypes";
+import type {
+  Perfil,
+  Pedido,
+  PortalTab,
+  DocTipo,
+  Filtro,
+} from "@/components/cliente/ClientePortalTypes";
 import {
   SidebarNavItem,
   BottomNavItem,
   NotificacionesSection,
   PerfilSection,
-} from "./ClientePortalHelpers";
-import { PedidoEmpty, PedidoCard, DocAvailablePopup } from "./ClientePortalPedido";
-import { ListasSection } from "./ClientePortalListas";
+} from "@/components/cliente/ClientePortalHelpers";
+import {
+  PedidoEmpty,
+  PedidoCard,
+  DocAvailablePopup,
+} from "@/components/cliente/ClientePortalPedido";
+import { ListasSection } from "@/components/cliente/ClientePortalListas";
 import { useListas } from "@/hooks/useListas";
 
 export const Route = createFileRoute("/cliente/portal")({

@@ -17,8 +17,8 @@ import {
   DialogDescription,
 } from "@/design-system/ui/dialog";
 import { Spinner } from "@/design-system/ui/spinner";
-import { FacturacionForm } from "@/routes/ClientePortalHelpers";
-import type { Perfil } from "@/routes/ClientePortalTypes";
+import { FacturacionForm } from "@/components/cliente/ClientePortalHelpers";
+import type { Perfil } from "@/components/cliente/ClientePortalTypes";
 
 export function FacturacionModal({
   open,

@@ -26,7 +26,7 @@ import {
 import { FacturacionModal } from "@/components/rental/FacturacionModal";
 import { TerminosModal } from "@/components/rental/TerminosModal";
 import { ContratoPreviewModal } from "@/components/rental/ContratoPreviewModal";
-import { DOC_DESCRIPTION, DOC_LABEL } from "@/routes/ClientePortalTypes";
+import { DOC_DESCRIPTION, DOC_LABEL } from "@/components/cliente/ClientePortalTypes";
 
 /** Los 4 docs disponibles desde "presupuesto" (ver `_documentos_disponibles`
  *  en el backend) — "factura" queda afuera, no existe hasta que se facture. */
