@@ -4,6 +4,7 @@ import { ShoppingBag } from "lucide-react";
 
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
+import { type CotizacionLinea } from "@/lib/cotizacion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/design-system/ui/button";
 import { EmptyImage } from "./EmptyImage";
@@ -27,6 +28,7 @@ export function CartMiniBarView({
   days,
   isEmpty,
   previewItems,
+  lineas,
   totalNeto,
   conIva,
   hayFechas,
@@ -38,6 +40,8 @@ export function CartMiniBarView({
   days: number;
   isEmpty: boolean;
   previewItems: CartPreviewItem[];
+  /** Detalle por línea resuelto por el backend — ver mismo campo en CartDrawerView. */
+  lineas?: CotizacionLinea[];
   totalNeto: number;
   conIva: boolean;
   hayFechas: boolean;
@@ -81,7 +85,15 @@ export function CartMiniBarView({
             </div>
             <div className="max-h-[240px] overflow-y-auto">
               {previewItems.map(({ equipo, qty }) => (
-                <CartPreviewRow key={equipo.id} equipo={equipo} qty={qty} days={days} />
+                <CartPreviewRow
+                  key={equipo.id}
+                  equipo={equipo}
+                  qty={qty}
+                  days={days}
+                  linea={lineas?.find(
+                    (l) => l.equipoId === (equipo._backendId ?? Number(equipo.id)),
+                  )}
+                />
               ))}
             </div>
           </div>
@@ -136,8 +148,19 @@ export function CartMiniBarView({
   );
 }
 
-function CartPreviewRow({ equipo, qty, days }: { equipo: Equipment; qty: number; days: number }) {
-  const periodTotal = equipo.pricePerDay * qty * Math.max(days, 1);
+function CartPreviewRow({
+  equipo,
+  qty,
+  days,
+  linea,
+}: {
+  equipo: Equipment;
+  qty: number;
+  days: number;
+  /** Línea resuelta por el backend — fallback al cálculo local si no llegó aún. */
+  linea?: CotizacionLinea;
+}) {
+  const periodTotal = linea?.bruto ?? equipo.pricePerDay * qty * Math.max(days, 1);
   return (
     <div className="flex items-center gap-2.5 py-1">
       <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded bg-white">

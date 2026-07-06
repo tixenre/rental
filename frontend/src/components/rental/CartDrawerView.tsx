@@ -16,7 +16,7 @@ import { es } from "date-fns/locale";
 import { Button } from "@/design-system/ui/button";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
-import { descuentoLabel, type DescuentoOrigen } from "@/lib/cotizacion";
+import { descuentoLabel, type CotizacionLinea, type DescuentoOrigen } from "@/lib/cotizacion";
 import { cn } from "@/lib/utils";
 import { StepperPill } from "./equipment/shared/StepperPill";
 import { IncludesLine } from "./equipment/shared/IncludesLine";
@@ -97,6 +97,7 @@ export function CartDrawerView({
   onRemove,
   onSetQty,
   // plata
+  lineas,
   subtotalTotal,
   descuentoPct,
   descuentoOrigen,
@@ -154,6 +155,11 @@ export function CartDrawerView({
   onAdd: (id: string) => void;
   onRemove: (id: string) => void;
   onSetQty: (id: string, qty: number) => void;
+  /** Detalle por línea que YA resolvió el backend (combo-aware, con el
+   *  descuento ganado repartido) — #617 / regla "el front no calcula plata".
+   *  Ausente/sin match → fallback al cálculo local (carrito vacío / línea
+   *  todavía no cotizada). */
+  lineas?: CotizacionLinea[];
   subtotalTotal: number;
   descuentoPct: number;
   descuentoOrigen: DescuentoOrigen;
@@ -341,10 +347,20 @@ export function CartDrawerView({
                             const reachedMax = qty >= cap;
                             const noDisponible =
                               !!startDate && getDisponible?.(it) !== undefined && cap < qty;
-                            const lineaBruta = it.pricePerDay * qty * (d || 1);
-                            const lineaDto =
-                              descuentoPct > 0 ? Math.round((lineaBruta * descuentoPct) / 100) : 0;
-                            const lineaNeta = lineaBruta - lineaDto;
+                            // Línea resuelta por el backend (combo-aware, descuento
+                            // ya repartido) — fallback al cálculo local solo si
+                            // todavía no llegó/no matchea (ver prop `lineas`).
+                            const backendId = it._backendId ?? Number(it.id);
+                            const linea = lineas?.find((l) => l.equipoId === backendId);
+                            const lineaSubtotalPorJornada =
+                              linea?.subtotalPorJornada ?? it.pricePerDay * qty;
+                            const lineaBruta = linea?.bruto ?? it.pricePerDay * qty * (d || 1);
+                            const lineaNeta =
+                              linea?.neto ??
+                              (descuentoPct > 0
+                                ? lineaBruta - Math.round((lineaBruta * descuentoPct) / 100)
+                                : lineaBruta);
+                            const lineaDto = lineaBruta - lineaNeta;
                             return (
                               <li
                                 key={it.id}
@@ -442,7 +458,7 @@ export function CartDrawerView({
                                     />
                                     <div className="text-right">
                                       <div className="text-xs tabular text-ink">
-                                        {formatARS(it.pricePerDay * qty)}
+                                        {formatARS(lineaSubtotalPorJornada)}
                                         <span className="text-muted-foreground"> /día</span>
                                       </div>
                                       {d > 0 && (

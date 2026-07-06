@@ -2,7 +2,7 @@ import { useCart } from "@/lib/cart-store";
 import { useFlyToCart } from "@/lib/fly-to-cart-store";
 import { type Equipment } from "@/data/equipment";
 import { toLocalISO } from "@/lib/rental-dates";
-import { useCotizacion, lineaPorEquipo } from "@/lib/cotizacion";
+import { useCotizacion } from "@/lib/cotizacion";
 import { CartMiniBarView, type CartPreviewItem } from "./CartMiniBarView";
 
 /**
@@ -54,6 +54,7 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
       days={days}
       isEmpty={isEmpty}
       previewItems={previewItems}
+      lineas={totales.lineas}
       totalNeto={totales.totalNeto}
       conIva={totales.conIva}
       hayFechas={hayFechas}

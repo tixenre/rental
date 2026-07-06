@@ -167,6 +167,7 @@ export function CartDrawer({
     descuentoMonto,
     totalNeto,
     conIva,
+    lineas,
   } = totales;
 
   // Lead-time (#1126): el backend es la fuente de verdad (lo enforza el portero +
@@ -350,6 +351,7 @@ export function CartDrawer({
       onAdd={add}
       onRemove={remove}
       onSetQty={setQty}
+      lineas={lineas}
       subtotalTotal={subtotalTotal}
       descuentoPct={descuentoPct}
       descuentoOrigen={descuentoOrigen}
