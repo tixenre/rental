@@ -23,6 +23,7 @@ import { Input } from "@/design-system/ui/input";
 import { QtyInput } from "@/design-system/ui/qty-input";
 import { Label } from "@/design-system/ui/label";
 import { Textarea } from "@/design-system/ui/textarea";
+import { AdminPage } from "@/components/admin/AdminPage";
 import { QueryState } from "@/components/admin/QueryState";
 import { ListSkeleton } from "@/components/admin/skeletons";
 import { EmptyState } from "@/design-system/composites/EmptyState";
@@ -78,15 +79,11 @@ function SolicitudesPage() {
   const resueltas = solicitudes.filter((s) => s.estado !== "pendiente");
 
   return (
-    <div className="space-y-6 p-4 md:p-6 max-w-4xl mx-auto">
-      <header>
-        <div className="t-eyebrow">Operaciones · Solicitudes</div>
-        <h1 className="font-display text-3xl text-ink">Solicitudes</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Cambios pedidos por clientes en pedidos confirmados.
-        </p>
-      </header>
-
+    <AdminPage
+      title="Solicitudes"
+      maxW="detail"
+      description="Cambios pedidos por clientes en pedidos confirmados."
+    >
       <QueryState
         query={listQ}
         isEmpty={(d) => d.length === 0}
@@ -136,7 +133,7 @@ function SolicitudesPage() {
           </>
         )}
       </QueryState>
-    </div>
+    </AdminPage>
   );
 }
 

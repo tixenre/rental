@@ -8,6 +8,8 @@ import { AlertTriangle, ChevronDown, ChevronRight, RefreshCw } from "lucide-reac
 import { adminApi } from "@/lib/admin/api";
 import type { ServerError } from "@/lib/admin/api/errores";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { Button } from "@/design-system/ui/button";
+import { AdminPage } from "@/components/admin/AdminPage";
 import { QueryState } from "@/components/admin/QueryState";
 import { ListSkeleton } from "@/components/admin/skeletons";
 import { EmptyState } from "@/design-system/composites/EmptyState";
@@ -83,34 +85,33 @@ function ErroresPage() {
   const updatedAt = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5 text-destructive" />
-          <h1 className="text-xl font-display font-semibold text-ink">Errores del servidor</h1>
-          {data && (
-            <span className="font-mono text-xs text-muted-foreground">
-              ({data.total} registros)
-            </span>
+    <AdminPage
+      title="Errores del servidor"
+      maxW="detail"
+      description={
+        <>
+          {data && `${data.total} registros`}
+          {updatedAt && (
+            <>
+              {data && " · "}
+              Actualizado {formatDistanceToNow(updatedAt, { addSuffix: true, locale: es })} ·
+              Refresca automático cada 5 min
+            </>
           )}
-        </div>
-        <button
+        </>
+      }
+      actions={
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => refetch()}
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-ink transition-colors"
+          className="gap-1.5 text-muted-foreground hover:text-ink"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Actualizar
-        </button>
-      </div>
-
-      {updatedAt && (
-        <p className="text-xs text-muted-foreground">
-          Actualizado {formatDistanceToNow(updatedAt, { addSuffix: true, locale: es })}
-          {" · "}
-          Refresca automático cada 5 min
-        </p>
-      )}
-
+        </Button>
+      }
+    >
       <QueryState
         query={query}
         isEmpty={(d) => d.errores.length === 0}
@@ -131,6 +132,6 @@ function ErroresPage() {
           </div>
         )}
       </QueryState>
-    </div>
+    </AdminPage>
   );
 }

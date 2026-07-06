@@ -28,6 +28,12 @@ type AdminPageMaxW = keyof typeof MAX_W;
  *   <AdminPage title="Unidades" actions={<Button>Nueva</Button>}>
  *     …contenido…
  *   </AdminPage>
+ *
+ * **Excepción documentada:** `pedidos.$id.lazy.tsx` (el editor de un pedido) NO
+ * usa `AdminPage` — su topbar es una entidad viva (nombre del cliente + número +
+ * `EstadoBadge` + `SaveIndicator`/WhatsApp), no un título estático, y su cuerpo es
+ * una grilla de 2 columnas con rail sticky de financials — no encaja en `title`/
+ * `eyebrow`/`layout="page"` ni `"fullHeight"`. No forzar el swap ahí.
  */
 export function AdminPage({
   title,

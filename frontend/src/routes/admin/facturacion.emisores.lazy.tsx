@@ -28,6 +28,8 @@ import { facturacionApi, type EmisorArca } from "@/lib/admin/api";
 import { usePadronLookup, type PadronImpuesto } from "@/lib/admin/usePadronLookup";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { cn } from "@/lib/utils";
+import { Button } from "@/design-system/ui/button";
+import { AdminPage } from "@/components/admin/AdminPage";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,92 +70,82 @@ function EmisoresPage() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "emisores-arca"] });
 
   return (
-    <div className="px-4 md:px-6 py-6 space-y-6 max-w-3xl mx-auto">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <div className="font-mono text-2xs uppercase tracking-[0.25em] text-muted-foreground">
-            Back-office · Facturación ARCA
-          </div>
-          <h1 className="font-display text-3xl text-ink">Emisores</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            CUITs habilitados para emitir comprobantes electrónicos. Las claves se cifran con AES
-            antes de guardarse.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => setShowGuia(true)}
-            className="flex items-center gap-1.5 h-9 px-3 rounded-md border hairline text-sm font-medium text-ink hover:bg-muted/50"
-          >
-            <BookOpen className="h-3.5 w-3.5" />
+    <AdminPage
+      title="Emisores"
+      eyebrow="Facturación ARCA"
+      maxW="form"
+      description="CUITs habilitados para emitir comprobantes electrónicos. Las claves se cifran con AES antes de guardarse."
+      actions={
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowGuia(true)}>
+            <BookOpen className="h-3.5 w-3.5 mr-1.5" />
             Guía de AFIP
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             onClick={() => {
               setEditId(null);
               setShowForm(true);
             }}
-            className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-ink text-background text-sm font-medium"
           >
-            <Plus className="h-3.5 w-3.5" />
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
             Nuevo emisor
-          </button>
+          </Button>
         </div>
-      </header>
+      }
+    >
+      <div className="space-y-6">
+        {q.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
+        {q.isError && (
+          <div className="text-sm text-destructive">
+            Error cargando emisores. {(q.error as Error)?.message}
+          </div>
+        )}
 
-      {q.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
-      {q.isError && (
-        <div className="text-sm text-destructive">
-          Error cargando emisores. {(q.error as Error)?.message}
-        </div>
-      )}
+        {/* Lista */}
+        {emisores.length > 0 && (
+          <div className="space-y-3">
+            {emisores.map((e) => (
+              <EmisorCard
+                key={e.id}
+                emisor={e}
+                onEdit={() => {
+                  setEditId(e.id);
+                  setShowForm(true);
+                }}
+                onCert={() => setCertId(e.id)}
+                onToggleActivo={invalidate}
+              />
+            ))}
+          </div>
+        )}
 
-      {/* Lista */}
-      {emisores.length > 0 && (
-        <div className="space-y-3">
-          {emisores.map((e) => (
-            <EmisorCard
-              key={e.id}
-              emisor={e}
-              onEdit={() => {
-                setEditId(e.id);
-                setShowForm(true);
-              }}
-              onCert={() => setCertId(e.id)}
-              onToggleActivo={invalidate}
-            />
-          ))}
-        </div>
-      )}
+        {!q.isLoading && emisores.length === 0 && (
+          <div className="text-sm text-muted-foreground py-8 text-center">
+            No hay emisores configurados. Agregá el primero.
+          </div>
+        )}
 
-      {!q.isLoading && emisores.length === 0 && (
-        <div className="text-sm text-muted-foreground py-8 text-center">
-          No hay emisores configurados. Agregá el primero.
-        </div>
-      )}
+        {/* Formulario crear/editar */}
+        {showForm && (
+          <EmisorFormModal
+            emisor={editEmisor ?? null}
+            onClose={() => {
+              setShowForm(false);
+              setEditId(null);
+            }}
+            onSaved={invalidate}
+          />
+        )}
 
-      {/* Formulario crear/editar */}
-      {showForm && (
-        <EmisorFormModal
-          emisor={editEmisor ?? null}
-          onClose={() => {
-            setShowForm(false);
-            setEditId(null);
-          }}
-          onSaved={invalidate}
-        />
-      )}
+        {/* Formulario de cert/clave */}
+        {certId !== null && certEmisor && (
+          <CertFormModal emisor={certEmisor} onClose={() => setCertId(null)} onSaved={invalidate} />
+        )}
 
-      {/* Formulario de cert/clave */}
-      {certId !== null && certEmisor && (
-        <CertFormModal emisor={certEmisor} onClose={() => setCertId(null)} onSaved={invalidate} />
-      )}
-
-      {/* Guía de trámites de AFIP */}
-      {showGuia && <GuiaAfipModal onClose={() => setShowGuia(false)} />}
-    </div>
+        {/* Guía de trámites de AFIP */}
+        {showGuia && <GuiaAfipModal onClose={() => setShowGuia(false)} />}
+      </div>
+    </AdminPage>
   );
 }
 

@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 import { Button } from "@/design-system/ui/button";
+import { AdminPage } from "@/components/admin/AdminPage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -192,39 +193,39 @@ function PedidosPage() {
   });
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-var(--admin-topbar-h,56px))] min-h-0">
-      {/* Header */}
-      <div className="px-4 md:px-6 pt-3 md:pt-5 pb-2 md:pb-3 shrink-0">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-          <div>
-            <div className="t-eyebrow">Operaciones · Pedidos</div>
-            <h1 className="font-display text-2xl md:text-3xl text-ink">Pedidos</h1>
-            <p className="hidden md:block text-sm text-muted-foreground mt-1 max-w-[540px]">
-              Reservas activas y solicitudes de cambio de tus clientes.{" "}
-              {pedidosQ.isLoading ? "Cargando…" : `${total} en total.`}
-            </p>
-          </div>
-          <div className="hidden md:flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => navigate({ to: "/admin/solicitudes" })}
-              className="relative"
-            >
-              <Pencil className="h-4 w-4 mr-1" /> Solicitudes
-              {pendientes > 0 && (
-                <span className="ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-amber px-1.5 font-mono text-2xs font-bold text-ink">
-                  {pendientes}
-                </span>
-              )}
-            </Button>
-            <Button onClick={() => navigate({ to: "/admin/pedidos/nuevo" })}>
-              <Plus className="h-4 w-4 mr-1" /> Nuevo pedido
-            </Button>
-          </div>
+    <AdminPage
+      layout="fullHeight"
+      title="Pedidos"
+      description={
+        <>
+          Reservas activas y solicitudes de cambio de tus clientes.{" "}
+          {pedidosQ.isLoading ? "Cargando…" : `${total} en total.`}
+        </>
+      }
+      actions={
+        <div className="hidden md:flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate({ to: "/admin/solicitudes" })}
+            className="relative"
+          >
+            <Pencil className="h-4 w-4 mr-1" /> Solicitudes
+            {pendientes > 0 && (
+              <span className="ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-amber px-1.5 font-mono text-2xs font-bold text-ink">
+                {pendientes}
+              </span>
+            )}
+          </Button>
+          <Button onClick={() => navigate({ to: "/admin/pedidos/nuevo" })}>
+            <Plus className="h-4 w-4 mr-1" /> Nuevo pedido
+          </Button>
         </div>
-
-        {/* Búsqueda + chips de estado */}
-        <div className="flex flex-col md:flex-row md:items-center gap-2 mt-3 md:mt-4">
+      }
+      className="flex flex-col"
+    >
+      {/* Búsqueda + chips de estado */}
+      <div className="px-4 md:px-6 pb-2 md:pb-3 shrink-0">
+        <div className="flex flex-col md:flex-row md:items-center gap-2">
           <SearchInput
             value={q}
             onValueChange={setQ}
@@ -403,7 +404,7 @@ function PedidosPage() {
         onClick={() => navigate({ to: "/admin/pedidos/nuevo" })}
         label="Nuevo pedido"
       />
-    </div>
+    </AdminPage>
   );
 }
 
