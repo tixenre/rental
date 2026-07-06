@@ -267,6 +267,18 @@ jobs:
           export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
           export RESERVAS_DB_TEST=1
           python -m pytest tests/test_ranking_service_db.py tests/test_routes_admin_guard_db.py -v --tb=short -m integration
+      - name: Canal C de specs (propuestas + embudo que aprende) contra Postgres real (#1176 F7)
+        run: |
+          cd backend
+          # spec_propuestas_pendientes: proponer_desde_equipo/proponer_desde_unmatched
+          # encolan candidatos de spec/alias nuevos desde unmatched frecuente; el
+          # CHECK constraint de `tipo` y el JSONB del payload no los captura el
+          # FakeConn de los tests unit.
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_specs_ingesta_proponer_db.py -v --tb=short -m integration
 
   build:
     name: Build frontend
