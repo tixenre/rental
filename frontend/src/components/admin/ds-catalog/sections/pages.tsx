@@ -133,7 +133,7 @@ function ArchetypeCard({ a }: { a: Archetype }) {
   const [thumbErr, setThumbErr] = useState(false);
   const thumb = a.href && !thumbErr ? `/ds-thumbs/${a.name}.png` : undefined;
   return (
-    <div className="flex flex-col gap-2 rounded-lg border hairline bg-surface p-4">
+    <div className="flex flex-col gap-2 card p-4">
       {thumb && (
         <div className="-mx-1 -mt-1 mb-1 overflow-hidden rounded-md border hairline bg-card">
           <img
@@ -193,7 +193,7 @@ export const pagesSection: CatalogSection = {
       blurb:
         "El chrome único de página del back-office: eyebrow + título + descripción + acciones + back-link. maxW=form|detail|list|wide (presets, default wide). layout=fullHeight para master-detail (ocupa el viewport, sin maxW).",
       render: () => (
-        <div className="overflow-hidden rounded-lg border hairline bg-background">
+        <div className="overflow-hidden card">
           <AdminPage
             title="Título de la página"
             eyebrow="Sección"
@@ -204,9 +204,7 @@ export const pagesSection: CatalogSection = {
               </Button>
             }
           >
-            <div className="rounded-md border hairline bg-surface p-4 text-sm text-muted-foreground">
-              …contenido de la página…
-            </div>
+            <div className="card p-4 text-sm text-muted-foreground">…contenido de la página…</div>
           </AdminPage>
         </div>
       ),

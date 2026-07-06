@@ -123,7 +123,7 @@ export const navigationSection: CatalogSection = {
               <ChevronDown className="h-4 w-4" />
             </Button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="rounded-lg border hairline bg-surface p-3 text-sm text-muted-foreground">
+          <CollapsibleContent className="card p-3 text-sm text-muted-foreground">
             Sensor full-frame, grabación 4K60, montura E. Specs derivadas del catálogo.
           </CollapsibleContent>
         </Collapsible>
@@ -161,7 +161,7 @@ export const navigationSection: CatalogSection = {
       blurb:
         "Contenedor de alto fijo con scrollbar estilizada propia. Para listas largas que no deben empujar el layout.",
       render: () => (
-        <ScrollArea className="h-48 w-full max-w-xs rounded-lg border hairline bg-surface">
+        <ScrollArea className="h-48 w-full max-w-xs card">
           <div className="p-3">
             <Caption>Equipos disponibles</Caption>
             <ul className="mt-2 space-y-2">

@@ -131,10 +131,7 @@ function CartMiniBarDemo() {
       </Row>
       {/* `transform` crea el containing block → el mini-bar `fixed` se ancla a esta
           caja en vez del viewport. Así se muestra embebido sin tocar el componente. */}
-      <div
-        className="relative h-36 overflow-hidden rounded-lg border hairline bg-surface"
-        style={{ transform: "translateZ(0)" }}
-      >
+      <div className="relative h-36 overflow-hidden card" style={{ transform: "translateZ(0)" }}>
         <CartMiniBarView
           count={count}
           days={DEMO_DAYS}

@@ -346,8 +346,8 @@ intuición de devs que conocen Tailwind. Referencia rápida:
 | `p-1` `gap-1`   | 4   | Stepper button gap         |
 | `p-2` `gap-2`   | 8   | Chip rail gap, inline pill |
 | `p-3` `gap-3`   | 12  | Card body, button gap      |
-| `p-4` `gap-4`   | 16  | Drawer item                |
-| `p-6` `gap-6`   | 24  | Section, card padding      |
+| `p-4` `gap-4`   | 16  | Drawer item, **padding default de `card`/`card-elevated`** |
+| `p-6` `gap-6`   | 24  | Section grande, dialogs    |
 | `p-8` `gap-8`   | 32  | Hero mobile                |
 | `p-12` `gap-12` | 48  | Hero desktop, container    |
 
@@ -529,6 +529,22 @@ import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
   <div className="...">contenido del modal</div>
 </ModalBackdrop>
 // ModalBackdrop incluye fixed inset-0 + z-50 + bg-black/60 — no wrappear con otro backdrop.
+```
+
+### `card` / `card-elevated` (utility CSS en `utilities.css`)
+
+Receta única de panel con borde+fondo — reemplaza el `rounded-(md|lg|xl) border
+hairline bg-(background|surface)` (y su variante `bg-surface-elevated`) que
+aparecía copy-pasteado por el admin. `@utility` (no `@layer utilities`), así
+soporta variantes (`hover:card`, `dark:card`…). **Sin padding en la receta** —
+el default es `p-4`, cada consumidor lo agrega (o lo pisa: dialogs/drawers
+usan otro). Solo para **paneles estáticos** — un `<input>`/`<select>`/
+`<button>` que comparta la misma forma visual NO usa `card` (mezclaría la
+semántica de "panel" con la de "control"); esos quedan con las clases sueltas.
+
+```tsx
+<div className="card p-4">…</div>              // bg-surface
+<div className="card-elevated p-4">…</div>      // bg-surface-elevated
 ```
 
 ### `.px-portal` (utility CSS en `utilities.css`)

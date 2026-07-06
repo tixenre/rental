@@ -571,7 +571,7 @@ function PedidoEditorPage() {
                       {format(endDate, "dd MMM yyyy", { locale: es })} · {endTime}
                     </span>
                   </div>
-                  <span className="ml-auto rounded-md border hairline bg-background px-2.5 py-1 text-center shrink-0">
+                  <span className="ml-auto card px-2.5 py-1 text-center shrink-0">
                     <span className="font-mono text-base font-semibold leading-none">
                       {jornadas}
                     </span>

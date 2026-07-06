@@ -71,7 +71,7 @@ function ReporteMensualPage() {
             )}
 
             {/* Cascada del mes: facturado − comisiones a dueños − gastos = ganancia */}
-            <div className="max-w-xl rounded-xl border hairline bg-surface-elevated p-5 sm:p-6">
+            <div className="max-w-xl card-elevated p-5 sm:p-6">
               <div className="t-eyebrow">El mes de Rambla</div>
               <div className="mt-3 space-y-0.5">
                 <CascadaRow

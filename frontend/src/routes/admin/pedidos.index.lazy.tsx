@@ -642,7 +642,7 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
 
         {/* Fechas + total */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="rounded-xl border hairline bg-surface-elevated px-4 py-3">
+          <div className="card-elevated px-4 py-3">
             <div className="t-eyebrow">Fechas</div>
             <div className="mt-1 text-ink font-medium tabular-nums">
               {fechaDia(p.fecha_desde)} → {fechaDia(p.fecha_hasta)}
@@ -651,7 +651,7 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
               {jornadas} jornada{jornadas !== 1 ? "s" : ""}
             </div>
           </div>
-          <div className="rounded-xl border hairline bg-surface-elevated px-4 py-3">
+          <div className="card-elevated px-4 py-3">
             <div className="t-eyebrow">Total neto</div>
             <div className="mt-1 font-mono text-2xl font-semibold tabular-nums text-ink">
               {fmtArs(total)}
@@ -667,7 +667,7 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
         </div>
 
         {/* Equipos */}
-        <div className="rounded-xl border hairline bg-surface-elevated">
+        <div className="card-elevated">
           <div className="flex items-center justify-between px-4 py-2.5 border-b hairline">
             <span className="t-eyebrow">Equipos · {nItems}</span>
             {nItems > 0 && <span className="t-eyebrow">precio / jornada</span>}

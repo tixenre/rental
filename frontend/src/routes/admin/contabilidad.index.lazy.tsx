@@ -50,7 +50,7 @@ function ContabilidadTablero() {
           <>
             {/* KPIs: disponible · ganancia del mes (la rendición vive en la cuenta corriente) */}
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border hairline bg-surface-elevated p-5">
+              <div className="card-elevated p-5">
                 <div className="t-eyebrow">Plata disponible</div>
                 <div className="font-mono text-3xl font-semibold tabular-nums text-ink mt-1">
                   {formatMoney(data.disponible.totales.ARS ?? 0, "ARS")}
@@ -65,7 +65,7 @@ function ContabilidadTablero() {
                 </div>
               </div>
 
-              <div className="rounded-xl border hairline bg-surface-elevated p-5">
+              <div className="card-elevated p-5">
                 <div className="t-eyebrow">Ganancia neta · {data.ganancia_mes.mes}</div>
                 <div
                   className={`font-mono text-3xl font-semibold tabular-nums mt-1 ${

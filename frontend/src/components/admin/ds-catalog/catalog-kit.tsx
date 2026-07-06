@@ -41,7 +41,7 @@ export function Sample({ label, children }: { label: ReactNode; children: ReactN
  */
 function SpecimenCard({ spec }: { spec: Specimen }) {
   return (
-    <article className="space-y-3 rounded-xl border hairline bg-surface-elevated p-5">
+    <article className="space-y-3 card-elevated p-5">
       <header className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h3 className="font-display text-base text-ink">{spec.name}</h3>
         {spec.files[0] && (
@@ -49,7 +49,7 @@ function SpecimenCard({ spec }: { spec: Specimen }) {
         )}
       </header>
       {spec.blurb && <p className="text-sm text-muted-foreground">{spec.blurb}</p>}
-      <div className="rounded-lg border hairline bg-surface p-4">{spec.render()}</div>
+      <div className="card p-4">{spec.render()}</div>
     </article>
   );
 }

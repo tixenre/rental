@@ -298,7 +298,7 @@ function EmisorCard({
         </DropdownMenu>
       </div>
       {certInfo.data && (
-        <div className="rounded-md border hairline bg-surface-elevated px-3 py-2 text-xs space-y-1 font-mono">
+        <div className="card-elevated px-3 py-2 text-xs space-y-1 font-mono">
           <div>
             <span className="text-muted-foreground">Nº de serie: </span>
             {certInfo.data.numero_serie}
@@ -318,7 +318,7 @@ function EmisorCard({
         </div>
       )}
       {diagnostico.data && (
-        <div className="rounded-md border hairline bg-surface-elevated px-3 py-2.5">
+        <div className="card-elevated px-3 py-2.5">
           <div
             className={cn(
               "text-2xs font-mono font-medium mb-2",
@@ -1187,7 +1187,7 @@ function PemFileField({
     <Field label={displayLabel}>
       <div className="space-y-1.5">
         {/* File picker */}
-        <label className="flex items-center gap-2 h-9 px-3 rounded-md border hairline bg-surface-elevated text-sm cursor-pointer hover:bg-muted/20 w-full">
+        <label className="flex items-center gap-2 h-9 px-3 card-elevated text-sm cursor-pointer hover:bg-muted/20 w-full">
           <Upload className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <span className={cn("truncate text-sm", fileName ? "text-ink" : "text-muted-foreground")}>
             {fileName ?? "Elegir archivo .pem / .crt / .key"}

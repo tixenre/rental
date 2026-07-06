@@ -32,7 +32,7 @@ function EntryCard({ entry }: { entry: ChangelogEntry }) {
       >
         {kind.icon}
       </div>
-      <article className="rounded-xl border hairline bg-surface p-5 hover:border-ink/20 transition">
+      <article className="card p-5 hover:border-ink/20 transition">
         <header className="flex items-start gap-3 mb-2">
           <div className="flex-1 min-w-0">
             <h2 className="font-display text-base text-ink leading-snug">{entry.title}</h2>

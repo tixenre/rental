@@ -294,6 +294,25 @@
   }
 }
 
+/* ── Card: receta única de panel con borde+fondo ──────────────
+   Consolida el patrón `rounded-lg border hairline bg-surface` (y su variante
+   `bg-surface-elevated`) que aparecía copy-pasteado por el admin. A propósito
+   SIN padding — el default es p-4 (ver "Spacing" en DESIGN_SYSTEM.md), pero
+   cada consumidor lo pisa si hace falta (dialogs, drawers). `@utility` (no
+   `@layer utilities`) para que soporte variantes (hover:card, dark:card…). */
+@utility card {
+  border-radius: var(--radius-lg);
+  border-width: 1px;
+  border-color: var(--color-hairline);
+  background-color: var(--color-surface);
+}
+@utility card-elevated {
+  border-radius: var(--radius-lg);
+  border-width: 1px;
+  border-color: var(--color-hairline);
+  background-color: var(--color-surface-elevated);
+}
+
 /* ── prefers-reduced-motion: kill ALL CSS animations ───────── */
 /* La red de Framer Motion la tira MotionConfig reducedMotion="user" en main.tsx */
 @media (prefers-reduced-motion: reduce) {

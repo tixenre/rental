@@ -134,7 +134,7 @@ export function EquipoComboSearch({
       />
 
       {open && (
-        <div className="absolute z-30 left-0 right-0 mt-1 rounded-lg border hairline bg-surface-elevated shadow-[var(--shadow-md)] max-h-80 overflow-auto">
+        <div className="absolute z-30 left-0 right-0 mt-1 card-elevated shadow-[var(--shadow-md)] max-h-80 overflow-auto">
           {equiposQ.isLoading ? (
             <div className="p-3 text-xs text-muted-foreground">Cargando catálogo…</div>
           ) : matches.length === 0 ? (

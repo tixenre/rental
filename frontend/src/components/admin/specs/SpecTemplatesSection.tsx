@@ -196,11 +196,7 @@ export function SpecTemplatesSection({
   };
 
   return (
-    <section
-      className={
-        showHeader ? "rounded-lg border hairline bg-background p-4 space-y-4" : "space-y-4"
-      }
-    >
+    <section className={showHeader ? "card p-4 space-y-4" : "space-y-4"}>
       {showHeader && (
         <header className="space-y-1">
           <h2 className="font-display text-lg text-ink">Specs por categoría</h2>

@@ -374,7 +374,7 @@ function DisclaimerFieldRow({ field }: { field: DisclaimerField }) {
 
 export function HorariosSection() {
   return (
-    <section className="rounded-lg border hairline bg-background p-4 space-y-5">
+    <section className="card p-4 space-y-5">
       <div>
         <h2 className="font-display text-lg text-ink">Horarios</h2>
         <p className="text-xs text-muted-foreground mt-0.5">

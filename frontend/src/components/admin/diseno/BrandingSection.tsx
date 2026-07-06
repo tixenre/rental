@@ -132,7 +132,7 @@ export function BrandingSection() {
   return (
     <section className="space-y-6">
       {/* OG image */}
-      <div className="rounded-lg border hairline bg-background p-4 space-y-3">
+      <div className="card p-4 space-y-3">
         <div className="flex items-center gap-2">
           <ImageIcon className="h-4 w-4 text-muted-foreground" />
           <h2 className="font-display text-lg text-ink">Imagen para compartir</h2>
@@ -199,7 +199,7 @@ export function BrandingSection() {
       </div>
 
       {/* WhatsApp phone */}
-      <div className="rounded-lg border hairline bg-background p-4 space-y-3">
+      <div className="card p-4 space-y-3">
         <div className="flex items-center gap-2">
           <MessageCircle className="h-4 w-4 text-verde-ink" />
           <h2 className="font-display text-lg text-ink">WhatsApp del negocio</h2>
@@ -247,7 +247,7 @@ export function BrandingSection() {
       </div>
 
       {/* Hero taglines */}
-      <div className="rounded-lg border hairline bg-background p-4 space-y-3">
+      <div className="card p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Type className="h-4 w-4 text-muted-foreground" />
           <h2 className="font-display text-lg text-ink">Taglines del hero</h2>

@@ -36,7 +36,7 @@ export function SortableTrabajoCard({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-center gap-3 rounded-xl border hairline bg-background p-3 transition-shadow",
+        "flex items-center gap-3 card p-3 transition-shadow",
         isDragging ? "shadow-lg opacity-80" : "",
       )}
     >

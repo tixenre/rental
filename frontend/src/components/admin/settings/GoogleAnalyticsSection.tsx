@@ -43,7 +43,7 @@ export function GoogleAnalyticsSection() {
   const dirty = norm !== actual;
 
   return (
-    <section className="rounded-lg border hairline bg-background p-4 space-y-3">
+    <section className="card p-4 space-y-3">
       <div>
         <h2 className="font-display text-lg text-ink">Google Analytics</h2>
         <p className="text-xs text-muted-foreground mt-0.5">

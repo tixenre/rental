@@ -133,7 +133,7 @@ function FieldRow({ field }: { field: FieldDef }) {
 
 export function ContactoSection() {
   return (
-    <div className="rounded-lg border hairline bg-background p-4 space-y-5">
+    <div className="card p-4 space-y-5">
       <div>
         <h2 className="font-display text-lg text-ink">Datos de contacto</h2>
         <p className="text-xs text-muted-foreground mt-0.5">

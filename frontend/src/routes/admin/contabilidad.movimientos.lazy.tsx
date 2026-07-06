@@ -377,7 +377,7 @@ function CobroDetalle({ mes }: { mes: string }) {
           ver ledger completo →
         </Link>
       </div>
-      <div className="divide-y hairline rounded-md border hairline bg-surface-elevated">
+      <div className="divide-y hairline card-elevated">
         {pagos.map((p) => (
           <div key={p.id} className="flex items-center gap-3 px-3 py-1.5 text-xs">
             <span className="whitespace-nowrap text-muted-foreground">

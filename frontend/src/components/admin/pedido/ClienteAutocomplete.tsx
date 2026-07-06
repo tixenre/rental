@@ -58,7 +58,7 @@ export function ClienteAutocomplete({
           <div
             role="listbox"
             id="cliente-autocomplete-list"
-            className="absolute z-30 left-0 right-0 mt-1 rounded-md border hairline bg-background shadow-md max-h-52 overflow-auto"
+            className="absolute z-30 left-0 right-0 mt-1 card shadow-md max-h-52 overflow-auto"
           >
             {clientesQ.isLoading && (
               <div className="p-3 text-xs text-muted-foreground">Buscando…</div>

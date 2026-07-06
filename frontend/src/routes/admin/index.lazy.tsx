@@ -175,7 +175,7 @@ function PedidosCard({
   empty: string;
 }) {
   return (
-    <div className="rounded-xl border hairline bg-surface overflow-hidden">
+    <div className="card overflow-hidden">
       <div className="px-4 py-3 border-b hairline flex items-center gap-2">
         <span className="text-muted-foreground">{icon}</span>
         <h2 className="font-display text-base text-ink">{title}</h2>
@@ -220,7 +220,7 @@ function EquiposAfueraCard({
   }[];
 }) {
   return (
-    <div className="rounded-xl border hairline bg-surface overflow-hidden">
+    <div className="card overflow-hidden">
       <div className="px-4 py-3 border-b hairline flex items-center gap-2">
         <span className="text-muted-foreground">
           <AlertCircle className="h-4 w-4" />
