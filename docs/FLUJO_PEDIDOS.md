@@ -12,15 +12,33 @@ Un pedido pasa por estos estados (columna `estado` de la tabla `alquileres`):
 |---|---|---|
 | `borrador` | Pedido a medio cargar (lo usa el admin). | No lo ve. |
 | `presupuesto` | **Solicitud enviada, a confirmar.** Es donde caen todos los pedidos del cliente al crearse. | "Solicitado" |
-| `confirmado` | Confirmamos disponibilidad y precio. Acá se habilitan el **remito** y el **contrato**. | "Confirmado" |
+| `confirmado` | Confirmamos disponibilidad y precio. Acá se habilitan los documentos (remito/contrato). | "Confirmado" |
 | `retirado` | El cliente pasó por el local y se llevó el equipo. | "Retirado" |
 | `devuelto` | Recibimos el equipo de vuelta y lo revisamos. | "Devuelto" |
-| `finalizado` | Pedido cerrado. | "Finalizado" |
-| `cancelado` | El pedido se dio de baja (estado terminal alternativo). | "Cancelado" |
+| `finalizado` | Pedido cerrado (normalmente automático — ver abajo). | "Finalizado" |
+| `cancelado` | El pedido se dio de baja (estado terminal, sin salida). | "Cancelado" |
 
 Los estados que **reservan stock** (cuentan contra la disponibilidad) son `presupuesto`,
-`confirmado` y `retirado`. El estado canónico vive en `backend/routes/alquileres.py`
-(`ESTADOS_VALIDOS`).
+`confirmado` y `retirado`.
+
+**Motor único de transición** (`backend/routes/alquileres/transiciones.py::cambiar_estado`,
+sesión 2026-07-06): antes esta lógica estaba desparramada (el PATCH admin, el cancelar del
+cliente, el auto-finalizar); ahora es una sola puerta con un grafo explícito
+(`TRANSICIONES`). El admin puede moverse **libremente hacia adelante y hacia atrás** entre
+los estados operativos (necesita poder corregir un pedido ya avanzado), con dos guards:
+
+- **Volver a `borrador` está bloqueado** si el pedido ya tiene plata cobrada (`monto_pagado
+  > 0`) o una factura activa — no puede retroceder a un estado que ni siquiera exige
+  fechas/ítems una vez que hay algo real comprometido.
+- **`finalizado` es "estilo Magento"**: normalmente se prende solo (`devuelto` + pagado
+  completo) y se apaga solo si se anula el pago que lo completaba — pero sigue siendo un
+  destino manual válido, un paso desde/hacia `devuelto`, para el caso real de un pedido
+  `monto_total=0` (comp/cortesía) que nunca cumple esa condición y quedaría trabado en
+  `devuelto` para siempre sin el botón "Finalizar" del admin.
+
+`cancelado` es alcanzable desde cualquier estado *antes* de `retirado` (para admin y
+cliente), pero no tiene salida definida. El cliente (portal) solo puede disparar la
+transición a `cancelado` — cualquier otro destino es rechazado.
 
 ## 2. El flujo de confirmación visible (qué ve el cliente al solicitar)
 

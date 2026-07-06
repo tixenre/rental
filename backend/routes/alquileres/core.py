@@ -91,8 +91,6 @@ from reservas import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-ESTADOS_VALIDOS    = {"borrador", "presupuesto", "confirmado", "retirado", "devuelto", "finalizado", "cancelado"}
-
 
 # ── Rutas de pedidos ─────────────────────────────────────────────────────────
 

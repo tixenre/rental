@@ -15,21 +15,17 @@ from typing import Optional
 
 from fastapi import Request, HTTPException, Query, BackgroundTasks
 
-from database import get_db, row_to_dict, to_datetime
+from database import get_db, row_to_dict
 from auth.guards import require_admin
 from services.email import send_email
 from reservas import validar_stock as _check_stock
 from routes.alquileres.core import (
     router,
-    ESTADOS_VALIDOS,
     PedidoCreate,
     PedidoEstado,
     PedidoDatos,
     PedidoItemUpdate,
     create_pedido_retry,
-    _es_historico,
-    _maybe_finalizar,
-    _next_numero_pedido,
     _get_alquiler_detail,
     _batch_get_alquiler_items,
     _enriquecer_pedidos_con_cliente,
@@ -38,6 +34,7 @@ from routes.alquileres.core import (
     _apply_pedido_datos,
     _apply_pedido_items,
 )
+from routes.alquileres.transiciones import ESTADOS_QUE_RESERVAN, cambiar_estado
 
 logger = logging.getLogger(__name__)
 
@@ -49,14 +46,6 @@ SORT_COLS = {
     "fecha":   "p.fecha_desde",
     "estado":  "p.estado",
 }
-
-ESTADOS_REQUIEREN_FECHAS = {"confirmado", "retirado", "devuelto", "finalizado"}
-
-
-# Estados que reservan stock activamente — cualquier transición HACIA uno de
-# estos requiere re-validar stock incluso si el destino no exige fechas/items
-# (caso típico: borrador → presupuesto).
-ESTADOS_QUE_RESERVAN = {"presupuesto", "confirmado", "retirado"}
 
 
 @router.post("/alquileres", status_code=201)
@@ -174,90 +163,17 @@ def delete_pedido(id: int, request: Request):
 
 @router.patch("/alquileres/{id}")
 def update_pedido(id: int, data: PedidoEstado, request: Request, background: BackgroundTasks):
+    """Transición de estado admin. La legalidad de la transición, las
+    validaciones de fecha/stock, la asignación de `numero_pedido` y el
+    auto-cancelado de solicitudes pendientes viven todas en
+    `transiciones.cambiar_estado` — ver ese módulo para el grafo completo.
+    Acá solo queda el transporte HTTP + el mail de confirmación."""
     require_admin(request)
-    if data.estado not in ESTADOS_VALIDOS:
-        raise HTTPException(400, f"Estado inválido. Usar: {', '.join(sorted(ESTADOS_VALIDOS))}")
 
     with get_db() as conn:
         try:
-            p_row = conn.execute("SELECT * FROM alquileres WHERE id=%s", (id,)).fetchone()
-            if not p_row:
-                raise HTTPException(404, "Pedido no encontrado")
-
-            # ── Validaciones para estados que requieren fechas y stock ──────────────
-            if data.estado in ESTADOS_REQUIEREN_FECHAS and not _es_historico(p_row["fuente"]):
-                errores = []
-                if not p_row["fecha_desde"] or not p_row["fecha_hasta"]:
-                    errores.append("El pedido no tiene fechas de inicio y fin.")
-                else:
-                    try:
-                        d0 = to_datetime(p_row["fecha_desde"])
-                        d1 = to_datetime(p_row["fecha_hasta"])
-
-                        if d0 >= d1:
-                            errores.append("fecha_hasta debe ser posterior a fecha_desde")
-                        # Endpoint admin-only (require_admin arriba): el admin puede
-                        # avanzar pedidos con fecha de retiro pasada (carga
-                        # retroactiva), así que no se rechaza el pasado acá.
-                    except ValueError:
-                        errores.append("Las fechas tienen formato inválido")
-
-                if not conn.execute(
-                    "SELECT 1 FROM alquiler_items WHERE pedido_id=%s", (id,)
-                ).fetchone():
-                    errores.append("El pedido no tiene equipos cargados.")
-                if p_row["fecha_desde"] and p_row["fecha_hasta"] and not errores:
-                    sin_stock = _check_stock(conn, id, p_row["fecha_desde"], p_row["fecha_hasta"])
-                    for s in sin_stock:
-                        errores.append(f"Sin stock suficiente: {s}")
-                if errores:
-                    raise HTTPException(422, {"errores": errores})
-
-            # Cualquier transición a un estado que reserva stock debe re-validar,
-            # incluyendo "presupuesto" (que no exige fechas pero sí reserva si las
-            # tiene). Salteamos si la transición no cambia el flag de "reserva"
-            # (ej. confirmado → confirmado, o presupuesto → confirmado ya validado
-            # arriba).
-            elif (
-                data.estado in ESTADOS_QUE_RESERVAN
-                and p_row["estado"] not in ESTADOS_QUE_RESERVAN
-                and not _es_historico(p_row["fuente"])
-                and p_row["fecha_desde"] and p_row["fecha_hasta"]
-            ):
-                sin_stock = _check_stock(conn, id, p_row["fecha_desde"], p_row["fecha_hasta"])
-                if sin_stock:
-                    raise HTTPException(
-                        422,
-                        {"errores": [f"Sin stock suficiente: {s}" for s in sin_stock]},
-                    )
-
-            estado_anterior = p_row["estado"]
-            updates         = {"estado": data.estado}
-
-            if data.estado == "confirmado" and not p_row["numero_pedido"]:
-                next_n = _next_numero_pedido(conn)
-                updates["numero_pedido"] = next_n
-
-            set_clause = ", ".join(f"{k}=%s" for k in updates)
-            conn.execute(f"UPDATE alquileres SET {set_clause} WHERE id=%s", (*updates.values(), id))
-
-            # Si el pedido se va a un estado fuera de los modificables, las
-            # solicitudes pendientes quedan huérfanas. Las cancelamos en la
-            # misma transacción para no confundir al cliente ni al admin.
-            # Import diferido para evitar ciclo con cliente_portal.
-            from routes.cliente_portal import (
-                ESTADOS_MODIFICABLES, _cancelar_solicitudes_pendientes,
-            )
-            if data.estado not in ESTADOS_MODIFICABLES:
-                _cancelar_solicitudes_pendientes(
-                    conn, id,
-                    motivo=f"El pedido pasó a estado '{data.estado}'.",
-                    actor="system",
-                )
-
-            _maybe_finalizar(conn, id)
+            resultado = cambiar_estado(conn, id, data.estado, es_admin=True, actor="system")
             conn.commit()
-
             pedido = _get_alquiler_detail(conn, id)
         except Exception:
             logger.error("Error actualizando estado del pedido %s", id, exc_info=True)
@@ -268,8 +184,8 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
     # otro estado — no re-mandamos si ya estaba confirmado).
     if (
         pedido
-        and data.estado == "confirmado"
-        and estado_anterior != "confirmado"
+        and resultado["estado_nuevo"] == "confirmado"
+        and resultado["estado_anterior"] != "confirmado"
         and pedido.get("cliente_email")
     ):
         ctx = _pedido_email_context(pedido)
@@ -305,8 +221,8 @@ def update_alquiler_items(id: int, data: PedidoItemUpdate, request: Request):
             # Si el pedido está en estado que reserva stock, validar después de
             # aplicar los nuevos items. Sin esto el admin podía sumar cantidades
             # que excedieran el stock disponible y crear doble booking silencioso.
-            # `ESTADOS_QUE_RESERVAN` (mismo set que usa `update_pedido` arriba) —
-            # antes era un literal duplicado que podía desincronizarse en silencio.
+            # `ESTADOS_QUE_RESERVAN` es el mismo set que usa el grafo de
+            # transiciones (`transiciones.py`) — una sola fuente.
             p = conn.execute(
                 "SELECT estado, fecha_desde, fecha_hasta FROM alquileres WHERE id=%s", (id,)
             ).fetchone()
