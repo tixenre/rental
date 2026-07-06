@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { authedFetch, authedJson } from "@/lib/authedFetch";
+import { solicitudesAdminApi } from "@/lib/admin/api/solicitudes";
+import type { CambiosJson, Solicitud } from "@/lib/admin/api/types";
 import { fmtArs, formatFechaDisplay } from "@/lib/format";
 import { nombreCliente } from "@/lib/cliente-nombre";
 import { Button } from "@/design-system/ui/button";
@@ -40,42 +41,6 @@ export const Route = createLazyFileRoute("/admin/solicitudes")({
   component: SolicitudesPage,
 });
 
-type ModificacionItem = { equipo_id: number; cantidad: number };
-type CambiosJson = {
-  fecha_desde?: string | null;
-  fecha_hasta?: string | null;
-  items: ModificacionItem[];
-  mensaje?: string | null;
-};
-type Solicitud = {
-  id: number;
-  pedido_id: number;
-  cliente_nombre: string;
-  cliente_apellido?: string | null;
-  cliente_email: string | null;
-  numero_pedido: number | null;
-  mensaje: string | null;
-  estado: "pendiente" | "aprobada" | "rechazada" | "cancelada";
-  respuesta: string | null;
-  cambios_json: CambiosJson | null;
-  tipo: "directo" | "aprobacion";
-  resolved_at: string | null;
-  resolved_by: string | null;
-  created_at: string;
-  pedido_fecha_desde: string | null;
-  pedido_fecha_hasta: string | null;
-  monto_total: number;
-};
-
-type Equipo = { id: number; nombre: string; nombre_publico?: string | null };
-type PedidoLite = {
-  id: number;
-  numero_pedido: number | null;
-  fecha_desde: string | null;
-  fecha_hasta: string | null;
-  items: { equipo_id: number; cantidad: number; nombre: string; nombre_publico?: string | null }[];
-};
-
 function fmtFecha(s?: string | null) {
   return formatFechaDisplay(s);
 }
@@ -84,31 +49,16 @@ function SolicitudesPage() {
   const qc = useQueryClient();
   const listQ = useQuery({
     queryKey: ["admin", "solicitudes"],
-    queryFn: () => authedJson<Solicitud[]>("/api/admin/solicitudes"),
+    queryFn: () => solicitudesAdminApi.list(),
   });
 
   const resolverMut = useMutation({
-    mutationFn: async (args: {
+    mutationFn: (args: {
       id: number;
       estado: "aprobada" | "rechazada";
       respuesta: string;
       cambios_override?: CambiosJson;
-    }) => {
-      const body: Record<string, unknown> = {
-        estado: args.estado,
-        respuesta: args.respuesta,
-      };
-      if (args.cambios_override) body.cambios_override = args.cambios_override;
-      const res = await authedFetch(`/api/admin/solicitudes/${args.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const detail = await res.json().catch(() => ({}));
-        throw new Error(detail?.detail ?? `PATCH → ${res.status}`);
-      }
-    },
+    }) => solicitudesAdminApi.resolver(args),
     onSuccess: (_d, vars) => {
       const label =
         vars.estado === "aprobada"
@@ -210,7 +160,7 @@ function SolicitudCard({
 
   const pedidoQ = useQuery({
     queryKey: ["admin", "pedido", solicitud.pedido_id],
-    queryFn: () => authedJson<PedidoLite>(`/api/alquileres/${solicitud.pedido_id}`),
+    queryFn: () => solicitudesAdminApi.getPedido(solicitud.pedido_id),
   });
 
   const cambios = solicitud.cambios_json;

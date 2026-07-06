@@ -19,7 +19,7 @@ import { AdminPage } from "@/components/admin/AdminPage";
 import { Badge } from "@/design-system/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/design-system/ui/tabs";
 import { useDocumentTitle } from "@/lib/use-document-title";
-import { authedJson } from "@/lib/authedFetch";
+import { adminApi } from "@/lib/admin/api";
 import {
   CategoriaPanel,
   SpecDetailDrawer,
@@ -38,7 +38,7 @@ function SpecsConsolidadasPage() {
   useDocumentTitle("Specs · Back Office");
   const q = useQuery<PorCategoriaResponse>({
     queryKey: ["admin", "specs-por-categoria"],
-    queryFn: () => authedJson<PorCategoriaResponse>("/api/admin/specs/por-categoria"),
+    queryFn: () => adminApi.porCategoria(),
   });
 
   const [selectedSpec, setSelectedSpec] = useState<Spec | null>(null);

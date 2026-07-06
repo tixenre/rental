@@ -39,7 +39,7 @@ import { AdminPage } from "@/components/admin/AdminPage";
 import { Button } from "@/design-system/ui/button";
 import { Spinner } from "@/design-system/ui/spinner";
 import { Input } from "@/design-system/ui/input";
-import { authedFetch } from "@/lib/authedFetch";
+import { dataioAdminApi } from "@/lib/admin/api/dataio";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
 const RESET_CONFIRMATION = "BORRAR TODO";
@@ -88,8 +88,8 @@ const CATALOG_ENTITIES = [
   { key: "equipo_fichas", label: "Equipo · fichas extendidas" },
 ] as const;
 
-async function downloadFile(path: string, fallbackName: string) {
-  const res = await authedFetch(path);
+async function downloadFile(entity: string, fallbackName: string) {
+  const res = await dataioAdminApi.exportEntity(entity);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(text || `${res.status} ${res.statusText}`);
@@ -123,7 +123,7 @@ function DataIoPage() {
   const handleDownload = async (entity: string, label: string, fallback: string) => {
     setBusy(entity);
     try {
-      await downloadFile(`/api/admin/dataio/export?entity=${entity}`, fallback);
+      await downloadFile(entity, fallback);
       toast.success(`Backup descargado: ${label}`);
     } catch (e) {
       toast.error(`Falló la descarga de ${label}: ${(e as Error).message}`);
@@ -135,10 +135,7 @@ function DataIoPage() {
   const handleImport = async (scope: string, label: string, file: File, dryRun: boolean) => {
     setImportBusy(scope);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const url = `/api/admin/dataio/import?scope=${scope}${dryRun ? "&dry_run=true" : ""}`;
-      const res = await authedFetch(url, { method: "POST", body: fd });
+      const res = await dataioAdminApi.importScope(scope, file, dryRun);
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.detail ?? `${res.status} ${res.statusText}`);
       setLastImport({ scope, result: json as ImportResult });
@@ -155,11 +152,7 @@ function DataIoPage() {
   const handleResetOperacional = async () => {
     setResetBusy(true);
     try {
-      const res = await authedFetch("/api/admin/dataio/reset-operacional", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirm: RESET_CONFIRMATION }),
-      });
+      const res = await dataioAdminApi.resetOperacional(RESET_CONFIRMATION);
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.detail ?? `${res.status} ${res.statusText}`);
       toast.success(

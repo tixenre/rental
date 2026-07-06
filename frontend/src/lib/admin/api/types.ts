@@ -1411,3 +1411,38 @@ export type Inscripcion = {
   edicion_slug: string | null;
   created_at: string | null;
 };
+
+// ── Solicitudes ───────────────────────────────────────────────────────────────
+export type ModificacionItem = { equipo_id: number; cantidad: number };
+export type CambiosJson = {
+  fecha_desde?: string | null;
+  fecha_hasta?: string | null;
+  items: ModificacionItem[];
+  mensaje?: string | null;
+};
+export type Solicitud = {
+  id: number;
+  pedido_id: number;
+  cliente_nombre: string;
+  cliente_apellido?: string | null;
+  cliente_email: string | null;
+  numero_pedido: number | null;
+  mensaje: string | null;
+  estado: "pendiente" | "aprobada" | "rechazada" | "cancelada";
+  respuesta: string | null;
+  cambios_json: CambiosJson | null;
+  tipo: "directo" | "aprobacion";
+  resolved_at: string | null;
+  resolved_by: string | null;
+  created_at: string;
+  pedido_fecha_desde: string | null;
+  pedido_fecha_hasta: string | null;
+  monto_total: number;
+};
+export type PedidoLite = {
+  id: number;
+  numero_pedido: number | null;
+  fecha_desde: string | null;
+  fecha_hasta: string | null;
+  items: { equipo_id: number; cantidad: number; nombre: string; nombre_publico?: string | null }[];
+};
