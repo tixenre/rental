@@ -151,7 +151,7 @@ function CompartidoBody({
             Te compartieron esta selección
           </span>
         </div>
-        <h1 className="font-display text-28 sm:text-3xl font-black text-ink leading-[1.05] tracking-[-0.01em]">
+        <h1 className="font-display text-22 sm:text-3xl font-black text-ink leading-[1.05] tracking-[-0.01em]">
           {data.titulo?.trim() || "Equipos para tu producción"}
         </h1>
         <p className="mt-3 max-w-[54ch] font-sans text-sm leading-relaxed text-muted-foreground">
