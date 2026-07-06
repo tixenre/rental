@@ -412,7 +412,7 @@ export function CartDrawerView({
                                         <IncludesLine
                                           includes={it.includes}
                                           label="Incluye:"
-                                          className="text-2xs group-hover:text-ink"
+                                          className="text-xs group-hover:text-ink"
                                         />
                                       </button>
                                       <AnimatePresence initial={false}>
@@ -434,13 +434,13 @@ export function CartDrawerView({
                                   ) : null}
                                   {noDisponible && (
                                     <div className="mt-1 flex items-center justify-between gap-2">
-                                      <div className="flex items-center gap-1 text-2xs font-semibold text-destructive uppercase tracking-wide">
+                                      <div className="flex items-center gap-1 text-xs font-semibold text-destructive uppercase tracking-wide">
                                         <AlertCircle className="h-3 w-3 shrink-0" />
                                         Sin stock en estas fechas
                                       </div>
                                       <button
                                         onClick={() => onRemove(it.id)}
-                                        className="flex items-center gap-1 text-2xs font-medium text-destructive/80 underline underline-offset-2 transition hover:text-destructive"
+                                        className="flex items-center gap-1 text-xs font-medium text-destructive/80 underline underline-offset-2 transition hover:text-destructive"
                                       >
                                         Quitar
                                       </button>

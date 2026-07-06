@@ -605,7 +605,7 @@ export function PedidoCard({
                   {fmtDate(pedido.fecha_desde)}
                 </div>
                 {retiroTime && (
-                  <div className="font-mono text-2xs text-muted-foreground">{retiroTime}</div>
+                  <div className="font-mono text-xs text-muted-foreground">{retiroTime}</div>
                 )}
               </div>
               <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
@@ -616,7 +616,7 @@ export function PedidoCard({
                   {fmtDate(pedido.fecha_hasta)}
                 </div>
                 {devolucionTime && (
-                  <div className="font-mono text-2xs text-muted-foreground">{devolucionTime}</div>
+                  <div className="font-mono text-xs text-muted-foreground">{devolucionTime}</div>
                 )}
               </div>
               <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
@@ -663,7 +663,7 @@ export function PedidoCard({
                         <div className="font-sans text-sm font-semibold text-ink leading-tight mt-0.5 truncate">
                           {display}
                         </div>
-                        <div className="font-mono text-2xs text-muted-foreground tabular-nums mt-0.5">
+                        <div className="font-mono text-xs text-muted-foreground tabular-nums mt-0.5">
                           {item.cantidad} × {fmt(item.precio_jornada)}/j · {jornadas}j
                         </div>
                       </div>
