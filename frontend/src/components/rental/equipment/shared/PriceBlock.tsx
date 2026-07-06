@@ -103,12 +103,14 @@ export function PriceBlock({
         className,
       )}
     >
-      {/* Número protagonista (+ original tachado al lado, si hay descuento) */}
+      {/* Número protagonista (+ original tachado al lado, si hay descuento).
+          Sin color extra a propósito (feedback 2026-07-06): el tachado + el
+          label de contexto ya comunican el ahorro, sin sumar un verde que no
+          pega con la paleta ámbar/ink del resto del sitio. */}
       <div className={cn("flex items-baseline gap-1.5", align === "right" && "flex-row-reverse")}>
         <span
           className={cn(
-            "font-mono font-semibold tabular-nums leading-none whitespace-nowrap",
-            hasDiscount ? "text-verde-ink" : "text-ink",
+            "font-mono font-semibold tabular-nums text-ink leading-none whitespace-nowrap",
             amountClass,
           )}
         >
@@ -125,7 +127,7 @@ export function PriceBlock({
       <span
         className={cn(
           "font-mono text-xs uppercase tracking-widest leading-none",
-          hasDiscount ? "font-semibold text-verde-ink" : "text-muted-foreground",
+          hasDiscount ? "font-semibold text-ink" : "text-muted-foreground",
         )}
       >
         {contextLabel}
