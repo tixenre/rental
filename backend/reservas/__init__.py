@@ -14,7 +14,11 @@ pasos. `routes/alquileres.py` mantiene alias a estos nombres para no romper los
 imports existentes (`routes.estudio`, `routes.cliente_portal`).
 """
 from reservas.estados import ESTADOS_RESERVADO
-from reservas.disponibilidad import calcular_disponibilidad, dias_no_disponibles
+from reservas.disponibilidad import (
+    calcular_disponibilidad,
+    calcular_disponibilidad_draft,
+    dias_no_disponibles,
+)
 from reservas.gate import validar_stock, validar_stock_hipotetico
 from reservas.semantics import (
     componentes_de,
@@ -35,6 +39,7 @@ from reservas.semantics import (
 __all__ = [
     "ESTADOS_RESERVADO",
     "calcular_disponibilidad",
+    "calcular_disponibilidad_draft",
     "componentes_de",
     "consolidar_items_por_equipo",
     "consumo_nodos",

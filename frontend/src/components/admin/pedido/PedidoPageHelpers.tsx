@@ -87,7 +87,9 @@ export function ItemRow({
   removeItem,
 }: {
   it: DraftItem;
-  stock?: { cantidad: number; reservado: number };
+  /** Libres del equipo tras TODO el draft (backend, expansión de kits incluida).
+   *  Con signo: negativo = faltan unidades. undefined = sin dato (sin fechas). */
+  stock?: number;
   jornadas: number;
   updateItem: (uid: string, patch: Partial<DraftItem>) => void;
   removeItem: (uid: string) => void;
@@ -96,9 +98,10 @@ export function ItemRow({
     id: it.uid,
   });
   const esLibre = it.equipo_id == null;
-  const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : it.cantidad;
-  const disponible = max - it.cantidad;
-  const overstock = it.cantidad > max && !!stock;
+  // El backend ya descontó el draft completo (incluida esta línea y los kits
+  // que consumen sus componentes) — acá NO se resta nada más.
+  const disponible = stock;
+  const overstock = disponible !== undefined && disponible < 0;
   const subtotal = subtotalDraftItem(it, jornadas);
 
   return (
@@ -145,7 +148,7 @@ export function ItemRow({
               <div className="text-sm text-ink truncate">{it.nombre_publico || it.nombre}</div>
               <div className="mt-0.5 flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
                 {it.marca && <span className="truncate">{it.marca}</span>}
-                {stock && (
+                {disponible !== undefined && (
                   <span
                     className={cn(
                       "inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-2xs",

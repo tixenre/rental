@@ -88,6 +88,7 @@ import {
   nuevoUidLinea,
   type DraftItem,
 } from "@/components/admin/pedido/usePedidoDraft";
+import { useDisponibilidadDraft } from "@/components/admin/pedido/useDisponibilidadDraft";
 import { ClienteAutocomplete } from "@/components/admin/pedido/ClienteAutocomplete";
 import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
@@ -160,18 +161,14 @@ function PedidoEditorPage() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  // Disponibilidad (stock) — enabled cuando hay ambas fechas
-  const dispoQ = useQuery({
-    queryKey: [
-      "admin",
-      "disponibilidad",
-      draft.datos?.fecha_desde,
-      draft.datos?.fecha_hasta,
-      pedidoId,
-    ],
-    queryFn: () =>
-      adminApi.getDisponibilidad(draft.datos!.fecha_desde, draft.datos!.fecha_hasta, pedidoId),
-    enabled: !!p && !!draft.datos?.fecha_desde && !!draft.datos?.fecha_hasta,
+  // Disponibilidad (stock) draft-aware — el backend descuenta TODO el draft con
+  // la expansión de kits del motor (fuente única). Enabled cuando hay fechas.
+  const dispo = useDisponibilidadDraft({
+    pedidoId,
+    fechaDesde: draft.datos?.fecha_desde,
+    fechaHasta: draft.datos?.fecha_hasta,
+    items: draft.items,
+    enabled: !!p,
   });
 
   // Cotización en vivo (useCotizacion) — recalcula al editar items/fechas/descuento
@@ -305,19 +302,9 @@ function PedidoEditorPage() {
   const pagadoMonto = p.monto_pagado ?? 0;
   const restante = Math.max(0, total - pagadoMonto);
 
-  // stockMap: { equipo_id → { cantidad: libres, reservado: 0 } }
-  const stockMap: Record<string, { cantidad: number; reservado: number }> = Object.fromEntries(
-    Object.entries(dispoQ.data ?? {}).map(([k, v]) => [
-      k,
-      { cantidad: Number(v) || 0, reservado: 0 },
-    ]),
-  );
-
-  const hasOverstock = items.some((it) => {
-    const s = stockMap[String(it.equipo_id)];
-    if (!s) return false;
-    return it.cantidad > Math.max(0, s.cantidad - s.reservado);
-  });
+  // stockMap: { equipo_id → libres tras TODO el draft } (con signo; negativo =
+  // faltan unidades). hasOverstock lo deriva el hook con la misma regla.
+  const { stockMap, hasOverstock } = dispo;
 
   // Las líneas se identifican por `uid` (las personalizadas no tienen equipo_id).
   const updateItem = (uid: string, patch: Partial<DraftItem>) =>

@@ -470,9 +470,12 @@ def _enviar_email_cancelacion_admin(
 @router.get("/api/cliente/pedidos/{id}/disponibilidad")
 def cliente_disponibilidad(
     id: int, request: Request, fecha_desde: str, fecha_hasta: str,
+    items: str = None,
 ):
     """Wrapper de /api/disponibilidad con validación de ownership y
-    `exclude_pedido_id` automático."""
+    `exclude_pedido_id` automático. `items` (draft 'id:qty,...') pasa tal cual:
+    el editor de modificación descuenta TODO su draft con la expansión de kits
+    del motor (valores con signo), igual que el editor admin."""
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
     with get_db() as conn:
@@ -485,6 +488,7 @@ def cliente_disponibilidad(
     from routes.alquileres import get_disponibilidad
     return get_disponibilidad(
         fecha_desde=fecha_desde, fecha_hasta=fecha_hasta, exclude_pedido_id=id,
+        items=items,
     )
 
 

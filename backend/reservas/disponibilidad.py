@@ -24,12 +24,14 @@ from reservas.semantics import (
 )
 
 
-def calcular_disponibilidad(conn, fecha_desde, fecha_hasta, exclude_pedido_id=None) -> dict:
-    """Unidades libres por equipo en [fecha_desde, fecha_hasta], descontando
-    reservas directas + vía kit + mantenimiento, con el buffer global aplicado.
+def _libres_crudos(conn, fecha_desde, fecha_hasta, exclude_pedido_id=None) -> dict:
+    """Disponibilidad "cruda" CON SIGNO de cada equipo como ítem suelto en
+    [fecha_desde, fecha_hasta]: `{equipo_id: stock - reservado - mantenimiento}`,
+    con el consumo de reservas expandido recursivamente y el buffer aplicado.
 
-    Devuelve `{str(equipo_id): unidades_libres}`. Solo LECTURA — no lockea.
-    `exclude_pedido_id` (o None) excluye el propio pedido al editar.
+    Pipeline compartido por `calcular_disponibilidad` (que clampea a 0 y deriva)
+    y `calcular_disponibilidad_draft` (que resta además la demanda de un draft y
+    conserva el signo). Solo LECTURA — no lockea.
     """
     # exclude_pedido_id como NULL en SQL → (NULL IS NULL) = TRUE → no filtra nada
     excl = exclude_pedido_id  # None o int, ambos seguros como parámetro
@@ -77,15 +79,53 @@ def calcular_disponibilidad(conn, fecha_desde, fecha_hasta, exclude_pedido_id=No
     """, (fecha_hasta, fecha_desde)).fetchall()
     en_mant = {r["equipo_id"]: r["bloqueado"] for r in mant}
 
-    # Disponibilidad "cruda" de cada equipo como ítem suelto (correcta para hojas).
-    raw = {
-        eid: max(0, cantidad.get(eid, 0) - consumo.get(eid, 0) - en_mant.get(eid, 0))
+    return {
+        eid: cantidad.get(eid, 0) - consumo.get(eid, 0) - en_mant.get(eid, 0)
         for eid in cantidad
     }
+
+
+def calcular_disponibilidad(conn, fecha_desde, fecha_hasta, exclude_pedido_id=None) -> dict:
+    """Unidades libres por equipo en [fecha_desde, fecha_hasta], descontando
+    reservas directas + vía kit + mantenimiento, con el buffer global aplicado.
+
+    Devuelve `{str(equipo_id): unidades_libres}`. Solo LECTURA — no lockea.
+    `exclude_pedido_id` (o None) excluye el propio pedido al editar.
+    """
+    crudo = _libres_crudos(conn, fecha_desde, fecha_hasta, exclude_pedido_id)
+    # Disponibilidad de cada equipo como ítem suelto, nunca negativa (catálogo).
+    raw = {eid: max(0, v) for eid, v in crudo.items()}
     return _derivar_compuestos(raw, componentes_de(conn))
 
 
-def _derivar_compuestos(raw: dict, comps_by: dict) -> dict:
+def calcular_disponibilidad_draft(
+    conn, fecha_desde, fecha_hasta, items: dict, exclude_pedido_id=None,
+) -> dict:
+    """Como `calcular_disponibilidad`, pero descuenta ADEMÁS la demanda de un
+    DRAFT de items todavía no guardado (`{equipo_id: cantidad}`), expandida
+    recursivamente hasta las hojas con la MISMA pieza que usa el gate
+    (`expandir_demanda`, `solo_esenciales=False` — este número existe para
+    predecir al gate, que es estricto). Es lo que el editor de pedidos muestra
+    por línea: cuántas unidades más caben dado TODO el draft — sin esto, un kit
+    y sus componentes sueltos en el mismo draft no se descontaban entre sí y el
+    badge mentía ("2 libres" con 0 reales).
+
+    Devuelve `{str(equipo_id): unidades}` CON SIGNO (sin clamp a 0): un valor
+    negativo dice cuántas unidades FALTAN — el front lo usa para marcar
+    overstock antes de que el gate rechace el guardado. Un compuesto hereda el
+    faltante de sus hojas vía la derivación. Solo LECTURA — no lockea; el
+    chequeo autoritativo sigue siendo el gate (`validar_stock`).
+    """
+    crudo = _libres_crudos(conn, fecha_desde, fecha_hasta, exclude_pedido_id)
+    demanda_draft = expandir_demanda(conn, items, solo_esenciales=False)
+    raw = {eid: v - demanda_draft.get(eid, 0) for eid, v in crudo.items()}
+    # Derivación ESTRICTA (incluye best-effort), espejando la expansión del
+    # gate: la línea de un kit hereda también el faltante de una hoja
+    # best-effort — si no, el badge del kit diría "libres" y el gate rechazaría.
+    return _derivar_compuestos(raw, componentes_de(conn), incluir_best_effort=True)
+
+
+def _derivar_compuestos(raw: dict, comps_by: dict, incluir_best_effort: bool = False) -> dict:
     """C1+C4 #635 — derivación PURA de los equipos compuestos a partir de sus
     componentes, RECURSIVA (bottom-up / orden topológico). Dado `raw[eid]`
     (disponibilidad cruda de cada equipo como ítem suelto) y
@@ -108,6 +148,12 @@ def _derivar_compuestos(raw: dict, comps_by: dict) -> dict:
     alargue escaso no esconde el combo (el faltante se refleja como "parcial" en
     A2). El memo da orden topológico natural; `path` corta ciclos (defensa en
     profundidad — los ciclos ya se previenen al escribir vía `_crea_ciclo_kit`).
+
+    `incluir_best_effort=True` (SOLO el camino draft): el min cuenta TODOS los
+    componentes, también los best-effort — el gate expande estricto
+    (`solo_esenciales=False`), así que para PREDECIRLO la línea de un kit tiene
+    que heredar también el faltante de una hoja best-effort. El camino clásico
+    (catálogo) mantiene la semántica C2 sin cambios.
     """
     memo: dict[int, int] = {}
 
@@ -124,7 +170,7 @@ def _derivar_compuestos(raw: dict, comps_by: dict) -> dict:
             limites = [
                 derivar(cid, sub) // q
                 for (cid, q, esencial) in comps
-                if esencial and q > 0
+                if (esencial or incluir_best_effort) and q > 0
             ]
             val = min([raw.get(eid, 0), *limites]) if limites else raw.get(eid, 0)
         memo[eid] = val

@@ -26,7 +26,8 @@ export function EquipoSearchSheet({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   existing: DraftItem[];
-  stockMap: Record<string, { cantidad: number; reservado: number }>;
+  /** equipo_id → libres tras TODO el draft (backend, kits expandidos; con signo). */
+  stockMap: Record<string, number>;
   onAdd: (eq: Equipo) => void;
 }) {
   const [q, setQ] = useState("");
@@ -106,10 +107,13 @@ export function EquipoSearchSheet({
             </div>
             <ul className="divide-y hairline">
               {equipos.map((eq) => {
-                const stock = stockMap[String(eq.id)];
+                // El mapa del backend ya descuenta TODO el draft (kits
+                // expandidos) — no se vuelve a restar. Sin fechas no hay mapa
+                // → fallback naive (stock total − lo cargado, sin expansión).
+                const enMapa = stockMap[String(eq.id)];
                 const inCart = existing.find((i) => i.equipo_id === eq.id);
-                const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : eq.cantidad;
-                const disponible = max - (inCart?.cantidad ?? 0);
+                const disponible =
+                  enMapa !== undefined ? enMapa : eq.cantidad - (inCart?.cantidad ?? 0);
                 return (
                   <li key={eq.id} className="flex items-center justify-between gap-2 py-3">
                     <EquipoThumb

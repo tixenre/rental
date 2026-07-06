@@ -34,7 +34,8 @@ export function EquipoComboSearch({
   className,
 }: {
   existing: DraftItem[];
-  stockMap: Record<string, { cantidad: number; reservado: number }>;
+  /** equipo_id → libres tras TODO el draft (backend, kits expandidos; con signo). */
+  stockMap: Record<string, number>;
   onAdd: (eq: Equipo) => void;
   placeholder?: string;
   className?: string;
@@ -84,12 +85,15 @@ export function EquipoComboSearch({
   const visibles = matches.slice(0, MAX_VISIBLE);
   const overflow = matches.length - visibles.length;
 
-  /** Unidades libres restantes para este equipo (descuenta lo ya cargado en el pedido). */
+  /** Unidades libres restantes para este equipo. El mapa del backend ya
+   *  descuenta TODO el draft (con la expansión de kits del motor) — no se
+   *  vuelve a restar. Sin fechas no hay mapa → fallback naive al stock total
+   *  menos lo cargado (sin expansión, como antes). */
   const disponibleDe = (eq: Equipo): number => {
-    const stock = stockMap[String(eq.id)];
-    const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : eq.cantidad;
+    const enMapa = stockMap[String(eq.id)];
+    if (enMapa !== undefined) return enMapa;
     const inCart = existing.find((i) => i.equipo_id === eq.id);
-    return max - (inCart?.cantidad ?? 0);
+    return eq.cantidad - (inCart?.cantidad ?? 0);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

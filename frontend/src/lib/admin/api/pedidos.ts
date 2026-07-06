@@ -130,13 +130,20 @@ export const pedidosMethods = {
   },
   createCliente: (data: ClienteInput) => authedPostJson<Cliente>("/api/clientes", data),
 
-  // disponibilidad por rango (mapa equipo_id → { cantidad, reservado })
-  getDisponibilidad: (fechaDesde: string, fechaHasta: string, excludePedidoId?: number) => {
+  // disponibilidad por rango (mapa equipo_id → libres)
+  getDisponibilidad: (
+    fechaDesde: string,
+    fechaHasta: string,
+    excludePedidoId?: number,
+    items?: string,
+  ) => {
     const sp = new URLSearchParams({ fecha_desde: fechaDesde, fecha_hasta: fechaHasta });
     if (excludePedidoId) sp.set("exclude_pedido_id", String(excludePedidoId));
-    // El backend devuelve `{ equipo_id: libres }` — número neto (ya descontadas
-    // reservas + mantenimiento), no `{cantidad, reservado}`. El consumidor lo
-    // adapta. Ver `reservas.calcular_disponibilidad`.
+    // `items` ("id:cantidad,..." — el draft del editor): el backend descuenta
+    // TODO el draft con la expansión de kits del motor y devuelve valores CON
+    // SIGNO (negativo = faltan unidades). Sin `items`, devuelve los libres
+    // netos clásicos (≥ 0). Ver `reservas.calcular_disponibilidad[_draft]`.
+    if (items) sp.set("items", items);
     return authedJson<Record<string, number>>(`/api/disponibilidad?${sp.toString()}`);
   },
 

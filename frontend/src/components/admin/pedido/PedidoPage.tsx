@@ -60,6 +60,7 @@ import { clienteApi } from "@/lib/cliente/api";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import { useCotizacion } from "@/lib/cotizacion";
 import { usePedidoDraft, jornadasEntre, type SaveStatus, type PedidoMode } from "./usePedidoDraft";
+import { useDisponibilidadDraft } from "./useDisponibilidadDraft";
 import { fmtArs, formatFechaDisplay } from "@/lib/format";
 import { nombreCliente } from "@/lib/cliente-nombre";
 import { ClienteAutocomplete } from "./ClienteAutocomplete";
@@ -234,36 +235,22 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
     enableBeforeUnload: false,
   });
 
-  // Disponibilidad — usada por ItemsCard y por el gate del botón "Enviar".
-  // En cliente se usa el endpoint con ownership; en admin el normal.
-  // IMPORTANTE: estos hooks deben estar ANTES de cualquier early return
+  // Disponibilidad DRAFT-AWARE — usada por ItemsCard y por el gate del botón
+  // "Enviar". El backend descuenta TODO el draft con la expansión de kits del
+  // motor (fuente única `useDisponibilidadDraft`); en cliente pega al endpoint
+  // con ownership, en admin al normal.
+  // IMPORTANTE: este hook debe estar ANTES de cualquier early return
   // (líneas más abajo de pedidoQ.isLoading / pedidoQ.error) porque
   // React exige que los hooks se llamen en el mismo orden cada render
   // (Rules of Hooks → React error #310). Usamos `?.` y `enabled` para que
-  // no corran cuando los datos todavía no llegaron.
-  const adminDispoQ = useQuery({
-    queryKey: [
-      "admin",
-      "disponibilidad",
-      draft.datos?.fecha_desde,
-      draft.datos?.fecha_hasta,
-      pedido?.id,
-    ],
-    queryFn: () =>
-      adminApi.getDisponibilidad(draft.datos!.fecha_desde, draft.datos!.fecha_hasta, pedido!.id),
-    enabled: !isCliente && !!pedido && !!draft.datos?.fecha_desde && !!draft.datos?.fecha_hasta,
-  });
-  const clienteDispoQ = useQuery({
-    queryKey: [
-      "cliente",
-      "disponibilidad",
-      pedido?.id,
-      draft.datos?.fecha_desde,
-      draft.datos?.fecha_hasta,
-    ],
-    queryFn: () =>
-      clienteApi.getDisponibilidad(pedido!.id, draft.datos!.fecha_desde, draft.datos!.fecha_hasta),
-    enabled: isCliente && !!pedido && !!draft.datos?.fecha_desde && !!draft.datos?.fecha_hasta,
+  // no corra cuando los datos todavía no llegaron.
+  const dispo = useDisponibilidadDraft({
+    pedidoId: pedido?.id,
+    fechaDesde: draft.datos?.fecha_desde,
+    fechaHasta: draft.datos?.fecha_hasta,
+    items: draft.items,
+    mode: isCliente ? "cliente" : "admin",
+    enabled: !!pedido,
   });
 
   // Total calculado por el BACKEND (fuente única, /api/cotizar). Se recotiza
@@ -310,25 +297,9 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
   const numero = pedido.numero_pedido ? `#${pedido.numero_pedido}` : `(borrador #${pedido.id})`;
   const clienteNombre = draft.datos.cliente_nombre || "Sin cliente";
 
-  // `/api/disponibilidad` (admin y cliente) devuelve `{ equipo_id: libres }` —
-  // un número neto ya descontados reservas + mantenimiento (fuente única
-  // `reservas.calcular_disponibilidad`). Se adapta a `{cantidad, reservado}`
-  // (reservado=0 porque ya viene neto) para el UI. Antes el branch admin usaba
-  // la respuesta cruda como si fueran objetos → `stock.cantidad` undefined →
-  // "NaN libres" (bug de la modularización de reservas).
-  const stockMap: Record<string, { cantidad: number; reservado: number }> = Object.fromEntries(
-    Object.entries((isCliente ? clienteDispoQ.data : adminDispoQ.data) ?? {}).map(([k, v]) => [
-      k,
-      { cantidad: Number(v) || 0, reservado: 0 },
-    ]),
-  );
-
-  const hasOverstock = draft.items.some((it) => {
-    const s = stockMap[String(it.equipo_id)];
-    if (!s) return false;
-    const max = Math.max(0, s.cantidad - s.reservado);
-    return it.cantidad > max;
-  });
+  // stockMap: { equipo_id → libres tras TODO el draft } (con signo; negativo =
+  // faltan unidades). hasOverstock lo deriva el hook con la misma regla.
+  const { stockMap, hasOverstock } = dispo;
 
   const submitBlocked =
     draft.submitBlockedReason ?? (hasOverstock ? "Algún equipo excede el stock disponible" : null);

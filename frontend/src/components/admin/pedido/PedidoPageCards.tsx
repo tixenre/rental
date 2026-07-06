@@ -67,7 +67,8 @@ export function ItemsCard({
   items: DraftItem[];
   setItems: (v: DraftItem[]) => void;
   jornadas: number;
-  stockMap: Record<string, { cantidad: number; reservado: number }>;
+  /** equipo_id → libres tras TODO el draft (backend, kits expandidos; con signo). */
+  stockMap: Record<string, number>;
   mode?: PedidoMode;
 }) {
   const [openSearch, setOpenSearch] = useState(false);
@@ -115,10 +116,10 @@ export function ItemsCard({
 
       <ul className="divide-y hairline">
         {items.map((it, idx) => {
-          const stock = stockMap[String(it.equipo_id)];
-          const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : it.cantidad;
-          const disponible = max - it.cantidad;
-          const overstock = it.cantidad > max;
+          // El backend ya descontó el draft completo (incluida esta línea y
+          // los kits que consumen sus componentes) — acá NO se resta nada más.
+          const disponible = stockMap[String(it.equipo_id)];
+          const overstock = disponible !== undefined && disponible < 0;
           const subtotal = subtotalDraftItem(it, jornadas);
 
           return (
@@ -134,7 +135,7 @@ export function ItemsCard({
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {it.marca ?? "—"}
-                    {stock && (
+                    {disponible !== undefined && (
                       <Pill tone={disponible <= 0 ? "danger" : "neutral"} className="ml-1.5">
                         {disponible <= 0 ? `${disponible} restante` : `${disponible} libres`}
                       </Pill>
@@ -204,7 +205,8 @@ export function ItemsCard({
                 </div>
                 {overstock && (
                   <div className="ml-auto text-xs text-destructive flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" /> Excede stock ({max})
+                    <AlertTriangle className="h-3 w-3" /> Excede stock (faltan{" "}
+                    {Math.abs(disponible ?? 0)})
                   </div>
                 )}
               </div>
