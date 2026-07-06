@@ -6,6 +6,7 @@
  */
 
 import { formatARS } from "@/lib/format";
+import type { EstadoPedido } from "@/lib/pedido-estados";
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -98,8 +99,26 @@ export type Filtro = "todos" | "activos" | "historial";
 
 // ── Constantes compartidas con el componente principal ───────────────────────
 
-export const ACTIVE_STATES = new Set(["borrador", "presupuesto", "confirmado", "retirado"]);
-export const HIST_STATES = new Set(["devuelto", "finalizado", "cancelado"]);
+// Los literales se validan contra EstadoPedido (fuente única, lib/pedido-estados.ts)
+// acá — un typo o un estado que no exista no compila. El Set queda Set<string>
+// porque Pedido.estado es string (viene tal cual del backend), no EstadoPedido.
+function estadosSet(...estados: EstadoPedido[]): Set<string> {
+  return new Set(estados);
+}
+
+// "solicitado"/"entregado" son estados del portal (ver TRANSICIONES en
+// pedido-estados.ts) — el backend hoy no los emite (ver ESTADOS_VALIDOS en
+// backend/routes/alquileres/core.py), pero si algún día lo hace, un pedido en
+// esos estados ya cae en Activos, no en el limbo.
+export const ACTIVE_STATES = estadosSet(
+  "borrador",
+  "presupuesto",
+  "solicitado",
+  "confirmado",
+  "retirado",
+  "entregado",
+);
+export const HIST_STATES = estadosSet("devuelto", "finalizado", "cancelado");
 export const MODIFICABLE_STATES = new Set(["presupuesto", "confirmado"]);
 
 // "packing-list" (Checklist de retiro) queda afuera a propósito, igual que
