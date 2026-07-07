@@ -26,6 +26,7 @@ import { moneySection } from "./sections/money";
 import { overlaysSection } from "./sections/overlays";
 import { navigationSection } from "./sections/navigation";
 import { containersSection } from "./sections/containers";
+import { layoutSection } from "./sections/layout";
 import { statesSection } from "./sections/states";
 import { catalogSharedSection } from "./sections/catalog-shared";
 import { catalogoOrganismosSection } from "./sections/catalogo-organismos";
@@ -87,6 +88,7 @@ const SECTION_LAYER: Record<string, CatalogLayer> = {
   contenedores: "primitivos",
   notificaciones: "primitivos",
   estados: "composites",
+  layout: "composites",
   "catalogo-shared": "secciones",
   "catalogo-organismos": "secciones",
   "cliente-organismos": "secciones",
@@ -105,6 +107,7 @@ const SECTIONS: CatalogSection[] = [
   overlaysSection,
   navigationSection,
   containersSection,
+  layoutSection,
   statesSection,
   catalogSharedSection,
   catalogoOrganismosSection,

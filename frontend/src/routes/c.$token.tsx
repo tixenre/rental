@@ -29,7 +29,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-import { PublicLayout } from "@/components/rental/PublicLayout";
+import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { Button, buttonVariants } from "@/design-system/ui/button";
 import {
   AlertDialog,
@@ -46,7 +46,7 @@ import { useCart } from "@/lib/cart-store";
 import { useEquipos } from "@/hooks/useEquipos";
 import { getCompartido, type CompartidoData, type CompartirItem } from "@/lib/compartir";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
-import { fmt } from "./ClientePortalTypes";
+import { fmt } from "@/components/cliente/ClientePortalTypes";
 import { cn } from "@/lib/utils";
 import type { Equipment } from "@/data/equipment";
 
@@ -151,7 +151,7 @@ function CompartidoBody({
             Te compartieron esta selección
           </span>
         </div>
-        <h1 className="font-display text-28 sm:text-3xl font-black text-ink leading-[1.05] tracking-[-0.01em]">
+        <h1 className="font-display text-22 sm:text-3xl font-black text-ink leading-[1.05] tracking-[-0.01em]">
           {data.titulo?.trim() || "Equipos para tu producción"}
         </h1>
         <p className="mt-3 max-w-[54ch] font-sans text-sm leading-relaxed text-muted-foreground">
@@ -161,7 +161,7 @@ function CompartidoBody({
       </header>
 
       {/* Card con la composición */}
-      <div className="overflow-hidden rounded-xl border hairline bg-surface">
+      <div className="overflow-hidden card">
         <div className="flex items-center justify-between gap-3 border-b border-dashed hairline px-portal py-3">
           <span className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
             {data.items.length} {data.items.length === 1 ? "equipo" : "equipos"}

@@ -63,6 +63,7 @@ import {
 import { DUENOS, isCanonicalDueno } from "@/lib/admin/duenos";
 import { MonthYearPicker } from "@/components/admin/MonthYearPicker";
 import { useConfirm } from "@/components/admin/useConfirm";
+import { AdminPage } from "@/components/admin/AdminPage";
 
 import { adminApi, type Equipo, type EquipoInput } from "@/lib/admin/api";
 import type { ContenidoIncluidoItem } from "@/data/equipment";
@@ -2012,12 +2013,7 @@ ${fotoTag}
       typeof n === "number" && !Number.isNaN(n) ? n.toLocaleString("es-AR") : "—";
     return (
       <>
-        <div className="px-4 md:px-6 py-6 pb-28 max-w-6xl mx-auto">
-          <header className="mb-6">
-            <div className="t-eyebrow">Inventario · Equipos</div>
-            <h1 className="font-display text-3xl text-ink">{titleText}</h1>
-            {publicHint}
-          </header>
+        <AdminPage title={titleText} maxW="list" description={publicHint} className="pb-28">
           <div className="grid lg:[grid-template-columns:minmax(0,1fr)_320px] gap-6 items-start">
             <form id={formId} onSubmit={submit} className="space-y-5 min-w-0" data-equipo-form-v2>
               {formSections}
@@ -2070,7 +2066,7 @@ ${fotoTag}
               </div>
             </aside>
           </div>
-        </div>
+        </AdminPage>
         <div className="sticky bottom-0 z-20 border-t hairline bg-background/95 backdrop-blur px-4 md:px-6 py-3 flex justify-end gap-2">
           {footerActions}
         </div>

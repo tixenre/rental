@@ -8,7 +8,7 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 
 import { AdminPage } from "@/components/admin/AdminPage";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { LiquidacionReporte } from "@/components/admin/LiquidacionReporte";
 
 export const Route = createLazyFileRoute("/admin/contabilidad/liquidacion")({

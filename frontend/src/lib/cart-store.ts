@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { startOfDay } from "date-fns";
-import { snapTo30 } from "@/components/rental/time-utils";
+import { snapTo30 } from "@/lib/time-utils";
 import { computeJornadas } from "@/lib/rental-dates";
 import { trackAddToCart } from "@/lib/analytics";
 import { registrarClickBusqueda } from "@/lib/search-log";

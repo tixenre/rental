@@ -87,7 +87,7 @@ export function ItemsCard({
   };
 
   return (
-    <section className="rounded-lg border hairline bg-background overflow-hidden">
+    <section className="card overflow-hidden">
       {/* Search trigger */}
       <button
         type="button"
@@ -308,7 +308,7 @@ export function TotalesCard({
   const isCliente = mode === "cliente";
   const labelDescuento = descuentoLabel(descuentoOrigen, jornadas, nombreCliente);
   return (
-    <section className="rounded-lg border hairline bg-background overflow-hidden">
+    <section className="card overflow-hidden">
       <div className="px-4 py-3 space-y-2.5 text-sm">
         <div className="flex justify-between text-muted-foreground">
           <span>Subtotal</span>

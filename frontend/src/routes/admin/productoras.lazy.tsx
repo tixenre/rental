@@ -1,7 +1,7 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { ProductorasSection } from "@/components/admin/productoras/ProductorasSection";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export const Route = createLazyFileRoute("/admin/productoras")({
   component: ProductorasPage,
@@ -12,7 +12,7 @@ function ProductorasPage() {
   return (
     <AdminPage
       title="Productoras"
-      maxW="max-w-6xl"
+      maxW="list"
       description="Entidades fiscales compartidas — vinculá cuentas de cliente que facturan a nombre de una productora."
     >
       <ProductorasSection />

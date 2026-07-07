@@ -59,11 +59,7 @@ export function StudioPackKit({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              {e.marca && (
-                <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                  {e.marca}
-                </div>
-              )}
+              {e.marca && <div className="t-eyebrow">{e.marca}</div>}
               <div className="text-sm leading-snug text-ink">{e.nombre}</div>
             </div>
           </li>

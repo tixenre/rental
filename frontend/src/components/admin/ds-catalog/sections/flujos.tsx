@@ -11,10 +11,10 @@ import { toast } from "sonner";
 import { type CatalogSection } from "../types";
 import { Caption, Row, Stack } from "../catalog-kit";
 import { Button } from "@/design-system/ui/button";
-import { DatePill } from "@/components/rental/DatePill";
-import { DateRangePickerModal } from "@/components/rental/DateRangePickerModal";
-import { CartMiniBarView, type CartPreviewItem } from "@/components/rental/CartMiniBarView";
-import { CartDrawerView } from "@/components/rental/CartDrawerView";
+import { DatePill } from "@/components/rental/dates/DatePill";
+import { DateRangePickerModal } from "@/components/rental/dates/DateRangePickerModal";
+import { CartMiniBarView, type CartPreviewItem } from "@/components/rental/cart/CartMiniBarView";
+import { CartDrawerView } from "@/components/rental/cart/CartDrawerView";
 import { GuardarComoListaView } from "@/components/rental/GuardarComoListaView";
 import { type Equipment } from "@/data/equipment";
 import { computeJornadas } from "@/lib/rental-dates";
@@ -131,10 +131,7 @@ function CartMiniBarDemo() {
       </Row>
       {/* `transform` crea el containing block → el mini-bar `fixed` se ancla a esta
           caja en vez del viewport. Así se muestra embebido sin tocar el componente. */}
-      <div
-        className="relative h-36 overflow-hidden rounded-lg border hairline bg-surface"
-        style={{ transform: "translateZ(0)" }}
-      >
+      <div className="relative h-36 overflow-hidden card" style={{ transform: "translateZ(0)" }}>
         <CartMiniBarView
           count={count}
           days={DEMO_DAYS}

@@ -125,7 +125,7 @@ export function DisenoSection() {
   };
 
   return (
-    <section className="rounded-lg border hairline bg-background p-4 space-y-3">
+    <section className="card p-4 space-y-3">
       <header>
         <h2 className="font-display text-lg text-ink">Secciones del catálogo</h2>
         <p className="text-xs text-muted-foreground">

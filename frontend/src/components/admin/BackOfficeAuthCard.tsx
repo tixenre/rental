@@ -8,7 +8,7 @@
  */
 import type { ReactNode } from "react";
 
-import { Logo } from "@/components/rental/Logo";
+import { Logo } from "@/components/rental/shell/Logo";
 
 export function BackOfficeAuthCard({
   title,
@@ -29,9 +29,7 @@ export function BackOfficeAuthCard({
       <div className="flex-1 grid place-items-center px-4 py-12">
         <div className="w-full max-w-sm rounded-2xl border hairline bg-surface p-8 shadow-sm space-y-6">
           <div>
-            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Back-office
-            </div>
+            <div className="t-eyebrow">Back-office</div>
             <h1 className="mt-1 font-display text-2xl text-ink">{title}</h1>
             <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{description}</p>
           </div>

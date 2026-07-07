@@ -197,20 +197,29 @@ La escala genérica `amber-NNN` de Tailwind (`text-amber-700`, etc.) **también 
 --font-mono: "JetBrains Mono", ui-monospace, monospace;
 ```
 
-**Escala extendida** (en `tokens/typography.css`, además de la escala default de
-Tailwind `text-xs`…). Cubre tamaños frecuentes del codebase que antes iban como
-`text-[Npx]` mágico:
+**Escala base subida (2026-07)** — la app se sentía chica comparada con la
+competencia. `tokens/typography.css` redefine la escala default de Tailwind:
+
+```css
+--text-xs: 0.8125rem; /* 13px (antes 12) */
+--text-xs--line-height: calc(1.125 / 0.8125); /* 18px absolutos */
+--text-sm: 0.9375rem; /* 15px (antes 14) */
+--text-sm--line-height: calc(1.25 / 0.9375); /* 20px absolutos — igual que antes, cero drift vertical */
+```
+
+**Escala extendida** (mismo archivo). Cubre tamaños frecuentes del codebase que
+antes iban como `text-[Npx]` mágico:
 
 ```css
 --text-3xs: 0.5625rem; /* 9px  — micro-labels: counts, badges → text-3xs */
 --text-2xs: 0.625rem; /* 10px — el px más frecuente del codebase → text-2xs */
---text-15: 0.9375rem; /* 15px — product names, CTAs (entre text-sm y text-base) → text-15 */
+--text-15: 0.9375rem; /* 15px — ahora IDÉNTICO a text-sm; alias óptico legado de los call sites existentes → text-15 */
 --text-22: 1.375rem; /* 22px — display headings (entre text-xl y text-2xl) → text-22 */
 ```
 
-> Sin token para 11px (usá `text-xs`) ni 13px (usá `text-sm`): el 1px es
-> imperceptible a toda DPI. La escala se consume como utility Tailwind (`text-2xs`,
-> `text-15`, …) — la genera Tailwind v4 de estos tokens.
+> Sin token para 11px: usá `text-xs` (13px, imperceptible a toda DPI). La
+> escala se consume como utility Tailwind (`text-2xs`, `text-15`, …) — la
+> genera Tailwind v4 de estos tokens.
 
 **Reglas:**
 
@@ -222,6 +231,11 @@ Tailwind `text-xs`…). Cubre tamaños frecuentes del codebase que antes iban co
   ancho. _`CATÁLOGO · 187 EQUIPOS · MAR DEL PLATA`_.
 - **Numbers** tabulares siempre que aparezcan (precios, fechas, counts,
   IDs). Tailwind: `tabular-nums` o nuestra utility `.tabular`.
+- **`text-2xs`/`text-3xs` (10px/9px) solo para micro-labels decorativos, NO
+  interactivos** (badges de conteo, eyebrows puntuales, chips de marca). Un
+  valor que se lee, un warning, o el texto de un botón/acción nunca va acá —
+  sube a `text-xs` como mínimo (ver `Pill` más abajo: default `text-xs`,
+  `size="compact"` es la excepción para tablas muy densas).
 
 **Guardrail tipográfico (CI):** `eslint.config.js` bloquea los tamaños de fuente
 mágicos en `className` — `text-[Npx]`, `text-[Nrem]` y `text-[Nem]` (regla
@@ -332,8 +346,8 @@ intuición de devs que conocen Tailwind. Referencia rápida:
 | `p-1` `gap-1`   | 4   | Stepper button gap         |
 | `p-2` `gap-2`   | 8   | Chip rail gap, inline pill |
 | `p-3` `gap-3`   | 12  | Card body, button gap      |
-| `p-4` `gap-4`   | 16  | Drawer item                |
-| `p-6` `gap-6`   | 24  | Section, card padding      |
+| `p-4` `gap-4`   | 16  | Drawer item, **padding default de `card`/`card-elevated`** |
+| `p-6` `gap-6`   | 24  | Section grande, dialogs    |
 | `p-8` `gap-8`   | 32  | Hero mobile                |
 | `p-12` `gap-12` | 48  | Hero desktop, container    |
 
@@ -350,7 +364,7 @@ Defined as utility classes en `frontend/src/design-system/styles/utilities.css`:
 .t-h2          /* TT Commons 700, 24px (1.5rem) */
 .t-h3          /* TT Commons 600, 18px (1.125rem) */
 .t-body        /* TT Commons 400, 16px, lh 1.55 */
-.t-small       /* TT Commons 400, 14px, muted */
+.t-small       /* TT Commons 400, 15px, muted */
 .t-mono        /* JetBrains Mono, tabular-nums */
 .t-eyebrow     /* JetBrains Mono 500, 10px, tracking 0.2em, uppercase, muted */
 .tabular       /* font-variant-numeric: tabular-nums */
@@ -382,12 +396,12 @@ Utilidades canónicas en `frontend/src/design-system/styles/utilities.css` para 
 
 | Categoría                                          | Dónde vive                | Notas                                                                                                                                  |
 | -------------------------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Primitivas UI** (Button, Input, Card, Dialog, …) | `frontend/src/design-system/ui/*`     | shadcn/Radix base + variants de marca (`primary`, `amber`). Naming shadcn: `default` no se renombra (ver Button abajo).                |
-| **Componentes de aplicación (`rental/`)**          | `frontend/src/components/rental/*` | EquipmentCard, TopBar, Footer, CartMiniBar integrados con queries + estado.                                                            |
+| **Primitivas UI** (Button, Input, Dialog, …) | `frontend/src/design-system/ui/*`     | shadcn/Radix base + variants de marca (`primary`, `amber`). Naming shadcn: `default` no se renombra (ver Button abajo). El panel/card es la **utility** `card`/`card-elevated` (abajo), no un componente `Card` — se podó (0 adopción real, era solo la vitrina).                |
+| **Componentes de aplicación (`rental/`)**          | `frontend/src/components/rental/*` | EquipmentCard, TopBar/Footer (`shell/`), CartMiniBar (`cart/`) integrados con queries + estado.                                                            |
 | **Componentes admin**                              | `frontend/src/components/admin/*`  | Tablas, modales, sidebar del back-office.                                                                                              |
 | **Piezas de marca** (en `ui/`)                     | `frontend/src/design-system/ui/*`     | `Pill`, `EstadoBadge`, `PagoBadge`, `ClienteAvatar`, `Field` (+ `types.ts`). Presentacionales con paleta de marca; viven planas junto a los primitivos shadcn (antes en `kit/`, **disuelto en `ui/`**). `EstadoBadge` es la única fuente del repo. |
-| **Composites** (`composites/`)                     | `frontend/src/design-system/composites/*` | Combinaciones genéricas y reusables, **sin dominio**: `EmptyState` (estado "nada para mostrar"). La capa entre primitivos y organismos de negocio. |
-| **Otras presentacionales** (`rental/`)             | `frontend/src/components/rental/*`     | Con dominio de equipos: `AddonPills`, `PriceBlock` (`equipment/shared/`), `ViewToggle`, `StatCard`. No son librería pura. |
+| **Composites** (`composites/`)                     | `frontend/src/design-system/composites/*` | Combinaciones genéricas y reusables, **sin dominio**: `EmptyState` (estado "nada para mostrar"), `Chequeos` (lista de validaciones ok/falla), `Section` (encabezado + contenido de panel), `StatCard` (label + valor grande + meta). La capa entre primitivos y organismos de negocio. |
+| **Otras presentacionales** (`rental/`)             | `frontend/src/components/rental/*`     | Con dominio de equipos: `AddonPills`, `PriceBlock` (`equipment/shared/`), `ViewToggle`. No son librería pura. |
 
 ### Button (`frontend/src/design-system/ui/button.tsx`)
 
@@ -424,6 +438,22 @@ import { Button } from "@/design-system/ui/button";
 > `variant="on-accent"` es para CTAs sobre fondos con color fuerte (ink o accent):
 > fondo bone (`bg-background shadow-sm`) + texto ink, hover invierte a ink/bone.
 > Ejemplo: CartMiniBar sobre fondo ink, botones en heroes de marketing.
+
+### Pill (`frontend/src/design-system/ui/Pill.tsx`) — frontera con `count-badge`
+
+**Fuente única** de la forma pill (`rounded-full border`, tonos semánticos vía prop
+`tone`). `EstadoBadge`/`PagoBadge` derivan de acá — cualquier badge nuevo también,
+nunca copiar las clases a mano.
+
+**Frontera Pill vs. `count-badge`/botón:** `Pill` renderiza un `<span>` — **display
+puro**, sin `onClick`/foco/teclado. Úsalo para un **estado semántico pasivo**
+(badge de estado, tag informativo) que el usuario no clickea. Si el chip necesita
+ser **clickeable/seleccionable** (un filtro, un toggle, un selector), no lo envuelvas
+en `Pill` — perdés semántica de foco/teclado — usá `<Button>` (con `variant`/`size`/
+`shape` overrideados vía `className` si hace falta calzar la forma) o, si es un
+contador circular compacto tipo badge de carrito, `count-badge` (abajo). El
+supervisor marca un `Pill` con `onClick` agregado a mano, o un chip clickeable
+implementado como `<span>` en vez de `<button>`/`Button`.
 
 ### EstadoBadge
 
@@ -517,6 +547,22 @@ import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 // ModalBackdrop incluye fixed inset-0 + z-50 + bg-black/60 — no wrappear con otro backdrop.
 ```
 
+### `card` / `card-elevated` (utility CSS en `utilities.css`)
+
+Receta única de panel con borde+fondo — reemplaza el `rounded-(md|lg|xl) border
+hairline bg-(background|surface)` (y su variante `bg-surface-elevated`) que
+aparecía copy-pasteado por el admin. `@utility` (no `@layer utilities`), así
+soporta variantes (`hover:card`, `dark:card`…). **Sin padding en la receta** —
+el default es `p-4`, cada consumidor lo agrega (o lo pisa: dialogs/drawers
+usan otro). Solo para **paneles estáticos** — un `<input>`/`<select>`/
+`<button>` que comparta la misma forma visual NO usa `card` (mezclaría la
+semántica de "panel" con la de "control"); esos quedan con las clases sueltas.
+
+```tsx
+<div className="card p-4">…</div>              // bg-surface
+<div className="card-elevated p-4">…</div>      // bg-surface-elevated
+```
+
 ### `.px-portal` (utility CSS en `utilities.css`)
 
 Padding horizontal del card portal (1rem mobile · 1.125rem ≥sm). Reemplaza el `px-4 sm:px-[18px]`
@@ -570,23 +616,141 @@ import { QtyInput } from "@/design-system/ui/qty-input";
 // size="sm" (h-7, compacto para solicitudes) | "md" (h-9, default)
 ```
 
+### AdminPage (`frontend/src/components/admin/AdminPage.tsx`)
+
+Chrome único de página del back-office: eyebrow (del grupo de la ruta en
+`adminNav` por default) + `t-h1` + descripción + acciones + back-link.
+
+```tsx
+import { AdminPage } from "@/components/admin/AdminPage";
+
+<AdminPage title="Unidades" actions={<Button>Nueva</Button>}>…</AdminPage>
+// maxW: preset de ancho — form (3xl) · detail (4xl) · list (6xl) · wide (7xl, default)
+<AdminPage title="Reporte mensual" maxW="detail">…</AdminPage>
+// layout="fullHeight": ocupa el viewport bajo el topbar (flex column, header
+// shrink-0, children en flex-1 min-h-0 con su propio scroll) — para
+// master-detail. NO aplica maxW (ancho completo).
+<AdminPage title="Pedidos" layout="fullHeight">…</AdminPage>
+```
+
+### Section (`frontend/src/design-system/composites/Section.tsx`)
+
+Encabezado + contenido único para paneles admin — consolida los 6 wrappers locales
+"Section" (`LiquidacionReporte`, `contabilidad.reporte`, `marca.lazy`, `estudio`,
+`PedidoPageHelpers` + variantes) que habían aparecido con formas ligeramente
+distintas de lo mismo.
+
+```tsx
+import { Section } from "@/design-system/composites/Section";
+
+<Section title="Cliente" subtitle="Datos de contacto">…</Section>
+// variant="plain": sin chrome propio (para páginas ya envueltas en su card)
+<Section variant="plain" title="Assets canónicos">…</Section>
+// tone="elevated" (solo variant="card"): header en tira separada, para paneles
+// dentro de una página ya densa (ej. el editor de pedidos)
+<Section variant="card" tone="elevated" icon={User} title="Cliente" actions={<Badge />}>…</Section>
+// title="" suprime el header propio — para cuando un wrapper externo (ej.
+// AdminSection, colapsable) ya lo muestra
+<Section title="" className="bg-surface" contentClassName="space-y-4">…</Section>
+```
+
+`StudioBookingForm` (wizard numerado, público) queda como excepción documentada —
+es un patrón distinto (paso numerado, no un panel admin).
+
+### StatCard (`frontend/src/design-system/composites/StatCard.tsx`)
+
+Label + valor grande + meta opcional, para KPIs de dashboards admin y del portal
+cliente — consolida las 8 variantes locales que habían aparecido en el repo
+(`rental/StatCard`, `media.lazy`, `admin/index.lazy`, `LiquidacionReporte::Kpi`,
+`EquiposTableHelpers::KpiCard`, y los `Stat` de `MantenimientoEquipoDialog` /
+`HistorialEquipoDialog` / `DashboardUsoDialog`).
+
+```tsx
+import { StatCard } from "@/design-system/composites/StatCard";
+
+<StatCard label="Facturado 2026" value="$1.240.000" meta="pedido R-1039" />
+// icon: ComponentType (como Section), NO un nodo ya renderizado
+<StatCard icon={DollarSign} label="En juego" value={fmtArs(pipeline)} meta="Pipeline estimado" />
+// tone: default | warn (amber) | destructive (rojo, ej. mantenimiento vencido)
+<StatCard label="Huérfanos" value={n} tone={n > 0 ? "warn" : "default"} />
+// size: "lg" (default, dashboards) | "md" (tile compacto dentro de un dialog)
+<StatCard label="Eventos" value={total} size="md" />
+```
+
+El valor converge a `font-display font-black text-3xl` en `size="lg"` (antes esto
+variaba entre `text-base`/`text-lg`/`text-2xl`/`text-3xl` según el archivo) — un
+achique deliberado de la variante `size="md"` (antes hasta `text-2xl`) a cambio de
+una sola forma consistente en los tiles compactos de los dialogs de equipos.
+
 ### Componentes presentacionales (`frontend/src/components/rental/`)
 
 > **OJO — ubicación.** Estas piezas viven en `frontend/src/components/rental/`
 > (una, en `equipment/shared/`), **no en la librería pura** (`ui/` / `composites/`)
-> porque tienen dominio de equipos. (`EmptyState`, que era genérico, se movió a
-> `design-system/composites/`.)
+> porque tienen dominio de equipos. (`EmptyState`/`StatCard`, que eran genéricos,
+> se movieron a `design-system/composites/`.)
 
 - `AddonPills` (`rental/AddonPills.tsx`) — items "incluye" sobre rows de equipo.
 - `PriceBlock` (`rental/equipment/shared/PriceBlock.tsx`) — precio + tarifa display.
 - `ViewToggle` (`rental/ViewToggle.tsx`) — segmented control con pill deslizante (diferente al
   `SegmentedControl` del `ui/`: este tiene animación de slider, ese tiene fondo ink sólido).
-- `StatCard` (`rental/StatCard.tsx`) — número grande para dashboards.
 
 El primitivo `Input` vive en **`frontend/src/design-system/ui/input.tsx`**.
-**No existe** un `SearchInput` en el repo. **`FieldLabel` existe** como función local en
-`pagos.lazy.tsx` y en `StudioBookingForm` — todavía no es una pieza única del DS (es un
-`<label className="block t-eyebrow">`). `PedidoPageHelpers` ya usa `Field` del DS (`ui/Field`).
+
+### FieldLabel (`frontend/src/design-system/ui/Field.tsx`)
+
+Label suelto en voz eyebrow (mono/uppercase/tracked) — para cuando un form denso
+(filtros, grillas compactas) quiere esa voz en vez del `label` plano que ya trae
+`Field`. Consolida las 4 copias locales que habían aparecido en el repo
+(`StudioBookingForm`, `pagos.lazy`, `facturas.lazy` — este último con un `<div>`
+y tracking `0.15em`, convergido — y `PedidoPageHelpers`, que envolvía el control
+con una API distinta, `<FieldLabel label="...">`).
+
+```tsx
+import { FieldLabel } from "@/design-system/ui/Field";
+
+// sin envolver el control — sibling, no wrapper
+<div className="space-y-1">
+  <FieldLabel>Desde</FieldLabel>
+  <Input type="date" value={desde} onChange={...} />
+</div>
+```
+
+### Form (`frontend/src/design-system/ui/form.tsx`) — huérfano intencional
+
+Wrapper `react-hook-form` + `zod` (`FormItem`/`FormLabel`/`FormControl`/
+`FormDescription`/`FormMessage`, pinta el error solo en `destructive`). **0
+consumidores hoy** — casi todo el back-office usa `useState` + `Field` (la
+molécula label+control+hint/error, más liviana para el volumen de forms chicos
+del repo) — y eso está bien, **no** es deuda a resolver. Se mantiene como el
+**default documentado** para el día que aparezca un form grande con validación
+cruzada de campos donde RHF+zod realmente paguen (ver "Nada de hotfixes" / no
+migrar forms existentes solo para adoptarlo). Tiene specimen en la vitrina
+(`ds-catalog`) — por eso no lo agarra el radar de huérfanos-sin-uso.
+
+### SearchInput (`frontend/src/design-system/ui/search-input.tsx`)
+
+Buscador único: lupa a la izquierda + `Input` del DS + botón de limpiar opcional —
+consolida las 9 copias que habían aparecido en el repo con variantes ligeramente
+distintas de icono/padding/posición.
+
+```tsx
+import { SearchInput } from "@/design-system/ui/search-input";
+
+<SearchInput value={q} onValueChange={setQ} placeholder="Buscar…" />
+<SearchInput value={q} onValueChange={setQ} clearable placeholder="Buscar…" />
+// debounceMs + onDebouncedChange: drivea una query sin una por cada tecla
+// (value/onValueChange siguen siendo instantáneos para el input visible)
+<SearchInput
+  value={search}
+  onValueChange={setSearch}
+  debounceMs={250}
+  onDebouncedChange={runSearch}
+  placeholder="Buscar…"
+/>
+// wrapperClassName va al <div> contenedor (ej. flex-1 en una toolbar);
+// className sigue yendo al <input>, como en Input
+<SearchInput value={q} onValueChange={setQ} wrapperClassName="flex-1" />
+```
 
 > **Patrón de lista de pedidos (Booqable-inspired, 2026-06):** una fila se lee de
 > un vistazo con **avatar (`ClienteAvatar`) + nombre + `EstadoBadge` + `PagoBadge`
@@ -795,6 +959,16 @@ import { Skeleton } from "@/design-system/ui/skeleton";
 **Regla:** el skeleton **espeja el layout del componente real** (vía `className`)
 para no generar CLS (Content Layout Shift) al hidratar.
 
+**Regla de cuándo usar qué:** una **página/sección completa** cargando (fetch inicial,
+sin datos previos en pantalla) → `Skeleton` (o los presets `TableSkeleton`/`ListSkeleton`/
+`CardGridSkeleton` de `components/admin/skeletons.tsx`, el default de `QueryState`) con el
+shape del contenido real. Una **acción puntual** (submit de un form, un botón, un fetch
+chico dentro de una pantalla ya renderizada) → `Spinner` (`<Button loading={true}>` lo
+integra solo). **Nunca texto plano** ("Cargando…", "Cargando equipo…") como estado de
+carga de página — no comunica forma ni tamaño, y genera un salto de layout cuando llega
+la data real. El supervisor marca un "Cargando…" de texto plano reintroducido en un
+loading de página nuevo.
+
 ---
 
 ## Dark mode
@@ -846,7 +1020,10 @@ ocasionalmente.
    Las fuentes vendoreadas en `frontend/src/assets/fonts/` son las del manual oficial
    de marca.
 2. **Champ Black sólo para display.** No para headings de UI, no para
-   labels, no para body, no para botones.
+   labels, no para body, no para botones. Mapeo explícito del h1: el h1 de una
+   página **admin** es `t-h1` (TT Commons, vía `AdminPage`) — "headings de UI";
+   el h1 de una página **pública** (catálogo, ficha, landing) es `font-display`
+   (Champ Black) — "display". No hay una tercera forma.
 3. **Nunca hardcodear hex.** Siempre `var(--amber)`, `bg-amber`,
    `text-ink`. Si el color que necesitás no tiene token, hablalo antes
    de inventar.

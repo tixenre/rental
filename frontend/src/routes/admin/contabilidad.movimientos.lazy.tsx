@@ -31,7 +31,7 @@ import { QueryState } from "@/components/admin/QueryState";
 import { TableSkeleton } from "@/components/admin/skeletons";
 import { EmptyState } from "@/design-system/composites/EmptyState";
 import { formatMoney, formatFechaDisplay } from "@/lib/format";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Badge } from "@/design-system/ui/badge";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
@@ -233,7 +233,7 @@ function MovimientosPage() {
   return (
     <AdminPage
       title="Movimientos"
-      maxW="max-w-5xl"
+      maxW="list"
       description="Toda la plata de las cajas: los cobros de pedidos (que entran solos, una línea por mes) más los gastos, transferencias, retiros y aportes."
       backTo={{ to: "/admin/contabilidad", label: "Tablero" }}
     >
@@ -377,7 +377,7 @@ function CobroDetalle({ mes }: { mes: string }) {
           ver ledger completo →
         </Link>
       </div>
-      <div className="divide-y hairline rounded-md border hairline bg-surface-elevated">
+      <div className="divide-y hairline card-elevated">
         {pagos.map((p) => (
           <div key={p.id} className="flex items-center gap-3 px-3 py-1.5 text-xs">
             <span className="whitespace-nowrap text-muted-foreground">

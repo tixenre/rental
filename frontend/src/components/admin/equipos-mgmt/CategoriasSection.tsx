@@ -301,7 +301,7 @@ export function CategoriasSection() {
   };
 
   return (
-    <section className="rounded-lg border hairline bg-background p-4 space-y-3">
+    <section className="card p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="font-display text-lg text-ink">Categorías</h2>

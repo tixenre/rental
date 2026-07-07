@@ -5,7 +5,7 @@ import { BrandSvgSection } from "@/components/admin/diseno/BrandSvgSection";
 import { BrandingSection } from "@/components/admin/diseno/BrandingSection";
 import { ContactoSection } from "@/components/admin/diseno/ContactoSection";
 import { DsCatalog } from "@/components/admin/ds-catalog";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export const Route = createLazyFileRoute("/admin/diseno")({
   component: DisenoPage,
@@ -16,7 +16,7 @@ function DisenoPage() {
   return (
     <AdminPage
       title="Assets y diseño"
-      maxW="max-w-4xl"
+      maxW="detail"
       description="Tu marca y la librería de diseño de Rambla, en un solo lugar."
     >
       <Tabs defaultValue="assets">

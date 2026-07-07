@@ -13,7 +13,7 @@ import { AdminPage } from "@/components/admin/AdminPage";
 import { CardGridSkeleton } from "@/components/admin/skeletons";
 import { ErrorState } from "@/components/admin/ErrorState";
 import { formatARS, formatMoney } from "@/lib/format";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Badge } from "@/design-system/ui/badge";
 import { Button } from "@/design-system/ui/button";
 
@@ -34,7 +34,7 @@ function ContabilidadTablero() {
   return (
     <AdminPage
       title="Tablero"
-      maxW="max-w-5xl"
+      maxW="list"
       description="Cuánta plata hay y dónde. Los cobros de clientes ya entran solos a la caja de quien los cobró."
       actions={
         <Button asChild variant="outline" className="shrink-0">
@@ -50,7 +50,7 @@ function ContabilidadTablero() {
           <>
             {/* KPIs: disponible · ganancia del mes (la rendición vive en la cuenta corriente) */}
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border hairline bg-surface-elevated p-5">
+              <div className="card-elevated p-5">
                 <div className="t-eyebrow">Plata disponible</div>
                 <div className="font-mono text-3xl font-semibold tabular-nums text-ink mt-1">
                   {formatMoney(data.disponible.totales.ARS ?? 0, "ARS")}
@@ -65,7 +65,7 @@ function ContabilidadTablero() {
                 </div>
               </div>
 
-              <div className="rounded-xl border hairline bg-surface-elevated p-5">
+              <div className="card-elevated p-5">
                 <div className="t-eyebrow">Ganancia neta · {data.ganancia_mes.mes}</div>
                 <div
                   className={`font-mono text-3xl font-semibold tabular-nums mt-1 ${

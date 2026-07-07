@@ -16,11 +16,13 @@ import {
 } from "lucide-react";
 
 import { adminApi } from "@/lib/admin/api";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { cn } from "@/lib/utils";
 import { fmtArs } from "@/lib/format";
 import { AdminPage } from "@/components/admin/AdminPage";
-import { Kpi, Section, BarChart, RankList } from "@/components/admin/LiquidacionReporte";
+import { BarChart, RankList } from "@/components/admin/LiquidacionReporte";
+import { Section } from "@/design-system/composites/Section";
+import { StatCard } from "@/design-system/composites/StatCard";
 import { CardGridSkeleton, TableSkeleton } from "@/components/admin/skeletons";
 import { ErrorState } from "@/components/admin/ErrorState";
 
@@ -40,7 +42,6 @@ function EstadisticasPage() {
   return (
     <AdminPage
       title="Estadísticas"
-      maxW="max-w-7xl"
       description="Métricas del negocio. El reporte de liquidación ahora vive en Finanzas."
     >
       <div className="space-y-6">
@@ -55,22 +56,26 @@ function EstadisticasPage() {
           <>
             {/* KPIs */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Kpi
+              <StatCard
                 icon={DollarSign}
                 label="Facturado total"
                 value={fmtArs(data.totales.total_ars)}
               />
-              <Kpi
+              <StatCard
                 icon={Calendar}
                 label="Pedidos"
                 value={String(data.totales.total_pedidos ?? 0)}
               />
-              <Kpi icon={Users} label="Clientes" value={String(data.totales.total_clientes ?? 0)} />
-              <Kpi
+              <StatCard
+                icon={Users}
+                label="Clientes"
+                value={String(data.totales.total_clientes ?? 0)}
+              />
+              <StatCard
                 icon={TrendingUp}
                 label="Mejor mes"
                 value={data.mejor_peor_mes.mejor_mes ?? "—"}
-                sub={fmtArs(data.mejor_peor_mes.mejor_total)}
+                meta={fmtArs(data.mejor_peor_mes.mejor_total)}
               />
             </div>
 
@@ -85,23 +90,23 @@ function EstadisticasPage() {
                 : "0";
               return (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <Kpi
+                  <StatCard
                     icon={Calculator}
                     label="Ticket promedio"
                     value={fmtArs(ticket)}
-                    sub="Facturado / Pedidos"
+                    meta="Facturado / Pedidos"
                   />
-                  <Kpi
+                  <StatCard
                     icon={Heart}
                     label="LTV cliente"
                     value={fmtArs(ltv)}
-                    sub="Facturado / Clientes"
+                    meta="Facturado / Clientes"
                   />
-                  <Kpi
+                  <StatCard
                     icon={Repeat}
                     label="Pedidos / cliente"
                     value={pedidosPorCliente}
-                    sub="Frecuencia promedio"
+                    meta="Frecuencia promedio"
                   />
                 </div>
               );

@@ -75,7 +75,7 @@ function Uploader({ kind }: { kind: Kind }) {
   }
 
   return (
-    <div className="rounded-lg border hairline bg-background p-4 space-y-3">
+    <div className="card p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Icon className="h-4 w-4 text-muted-foreground" />
         <h3 className="font-display text-base text-ink">{meta.title}</h3>
@@ -140,7 +140,7 @@ function Uploader({ kind }: { kind: Kind }) {
 
 export function BrandSvgSection() {
   return (
-    <div className="rounded-lg border hairline bg-background p-4 space-y-4">
+    <div className="card p-4 space-y-4">
       <div>
         <h2 className="font-display text-lg text-ink">Marca (SVG)</h2>
         <p className="text-xs text-muted-foreground mt-1">

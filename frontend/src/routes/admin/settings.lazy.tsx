@@ -1,6 +1,6 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { AdminSection } from "@/components/admin/AdminSection";
 import { EmailsAdmin } from "@/components/admin/email/EmailsAdmin";
@@ -24,7 +24,7 @@ function SettingsPage() {
   return (
     <AdminPage
       title="Settings"
-      maxW="max-w-4xl"
+      maxW="detail"
       description="Configuración del sistema y herramientas de mantenimiento."
     >
       <div className="space-y-6">

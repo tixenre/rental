@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Spinner } from "@/design-system/ui/spinner";
 import { adminApi } from "@/lib/admin/api";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export const Route = createLazyFileRoute("/admin/pedidos/nuevo")({
   component: NuevoPedidoPage,

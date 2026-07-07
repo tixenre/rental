@@ -26,8 +26,10 @@ import {
 
 import { facturacionApi, type EmisorArca } from "@/lib/admin/api";
 import { usePadronLookup, type PadronImpuesto } from "@/lib/admin/usePadronLookup";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { cn } from "@/lib/utils";
+import { Button } from "@/design-system/ui/button";
+import { AdminPage } from "@/components/admin/AdminPage";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,92 +70,82 @@ function EmisoresPage() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "emisores-arca"] });
 
   return (
-    <div className="px-4 md:px-6 py-6 space-y-6 max-w-3xl mx-auto">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <div className="font-mono text-2xs uppercase tracking-[0.25em] text-muted-foreground">
-            Back-office · Facturación ARCA
-          </div>
-          <h1 className="font-display text-3xl text-ink">Emisores</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            CUITs habilitados para emitir comprobantes electrónicos. Las claves se cifran con AES
-            antes de guardarse.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => setShowGuia(true)}
-            className="flex items-center gap-1.5 h-9 px-3 rounded-md border hairline text-sm font-medium text-ink hover:bg-muted/50"
-          >
-            <BookOpen className="h-3.5 w-3.5" />
+    <AdminPage
+      title="Emisores"
+      eyebrow="Facturación ARCA"
+      maxW="form"
+      description="CUITs habilitados para emitir comprobantes electrónicos. Las claves se cifran con AES antes de guardarse."
+      actions={
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowGuia(true)}>
+            <BookOpen className="h-3.5 w-3.5 mr-1.5" />
             Guía de AFIP
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             onClick={() => {
               setEditId(null);
               setShowForm(true);
             }}
-            className="flex items-center gap-1.5 h-9 px-3 rounded-md bg-ink text-background text-sm font-medium"
           >
-            <Plus className="h-3.5 w-3.5" />
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
             Nuevo emisor
-          </button>
+          </Button>
         </div>
-      </header>
+      }
+    >
+      <div className="space-y-6">
+        {q.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
+        {q.isError && (
+          <div className="text-sm text-destructive">
+            Error cargando emisores. {(q.error as Error)?.message}
+          </div>
+        )}
 
-      {q.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
-      {q.isError && (
-        <div className="text-sm text-destructive">
-          Error cargando emisores. {(q.error as Error)?.message}
-        </div>
-      )}
+        {/* Lista */}
+        {emisores.length > 0 && (
+          <div className="space-y-3">
+            {emisores.map((e) => (
+              <EmisorCard
+                key={e.id}
+                emisor={e}
+                onEdit={() => {
+                  setEditId(e.id);
+                  setShowForm(true);
+                }}
+                onCert={() => setCertId(e.id)}
+                onToggleActivo={invalidate}
+              />
+            ))}
+          </div>
+        )}
 
-      {/* Lista */}
-      {emisores.length > 0 && (
-        <div className="space-y-3">
-          {emisores.map((e) => (
-            <EmisorCard
-              key={e.id}
-              emisor={e}
-              onEdit={() => {
-                setEditId(e.id);
-                setShowForm(true);
-              }}
-              onCert={() => setCertId(e.id)}
-              onToggleActivo={invalidate}
-            />
-          ))}
-        </div>
-      )}
+        {!q.isLoading && emisores.length === 0 && (
+          <div className="text-sm text-muted-foreground py-8 text-center">
+            No hay emisores configurados. Agregá el primero.
+          </div>
+        )}
 
-      {!q.isLoading && emisores.length === 0 && (
-        <div className="text-sm text-muted-foreground py-8 text-center">
-          No hay emisores configurados. Agregá el primero.
-        </div>
-      )}
+        {/* Formulario crear/editar */}
+        {showForm && (
+          <EmisorFormModal
+            emisor={editEmisor ?? null}
+            onClose={() => {
+              setShowForm(false);
+              setEditId(null);
+            }}
+            onSaved={invalidate}
+          />
+        )}
 
-      {/* Formulario crear/editar */}
-      {showForm && (
-        <EmisorFormModal
-          emisor={editEmisor ?? null}
-          onClose={() => {
-            setShowForm(false);
-            setEditId(null);
-          }}
-          onSaved={invalidate}
-        />
-      )}
+        {/* Formulario de cert/clave */}
+        {certId !== null && certEmisor && (
+          <CertFormModal emisor={certEmisor} onClose={() => setCertId(null)} onSaved={invalidate} />
+        )}
 
-      {/* Formulario de cert/clave */}
-      {certId !== null && certEmisor && (
-        <CertFormModal emisor={certEmisor} onClose={() => setCertId(null)} onSaved={invalidate} />
-      )}
-
-      {/* Guía de trámites de AFIP */}
-      {showGuia && <GuiaAfipModal onClose={() => setShowGuia(false)} />}
-    </div>
+        {/* Guía de trámites de AFIP */}
+        {showGuia && <GuiaAfipModal onClose={() => setShowGuia(false)} />}
+      </div>
+    </AdminPage>
   );
 }
 
@@ -306,7 +298,7 @@ function EmisorCard({
         </DropdownMenu>
       </div>
       {certInfo.data && (
-        <div className="rounded-md border hairline bg-surface-elevated px-3 py-2 text-xs space-y-1 font-mono">
+        <div className="card-elevated px-3 py-2 text-xs space-y-1 font-mono">
           <div>
             <span className="text-muted-foreground">Nº de serie: </span>
             {certInfo.data.numero_serie}
@@ -326,7 +318,7 @@ function EmisorCard({
         </div>
       )}
       {diagnostico.data && (
-        <div className="rounded-md border hairline bg-surface-elevated px-3 py-2.5">
+        <div className="card-elevated px-3 py-2.5">
           <div
             className={cn(
               "text-2xs font-mono font-medium mb-2",
@@ -512,14 +504,14 @@ function EmisorFormModal({
           onResolved={(nro) => asignarPtoVta.mutate(nro)}
         />
         <div className="flex justify-end gap-2 mt-5">
-          <button
+          <Button
             type="button"
+            variant="primary"
             onClick={onClose}
             disabled={asignarPtoVta.isPending}
-            className="h-9 px-4 rounded-md bg-ink text-background text-sm font-medium disabled:opacity-50"
           >
             Listo
-          </button>
+          </Button>
         </div>
       </Overlay>
     );
@@ -568,15 +560,17 @@ function EmisorFormModal({
               </span>
             ) : (
               cuit.replace(/\D/g, "").length === 11 && (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => padron.buscar(cuit)}
                   title="Volver a consultar AFIP para este CUIT"
-                  className="shrink-0 h-9 px-3 rounded-md border hairline text-xs text-muted-foreground hover:text-ink flex items-center gap-1.5"
+                  className="shrink-0"
                 >
                   <Search className="h-3.5 w-3.5" />
                   Actualizar
-                </button>
+                </Button>
               )
             )}
           </div>
@@ -699,16 +693,18 @@ function EmisorFormModal({
               className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm font-mono"
             />
             {!isNew && emisor?.cert_cargado && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => puntosVenta.mutate()}
                 disabled={puntosVenta.isPending}
                 title="Consultar los puntos de venta habilitados en ARCA para este emisor"
-                className="shrink-0 h-9 px-3 rounded-md border hairline text-xs text-muted-foreground hover:text-ink flex items-center gap-1.5 disabled:opacity-40"
+                className="shrink-0"
               >
                 <Search className="h-3.5 w-3.5" />
                 {puntosVenta.isPending ? "Consultando…" : "Consultar en ARCA"}
-              </button>
+              </Button>
             )}
           </div>
           {puntosVenta.isError && (
@@ -724,19 +720,20 @@ function EmisorFormModal({
                 </span>
               ) : (
                 puntosVenta.data.puntos_venta.map((p) => (
-                  <button
+                  <Button
                     key={p.nro}
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => setPtoVta(String(p.nro))}
                     className={cn(
-                      "h-7 px-2.5 rounded-md border hairline text-xs font-mono",
-                      String(p.nro) === ptoVta
-                        ? "bg-ink text-background border-ink"
-                        : "bg-surface-elevated text-muted-foreground hover:text-ink",
+                      "font-mono",
+                      String(p.nro) === ptoVta &&
+                        "bg-ink text-background border-ink hover:bg-ink hover:text-background",
                     )}
                   >
                     {String(p.nro).padStart(5, "0")}
-                  </button>
+                  </Button>
                 ))
               )}
             </div>
@@ -820,15 +817,12 @@ function EmisorFormModal({
         )}
       </div>
       <div className="flex justify-end gap-2 mt-5">
-        <button
-          type="button"
-          onClick={onClose}
-          className="h-9 px-4 rounded-md border hairline text-sm text-muted-foreground hover:text-ink"
-        >
+        <Button type="button" variant="outline" onClick={onClose}>
           Cancelar
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="primary"
           onClick={() => save.mutate()}
           disabled={
             save.isPending ||
@@ -838,10 +832,9 @@ function EmisorFormModal({
             !razonSocial ||
             (withCert && (!certOk || !keyOk))
           }
-          className="h-9 px-4 rounded-md bg-ink text-background text-sm font-medium disabled:opacity-50"
         >
           {save.isPending ? "Guardando…" : "Guardar"}
-        </button>
+        </Button>
       </div>
     </Overlay>
   );
@@ -938,14 +931,16 @@ function PuntoVentaResolver({
       </p>
       <div className="flex flex-wrap gap-1.5">
         {habilitados.map((p) => (
-          <button
+          <Button
             key={p.nro}
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => onResolved(p.nro)}
-            className="h-7 px-2.5 rounded-md border hairline text-xs font-mono bg-surface-elevated text-muted-foreground hover:text-ink"
+            className="font-mono"
           >
             {String(p.nro).padStart(5, "0")}
-          </button>
+          </Button>
         ))}
       </div>
     </div>
@@ -1005,14 +1000,14 @@ function CertFormModal({
         <p className="text-sm text-verde-ink mb-4">Certificado cargado y cifrado ✓</p>
         <PuntoVentaResolver emisorId={emisor.id} onResolved={(nro) => asignarPtoVta.mutate(nro)} />
         <div className="flex justify-end gap-2 mt-5">
-          <button
+          <Button
             type="button"
+            variant="primary"
             onClick={finalizar}
             disabled={asignarPtoVta.isPending}
-            className="h-9 px-4 rounded-md bg-ink text-background text-sm font-medium disabled:opacity-50"
           >
             Listo
-          </button>
+          </Button>
         </div>
       </Overlay>
     );
@@ -1042,21 +1037,17 @@ function CertFormModal({
         />
       </div>
       <div className="flex justify-end gap-2 mt-5">
-        <button
-          type="button"
-          onClick={onClose}
-          className="h-9 px-4 rounded-md border hairline text-sm text-muted-foreground hover:text-ink"
-        >
+        <Button type="button" variant="outline" onClick={onClose}>
           Cancelar
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="primary"
           onClick={() => save.mutate()}
           disabled={save.isPending || !certOk || !keyOk}
-          className="h-9 px-4 rounded-md bg-ink text-background text-sm font-medium disabled:opacity-50"
         >
           {save.isPending ? "Guardando…" : "Guardar y cifrar"}
-        </button>
+        </Button>
       </div>
     </Overlay>
   );
@@ -1195,7 +1186,7 @@ function PemFileField({
     <Field label={displayLabel}>
       <div className="space-y-1.5">
         {/* File picker */}
-        <label className="flex items-center gap-2 h-9 px-3 rounded-md border hairline bg-surface-elevated text-sm cursor-pointer hover:bg-muted/20 w-full">
+        <label className="flex items-center gap-2 h-9 px-3 card-elevated text-sm cursor-pointer hover:bg-muted/20 w-full">
           <Upload className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <span className={cn("truncate text-sm", fileName ? "text-ink" : "text-muted-foreground")}>
             {fileName ?? "Elegir archivo .pem / .crt / .key"}

@@ -1,7 +1,7 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
-import { PublicLayout } from "@/components/rental/PublicLayout";
+import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { PedidoPage } from "@/components/admin/pedido/PedidoPage";
 import { MODIFICAR_PEDIDOS_HABILITADO } from "@/lib/features";
 

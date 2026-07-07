@@ -8,7 +8,7 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 
 import { AdminPage } from "@/components/admin/AdminPage";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export const Route = createLazyFileRoute("/admin/contabilidad/glosario")({
   component: GlosarioPage,
@@ -109,7 +109,7 @@ function GlosarioPage() {
   return (
     <AdminPage
       title="Glosario"
-      maxW="max-w-3xl"
+      maxW="form"
       description="Qué significa cada término y qué hace cada acción. Para releer y sacarse dudas."
       backTo={{ to: "/admin/contabilidad", label: "Tablero" }}
     >

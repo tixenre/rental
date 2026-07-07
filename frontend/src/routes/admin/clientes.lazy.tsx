@@ -1,20 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createLazyFileRoute } from "@tanstack/react-router";
-import {
-  Plus,
-  Search,
-  Trash2,
-  Eye,
-  MoreHorizontal,
-  ShieldCheck,
-  Users,
-  UserPlus,
-} from "lucide-react";
+import { Plus, Trash2, Eye, MoreHorizontal, ShieldCheck, Users, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
-import { Input } from "@/design-system/ui/input";
+import { SearchInput } from "@/design-system/ui/search-input";
 import {
   Table,
   TableBody,
@@ -43,7 +35,7 @@ import { EmptyState } from "@/design-system/composites/EmptyState";
 import { ClienteDetalleDialog } from "@/components/admin/ClienteDetalleDialog";
 import { ClientesDuplicadosDialog } from "@/components/admin/ClientesDuplicadosDialog";
 import { InvitarClienteDialog } from "@/components/admin/InvitarClienteDialog";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { PERFIL_IMPUESTOS_LABEL, type PerfilImpuestos } from "@/lib/iva";
 
 export const Route = createLazyFileRoute("/admin/clientes")({
@@ -54,13 +46,7 @@ function ClientesPage() {
   useDocumentTitle("Clientes · Back Office");
   const qc = useQueryClient();
   const [q, setQ] = useState("");
-  // Debounce real (mismo patrón que el selector de clientes del pedido): cada
-  // tecla cancela el timer anterior → una sola búsqueda al frenar, no por tecla.
-  const [debouncedQ, setDebouncedQ] = useState("");
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(q.trim()), 250);
-    return () => clearTimeout(t);
-  }, [q]);
+  const debouncedQ = useDebouncedValue(q.trim(), 250);
   const [detalle, setDetalle] = useState<Cliente | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<Cliente | null>(null);
@@ -105,15 +91,11 @@ function ClientesPage() {
       }
     >
       <div className="space-y-6">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar por nombre, apellido, email o CUIT…"
-            className="pl-9 text-base sm:text-sm"
-          />
-        </div>
+        <SearchInput
+          value={q}
+          onValueChange={setQ}
+          placeholder="Buscar por nombre, apellido, email o CUIT…"
+        />
 
         <QueryState
           query={listQ}

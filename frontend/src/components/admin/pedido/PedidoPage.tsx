@@ -454,7 +454,7 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
         {/* ── Columna principal ── */}
         <div className="space-y-4">
           {/* Cliente + Recogida — una sola card, lado a lado */}
-          <section className="rounded-lg border hairline bg-background overflow-hidden">
+          <section className="card overflow-hidden">
             <div className="grid grid-cols-1 sm:grid-cols-2">
               {/* Cliente */}
               <div className="p-4 space-y-3 border-b hairline sm:border-b-0 sm:border-r">
@@ -653,10 +653,7 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
             En modo cliente sólo trae "Resumen" — info redundante con
             TotalesCard. Lo ocultamos en mobile y se ve en desktop. */}
         <div
-          className={cn(
-            "rounded-lg border hairline bg-background overflow-hidden lg:sticky lg:top-16",
-            isCliente && "hidden lg:block",
-          )}
+          className={cn("card overflow-hidden lg:sticky lg:top-16", isCliente && "hidden lg:block")}
         >
           {!isCliente && (
             <SidebarSection title="Pagos" defaultOpen>

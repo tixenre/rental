@@ -12,6 +12,7 @@ import type {
   Unidad,
   UnidadInput,
 } from "./types";
+import type { PorCategoriaResponse } from "@/components/admin/specs/SpecsConsolidadasHelpers";
 
 export const specsMethods = {
   // ── App settings (key/value globales) ─────────────────────────────────
@@ -285,6 +286,9 @@ export const specsMethods = {
    *  cada una trae su id real para fetchear el spec-template. */
   listSpecCategorias: () =>
     authedJson<{ categorias: { id: number; nombre: string }[] }>("/api/admin/specs/por-categoria"),
+  /** Mismo endpoint que listSpecCategorias pero con el shape completo (specs
+   *  anidadas por categoría) — consumido por la UI consolidada de specs. */
+  porCategoria: () => authedJson<PorCategoriaResponse>("/api/admin/specs/por-categoria"),
   listOrphanSpecs: (categoriaId: number) =>
     authedJson<OrphanSpec[]>(`/api/admin/categorias/${categoriaId}/spec-templates/orphans`),
   /** Asigna una spec_definition existente a una categoría. Para crear una

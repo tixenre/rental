@@ -20,7 +20,7 @@ interface PriceBlockProps {
   align?: "left" | "right";
   /**
    * Tamaño del amount principal.
-   * lg = 19px (grid card) · md = 17px (lista desktop) · sm = 14px (mobile)
+   * lg = 19px (grid card) · md = 17px (lista desktop) · sm = 15px (mobile)
    */
   size?: "lg" | "md" | "sm";
   /**
@@ -61,7 +61,7 @@ export function PriceBlock({
   const { total } = priceBreakdown(perDay, jornadas, qty);
   const ivaSuffix = conIva ? " +IVA" : "";
 
-  const amountClass = size === "lg" ? "text-[19px]" : size === "md" ? "text-[17px]" : "text-sm"; // eslint-disable-line no-restricted-syntax -- tamaños ópticos del precio: escala entre text-sm y text-xl calibrada para moneda
+  const amountClass = size === "lg" ? "text-[19px]" : size === "md" ? "text-[17px]" : "text-15"; // eslint-disable-line no-restricted-syntax -- tamaños ópticos del precio: escala entre text-15 y text-xl calibrada para moneda
 
   return (
     <div

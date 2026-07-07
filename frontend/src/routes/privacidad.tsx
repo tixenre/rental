@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 
-import { PublicLayout } from "@/components/rental/PublicLayout";
+import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { LAST_UPDATED, PRIVACY_SECTIONS } from "@/data/legal";
 import { SITE_URL } from "@/lib/site";
 
@@ -34,9 +34,7 @@ function PrivacidadPage() {
           <ArrowLeft className="h-3.5 w-3.5" /> Volver al catálogo
         </Link>
 
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Legal
-        </div>
+        <div className="t-eyebrow">Legal</div>
         <h1 className="font-display text-3xl md:text-4xl text-ink mt-1">Política de privacidad</h1>
         <p className="text-sm text-muted-foreground mt-2">Última actualización: {LAST_UPDATED}</p>
 

@@ -3,11 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { createLazyFileRoute, Link, notFound } from "@tanstack/react-router";
 import { Calendar, MapPin, Users, CheckCircle2, Clock, X } from "lucide-react";
 
-import { PublicLayout } from "@/components/rental/PublicLayout";
+import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { Button } from "@/design-system/ui/button";
 import { IconButton } from "@/design-system/ui/icon-button";
 import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
-import { Logo } from "@/components/rental/Logo";
+import { Logo } from "@/components/rental/shell/Logo";
 import { WorkshopInscripcionForm } from "@/components/talleres/WorkshopInscripcionForm";
 import { TallerCalendario } from "@/components/talleres/TallerCalendario";
 import { ResponsiveImage } from "@/components/common/ResponsiveImage";
@@ -63,8 +63,7 @@ function SoldOutModal({
   const labelProxima = ordinalEdicion(proxima.numero_edicion);
   return (
     <ModalBackdrop
-      className="z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
-      style={{ background: "oklch(0.15 0 0 / 65%)" }}
+      className="z-50 flex items-end sm:items-center justify-center bg-scrim p-4 sm:p-6"
       onClose={onDismiss}
     >
       <div className="relative w-full max-w-sm rounded-2xl bg-background border border-border/60 p-7 shadow-2xl">

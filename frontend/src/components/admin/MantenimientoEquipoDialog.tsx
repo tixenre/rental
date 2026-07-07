@@ -10,6 +10,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, AlertCircle } from "lucide-react";
 import { Spinner } from "@/design-system/ui/spinner";
+import { StatCard } from "@/design-system/composites/StatCard";
 import { toast } from "sonner";
 
 import {
@@ -167,12 +168,18 @@ export function MantenimientoEquipoDialog({
         {/* Stats */}
         {logQ.data && (
           <div className="grid grid-cols-3 gap-2">
-            <Stat label="Eventos" value={logQ.data.stats.total_eventos} />
-            <Stat label="Costo total" value={fmtMoneda(logQ.data.stats.total_costo)} />
-            <Stat
+            <StatCard label="Eventos" value={logQ.data.stats.total_eventos} size="md" />
+            <StatCard
+              label="Costo total"
+              value={fmtMoneda(logQ.data.stats.total_costo)}
+              size="md"
+            />
+            <StatCard
               label="Próxima revisión"
               value={proxima ? fmtFecha(proxima) : "—"}
-              alert={vencida}
+              icon={vencida ? AlertCircle : undefined}
+              tone={vencida ? "destructive" : "default"}
+              size="md"
             />
           </div>
         )}
@@ -372,19 +379,5 @@ export function MantenimientoEquipoDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function Stat({ label, value, alert }: { label: string; value: string | number; alert?: boolean }) {
-  return (
-    <div
-      className={`rounded-md border hairline p-2 ${alert ? "bg-destructive/10 border-destructive/30" : "bg-muted/20"}`}
-    >
-      <div className="text-2xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-        {alert && <AlertCircle className="h-3 w-3 text-destructive" />}
-        {label}
-      </div>
-      <div className="text-base font-medium tabular-nums">{value}</div>
-    </div>
   );
 }

@@ -4,11 +4,11 @@
  */
 
 import { useMemo, useState } from "react";
-import { Search, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "@/design-system/ui/button";
-import { Input } from "@/design-system/ui/input";
+import { SearchInput } from "@/design-system/ui/search-input";
 import { BottomSheet } from "@/components/mobile";
 import { adminApi, type Equipo } from "@/lib/admin/api";
 import { filtrarOrdenar } from "@/lib/search/normalize";
@@ -84,16 +84,7 @@ export function EquipoSearchSheet({
   return (
     <BottomSheet open={open} onOpenChange={onOpenChange} title="Agregar equipo" showClose>
       <div className="px-4 pt-3 pb-3 border-b hairline">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            autoFocus
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar…"
-            className="pl-9 text-base sm:text-sm"
-          />
-        </div>
+        <SearchInput autoFocus value={q} onValueChange={setQ} placeholder="Buscar…" />
       </div>
       <div className="px-4 pb-4">
         {grupos.length === 0 && (

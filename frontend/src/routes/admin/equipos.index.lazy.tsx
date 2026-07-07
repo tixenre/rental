@@ -1,9 +1,9 @@
 import { createLazyFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   Plus,
-  Search,
   Pencil,
   Trash2,
   Eye,
@@ -15,13 +15,12 @@ import {
   Copy,
   BarChart3,
   RotateCcw,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
 import { Pill } from "@/design-system/ui/Pill";
-import { Input } from "@/design-system/ui/input";
+import { SearchInput } from "@/design-system/ui/search-input";
 import { Checkbox } from "@/design-system/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { useUsdRate, calcularPrecioJornada } from "@/hooks/useSettings";
@@ -67,15 +66,15 @@ import { MantenimientoEquipoDialog } from "@/components/admin/MantenimientoEquip
 import { HistorialEquipoDialog } from "@/components/admin/HistorialEquipoDialog";
 import { DashboardUsoDialog } from "@/components/admin/DashboardUsoDialog";
 import { ComboBuilderDialog } from "@/components/admin/ComboBuilderDialog";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
   StockInline,
   RoiInline,
   PrecioJornadaInline,
   CategoriaInline,
-  KpiCard,
   FaltaBanner,
 } from "@/components/admin/equipos-mgmt/EquiposTableHelpers";
+import { StatCard } from "@/design-system/composites/StatCard";
 
 export const Route = createLazyFileRoute("/admin/equipos/")({
   component: EquiposPage,
@@ -134,12 +133,12 @@ function EquiposPage() {
   // el admin deja de tipear.
   const [searchInput, setSearchInput] = useState(q);
   useEffect(() => setSearchInput(q), [q]);
+  const debouncedSearchInput = useDebouncedValue(searchInput, 300);
   useEffect(() => {
-    if (searchInput === q) return;
-    const t = setTimeout(() => updateFilters({ q: searchInput }), 300);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce: solo re-dispara por texto tipeado, no por q/updateFilters
-  }, [searchInput]);
+    if (debouncedSearchInput === q) return;
+    updateFilters({ q: debouncedSearchInput });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce: solo re-dispara por texto debounced, no por q/updateFilters
+  }, [debouncedSearchInput]);
 
   const setQ = (v: string) => updateFilters({ q: v });
   const setCategoria = (v: string) => updateFilters({ categoria: v });
@@ -328,7 +327,6 @@ function EquiposPage() {
   return (
     <AdminPage
       title="Equipos"
-      maxW="max-w-7xl"
       description={equiposQ.isLoading ? "Cargando…" : `${kpisQ.data?.total ?? total} equipos`}
       actions={
         <>
@@ -356,17 +354,17 @@ function EquiposPage() {
       <div className="space-y-6">
         {/* KPI strip (handoff): inventario de un vistazo. */}
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          <KpiCard label="Total" value={kpisQ.data?.total ?? total} meta="equipos en catálogo" />
-          <KpiCard
+          <StatCard label="Total" value={kpisQ.data?.total ?? total} meta="equipos en catálogo" />
+          <StatCard
             label="En uso hoy"
             value={kpisQ.data?.en_uso_hoy ?? 0}
             meta="unidades alquiladas ahora"
           />
-          <KpiCard
+          <StatCard
             label="Mantenimiento"
             value={kpisQ.data?.mantenimiento ?? 0}
             meta="bloqueando stock hoy"
-            warn={(kpisQ.data?.mantenimiento ?? 0) > 0}
+            tone={(kpisQ.data?.mantenimiento ?? 0) > 0 ? "warn" : "default"}
           />
         </div>
 
@@ -380,25 +378,13 @@ function EquiposPage() {
         )}
 
         <div className="flex flex-col md:flex-row md:flex-wrap gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Buscar (nombre, marca, modelo, serie, specs, keywords…)"
-              className="pl-9 pr-9 text-base sm:text-sm"
-            />
-            {searchInput && (
-              <button
-                type="button"
-                onClick={() => setSearchInput("")}
-                aria-label="Limpiar búsqueda"
-                className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-ink"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
+          <SearchInput
+            value={searchInput}
+            onValueChange={setSearchInput}
+            clearable
+            placeholder="Buscar (nombre, marca, modelo, serie, specs, keywords…)"
+            wrapperClassName="flex-1"
+          />
           <Select
             value={categoria || "__all"}
             onValueChange={(v) => setCategoria(v === "__all" ? "" : v)}

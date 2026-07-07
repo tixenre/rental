@@ -17,7 +17,12 @@
  * SQL para el server local).
  */
 import { type Equipment, type IncludedItem } from "@/data/equipment";
-import { type Pedido, type Item, type Pago, type Perfil } from "@/routes/ClientePortalTypes";
+import {
+  type Pedido,
+  type Item,
+  type Pago,
+  type Perfil,
+} from "@/components/cliente/ClientePortalTypes";
 import { type ListaPersonal } from "@/lib/cliente/api";
 // El back-office tiene su PROPIA forma del pedido (numero_pedido numérico, items
 // con id/pedido_id, plata desglosada) — distinta de la del portal del cliente.

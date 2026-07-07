@@ -8,7 +8,7 @@ import { STUDIO, STUDIO_PHONE } from "@/data/studio";
 import { apiGetEstudio, type EstudioTrabajo, type EstudioMedia } from "@/lib/api";
 import { formatARS } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { PublicLayout } from "@/components/rental/PublicLayout";
+import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { Button } from "@/design-system/ui/button";
 
 export const Route = createLazyFileRoute("/estudio")({
@@ -204,8 +204,8 @@ function LightboxSlide({
 
           {first?.kind === "instagram" && (
             <div
-              className="relative w-full"
-              style={{ height: igClipH, overflow: "hidden", backgroundColor: "rgb(244 244 245)" }}
+              className="relative w-full bg-muted"
+              style={{ height: igClipH, overflow: "hidden" }}
             >
               <IgEmbed key={first.url} url={first.url} />
               <a
@@ -839,9 +839,7 @@ function MobileBookBar({ priceLabel }: { priceLabel: string }) {
     >
       <div className="flex items-center gap-3 border-t hairline bg-background/95 backdrop-blur-xl px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="min-w-0 flex-1">
-          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Reservar el estudio
-          </div>
+          <div className="t-eyebrow">Reservar el estudio</div>
           <div className="truncate text-sm font-medium">{priceLabel}</div>
         </div>
         <Button
@@ -934,12 +932,15 @@ function EstudioPage() {
           className="flex items-center justify-between gap-3 bg-destructive/10 border-b border-destructive/30 px-4 py-3 text-sm text-destructive"
         >
           <span>No se pudo cargar la info actualizada del estudio. Mostrando datos guardados.</span>
-          <button
+          <Button
+            variant="outline"
+            size="sm"
+            shape="pill"
             onClick={() => refetch()}
-            className="shrink-0 rounded-full border border-destructive/40 px-3 py-1 text-xs font-medium hover:bg-destructive/10 transition"
+            className="shrink-0 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
           >
             Reintentar
-          </button>
+          </Button>
         </div>
       )}
 
@@ -1055,10 +1056,8 @@ function EstudioPage() {
               </h2>
               <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {visibles.map((f) => (
-                  <div key={f.label} className="rounded-xl border hairline bg-background p-3.5">
-                    <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1">
-                      {f.label}
-                    </div>
+                  <div key={f.label} className="card p-3.5">
+                    <div className="t-eyebrow mb-1">{f.label}</div>
                     <div className="font-semibold text-15">{f.value}</div>
                   </div>
                 ))}
@@ -1159,10 +1158,7 @@ function EstudioPage() {
               {faq
                 .filter((f) => f.q.trim() && f.a.trim())
                 .map((item) => (
-                  <details
-                    key={item.q}
-                    className="group rounded-xl border hairline bg-surface overflow-hidden"
-                  >
+                  <details key={item.q} className="group card overflow-hidden">
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3.5 font-semibold text-15 select-none">
                       {item.q}
                       <span className="text-muted-foreground shrink-0 transition-transform group-open:rotate-180">

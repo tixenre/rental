@@ -9,6 +9,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import { Spinner } from "@/design-system/ui/spinner";
+import { StatCard } from "@/design-system/composites/StatCard";
 import { Link } from "@tanstack/react-router";
 
 import {
@@ -94,16 +95,21 @@ export function HistorialEquipoDialog({
           <>
             {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <Stat label="Alquileres" value={histQ.data.stats.total_alquileres} />
-              <Stat label="Días totales" value={histQ.data.stats.total_dias} />
-              <Stat label="Revenue" value={fmtMoneda(histQ.data.stats.total_revenue)} />
-              <Stat
+              <StatCard label="Alquileres" value={histQ.data.stats.total_alquileres} size="md" />
+              <StatCard label="Días totales" value={histQ.data.stats.total_dias} size="md" />
+              <StatCard
+                label="Revenue"
+                value={fmtMoneda(histQ.data.stats.total_revenue)}
+                size="md"
+              />
+              <StatCard
                 label="Último alquiler"
                 value={
                   histQ.data.stats.ultimo_alquiler
                     ? fmtFecha(histQ.data.stats.ultimo_alquiler)
                     : "—"
                 }
+                size="md"
               />
             </div>
 
@@ -171,14 +177,5 @@ export function HistorialEquipoDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-md border hairline bg-muted/20 p-2">
-      <div className="text-2xs uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="text-base font-medium tabular-nums">{value}</div>
-    </div>
   );
 }

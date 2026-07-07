@@ -10,6 +10,7 @@ import { Input } from "@/design-system/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/design-system/ui/radio-group";
 import { DraftNumberInput } from "@/design-system/ui/draft-number-input";
 import { QtyInput } from "@/design-system/ui/qty-input";
+import { Section } from "@/design-system/composites/Section";
 import { cn } from "@/lib/utils";
 import { adminApi } from "@/lib/admin/api";
 import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
@@ -251,29 +252,6 @@ export function SaveIndicator({ status }: { status: string }) {
   );
 }
 
-export function Section({
-  icon: Icon,
-  title,
-  aside,
-  children,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  aside?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-xl border hairline bg-surface-elevated">
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b hairline">
-        <Icon className="h-4 w-4 text-muted-foreground" />
-        <span className="font-medium text-sm text-ink">{title}</span>
-        {aside && <span className="ml-auto">{aside}</span>}
-      </div>
-      <div className="p-4">{children}</div>
-    </section>
-  );
-}
-
 /** "Facturar a nombre de" (#1251) — el renter sigue siendo `cliente_id`; esto
  * solo elige a quién se factura: la cuenta default, un perfil fiscal personal,
  * o una productora vinculada al cliente. Mismo patrón que el selector del
@@ -318,7 +296,7 @@ export function FacturacionTargetSection({
   }
 
   return (
-    <Section icon={Building2} title="Facturar a nombre de">
+    <Section variant="card" tone="elevated" icon={Building2} title="Facturar a nombre de">
       <RadioGroup value={value} onValueChange={handleChange} className="gap-2">
         <label className="flex items-center gap-2 text-sm text-ink">
           <RadioGroupItem value="default" />
@@ -338,23 +316,6 @@ export function FacturacionTargetSection({
         ))}
       </RadioGroup>
     </Section>
-  );
-}
-
-export function FieldLabel({
-  label,
-  className,
-  children,
-}: {
-  label: string;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className={cn("block", className)}>
-      <span className="block t-eyebrow mb-1">{label}</span>
-      {children}
-    </label>
   );
 }
 

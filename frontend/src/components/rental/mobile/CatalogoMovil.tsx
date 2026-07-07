@@ -12,16 +12,14 @@ import { cn } from "@/lib/utils";
 import { useRetomarPedido } from "@/lib/verificacion";
 import { logSearch } from "@/lib/search-log";
 import { filtrarOrdenar } from "@/lib/search/normalize";
-import { RentalDateModal } from "@/components/rental/RentalDateModal";
-import { TopBarShell } from "@/components/rental/TopBar";
-import {
-  HeroBanner,
-  EquipmentRow,
-  CartSheet,
-  FichaSheet,
-  BrandSheet,
-  FiltrosSheet,
-} from "./CatalogoMovilHelpers";
+import { RentalDateModal } from "@/components/rental/dates/RentalDateModal";
+import { TopBarShell } from "@/components/rental/shell/TopBar";
+import { HeroBanner } from "./HeroBanner";
+import { CartSheet } from "./CartSheet";
+import { FichaSheet } from "./FichaSheet";
+import { EquipmentRowMobile } from "./EquipmentRowMobile";
+import { BrandSheet } from "./BrandSheet";
+import { FiltrosSheet } from "./FiltrosSheet";
 
 /* ── Shared styles ───────────────────────────────────────────────── */
 const TABS_BG = "color-mix(in oklch, var(--background) 90%, transparent)";
@@ -467,7 +465,7 @@ export function CatalogoMovil() {
             </div>
           )}
           {filteredEquipos.map((eq) => (
-            <EquipmentRow
+            <EquipmentRowMobile
               key={eq.id}
               eq={eq}
               inCart={cart.items[eq.id] ?? 0}

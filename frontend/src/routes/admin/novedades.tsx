@@ -13,7 +13,7 @@ export const Route = createFileRoute("/admin/novedades")({
 
 function NovedadesPage() {
   return (
-    <AdminPage title="Novedades" maxW="max-w-3xl" description="Cambios recientes en el sistema.">
+    <AdminPage title="Novedades" maxW="form" description="Cambios recientes en el sistema.">
       <ol className="space-y-4 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-px before:bg-border before:hairline">
         {changelog.map((entry) => (
           <EntryCard key={entry.number} entry={entry} />
@@ -32,7 +32,7 @@ function EntryCard({ entry }: { entry: ChangelogEntry }) {
       >
         {kind.icon}
       </div>
-      <article className="rounded-xl border hairline bg-surface p-5 hover:border-ink/20 transition">
+      <article className="card p-5 hover:border-ink/20 transition">
         <header className="flex items-start gap-3 mb-2">
           <div className="flex-1 min-w-0">
             <h2 className="font-display text-base text-ink leading-snug">{entry.title}</h2>

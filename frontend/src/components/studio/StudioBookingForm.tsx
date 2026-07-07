@@ -17,11 +17,12 @@ import {
   DialogTitle,
 } from "@/design-system/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/design-system/ui/popover";
+import { FieldLabel } from "@/design-system/ui/Field";
 import { cn } from "@/lib/utils";
 import { formatARS } from "@/lib/format";
 import { authedFetch } from "@/lib/authedFetch";
 import { iniciarVerificacionIdentidad } from "@/lib/verificacion";
-import { VerificacionRequeridaPanel } from "@/components/rental/VerificacionRequeridaPanel";
+import { VerificacionRequeridaPanel } from "@/components/rental/account/VerificacionRequeridaPanel";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
 import { apiGetEstudioDisponibilidad, apiCrearReservaEstudio } from "@/lib/api";
 
@@ -71,21 +72,11 @@ function Section({
   return (
     <section className={cn("rounded-2xl border hairline bg-surface p-5 sm:p-6", className)}>
       <header className="flex items-baseline gap-2 mb-4">
-        <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground tabular">
-          {pad(step)}
-        </span>
+        <span className="t-eyebrow tabular">{pad(step)}</span>
         <h3 className="font-display text-lg sm:text-xl">{title}</h3>
       </header>
       {children}
     </section>
-  );
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-      {children}
-    </label>
   );
 }
 
@@ -410,7 +401,7 @@ export function StudioBookingForm({
           {/* Duración */}
           <div>
             <FieldLabel>Duración · mín {minHours}h</FieldLabel>
-            <div className="mt-1.5 flex h-11 items-center gap-1 rounded-md border hairline bg-background px-1">
+            <div className="mt-1.5 flex h-11 items-center gap-1 card px-1">
               <button
                 type="button"
                 onClick={() => setHours((h) => Math.max(minHours, h - 1))}
@@ -443,9 +434,7 @@ export function StudioBookingForm({
             role="radiogroup"
             aria-label="¿Qué reservás?"
           >
-            <legend className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-2 sm:col-span-2">
-              ¿Qué reservás?
-            </legend>
+            <legend className="t-eyebrow mb-2 sm:col-span-2">¿Qué reservás?</legend>
 
             {/* Card A — Solo el estudio */}
             <label
@@ -626,7 +615,7 @@ export function StudioBookingForm({
               Usamos los datos de tu cuenta — no te pedimos formularios.
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-xl border hairline bg-surface px-4 py-3 text-sm">
+          <div className="card px-4 py-3 text-sm">
             <div className="font-medium text-ink">{dateLabelFull}</div>
             <div className="mt-1 text-muted-foreground">
               <span className="font-medium text-ink tabular">
@@ -640,9 +629,7 @@ export function StudioBookingForm({
               </div>
             )}
             <div className="mt-2 flex items-baseline justify-between border-t hairline pt-2">
-              <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                Total estimado
-              </span>
+              <span className="t-eyebrow">Total estimado</span>
               <span className="font-semibold tabular">
                 {total > 0 ? formatARS(total) : "A consultar"}
               </span>

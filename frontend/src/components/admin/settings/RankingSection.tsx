@@ -30,7 +30,7 @@ export function RankingSection() {
   });
 
   return (
-    <section className="rounded-lg border hairline bg-background p-4 space-y-3">
+    <section className="card p-4 space-y-3">
       <div>
         <h2 className="font-display text-lg text-ink flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-ink" /> Ranking automático

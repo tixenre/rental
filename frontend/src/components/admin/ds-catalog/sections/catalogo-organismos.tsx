@@ -18,8 +18,8 @@ import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { EquipmentRow } from "@/components/rental/EquipmentRow";
 import { CategoryMosaic } from "@/components/rental/CategoryMosaic";
 import { DiscoverySheet } from "@/components/rental/DiscoverySheet";
-import { CartDrawerView } from "@/components/rental/CartDrawerView";
-import { RentalDateModal } from "@/components/rental/RentalDateModal";
+import { CartDrawerView } from "@/components/rental/cart/CartDrawerView";
+import { RentalDateModal } from "@/components/rental/dates/RentalDateModal";
 
 import { equipment, categories, brands } from "@/data/equipment";
 import { equipoSimple, equipoKit, equipoCombo, noop } from "../fixtures";
