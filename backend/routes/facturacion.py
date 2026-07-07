@@ -123,6 +123,55 @@ def refrescar_catalogos_arca(request: Request):
     }
 
 
+@router.post("/admin/arca/catalogos-exportacion/refrescar")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
+def refrescar_catalogos_arca_exportacion(request: Request):
+    """Actualiza los catálogos de WSFEXv1 (países destino/Incoterms/monedas) que pueblan los
+    selects del formulario de Factura de Exportación en el admin."""
+    require_admin(request)
+
+    from services.facturacion.catalogos_exportacion import refrescar_catalogos_exportacion
+
+    with get_db() as conn:
+        try:
+            resultado = refrescar_catalogos_exportacion(conn)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        except ArcaError as e:
+            raise HTTPException(_status_for_arca_error(e), str(e))
+        except RuntimeError as e:
+            raise HTTPException(503, str(e))
+        conn.commit()
+
+    return {
+        "ok": True,
+        "paises_destino": len(resultado["paises_destino"]),
+        "incoterms": len(resultado["incoterms"]),
+        "monedas": len(resultado["monedas"]),
+    }
+
+
+@router.get("/admin/arca/catalogos-exportacion")
+def obtener_catalogos_exportacion(request: Request):
+    """Devuelve los catálogos de WSFEXv1 ya cacheados (países destino/Incoterms/monedas) para
+    poblar los selects del formulario admin — 503 si nunca se refrescaron."""
+    require_admin(request)
+
+    from services.facturacion import catalogos_exportacion as cat
+
+    with get_db() as conn:
+        try:
+            return {
+                "paises_destino": cat.paises_destino(conn),
+                "incoterms": cat.incoterms(conn),
+                "monedas": cat.monedas(conn),
+                "ultimo_refresco": cat.ultimo_refresco(conn),
+            }
+        except RuntimeError as e:
+            raise HTTPException(503, str(e))
+
+
 # ---------------------------------------------------------------------------
 # GET /admin/arca/padron/{cuit} — autocompletar razón social/domicilio/IVA
 # ---------------------------------------------------------------------------
@@ -198,6 +247,7 @@ def crear_emisor(request: Request, body: dict):
     domicilio = (body.get("domicilio") or "").strip() or None
     iibb = (body.get("iibb") or "").strip() or None
     inicio_actividades = (body.get("inicio_actividades") or "").strip() or None
+    habilitado_exportacion = bool(body.get("habilitado_exportacion", False))
     notas = (body.get("notas") or "").strip() or None
 
     if not nombre or not cuit or not pto_vta or not condicion_iva:
@@ -221,6 +271,7 @@ def crear_emisor(request: Request, body: dict):
                 domicilio=domicilio,
                 iibb=iibb,
                 inicio_actividades=inicio_actividades,
+                habilitado_exportacion=habilitado_exportacion,
                 notas=notas,
             )
             from services.facturacion.emisores_repo import get_by_id
@@ -254,6 +305,7 @@ def actualizar_emisor(emisor_id: int, request: Request, body: dict):
                 domicilio=body.get("domicilio"),
                 iibb=body.get("iibb"),
                 inicio_actividades=body.get("inicio_actividades"),
+                habilitado_exportacion=body.get("habilitado_exportacion"),
                 notas=body.get("notas"),
             )
             emisor = get_by_id(emisor_id, conn)
@@ -565,6 +617,156 @@ def listar_facturas(
 
 
 # ---------------------------------------------------------------------------
+# Factura de Exportación (WSFEXv1) — flujo NUEVO, sin pedido de por medio
+# ---------------------------------------------------------------------------
+
+
+def _comprobante_exportacion_desde_body(body: dict):
+    """Arma un `ComprobanteExportacionRequest` desde el body crudo del POST — mismo criterio de
+    validación fail-fast que el resto del módulo (`ValueError` con motivo claro, nunca un 500
+    críptico por un campo mal tipado)."""
+    from datetime import date as _date
+    from decimal import Decimal, InvalidOperation
+
+    from arca_fe import CondicionIva, Concepto, Emisor
+    from arca_fe.modelos_exportacion import (
+        CbteAsocExportacion,
+        CbteTipoExportacion,
+        ComprobanteExportacionRequest,
+        DatosExportacion,
+        ReceptorExterior,
+    )
+
+    emisor_body = body.get("emisor") or {}
+    receptor_body = body.get("receptor") or {}
+    exportacion_body = body.get("exportacion") or {}
+
+    _CONDICION_IVA_POR_NOMBRE = {
+        "responsable_inscripto": CondicionIva.RESPONSABLE_INSCRIPTO,
+        "monotributo": CondicionIva.MONOTRIBUTO,
+    }
+    try:
+        condicion_iva_raw = str(emisor_body.get("condicion_iva", "")).strip().lower()
+        if condicion_iva_raw not in _CONDICION_IVA_POR_NOMBRE:
+            raise ValueError(
+                f"emisor.condicion_iva inválida: '{condicion_iva_raw}' "
+                "(solo responsable_inscripto o monotributo facturan exportación)"
+            )
+        emisor = Emisor(
+            cuit=emisor_body.get("cuit"),
+            punto_venta=int(emisor_body.get("punto_venta")),
+            condicion_iva=_CONDICION_IVA_POR_NOMBRE[condicion_iva_raw],
+        )
+        receptor = ReceptorExterior(
+            razon_social=receptor_body.get("razon_social", ""),
+            pais_destino_id=int(receptor_body.get("pais_destino_id")),
+            domicilio=receptor_body.get("domicilio") or "",
+            id_impositivo=receptor_body.get("id_impositivo") or "",
+        )
+        exportacion = DatosExportacion(
+            incoterm=exportacion_body.get("incoterm", ""),
+            permiso_embarque=exportacion_body.get("permiso_embarque") or "",
+            permiso_existente=bool(exportacion_body.get("permiso_existente", True)),
+        )
+        cbtes_asoc = tuple(
+            CbteAsocExportacion(
+                tipo=CbteTipoExportacion(a["tipo"]), punto_venta=a["punto_venta"], numero=a["numero"],
+            )
+            for a in (body.get("cbtes_asoc") or [])
+        )
+        return ComprobanteExportacionRequest(
+            emisor=emisor,
+            receptor=receptor,
+            exportacion=exportacion,
+            concepto=Concepto(int(body.get("concepto", Concepto.PRODUCTOS))),
+            importe_neto=Decimal(str(body.get("importe_neto", "0"))),
+            fecha=_date.fromisoformat(body["fecha"]) if body.get("fecha") else _date.today(),
+            moneda=body.get("moneda", ""),
+            cotizacion=Decimal(str(body.get("cotizacion", "1"))),
+            es_nota_credito=bool(body.get("es_nota_credito", False)),
+            cbtes_asoc=cbtes_asoc,
+        )
+    except (TypeError, KeyError, InvalidOperation, ValueError) as e:
+        raise HTTPException(400, f"Datos de exportación inválidos: {e}")
+
+
+@router.post("/admin/facturacion/exportacion")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
+def crear_factura_exportacion(request: Request, body: dict):
+    """Emite una Factura de Exportación (WSFEXv1) — flujo NUEVO sin pedido de por medio: el body
+    trae todos los datos de la operación (emisor, receptor exterior, exportación, importe)."""
+    require_admin(request)
+    nombre_emisor = (body.get("nombre_emisor") or "").strip()
+    if not nombre_emisor:
+        raise HTTPException(400, "nombre_emisor es obligatorio")
+
+    comprobante = _comprobante_exportacion_desde_body(body)
+
+    try:
+        from services.facturacion.engine_exportacion import emitir_factura_exportacion
+        session = getattr(request.state, "session", None)
+        emitido_por = (session or {}).get("email") if session else None
+        factura = emitir_factura_exportacion(nombre_emisor, comprobante, emitido_por=emitido_por)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except ArcaError as e:
+        raise HTTPException(_status_for_arca_error(e), str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+    return _factura_exportacion_to_dict(factura)
+
+
+@router.post("/admin/facturacion/exportacion/{factura_id}/nota-credito")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
+def nota_credito_exportacion(factura_id: int, request: Request, body: dict):
+    """Emite una Nota de Crédito de exportación que anula `factura_id`."""
+    require_admin(request)
+    comprobante_nc = _comprobante_exportacion_desde_body({**body, "es_nota_credito": True})
+
+    try:
+        from services.facturacion.engine_exportacion import emitir_nota_credito_exportacion
+        session = getattr(request.state, "session", None)
+        emitido_por = (session or {}).get("email") if session else None
+        nc = emitir_nota_credito_exportacion(factura_id, comprobante_nc, emitido_por=emitido_por)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except ArcaError as e:
+        raise HTTPException(_status_for_arca_error(e), str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+    return _factura_exportacion_to_dict(nc)
+
+
+@router.get("/admin/facturacion/exportacion")
+def listar_facturas_exportacion(
+    request: Request,
+    emisor: Optional[str] = Query(None),
+    estado: Optional[str] = Query(None),
+    desde: Optional[str] = Query(None),
+    hasta: Optional[str] = Query(None),
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    """Listado global de Facturas de Exportación con filtros. Requiere sesión de admin."""
+    require_admin(request)
+
+    from services.facturacion.repo_exportacion import list_facturas_exportacion
+    with get_db() as conn:
+        facturas = list_facturas_exportacion(
+            conn, emisor=emisor or None, estado=estado or None,
+            desde=desde or None, hasta=hasta or None, limit=limit, offset=offset,
+        )
+    return {
+        "facturas": [_factura_exportacion_to_dict(f) for f in facturas],
+        "count": len(facturas),
+    }
+
+
+# ---------------------------------------------------------------------------
 # GET /facturas/{id}/pdf — siempre on-demand (no se guarda ni se cachea)
 # ---------------------------------------------------------------------------
 
@@ -656,6 +858,66 @@ async def descargar_pdf_factura(
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'attachment; filename="{factura_filename(factura, layout=layout)}"',
+            **_DOC_NO_CACHE,
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /facturas-exportacion/{id}/pdf — un solo layout (ver render_exportacion.py docstring)
+# ---------------------------------------------------------------------------
+
+
+def _factura_exportacion_html_o_404(factura_id: int, conn):
+    from services.facturacion.repo_exportacion import get_by_id
+    from services.facturacion.comprobante_render_exportacion import factura_exportacion_html
+
+    factura = get_by_id(factura_id, conn)
+    if factura is None:
+        raise HTTPException(404, "Factura de Exportación no encontrada")
+    if factura.estado != "emitida":
+        raise HTTPException(400, "Solo se pueden ver/descargar/enviar facturas emitidas")
+
+    try:
+        html_str = factura_exportacion_html(factura, conn)
+    except (ValueError, RuntimeError) as e:
+        raise HTTPException(503, str(e))
+    return factura, html_str
+
+
+@router.get("/facturas-exportacion/{factura_id}/pdf")
+async def descargar_pdf_factura_exportacion(factura_id: int, request: Request, format: str = "pdf"):
+    """PDF de una Factura de Exportación, renderizado on-demand. `format=html` devuelve el preview
+    rápido (mismo patrón que `GET /facturas/{id}/pdf`) — un solo layout, sin selector."""
+    require_admin(request)
+
+    with get_db() as conn:
+        factura, html_str = _factura_exportacion_html_o_404(factura_id, conn)
+        if format == "html":
+            cert_pem = key_pem = None
+        else:
+            from services.facturacion.signing_cert import get_or_create_signing_cert
+            cert_pem, key_pem = get_or_create_signing_cert(conn)
+
+    if format == "html":
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=html_str, headers=_DOC_NO_CACHE)
+
+    from pdf import _render_pdf
+    from arca_fe import asegurar_pdf
+    from services.facturacion.comprobante_render_exportacion import factura_exportacion_filename
+
+    try:
+        pdf_bytes = await _render_pdf(html_str, page_size=None)
+        pdf_bytes = await asyncio.to_thread(asegurar_pdf, pdf_bytes, cert_pem, key_pem)
+    except Exception as e:
+        raise HTTPException(503, f"No se pudo generar el PDF: {e}")
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{factura_exportacion_filename(factura)}"',
             **_DOC_NO_CACHE,
         },
     )
@@ -786,6 +1048,36 @@ def _factura_to_dict(f) -> dict:
     }
 
 
+def _factura_exportacion_to_dict(f) -> dict:
+    if f is None:
+        return {}
+    return {
+        "id": f.id,
+        "emisor": f.emisor,
+        "ambiente": f.ambiente,
+        "cbte_tipo": f.cbte_tipo,
+        "pto_vta": f.pto_vta,
+        "cbte_nro": f.cbte_nro,
+        "cae": f.cae,
+        "cae_vto": str(f.cae_vto) if f.cae_vto else None,
+        "receptor_razon_social": f.receptor_razon_social,
+        "receptor_pais_destino": f.receptor_pais_destino,
+        "receptor_domicilio": f.receptor_domicilio,
+        "receptor_id_impositivo": f.receptor_id_impositivo,
+        "incoterm": f.incoterm,
+        "permiso_embarque": f.permiso_embarque,
+        "moneda": f.moneda,
+        "cotizacion": f.cotizacion,
+        "imp_total": f.imp_total,
+        "estado": f.estado,
+        "nota_credito_de": f.nota_credito_de,
+        "errores": f.errores,
+        "fecha_emision": f.fecha_emision.isoformat() if f.fecha_emision else None,
+        "created_at": f.created_at.isoformat() if f.created_at else None,
+        "created_by": f.created_by,
+    }
+
+
 def _emisor_to_dict(e) -> dict:
     return {
         "id": e.id,
@@ -799,6 +1091,7 @@ def _emisor_to_dict(e) -> dict:
         "domicilio": e.domicilio,
         "iibb": e.iibb,
         "inicio_actividades": e.inicio_actividades,
+        "habilitado_exportacion": e.habilitado_exportacion,
         "notas": e.notas,
         "created_at": e.created_at.isoformat() if e.created_at else None,
         "updated_at": e.updated_at.isoformat() if e.updated_at else None,

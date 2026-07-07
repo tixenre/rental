@@ -3107,3 +3107,62 @@ cancel-in-progress` ya cancela corridas viejas.
   conocido (menor, sin issue todavía): el catálogo del cliente capea el stepper con la
   disponibilidad por equipo sin descontar los kits del propio carrito — el checkout igual lo frena
   (dry-run del gate); es UX, no sobreventa. Commits `06d837bf` + `effafdac` (dev).
+
+### 2026-07-05 — Factura de Exportación (WSFEXv1): flujo nuevo sin pedido, enum/tabla separados de la doméstica
+
+- **Contexto.** El dueño pidió construir soporte de Factura de Exportación — un webservice de AFIP
+  (WSFEXv1, RG 2758) completamente distinto de WSFEv1 (ya implementado): tipos de comprobante 19
+  (Factura E) / 20 (ND E) / 21 (NC E), operación `FEXAuthorize`, receptor exterior sin CUIT
+  argentino (identificado por país destino, con Incoterm y permiso de embarque). El código ya
+  documentaba explícitamente que esto NO estaba implementado.
+- **Decisión clave, confirmada con el dueño antes de diseñar el resto: es un flujo de negocio
+  NUEVO, sin pedido de `alquileres` de por medio** — venta al exterior, carga manual en el admin.
+  Esto fija toda la arquitectura de abajo: no hay `pedido_id`, no hay verificación de padrón (el
+  receptor no es argentino), no hay reuso del motor de reservas.
+- **`CbteTipoExportacion` separado de `modelos.CbteTipo`** (no in-place). Agregar 19/20/21 al enum
+  doméstico arriesgaba que cayeran sin querer en una rama de `tipo_comprobante`/
+  `letra_comprobante` que asume A/B/C/M/FCE — mismo tipo de bug silencioso que esta librería evita
+  en todos lados. Costo: algo de código paralelo (`modelos_exportacion.py`,
+  `comprobante_exportacion.py`, `wsfex.py`, `render_exportacion.py`); beneficio: cero riesgo sobre
+  lo doméstico ya probado en producción. `ItemFactura`/`CaeResult`/`Emisor`/`Concepto` SÍ se
+  reusan de `modelos.py` — son genuinamente compartidos (no dependen de IVA ni de un receptor
+  argentino).
+- **Tabla `facturas_exportacion` separada de `facturas`** — el receptor de exportación no tiene
+  `doc_tipo`/`doc_nro`/`condicion_iva_receptor` argentinos NOT NULL; forzar los dos modelos en una
+  tabla arriesgaba romper invariantes ya probados (`uq_factura_vigente_por_pedido`, etc.). DAL
+  paralelo (`repo_exportacion.py`), orquestador paralelo (`engine_exportacion.py`, mismo esqueleto
+  robusto que `engine.emitir_factura`: advisory lock namespace propio `0xFA0D0000`, idempotencia
+  post-timeout vía `FEXGetLast_CMP`/`FEXGetCMP`, INSERT pendiente antes del SOAP, nunca 500).
+- **`emisores_arca.habilitado_exportacion`** (flag nuevo, default `false`): un emisor necesita una
+  relación de servicio AFIP separada para WSFEXv1 (mismo mecanismo que el padrón) — sin el flag, el
+  fallo recién se ve al pegarle a AFIP con un `ArcaAuthError` opaco; el flag falla temprano con
+  mensaje claro apuntando al back-office.
+- **Un solo layout de render (`render_exportacion.py`), no 3 como la doméstica.** Decisión
+  explícita, no un descuido: la Factura E no es una "variante visual" de la doméstica — es un
+  documento fiscal distinto (sin discriminación de IVA, receptor exterior, país destino/Incoterm/
+  permiso de embarque en vez de condición IVA receptor/condición de venta). Multiplicar 3 layouts
+  para un documento sin volumen de uso real todavía habría sido sobre-ingeniería; si en el futuro
+  hace falta una versión "para compartir" (paralela a `simplificada`), se agrega ahí cuando haya
+  evidencia de que hace falta, no antes.
+- **QR fiscal con convención tentativa.** `armar_qr` (ya genérico) se reusa con
+  `doc_tipo_rec=99`/`doc_nro_rec=0` para el receptor exterior — no hay un `DocTipo` real de AFIP
+  para "receptor sin CUIT argentino" en el esquema del QR RG4892; convención documentada como
+  tentativa en el código, a confirmar contra el manual de RG4892 aplicado a WSFEXv1.
+- **Nombres de operación/campo SOAP no verificables desde este repo.** `FEXAuthorize`,
+  `FEXGetLast_CMP`, `FEXGetCMP`, los catálogos `FEXGetPARAM_*`, y los nombres de campo del payload
+  (`Cmp`/`Permisos`/`Cbtes_asoc`) son la mejor referencia disponible sin acceso al WSDL real de
+  homologación — se confirman/ajustan contra AFIP antes de producción, mismo criterio que ya aplicó
+  `padron.py` cuando el nombre de servicio documentado públicamente resultó estar deprecado en la
+  práctica. Nunca se asumieron como hecho confirmado en ningún docstring.
+- **`arca_fe` sube a `0.3.0`** (MINOR — superficie nueva, aditiva, no rompe nada existente):
+  `CbteTipoExportacion`, `ReceptorExterior`, `DatosExportacion`, `CbteAsocExportacion`,
+  `ComprobanteExportacionRequest`, `ComprobanteFiscalExportacion`, `WsfexClient`,
+  `WSFEX_WSAA_SERVICIO`, `renderizar_factura_exportacion_html`, etc.
+- **Proceso**: rama aislada `feature/wsfex-exportacion`, 21 fases en commits atómicos testeables
+  (núcleo portable → adapter → frontend → tests contra Postgres real → docs), PR scoped a `dev`
+  (queda sin mergear, el dueño prueba y aprueba) + issue de tracking con las 21 fases como
+  checklist — mismo patrón que perfiles fiscales/productoras (#1240/#1242).
+- **Verificación real, no solo tests puros**: la migración/schema se probaron contra Postgres local
+  real (`init_db()` + `alembic upgrade head` desde cero) antes de dar por buena cada fase que tocó
+  la tabla; `test_repo_exportacion_db.py` (opt-in) cubre el roundtrip completo contra la base real,
+  no solo mocks.

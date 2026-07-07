@@ -62,6 +62,7 @@ class _FakeConn:
                     "domicilio": None,
                     "iibb": None,
                     "inicio_actividades": None,
+                    "habilitado_exportacion": False,
                     "notas": None,
                     "created_at": None,
                     "updated_at": None,
@@ -114,6 +115,8 @@ def test_gating_produccion_cuando_is_production(monkeypatch):
     assert cred.ambiente == "produccion"
     assert "wsaa.afip.gov.ar" in cred.endpoint_wsaa
     assert "homo" not in cred.endpoint_wsaa
+    assert "wsfexv1" in cred.endpoint_wsfex
+    assert "homo" not in cred.endpoint_wsfex
 
 
 def test_gating_homologacion_cuando_no_is_production(monkeypatch):
@@ -126,6 +129,8 @@ def test_gating_homologacion_cuando_no_is_production(monkeypatch):
     cred = credenciales("pablo", _FakeConn())
     assert cred.ambiente == "homologacion"
     assert "homo" in cred.endpoint_wsaa
+    assert "homo" in cred.endpoint_wsfex
+    assert "wsfexv1" in cred.endpoint_wsfex
 
 
 def test_gating_emisor_no_encontrado_levanta(monkeypatch):
@@ -160,6 +165,7 @@ def test_gating_emisor_inactivo_levanta(monkeypatch):
                         "cert_enc": b"x", "key_enc": b"x",
                         "activo": False, "razon_social": None,
                         "domicilio": None, "iibb": None, "inicio_actividades": None,
+                        "habilitado_exportacion": False,
                         "notas": None,
                         "created_at": None, "updated_at": None,
                     }
@@ -273,6 +279,7 @@ class _FakeConnEmisor:
                     "domicilio": None,
                     "iibb": None,
                     "inicio_actividades": None,
+                    "habilitado_exportacion": False,
                     "notas": None,
                     "created_at": None,
                     "updated_at": None,

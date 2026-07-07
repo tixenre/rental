@@ -32,6 +32,7 @@ import {
   HardDriveDownload,
   Settings,
   AlertTriangle,
+  Globe,
   type LucideIcon,
 } from "lucide-react";
 
@@ -109,6 +110,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { title: "Liquidación", url: "/admin/contabilidad/liquidacion", icon: Calculator },
       { title: "Estadísticas", url: "/admin/estadisticas", icon: TrendingUp },
       { title: "Facturas ARCA", url: "/admin/facturas", icon: ClipboardList },
+      { title: "Factura de Exportación", url: "/admin/facturacion/exportacion", icon: Globe },
       { title: "Emisores ARCA", url: "/admin/facturacion/emisores", icon: Settings },
       { title: "Glosario", url: "/admin/contabilidad/glosario", icon: BookOpen },
     ],

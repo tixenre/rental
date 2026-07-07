@@ -2347,6 +2347,14 @@ def _init_db_schema(conn):
         ALTER TABLE emisores_arca
             ADD COLUMN IF NOT EXISTS inicio_actividades TEXT
     """)
+    # Factura de Exportación (WSFEXv1): un emisor necesita una relación de servicio AFIP
+    # SEPARADA de "wsfe" (mismo mecanismo que exige el padrón) — sin este flag, un intento de
+    # facturar exportación con un emisor que nunca delegó esa relación falla recién al pegarle a
+    # AFIP con un ArcaAuthError críptico; con el flag, se puede bloquear antes con un mensaje claro.
+    conn.execute("""
+        ALTER TABLE emisores_arca
+            ADD COLUMN IF NOT EXISTS habilitado_exportacion BOOLEAN NOT NULL DEFAULT false
+    """)
 
     # ── Perfiles fiscales múltiples + productoras (#1240) ────────────────────
     # Refina la regla "facturación siempre usa el dato de AFIP verificado" (2026-07-05):
@@ -2447,6 +2455,47 @@ def _init_db_schema(conn):
                     CHECK (perfil_fiscal_id IS NULL OR productora_id IS NULL);
             END IF;
         END $$;
+    """)
+
+    # ── Factura de Exportación — WSFEXv1 (#tracking pendiente) ───────────────
+    # Tabla SEPARADA de `facturas` (no extenderla): el receptor de exportación no tiene
+    # doc_tipo/doc_nro/condicion_iva_receptor argentinos (NOT NULL en `facturas`) — forzar dos
+    # modelos incompatibles en una sola tabla arriesga romper invariantes ya probados
+    # (uq_factura_vigente_por_pedido, etc.). Flujo NUEVO sin pedido de `alquileres` de por medio
+    # (confirmado con el dueño) — venta al exterior, carga manual en el admin.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS facturas_exportacion (
+            id                      SERIAL PRIMARY KEY,
+            emisor                  TEXT NOT NULL,
+            ambiente                TEXT NOT NULL,
+            cbte_tipo               INTEGER NOT NULL,
+            pto_vta                 INTEGER NOT NULL,
+            cbte_nro                INTEGER,
+            cae                     TEXT,
+            cae_vto                 DATE,
+            receptor_razon_social   TEXT NOT NULL,
+            receptor_pais_destino   INTEGER NOT NULL,
+            receptor_domicilio      TEXT,
+            receptor_id_impositivo  TEXT,
+            incoterm                TEXT NOT NULL,
+            permiso_embarque        TEXT,
+            moneda                  TEXT NOT NULL,
+            cotizacion              NUMERIC(12,4) NOT NULL,
+            imp_total               NUMERIC(12,2) NOT NULL,
+            estado                  TEXT NOT NULL DEFAULT 'pendiente',
+            nota_credito_de         INTEGER REFERENCES facturas_exportacion(id),
+            qr_payload              TEXT,
+            raw_request             JSONB,
+            raw_response            JSONB,
+            errores                 JSONB,
+            fecha_emision           TIMESTAMPTZ,
+            created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+            created_by              TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_facturas_exportacion_estado
+        ON facturas_exportacion (estado)
     """)
 
     # ── Estudio: trabajos / producciones (galería "en acción") ───────────────

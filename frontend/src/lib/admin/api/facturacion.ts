@@ -15,6 +15,7 @@ export type EmisorArca = {
   domicilio: string | null;
   iibb: string | null;
   inicio_actividades: string | null;
+  habilitado_exportacion: boolean;
   notas: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -70,6 +71,63 @@ export type FacturasListResp = {
   facturas: Factura[];
   total_imp_total: number;
   count: number;
+};
+
+// Factura de Exportación (WSFEXv1) — flujo nuevo sin pedido, receptor exterior.
+export type FacturaExportacionEstado = "pendiente" | "emitida" | "error" | "anulada";
+
+export type FacturaExportacion = {
+  id: number;
+  emisor: string;
+  ambiente: "homologacion" | "produccion";
+  cbte_tipo: number;
+  pto_vta: number;
+  cbte_nro: number | null;
+  cae: string | null;
+  cae_vto: string | null;
+  receptor_razon_social: string;
+  receptor_pais_destino: number;
+  receptor_domicilio: string | null;
+  receptor_id_impositivo: string | null;
+  incoterm: string;
+  permiso_embarque: string | null;
+  moneda: string;
+  cotizacion: number;
+  imp_total: number;
+  estado: FacturaExportacionEstado;
+  nota_credito_de: number | null;
+  errores: string[] | null;
+  fecha_emision: string | null;
+  created_at: string | null;
+  created_by: string | null;
+};
+
+export type FacturasExportacionListResp = {
+  facturas: FacturaExportacion[];
+  count: number;
+};
+
+export type CatalogoItem = { id: string | number; desc: string };
+
+export type NuevaFacturaExportacion = {
+  nombre_emisor: string;
+  emisor: { cuit: string; punto_venta: number; condicion_iva: string };
+  receptor: {
+    razon_social: string;
+    pais_destino_id: number;
+    domicilio?: string;
+    id_impositivo?: string;
+  };
+  exportacion: {
+    incoterm: string;
+    permiso_embarque?: string;
+    permiso_existente?: boolean;
+  };
+  concepto: number;
+  importe_neto: string;
+  fecha: string;
+  moneda: string;
+  cotizacion: string;
 };
 
 export type PadronResult =
@@ -231,4 +289,37 @@ export const facturacionApi = {
     const qs = sp.toString();
     return authedJson<FacturasListResp>(`/api/admin/facturas${qs ? `?${qs}` : ""}`);
   },
+
+  // Factura de Exportación (WSFEXv1)
+  crearFacturaExportacion: (body: NuevaFacturaExportacion) =>
+    authedPostJson<FacturaExportacion>("/api/admin/facturacion/exportacion", body),
+  notaCreditoExportacion: (
+    facturaId: number,
+    body: Omit<NuevaFacturaExportacion, "concepto"> & { cbtes_asoc: unknown[] },
+  ) =>
+    authedPostJson<FacturaExportacion>(
+      `/api/admin/facturacion/exportacion/${facturaId}/nota-credito`,
+      body,
+    ),
+  listFacturasExportacion: (params?: { emisor?: string; estado?: string }) => {
+    const sp = new URLSearchParams();
+    if (params?.emisor) sp.set("emisor", params.emisor);
+    if (params?.estado) sp.set("estado", params.estado);
+    const qs = sp.toString();
+    return authedJson<FacturasExportacionListResp>(
+      `/api/admin/facturacion/exportacion${qs ? `?${qs}` : ""}`,
+    );
+  },
+  refrescarCatalogosExportacion: () =>
+    authedPostJson<{ ok: boolean; paises_destino: number; incoterms: number; monedas: number }>(
+      "/api/admin/arca/catalogos-exportacion/refrescar",
+      {},
+    ),
+  getCatalogosExportacion: () =>
+    authedJson<{
+      paises_destino: CatalogoItem[];
+      incoterms: CatalogoItem[];
+      monedas: CatalogoItem[];
+      ultimo_refresco: string | null;
+    }>("/api/admin/arca/catalogos-exportacion"),
 };

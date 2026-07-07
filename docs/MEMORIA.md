@@ -1042,6 +1042,27 @@ Gotcha: `get_disponibilidad` se llama DIRECTO desde `routes/estudio.py` → el d
 plano, NUNCA `Query(None)` (truthy → rompía el Estudio con 500). El supervisor marca una resta de
 disponibilidad recalculada en el front, o un editor/buscador de pedido que no consuma el hook único.
 
+### 2026-07-05 — Factura de Exportación (WSFEXv1): flujo nuevo sin pedido, enum/tabla separados de la doméstica
+
+`arca_fe` suma soporte a **WSFEXv1** (RG 2758, `FEXAuthorize`) — webservice de AFIP distinto de
+WSFEv1, con receptor exterior sin CUIT argentino (país destino/Incoterm/permiso de embarque en vez
+de DocTipo/condición IVA). Confirmado con el dueño: **flujo de negocio nuevo, sin pedido de
+`alquileres` de por medio** (venta al exterior, carga manual en el admin) — decisión que fija el
+resto del diseño. `CbteTipoExportacion` (19/20/21) es un enum **separado** de `modelos.CbteTipo`
+(no se agrega ahí — evita que caiga sin querer en una rama de `tipo_comprobante`/
+`letra_comprobante` que asume A/B/C/M/FCE). Tabla **`facturas_exportacion` separada** de
+`facturas` (el receptor de exportación no tiene columnas argentinas NOT NULL) — sin `pedido_id`.
+Nuevo flag `emisores_arca.habilitado_exportacion`: la relación de servicio de WSFEXv1 se delega
+por separado en AFIP, sin el flag el fallo recién se ve al pegarle a AFIP con un error críptico.
+`render_exportacion.py` es **un solo layout** A4 (no 3 como la doméstica) — es un documento fiscal
+distinto (sin IVA discriminado), no una variante visual; no multiplicar layouts sin evidencia de
+que hacen falta. `arca_fe` sube a **0.3.0** (MINOR). Nombres de operación/campo SOAP de WSFEXv1
+(`FEXAuthorize`, `FEXGetPARAM_*`) son la mejor referencia sin acceso al WSDL real de homologación —
+confirmar contra AFIP antes de producción. El supervisor marca: `CbteTipoExportacion` mezclado con
+`CbteTipo`, un consumidor que cuelgue la Factura de Exportación de un pedido, o un layout nuevo
+agregado sin justificar por qué el único existente no alcanza — ver `docs/SISTEMA_FACTURACION.md`
+§12 para el mapa completo.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
