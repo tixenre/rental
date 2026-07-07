@@ -12,10 +12,10 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
-import { Input } from "@/design-system/ui/input";
+import { SearchInput } from "@/design-system/ui/search-input";
 import { cn } from "@/lib/utils";
 import { adminApi, type Equipo } from "@/lib/admin/api";
 import { filtrarOrdenar } from "@/lib/search/normalize";
@@ -34,7 +34,8 @@ export function EquipoComboSearch({
   className,
 }: {
   existing: DraftItem[];
-  stockMap: Record<string, { cantidad: number; reservado: number }>;
+  /** equipo_id → libres tras TODO el draft (backend, kits expandidos; con signo). */
+  stockMap: Record<string, number>;
   onAdd: (eq: Equipo) => void;
   placeholder?: string;
   className?: string;
@@ -84,12 +85,15 @@ export function EquipoComboSearch({
   const visibles = matches.slice(0, MAX_VISIBLE);
   const overflow = matches.length - visibles.length;
 
-  /** Unidades libres restantes para este equipo (descuenta lo ya cargado en el pedido). */
+  /** Unidades libres restantes para este equipo. El mapa del backend ya
+   *  descuenta TODO el draft (con la expansión de kits del motor) — no se
+   *  vuelve a restar. Sin fechas no hay mapa → fallback naive al stock total
+   *  menos lo cargado (sin expansión, como antes). */
   const disponibleDe = (eq: Equipo): number => {
-    const stock = stockMap[String(eq.id)];
-    const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : eq.cantidad;
+    const enMapa = stockMap[String(eq.id)];
+    if (enMapa !== undefined) return enMapa;
     const inCart = existing.find((i) => i.equipo_id === eq.id);
-    return max - (inCart?.cantidad ?? 0);
+    return eq.cantidad - (inCart?.cantidad ?? 0);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -112,8 +116,7 @@ export function EquipoComboSearch({
 
   return (
     <div ref={wrapRef} className={cn("relative", className)}>
-      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-      <Input
+      <SearchInput
         value={q}
         role="combobox"
         aria-expanded={open}
@@ -121,18 +124,17 @@ export function EquipoComboSearch({
         aria-autocomplete="list"
         aria-controls="equipo-combo-list"
         aria-activedescendant={focusedIdx >= 0 ? `equipo-opt-${focusedIdx}` : undefined}
-        onChange={(e) => {
-          setQ(e.target.value);
+        onValueChange={(v) => {
+          setQ(v);
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className="pl-9 text-base sm:text-sm"
       />
 
       {open && (
-        <div className="absolute z-30 left-0 right-0 mt-1 rounded-lg border hairline bg-surface-elevated shadow-[var(--shadow-md)] max-h-80 overflow-auto">
+        <div className="absolute z-30 left-0 right-0 mt-1 card-elevated shadow-[var(--shadow-md)] max-h-80 overflow-auto">
           {equiposQ.isLoading ? (
             <div className="p-3 text-xs text-muted-foreground">Cargando catálogo…</div>
           ) : matches.length === 0 ? (

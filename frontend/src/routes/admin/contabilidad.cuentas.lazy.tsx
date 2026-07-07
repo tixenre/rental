@@ -19,7 +19,7 @@ import { TableSkeleton } from "@/components/admin/skeletons";
 import { ErrorState } from "@/components/admin/ErrorState";
 import { useConfirm } from "@/components/admin/useConfirm";
 import { formatMoney } from "@/lib/format";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Badge } from "@/design-system/ui/badge";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
@@ -50,7 +50,7 @@ function CuentasPage() {
   return (
     <AdminPage
       title="Cuentas"
-      maxW="max-w-4xl"
+      maxW="detail"
       description="La cuenta corriente de cada socio (quién le debe a quién) y las cajas con la plata real del negocio."
       backTo={{ to: "/admin/contabilidad", label: "Tablero" }}
     >

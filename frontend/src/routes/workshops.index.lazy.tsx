@@ -2,8 +2,8 @@ import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Calendar, MapPin, Users } from "lucide-react";
 
-import { PublicLayout } from "@/components/rental/PublicLayout";
-import { SectionBanner } from "@/components/rental/SectionBanner";
+import { PublicLayout } from "@/components/rental/shell/PublicLayout";
+import { SectionBanner } from "@/components/rental/landing/SectionBanner";
 import { apiGetTalleres, type Taller } from "@/lib/api";
 import { formatARS } from "@/lib/format";
 

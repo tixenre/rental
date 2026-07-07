@@ -70,6 +70,25 @@ jobs:
       # eslint corre prettier embebido (formato = error, reglas de React = aviso)
       - run: npm run lint
 
+  unit-tests:
+    name: Unit tests (node:test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      # node:test corriendo TS nativo vía --experimental-strip-types (Node ≥22.6) — el resto
+      # del frontend pinea Node 20 (setup-node de los otros jobs), este job va aparte a
+      # propósito para no forzar el bump global solo por esto.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run test:unit
+
   python-syntax:
     name: Python lint + syntax
     runs-on: ubuntu-latest
@@ -267,6 +286,30 @@ jobs:
           export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
           export RESERVAS_DB_TEST=1
           python -m pytest tests/test_ranking_service_db.py tests/test_routes_admin_guard_db.py -v --tb=short -m integration
+      - name: Canal C de specs (propuestas + embudo que aprende) contra Postgres real (#1176 F7)
+        run: |
+          cd backend
+          # spec_propuestas_pendientes: proponer_desde_equipo/proponer_desde_unmatched
+          # encolan candidatos de spec/alias nuevos desde unmatched frecuente; el
+          # CHECK constraint de `tipo` y el JSONB del payload no los captura el
+          # FakeConn de los tests unit.
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_specs_ingesta_proponer_db.py -v --tb=short -m integration
+      - name: Stream B de completitud de catálogo — enriquecer-from-html + fotos batch (#1051)
+        run: |
+          cd backend
+          # enriquecer-from-html: mismo extractor que upload-html-source pero SIN
+          # persistir en R2 — el candado real es que `equipos.html_source_url`
+          # quede intacto, indistinguible con un FakeConn. fotos/from-urls: el
+          # batch es best-effort (una URL que falla no aborta el resto).
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_stream_b_enriquecer_fotos_db.py -v --tb=short -m integration
 
   build:
     name: Build frontend

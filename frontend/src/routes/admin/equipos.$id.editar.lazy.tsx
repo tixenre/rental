@@ -5,7 +5,7 @@ import { Spinner } from "@/design-system/ui/spinner";
 import { adminApi, type EquipoInput } from "@/lib/admin/api";
 import { EquipoFormDialogV2 } from "@/components/admin/equipo-form-v2/EquipoFormDialogV2";
 import { popEquiposReturnSearch } from "@/lib/admin/equiposReturnSearch";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export const Route = createLazyFileRoute("/admin/equipos/$id/editar")({
   component: EditarEquipoRoute,

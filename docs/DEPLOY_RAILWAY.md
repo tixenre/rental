@@ -188,13 +188,17 @@ uvicorn main:app --port 8000
 #    (sin `cliente_id` impersona STAGING_CLIENTE_EMAIL; con `cliente_id` impersonás un cliente real del clon.)
 ```
 
-⚠️ **Apagá los fixtures de dev para ver datos REALES.** `frontend/dev/api-fixtures-plugin.ts`
+✅ **Los fixtures de dev ya no tapan el backend real.** `frontend/dev/api-fixtures-plugin.ts`
 (`apply: "serve"`) intercepta `GET /api/equipos|categorias|marcas|talleres` y `POST /api/cotizar`
-**siempre que exista `frontend/dev/api-fixtures/`** — NO chequea si el backend está levantado. O sea:
-con el backend local corriendo, el catálogo y la cotización del carrito igual salen del **mock**
-(catálogo viejo + descuentos/IVA aproximados), no de tu clon. Para iterar con datos reales, **borrá o
-renombrá `frontend/dev/api-fixtures/`** (el plugin se desactiva solo si la carpeta no existe) y reiniciá
-vite. Verificá: `curl -sI localhost:3000/api/equipos | grep -i x-rambla-fixture` no debe devolver nada.
+**solo si el backend real no responde** (`probeBackend`, timeout ~1.5s, prueba antes de servir el
+JSON estático) — antes servía el fixture SIEMPRE que existiera `frontend/dev/api-fixtures/` sin
+chequear el backend, lo que hacía que un equipo agregado desde su ficha (que sí pega al backend real)
+pareciera un "fantasma" en `/rental` y el efecto de reconciliación del carrito lo vaciara (falso
+positivo, no un bug de reservas). Con el backend local levantado, catálogo y cotización salen
+siempre de tu clon — no hace falta borrar nada. Para confirmar qué respondió:
+`curl -sI localhost:3000/api/equipos | grep -i x-rambla-fixture` — sin ese header (o con
+`X-Rambla-Fixture-Probe: backend-real`) es tu backend real; con `X-Rambla-Fixture: 1` es el mock
+(solo pasa si el backend está caído/inalcanzable).
 
 ⚠️ **Cuenta VERIFICADA en local sin Didit.** El flujo de pedido gatea por verificación de identidad
 (Didit + RENAPER), que **no corre local**. La fuente única del gate es `clientes.dni_validado_at IS NOT

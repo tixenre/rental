@@ -281,6 +281,20 @@ def _init_db_schema(conn):
         "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS "
         "identidad_conflicto BOOLEAN NOT NULL DEFAULT FALSE"
     )
+    # Soft delete (backend/clientes/, #1251 Fase 2): NULL = activo, timestamp = eliminado.
+    # Mismo patrón que equipos (#206) — sin actor/motivo (el dueño es único admin hoy; no
+    # se justifica el log de auditoría completo). `eliminar` ya no hace DELETE físico.
+    # Trade-off consciente: `email UNIQUE` de la tabla sigue siendo global (no
+    # `WHERE eliminado_at IS NULL`) — un cliente borrado sigue "reservando" su
+    # email. No se tocó: convertir un UNIQUE inline existente en una base viva
+    # es cirugía de constraint innecesaria para un caso borde de bajo volumen
+    # (pocas bajas de cliente). Revisar si algún día un alta choca con un
+    # email de una cuenta ya eliminada.
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS eliminado_at TIMESTAMP")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_clientes_eliminado_at ON clientes(eliminado_at) "
+        "WHERE eliminado_at IS NOT NULL"
+    )
     # verified_contacts: mail/teléfono VERIFICADOS (Google OAuth / código Didit / OTP) —
     # factores de comunicación y recuperación. El teléfono se guarda en E.164. Owner-scoped
     # (FK CASCADE). Trae las señales anti-fraude de Didit (is_disposable/is_virtual/is_breached).
@@ -1325,6 +1339,17 @@ def _init_db_schema(conn):
     # beneficiario: a quién / para qué es el movimiento (ej. "Jimena") — etiqueta
     # parseable y reutilizable (migración e5f6a7b8c9d0).
     conn.execute("ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS beneficiario TEXT")
+    # Cambio de divisa (comprar/vender USD con ARS): dos `ajuste` atados. `cotizacion`
+    # guarda los pesos por dólar usados (informativo, no recalculado); `movimiento_par_id`
+    # linkea la pata origen↔destino entre sí (self-FK, se completa después de insertar
+    # ambas filas — no hay forma de conocer el id de la otra pata al insertar la primera).
+    # `commands/movimientos.py::crear_cambio_divisa` es la única puerta que las escribe
+    # (migración z9y8x7w6v5u4).
+    conn.execute("ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS cotizacion NUMERIC(12,4)")
+    conn.execute(
+        "ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS movimiento_par_id INTEGER "
+        "REFERENCES movimientos(id)"
+    )
     # Cierres contables (#809, Fase 6): congelan un mes (foto + traba la edición de
     # movimientos de ese mes). Espejo de la migración b2c3d4e5f6a7.
     conn.execute("""
@@ -2363,17 +2388,30 @@ def _init_db_schema(conn):
     conn.execute("""
         CREATE TABLE IF NOT EXISTS productoras (
             id                SERIAL PRIMARY KEY,
-            cuit              TEXT NOT NULL UNIQUE,
-            perfil_impuestos  TEXT NOT NULL,
+            cuit              TEXT UNIQUE,
+            perfil_impuestos  TEXT,
             razon_social      TEXT,
             domicilio_fiscal  TEXT,
             email_facturacion TEXT,
             notas             TEXT,
-            verificado_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+            verificado_at     TIMESTAMPTZ,
             created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
         )
     """)
+    # nombre/redes_sociales (#1251 Fase 2): manuales, no vienen de AFIP. `nombre` es
+    # el label amigable que siempre queda disponible aunque razon_social venga vacía
+    # de AFIP para cierto tipo de CUIT.
+    conn.execute("ALTER TABLE productoras ADD COLUMN IF NOT EXISTS nombre TEXT")
+    conn.execute("ALTER TABLE productoras ADD COLUMN IF NOT EXISTS redes_sociales TEXT")
+    # Borrador sin CUIT (#1251 Fase 3): "podemos crear una productora sin el CUIT,
+    # solo el nombre" — cuit/perfil_impuestos/verificado_at pasan a NULLABLE (antes
+    # NOT NULL). Una productora sin CUIT NO es facturable — la excluye
+    # `clientes.queries.fiscal.productoras_vinculadas(solo_facturables=True)`, que
+    # alimenta el selector de checkout; la ficha admin sigue viendo el borrador.
+    conn.execute("ALTER TABLE productoras ALTER COLUMN cuit DROP NOT NULL")
+    conn.execute("ALTER TABLE productoras ALTER COLUMN perfil_impuestos DROP NOT NULL")
+    conn.execute("ALTER TABLE productoras ALTER COLUMN verificado_at DROP NOT NULL")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS productora_miembros (
             productora_id  INTEGER NOT NULL REFERENCES productoras(id) ON DELETE CASCADE,

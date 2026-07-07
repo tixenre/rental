@@ -18,8 +18,8 @@ import { useFavoritos } from "@/hooks/useFavoritos";
 import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { authedFetch } from "@/lib/authedFetch";
 import { clienteApi } from "@/lib/cliente/api";
-import { TopBar } from "@/components/rental/TopBar";
-import { StatCard } from "@/components/rental/StatCard";
+import { TopBar } from "@/components/rental/shell/TopBar";
+import { StatCard } from "@/design-system/composites/StatCard";
 import {
   ArrowRight,
   ShieldAlert,
@@ -46,16 +46,23 @@ import {
   HIST_STATES,
   DOC_NOTIFICABLE,
   TAB_OPTIONS,
-} from "./ClientePortalTypes";
-import type { Perfil, Pedido, PortalTab, DocTipo, Filtro } from "./ClientePortalTypes";
+} from "@/components/cliente/ClientePortalTypes";
+import type {
+  Perfil,
+  Pedido,
+  PortalTab,
+  DocTipo,
+  Filtro,
+} from "@/components/cliente/ClientePortalTypes";
+import { SidebarNavItem, BottomNavItem } from "@/components/cliente/nav";
+import { NotificacionesSection } from "@/components/cliente/NotificacionesSection";
+import { PerfilSection } from "@/components/cliente/PerfilSection";
 import {
-  SidebarNavItem,
-  BottomNavItem,
-  NotificacionesSection,
-  PerfilSection,
-} from "./ClientePortalHelpers";
-import { PedidoEmpty, PedidoCard, DocAvailablePopup } from "./ClientePortalPedido";
-import { ListasSection } from "./ClientePortalListas";
+  PedidoEmpty,
+  PedidoCard,
+  DocAvailablePopup,
+} from "@/components/cliente/ClientePortalPedido";
+import { ListasSection } from "@/components/cliente/ClientePortalListas";
 import { useListas } from "@/hooks/useListas";
 
 export const Route = createFileRoute("/cliente/portal")({

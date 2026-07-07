@@ -1,6 +1,6 @@
 """auth/sessions_routes.py — gestión de sesiones activas (revocación).
 
-Transporte sobre el store `auth.sessions_store`: listar las sesiones vivas del
+Transporte sobre `auth.queries.sessions`/`auth.commands.sessions`: listar las sesiones vivas del
 dueño, cerrar "las otras" (revoke-all salvo la actual) y cerrar una puntual.
 Todo **scopeado al dueño** (anti-IDOR: resuelve owner_email/cliente_id de la
 sesión, nunca del body), espejando la gestión de passkeys. Router propio
@@ -12,7 +12,8 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Request
 
-from auth import sessions_store
+from auth.commands import sessions as sessions_commands
+from auth.queries import sessions as sessions_queries
 from auth.guards import require_admin, require_cliente
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,7 @@ def _payload(rows: list[dict], current_jti: str | None) -> dict:
 def admin_list(request: Request):
     admin = require_admin(request)
     current_jti = (admin.get("session") or {}).get("jti")
-    rows = sessions_store.list_for_owner("admin", owner_email=admin["email"])
+    rows = sessions_queries.list_for_owner("admin", owner_email=admin["email"])
     return _payload(rows, current_jti)
 
 
@@ -43,7 +44,7 @@ def admin_revoke_all(request: Request):
     """Cierra todas las otras sesiones del admin (mantiene la actual, `except_jti`)."""
     admin = require_admin(request)
     current_jti = (admin.get("session") or {}).get("jti")
-    n = sessions_store.revoke_all_for_owner(
+    n = sessions_commands.revoke_all_for_owner(
         "admin", owner_email=admin["email"], except_jti=current_jti
     )
     return {"ok": True, "revoked": n}
@@ -52,7 +53,7 @@ def admin_revoke_all(request: Request):
 @router.delete("/auth/sessions/{jti}")
 def admin_revoke_one(jti: str, request: Request):
     admin = require_admin(request)
-    if not sessions_store.revoke_one_for_owner(jti, "admin", owner_email=admin["email"]):
+    if not sessions_commands.revoke_one_for_owner(jti, "admin", owner_email=admin["email"]):
         raise HTTPException(404, "Sesión no encontrada.")
     return {"ok": True}
 
@@ -62,7 +63,7 @@ def admin_revoke_one(jti: str, request: Request):
 @router.get("/cliente/auth/sessions")
 def cliente_list(request: Request):
     sess = require_cliente(request)
-    rows = sessions_store.list_for_owner("cliente", cliente_id=sess["cliente_id"])
+    rows = sessions_queries.list_for_owner("cliente", cliente_id=sess["cliente_id"])
     return _payload(rows, sess.get("jti"))
 
 
@@ -70,7 +71,7 @@ def cliente_list(request: Request):
 def cliente_revoke_all(request: Request):
     """Cierra todas las otras sesiones del cliente (mantiene la actual)."""
     sess = require_cliente(request)
-    n = sessions_store.revoke_all_for_owner(
+    n = sessions_commands.revoke_all_for_owner(
         "cliente", cliente_id=sess["cliente_id"], except_jti=sess.get("jti")
     )
     return {"ok": True, "revoked": n}
@@ -79,6 +80,6 @@ def cliente_revoke_all(request: Request):
 @router.delete("/cliente/auth/sessions/{jti}")
 def cliente_revoke_one(jti: str, request: Request):
     sess = require_cliente(request)
-    if not sessions_store.revoke_one_for_owner(jti, "cliente", cliente_id=sess["cliente_id"]):
+    if not sessions_commands.revoke_one_for_owner(jti, "cliente", cliente_id=sess["cliente_id"]):
         raise HTTPException(404, "Sesión no encontrada.")
     return {"ok": True}

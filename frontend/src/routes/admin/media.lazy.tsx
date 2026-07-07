@@ -1,16 +1,18 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Database, RefreshCw, Trash2, RotateCcw, AlertCircle } from "lucide-react";
+import { RefreshCw, Trash2, RotateCcw, AlertCircle } from "lucide-react";
 
 import { adminApi } from "@/lib/admin/api";
 import type { GcResult } from "@/lib/admin/api";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 import { CardGridSkeleton } from "@/components/admin/skeletons";
+import { AdminPage } from "@/components/admin/AdminPage";
 import { useConfirm } from "@/components/admin/useConfirm";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { cn } from "@/lib/utils";
+import { StatCard } from "@/design-system/composites/StatCard";
 
 export const Route = createLazyFileRoute("/admin/media")({
   component: MediaDashboardPage,
@@ -21,28 +23,6 @@ function formatBytes(bytes: number): string {
   const units = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
-}
-
-function StatCard({
-  label,
-  value,
-  warn,
-}: {
-  label: string;
-  value: string | number;
-  warn?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border hairline p-4",
-        warn ? "border-amber/50 bg-amber/10" : "bg-card",
-      )}
-    >
-      <div className="text-2xl font-mono font-semibold text-ink">{value}</div>
-      <div className="text-xs text-muted-foreground mt-1">{label}</div>
-    </div>
-  );
 }
 
 function GcResultView({ result }: { result: GcResult }) {
@@ -117,13 +97,10 @@ function MediaDashboardPage() {
   const isGcRunning = gcDryRun.isPending || gcRun.isPending;
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <Database className="h-5 w-5 text-muted-foreground" />
-          <h1 className="text-xl font-display font-semibold text-ink">Media</h1>
-        </div>
+    <AdminPage
+      title="Media"
+      maxW="detail"
+      actions={
         <Button
           variant="ghost"
           size="sm"
@@ -133,94 +110,102 @@ function MediaDashboardPage() {
           <RefreshCw className="h-3.5 w-3.5" />
           Actualizar
         </Button>
+      }
+    >
+      <div className="space-y-6">
+        {/* Stats */}
+        {isLoading ? (
+          <CardGridSkeleton count={6} />
+        ) : stats ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <StatCard label="Assets" value={stats.total_assets} size="md" />
+            <StatCard label="Variantes" value={stats.total_variants} size="md" />
+            <StatCard label="Almacenamiento" value={formatBytes(stats.total_bytes)} size="md" />
+            <StatCard label="Con LQIP" value={stats.assets_with_lqip} size="md" />
+            <StatCard
+              label="Huérfanos"
+              value={stats.orphans}
+              size="md"
+              tone={stats.orphans > 0 ? "warn" : "default"}
+            />
+            <StatCard
+              label="Sin variantes"
+              value={stats.assets_no_variants}
+              size="md"
+              tone={stats.assets_no_variants > 0 ? "warn" : "default"}
+            />
+          </div>
+        ) : null}
+
+        {/* GC */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium text-ink flex items-center gap-2">
+            <Trash2 className="h-4 w-4 text-muted-foreground" />
+            Garbage collection
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Detecta y purga assets de media que no están referenciados por ninguna entidad (equipos,
+            estudio, marcas).
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => gcDryRun.mutate()}
+              disabled={isGcRunning}
+              className="gap-1.5"
+            >
+              {gcDryRun.isPending ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <AlertCircle className="h-3.5 w-3.5" />
+              )}
+              Detectar (dry-run)
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={async () => {
+                if (
+                  await confirm({
+                    title: "¿Ejecutar GC real?",
+                    description: "Esta acción borra assets y keys de R2.",
+                    danger: true,
+                    confirmLabel: "Ejecutar",
+                  })
+                ) {
+                  gcRun.mutate();
+                }
+              }}
+              disabled={isGcRunning}
+              className="gap-1.5"
+            >
+              {gcRun.isPending ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
+              Ejecutar GC real
+            </Button>
+          </div>
+
+          {gcResult && <GcResultView result={gcResult} />}
+        </section>
+
+        {/* Re-derivar */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium text-ink flex items-center gap-2">
+            <RotateCcw className="h-4 w-4 text-muted-foreground" />
+            Re-derivar variantes
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Regenera las variantes de un asset desde su original privado en R2. Útil si los derive
+            specs cambiaron o una variante quedó corrupta.
+          </p>
+          <RederiveForm />
+        </section>
       </div>
-
-      {/* Stats */}
-      {isLoading ? (
-        <CardGridSkeleton count={6} />
-      ) : stats ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <StatCard label="Assets" value={stats.total_assets} />
-          <StatCard label="Variantes" value={stats.total_variants} />
-          <StatCard label="Almacenamiento" value={formatBytes(stats.total_bytes)} />
-          <StatCard label="Con LQIP" value={stats.assets_with_lqip} />
-          <StatCard label="Huérfanos" value={stats.orphans} warn={stats.orphans > 0} />
-          <StatCard
-            label="Sin variantes"
-            value={stats.assets_no_variants}
-            warn={stats.assets_no_variants > 0}
-          />
-        </div>
-      ) : null}
-
-      {/* GC */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-medium text-ink flex items-center gap-2">
-          <Trash2 className="h-4 w-4 text-muted-foreground" />
-          Garbage collection
-        </h2>
-        <p className="text-xs text-muted-foreground">
-          Detecta y purga assets de media que no están referenciados por ninguna entidad (equipos,
-          estudio, marcas).
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => gcDryRun.mutate()}
-            disabled={isGcRunning}
-            className="gap-1.5"
-          >
-            {gcDryRun.isPending ? (
-              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <AlertCircle className="h-3.5 w-3.5" />
-            )}
-            Detectar (dry-run)
-          </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={async () => {
-              if (
-                await confirm({
-                  title: "¿Ejecutar GC real?",
-                  description: "Esta acción borra assets y keys de R2.",
-                  danger: true,
-                  confirmLabel: "Ejecutar",
-                })
-              ) {
-                gcRun.mutate();
-              }
-            }}
-            disabled={isGcRunning}
-            className="gap-1.5"
-          >
-            {gcRun.isPending ? (
-              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Trash2 className="h-3.5 w-3.5" />
-            )}
-            Ejecutar GC real
-          </Button>
-        </div>
-
-        {gcResult && <GcResultView result={gcResult} />}
-      </section>
-
-      {/* Re-derivar */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-medium text-ink flex items-center gap-2">
-          <RotateCcw className="h-4 w-4 text-muted-foreground" />
-          Re-derivar variantes
-        </h2>
-        <p className="text-xs text-muted-foreground">
-          Regenera las variantes de un asset desde su original privado en R2. Útil si los derive
-          specs cambiaron o una variante quedó corrupta.
-        </p>
-        <RederiveForm />
-      </section>
-    </div>
+    </AdminPage>
   );
 }
 

@@ -4,9 +4,10 @@
  * Extraído de la pantalla de Estadísticas para vivir en Finanzas (su lugar: es
  * plata). Mantiene TODAS sus features: navegación por mes, día a día, mes a mes,
  * resumen por dueño, cierre/reapertura de mes (#721), reconciliación, export CSV
- * y enviar por mail. Los primitivos de presentación (`Kpi`/`Section`/`BarChart`/
- * `RankList`/`fmtArs`) se exportan para reusarlos donde haga falta (ej. el Resumen
- * de Estadísticas) — única fuente, sin duplicar.
+ * y enviar por mail. Los primitivos de presentación (`BarChart`/`RankList`/`fmtArs`)
+ * se exportan para reusarlos donde haga falta (ej. el Resumen de Estadísticas) —
+ * única fuente, sin duplicar. `Kpi`/`Section` migraron a composites del DS
+ * (`StatCard`/`Section`).
  */
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -42,6 +43,8 @@ import {
   DialogDescription,
 } from "@/design-system/ui/dialog";
 import { useConfirm } from "@/components/admin/useConfirm";
+import { Section } from "@/design-system/composites/Section";
+import { StatCard } from "@/design-system/composites/StatCard";
 
 export function LiquidacionReporte() {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -165,7 +168,7 @@ export function LiquidacionReporte() {
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {cerrado ? (
             <Button
               type="button"
@@ -294,9 +297,13 @@ export function LiquidacionReporte() {
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi icon={DollarSign} label={`Total ${mesLabel}`} value={fmtArs(mes?.resumen.total)} />
+        <StatCard
+          icon={DollarSign}
+          label={`Total ${mesLabel}`}
+          value={fmtArs(mes?.resumen.total)}
+        />
         {beneficiarios.map((b) => (
-          <Kpi
+          <StatCard
             key={b}
             icon={Wallet}
             label={b}
@@ -342,9 +349,7 @@ export function LiquidacionReporte() {
             >
               <div className="space-y-4">
                 <div>
-                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1.5">
-                    Equipos
-                  </div>
+                  <div className="t-eyebrow mb-1.5">Equipos</div>
                   <RankList
                     icon={Package}
                     items={d.equipos.map((eq) => ({
@@ -355,9 +360,7 @@ export function LiquidacionReporte() {
                   />
                 </div>
                 <div>
-                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1.5">
-                    Pedidos
-                  </div>
+                  <div className="t-eyebrow mb-1.5">Pedidos</div>
                   <RankList
                     icon={Receipt}
                     items={(d.pedidos_detalle ?? []).map((p) => ({
@@ -422,47 +425,6 @@ function MesAMesTabla({
           ))}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-export function Kpi({
-  icon: Icon,
-  label,
-  value,
-  sub,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  sub?: string;
-}) {
-  return (
-    <div className="rounded-lg border hairline bg-background p-3">
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <Icon className="h-4 w-4" />
-        <div className="font-mono text-2xs uppercase tracking-[0.2em]">{label}</div>
-      </div>
-      <div className="font-display text-2xl text-ink mt-1.5 truncate">{value}</div>
-      {sub && <div className="text-xs text-muted-foreground tabular-nums">{sub}</div>}
-    </div>
-  );
-}
-
-export function Section({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-lg border hairline bg-background p-4">
-      <h2 className="font-display text-lg text-ink">{title}</h2>
-      {subtitle && <p className="text-xs text-muted-foreground mb-3">{subtitle}</p>}
-      <div className="mt-2">{children}</div>
     </div>
   );
 }

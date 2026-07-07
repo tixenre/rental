@@ -2,7 +2,7 @@ import { createLazyFileRoute } from "@tanstack/react-router";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { CategoriasSection } from "@/components/admin/equipos-mgmt/CategoriasSection";
 import { DisenoSection } from "@/components/admin/diseno/DisenoSection";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export const Route = createLazyFileRoute("/admin/equipos/categorias")({
   component: CategoriasPage,
@@ -13,7 +13,7 @@ function CategoriasPage() {
   return (
     <AdminPage
       title="Categorías"
-      maxW="max-w-4xl"
+      maxW="detail"
       description="Árbol jerárquico de categorías y cómo aparecen en el catálogo público."
     >
       <div className="space-y-6">

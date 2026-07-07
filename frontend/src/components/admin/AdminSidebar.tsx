@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { LogOut, ChevronRight, PanelLeft, Search } from "lucide-react";
+import { LogOut, ChevronRight, PanelLeft, Search, UserCog } from "lucide-react";
 
 import {
   Sidebar,
@@ -220,6 +220,17 @@ export function AdminSidebar({ email }: { email: string }) {
           </div>
         )}
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={currentPath === "/admin/cuenta"}
+              tooltip={collapsed ? "Mi cuenta" : undefined}
+            >
+              <Link to="/admin/cuenta" className="flex items-center gap-2 min-h-11 md:min-h-0">
+                <UserCog className="h-4 w-4 shrink-0" />
+                {!collapsed && <span>Mi cuenta</span>}
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={handleSignOut}

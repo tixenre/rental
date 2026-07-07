@@ -20,18 +20,27 @@ const TONE: Record<PillTone, string> = {
   neutral: "bg-muted text-muted-foreground border-transparent",
 };
 
-const BASE =
-  "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-2xs font-medium";
+const BASE = "inline-flex shrink-0 items-center rounded-full border font-medium";
+
+/** `default` = tamaño estándar (text-xs); `compact` = para tablas/listas muy
+ *  densas donde el default rompe el layout (mismo tamaño que antes de la
+ *  subida de escala). No usar `compact` por defecto — es la excepción. */
+const SIZE: Record<"default" | "compact", string> = {
+  default: "px-2 py-0.5 text-xs",
+  compact: "px-1.5 py-0.5 text-2xs",
+};
 
 export function Pill({
   tone,
+  size = "default",
   className,
   children,
 }: {
   /** Color por tono semántico. Omitilo y pasá `className` para un color a medida. */
   tone?: PillTone;
+  size?: "default" | "compact";
   className?: string;
   children: React.ReactNode;
 }) {
-  return <span className={cn(BASE, tone && TONE[tone], className)}>{children}</span>;
+  return <span className={cn(BASE, SIZE[size], tone && TONE[tone], className)}>{children}</span>;
 }

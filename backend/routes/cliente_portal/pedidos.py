@@ -3,8 +3,8 @@
 Crear / cancelar pedido + listar / ver detalle de los pedidos del cliente logueado.
 Registra sus rutas en el router compartido del paquete `routes.cliente_portal`. Los
 helpers compartidos (`require_cliente`, `_proyectar`, `_documentos_disponibles`) viven
-en `core`; `_cancelar_solicitudes_pendientes` (cancelar solicitudes pendientes al
-cancelar el pedido) vive en `solicitudes`.
+en `core`; cancelar el pedido delega en `routes.alquileres.transiciones.cambiar_estado`
+(única puerta de transición de estado, admin y cliente).
 """
 from typing import Optional
 
@@ -20,7 +20,6 @@ from routes.cliente_portal.core import (
     _documentos_disponibles,
     _ITEM_CAMPOS_PORTAL,
 )
-from routes.cliente_portal.solicitudes import _cancelar_solicitudes_pendientes
 from services.checkout import faltan_firma_tyc, FIRMA_CHECKOUT_OBLIGATORIA
 from services.fechas import validar_rango_fechas, antelacion_insuficiente, validar_fecha_iso
 from auth.stepup import has_recent_stepup
@@ -196,22 +195,22 @@ def cliente_crear_pedido(
 
 @router.patch("/api/cliente/pedidos/{id}/cancelar")
 def cliente_cancelar_pedido(id: int, request: Request):
+    """La legalidad de la transición (qué estados puede cancelar un cliente)
+    y el auto-cancelado de solicitudes pendientes viven en
+    `routes.alquileres.transiciones.cambiar_estado` — única puerta, la
+    comparte con la transición de estado del admin."""
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
     with get_db() as conn:
         p = conn.execute(
-            "SELECT estado FROM alquileres WHERE id = %s AND cliente_id = %s",
+            "SELECT id FROM alquileres WHERE id = %s AND cliente_id = %s",
             (id, cliente_id),
         ).fetchone()
         if not p:
             raise HTTPException(404, "Pedido no encontrado")
-        if p["estado"] not in ("borrador", "presupuesto"):
-            raise HTTPException(400, "Este pedido ya no se puede cancelar")
-        conn.execute("UPDATE alquileres SET estado = 'cancelado' WHERE id = %s", (id,))
-        # Si había alguna solicitud pendiente, cancelarla también para no
-        # dejarla huérfana.
-        _cancelar_solicitudes_pendientes(
-            conn, id, motivo="El pedido fue cancelado.",
+        from routes.alquileres.transiciones import cambiar_estado
+        cambiar_estado(
+            conn, id, "cancelado", es_admin=False,
             actor=session.get("email") or "cliente",
         )
         conn.commit()

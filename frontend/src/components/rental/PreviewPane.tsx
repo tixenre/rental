@@ -39,7 +39,7 @@ export function PreviewPane({
       <button
         type="button"
         onClick={onOpen}
-        className="sticky top-[140px] z-[var(--z-sub-toolbar)] hidden lg:flex items-center justify-center gap-1.5 h-32 w-7 self-start [writing-mode:vertical-rl] rotate-180 rounded-l-md border border-r-0 border-[var(--hairline)] bg-card font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground hover:text-ink hover:border-ink transition"
+        className="sticky top-[140px] z-[var(--z-sub-toolbar)] hidden lg:flex items-center justify-center gap-1.5 h-32 w-7 self-start [writing-mode:vertical-rl] rotate-180 rounded-l-md border border-r-0 border-[var(--hairline)] bg-card t-eyebrow hover:text-ink hover:border-ink transition"
         aria-label="Mostrar panel de detalle"
       >
         Detalle <ArrowRight className="h-3 w-3" />
@@ -123,7 +123,7 @@ function PreviewBody({ item, disponible }: { item: Equipment; disponible?: numbe
 
         <div className="p-5 flex flex-col gap-3.5">
           <div>
-            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="t-eyebrow">
               {item.brand} · {item.category}
             </div>
             <h3 className="font-sans text-22 font-bold text-ink leading-[1.1] tracking-[-0.015em] mt-1">

@@ -14,7 +14,7 @@ export function AdminCard({
     <div
       onClick={onClick}
       className={cn(
-        "w-full rounded-xl border hairline bg-surface p-3 space-y-2 transition",
+        "w-full card p-3 space-y-2 transition",
         onClick && "cursor-pointer active:bg-muted",
         className,
       )}
@@ -38,11 +38,7 @@ export function AdminCardHeader({
   return (
     <div className="flex items-start justify-between gap-2">
       <div className="min-w-0 flex-1">
-        {label && (
-          <div className="mb-0.5 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            {label}
-          </div>
-        )}
+        {label && <div className="mb-0.5 t-eyebrow">{label}</div>}
         <div className="truncate font-medium text-ink">{title}</div>
         {subtitle && <div className="truncate text-xs text-muted-foreground">{subtitle}</div>}
       </div>

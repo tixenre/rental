@@ -15,9 +15,10 @@ import { type DateRange } from "react-day-picker";
 
 import { type CatalogSection } from "../types";
 import { Caption, Row, Sample, Stack } from "../catalog-kit";
-import { Field } from "@/design-system/ui/Field";
+import { Field, FieldLabel } from "@/design-system/ui/Field";
 import { Label } from "@/design-system/ui/label";
 import { Input } from "@/design-system/ui/input";
+import { SearchInput } from "@/design-system/ui/search-input";
 import { Textarea } from "@/design-system/ui/textarea";
 import { Checkbox } from "@/design-system/ui/checkbox";
 import { Switch } from "@/design-system/ui/switch";
@@ -29,7 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/design-system/ui/select";
-import { Slider } from "@/design-system/ui/slider";
 import {
   Form,
   FormControl,
@@ -153,6 +153,18 @@ export const formsSection: CatalogSection = {
       ),
     },
     {
+      name: "FieldLabel",
+      files: ["design-system/ui/Field.tsx"],
+      blurb:
+        "Label suelto en voz eyebrow (mono/uppercase/tracked) — para forms densos que quieren esa voz en vez del label plano de Field. Sibling del control, no lo envuelve.",
+      render: () => (
+        <Stack className="max-w-xs gap-1.5">
+          <FieldLabel>Desde</FieldLabel>
+          <Input type="date" />
+        </Stack>
+      ),
+    },
+    {
       name: "Label",
       files: ["design-system/ui/label.tsx"],
       blurb:
@@ -185,6 +197,28 @@ export const formsSection: CatalogSection = {
           </Sample>
         </Stack>
       ),
+    },
+    {
+      name: "SearchInput",
+      files: ["design-system/ui/search-input.tsx"],
+      blurb:
+        "Buscador único: lupa + Input + limpiar opcional. Consolida las 9 copias que había en el repo. debounceMs/onDebouncedChange para drivear una query sin una por tecla.",
+      render: () => {
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const [q, setQ] = useState("");
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const [q2, setQ2] = useState("equipos");
+        return (
+          <Stack className="max-w-xs gap-3">
+            <Sample label="default">
+              <SearchInput value={q} onValueChange={setQ} placeholder="Buscar…" />
+            </Sample>
+            <Sample label="clearable">
+              <SearchInput value={q2} onValueChange={setQ2} clearable placeholder="Buscar…" />
+            </Sample>
+          </Stack>
+        );
+      },
     },
     {
       name: "Textarea",
@@ -276,16 +310,6 @@ export const formsSection: CatalogSection = {
             <SelectItem value="audio">Audio</SelectItem>
           </SelectContent>
         </Select>
-      ),
-    },
-    {
-      name: "Slider",
-      files: ["design-system/ui/slider.tsx"],
-      blurb: "Selección de un valor en un rango continuo (Radix). defaultValue es un array.",
-      render: () => (
-        <div className="max-w-xs pt-2">
-          <Slider defaultValue={[40]} max={100} step={1} />
-        </div>
       ),
     },
     {

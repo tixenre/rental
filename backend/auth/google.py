@@ -78,6 +78,20 @@ def _oauth_client() -> OAuth2Client:
     )
 
 
+def _oauth_client_cliente() -> OAuth2Client:
+    """Mismo helper que `_oauth_client()` pero para el flujo de CLIENTE (otro
+    `redirect_uri`). Antes se repetía inline en `cliente_auth_google`,
+    `cliente_auth_google_link` y `cliente_auth_callback` — única fuente ahora."""
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise HTTPException(503, "Google OAuth no configurado en el servidor.")
+    return OAuth2Client(
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        redirect_uri=CLIENTE_REDIRECT_URI,
+        scope="openid email profile",
+    )
+
+
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("/auth/me")
@@ -106,8 +120,8 @@ def _revoke_current_session(request: Request) -> None:
     session = get_session(request)
     jti = session.get("jti") if session else None
     if jti:
-        from auth import sessions_store  # perezoso: rompe el ciclo con auth/__init__
-        sessions_store.revoke(jti)
+        from auth.commands import sessions as sessions_commands  # perezoso: rompe el ciclo con auth/__init__
+        sessions_commands.revoke(jti)
 
 
 @router.get("/auth/logout")
@@ -210,6 +224,17 @@ def auth_callback(request: Request):
         _record_fail(ip)
         return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=not_allowed", status_code=303)
 
+    # 2º factor obligatorio para admin (#1098 extensión, criterio del dueño): si esta cuenta
+    # YA tiene una passkey enrolada, Google solo NO alcanza — no minteamos sesión acá, mandamos
+    # a confirmar con la passkey (el login discoverable ya existente la mintea de verdad). Sin
+    # passkey todavía: Google alcanza HOY, pero `AdminLayout` fuerza el enrolamiento on-the-fly
+    # apenas entra (mismo primitivo `registerPasskey`, sin código nuevo de ese lado).
+    from auth.passkey import queries as passkey_queries
+    if passkey_queries.list_for_owner("admin", owner_email=email):
+        res = RedirectResponse(f"{FRONTEND_BASE}/admin/login?paso=passkey", status_code=303)
+        res.delete_cookie("oauth_state")
+        return res
+
     res = _make_session_response(email, name, redirect=POST_LOGIN_URL, request=request)
     # Limpiar cookie de state
     res.delete_cookie("oauth_state")
@@ -270,14 +295,7 @@ def cliente_auth_google(request: Request):
     login en vez de mandar siempre a /cliente/portal. Solo aceptamos paths
     internos (validación en `_safe_next_path` — no open-redirect).
     """
-    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        raise HTTPException(503, "Google OAuth no configurado en el servidor.")
-    client = OAuth2Client(
-        client_id=GOOGLE_CLIENT_ID,
-        client_secret=GOOGLE_CLIENT_SECRET,
-        redirect_uri=CLIENTE_REDIRECT_URI,
-        scope="openid email profile",
-    )
+    client = _oauth_client_cliente()
     state = signer.dumps({"nonce": secrets.token_urlsafe(16)})
     uri, _ = client.create_authorization_url(
         GOOGLE_AUTH_URL,
@@ -306,14 +324,7 @@ def cliente_auth_google_link(request: Request):
     sess = get_session(request)
     if not sess or sess.get("role") != "cliente":
         raise HTTPException(401, "Sesión de cliente requerida.")
-    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        raise HTTPException(503, "Google OAuth no configurado en el servidor.")
-    client = OAuth2Client(
-        client_id=GOOGLE_CLIENT_ID,
-        client_secret=GOOGLE_CLIENT_SECRET,
-        redirect_uri=CLIENTE_REDIRECT_URI,
-        scope="openid email profile",
-    )
+    client = _oauth_client_cliente()
     state = signer.dumps({"nonce": secrets.token_urlsafe(16), "link_cliente_id": sess["cliente_id"]})
     uri, _ = client.create_authorization_url(
         GOOGLE_AUTH_URL, state=state, access_type="online", prompt="select_account",
@@ -352,7 +363,8 @@ def _completar_link_google(request: Request, link_cid: int, sub: str | None, ema
     current = get_session(request)
     if not current or current.get("role") != "cliente" or current.get("cliente_id") != link_cid or not sub:
         return RedirectResponse(f"{base}&keys=error", status_code=303)
-    from auth.identities_store import link_identity, google_identity_for_cliente  # perezoso
+    from auth.commands.identities import link_identity  # perezoso
+    from auth.queries.identities import google_identity_for_cliente
     # Una cuenta = un Google: si ya hay un Google distinto vinculado, no sumamos otro.
     ya = google_identity_for_cliente(link_cid)
     if ya is not None and ya["identifier"] != sub:
@@ -372,8 +384,9 @@ def _merge_cuentas_por_google(request: Request, *, actual: int, sub: str):
     """El Google que se quiso vincular ya es de otra cuenta. Se unen si una de las dos es
     **absorbible** (liviana/vacía); si ambas tienen datos, no se auto-mergea → "taken"
     (el merge general con reasignación de datos es Fase 2)."""
-    from auth.identities_store import find_cliente_by_identity
-    from auth.account_merge import account_is_absorbable, merge_accounts
+    from auth.queries.identities import find_cliente_by_identity
+    from auth.queries.account_merge import account_is_absorbable
+    from auth.commands.account_merge import merge_accounts
     base = f"{FRONTEND_BASE}/cliente/portal?tab=perfil"
     otra = find_cliente_by_identity("google", sub)
     if otra is None or otra == actual:
@@ -439,12 +452,7 @@ def cliente_auth_callback(request: Request):
         _record_fail(ip)
         return RedirectResponse(f"{FRONTEND_BASE}/cliente/login?error=state_mismatch", status_code=303)
 
-    client = OAuth2Client(
-        client_id=GOOGLE_CLIENT_ID,
-        client_secret=GOOGLE_CLIENT_SECRET,
-        redirect_uri=CLIENTE_REDIRECT_URI,
-        scope="openid email profile",
-    )
+    client = _oauth_client_cliente()
     try:
         client.fetch_token(GOOGLE_TOKEN_URL, code=code)
     except Exception as e:
@@ -472,7 +480,7 @@ def cliente_auth_callback(request: Request):
     # para las cuentas previas a `login_identities` (backfillea el sub). Que el ancla
     # sea el `sub` y no el mail = un cliente que cambió su mail en Google sigue entrando
     # a la misma cuenta.
-    from auth.identities_store import find_or_backfill_google  # perezoso: evita ciclo con auth/__init__
+    from auth.commands.identities import find_or_backfill_google  # perezoso: evita ciclo con auth/__init__
     sub = userinfo.get("sub") or userinfo.get("id")
 
     # ¿Es un LINK (vincular Google a una cuenta ya logueada), no un login? El

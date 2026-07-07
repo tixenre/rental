@@ -12,6 +12,7 @@ import type {
   Unidad,
   UnidadInput,
 } from "./types";
+import type { PorCategoriaResponse } from "@/components/admin/specs/SpecsConsolidadasHelpers";
 
 export const specsMethods = {
   // ── App settings (key/value globales) ─────────────────────────────────
@@ -164,6 +165,21 @@ export const specsMethods = {
       unmatched?: { label: string; value: string }[];
       categoria_sugerida?: string | null;
     }>(`/api/admin/equipos/${id}/re-extract-specs`, { method: "POST" }),
+  /** Hermano JSON de upload-html-source (#1051 Stream B): mismo extractor,
+   *  pero recibe el HTML pegado como texto (no un archivo) y NO lo persiste
+   *  en R2 ni toca `html_source_url` — para cuando el HTML se consigue
+   *  pegando texto (Chrome MCP, portapapeles) en vez de un Cmd+S. */
+  enriquecerFromHtml: (id: number, html: string, categoriaHint?: string | null) =>
+    authedJson<{
+      specs?: { label: string; value: string; spec_key?: string }[];
+      unmatched?: { label: string; value: string }[];
+      categoria_sugerida?: string | null;
+      foto_candidates?: string[];
+    }>(`/api/admin/equipos/${id}/enriquecer-from-html`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ html, categoria_hint: categoriaHint ?? null }),
+    }),
 
   // ── Observatorio de specs (relevamiento de scrapes reales) ─────────
   recomputeObservatorio: () =>
@@ -270,6 +286,9 @@ export const specsMethods = {
    *  cada una trae su id real para fetchear el spec-template. */
   listSpecCategorias: () =>
     authedJson<{ categorias: { id: number; nombre: string }[] }>("/api/admin/specs/por-categoria"),
+  /** Mismo endpoint que listSpecCategorias pero con el shape completo (specs
+   *  anidadas por categoría) — consumido por la UI consolidada de specs. */
+  porCategoria: () => authedJson<PorCategoriaResponse>("/api/admin/specs/por-categoria"),
   listOrphanSpecs: (categoriaId: number) =>
     authedJson<OrphanSpec[]>(`/api/admin/categorias/${categoriaId}/spec-templates/orphans`),
   /** Asigna una spec_definition existente a una categoría. Para crear una

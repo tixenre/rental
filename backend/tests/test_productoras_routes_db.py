@@ -52,7 +52,7 @@ def _client() -> TestClient:
 def admin_cookie(monkeypatch):
     from auth.session import signer
 
-    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
+    monkeypatch.setattr("auth.queries.sessions.is_active", lambda jti: {"jti": jti})
     payload = {"email": "admin@test.com", "role": "admin", "jti": "productoras-db"}
     return {"session": signer.dumps(payload)}
 
@@ -69,11 +69,17 @@ def _limpiar():
             "INSERT INTO clientes (id, nombre, apellido, email) VALUES (%s, 'Ana', 'Gómez', 'productoras-db@test.com')",
             (_CLIENTE_ID,),
         )
-        conn.execute("DELETE FROM productoras WHERE cuit IN (%s, %s)", (_CUIT_1, _CUIT_2))
+        conn.execute(
+            "DELETE FROM productoras WHERE cuit IN (%s, %s) OR nombre ILIKE 'Productora Borrador%%'",
+            (_CUIT_1, _CUIT_2),
+        )
         conn.commit()
         yield conn
     finally:
-        conn.execute("DELETE FROM productoras WHERE cuit IN (%s, %s)", (_CUIT_1, _CUIT_2))
+        conn.execute(
+            "DELETE FROM productoras WHERE cuit IN (%s, %s) OR nombre ILIKE 'Productora Borrador%%'",
+            (_CUIT_1, _CUIT_2),
+        )
         conn.execute("DELETE FROM clientes WHERE id = %s", (_CLIENTE_ID,))
         conn.commit()
         conn.close()
@@ -193,3 +199,68 @@ def test_reverificar_productora_refresca_datos(admin_cookie, monkeypatch):
     )
     assert r.status_code == 200, r.text
     assert r.json()["razon_social"] == "Nombre Real SA"
+
+
+def test_crear_productora_sin_cuit_queda_borrador(admin_cookie):
+    """#1251 Fase 3: "podemos crear una productora sin el CUIT, solo el nombre"."""
+    client = _client()
+    r = client.post(
+        "/api/admin/productoras", json={"nombre": "Productora Borrador"}, cookies=admin_cookie,
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["cuit"] is None
+    assert body["perfil_impuestos"] is None
+    assert body["nombre"] == "Productora Borrador"
+
+    lista = client.get("/api/admin/productoras", cookies=admin_cookie).json()
+    assert any(p["id"] == body["id"] and p["cuit"] is None for p in lista)
+
+
+def test_crear_productora_sin_cuit_ni_nombre_400(admin_cookie):
+    client = _client()
+    r = client.post("/api/admin/productoras", json={}, cookies=admin_cookie)
+    assert r.status_code == 400, r.text
+
+
+def test_asignar_cuit_completa_el_borrador(admin_cookie, monkeypatch):
+    client = _client()
+    borrador_id = client.post(
+        "/api/admin/productoras", json={"nombre": "Productora Borrador 2"}, cookies=admin_cookie,
+    ).json()["id"]
+
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona",
+        lambda cuit, conn: _persona(cuit, razon_social="Recién Verificada SA"),
+    )
+    r = client.patch(
+        f"/api/admin/productoras/{borrador_id}", json={"cuit": _CUIT_1}, cookies=admin_cookie,
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["cuit"] == _CUIT_1
+    assert body["razon_social"] == "Recién Verificada SA"
+    assert body["nombre"] == "Productora Borrador 2"
+
+    # No duplica la fila — sigue siendo el mismo id.
+    detalle = client.get(f"/api/admin/productoras/{borrador_id}", cookies=admin_cookie).json()
+    assert detalle["id"] == borrador_id
+
+
+def test_asignar_cuit_no_reemplaza_uno_ya_verificado(admin_cookie, monkeypatch):
+    """El PATCH con `cuit` solo aplica a un borrador — si ya tiene CUIT, se ignora
+    (no está soportado reasignar la identidad fiscal de una productora)."""
+    client = _client()
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona",
+        lambda cuit, conn: _persona(cuit),
+    )
+    productora_id = client.post(
+        "/api/admin/productoras", json={"cuit": _CUIT_1}, cookies=admin_cookie,
+    ).json()["id"]
+
+    r = client.patch(
+        f"/api/admin/productoras/{productora_id}", json={"cuit": _CUIT_2}, cookies=admin_cookie,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["cuit"] == _CUIT_1

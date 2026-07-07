@@ -31,7 +31,7 @@ _COOKIE_CLIENTE = f"session={signer.dumps({'email': 'x@test.com', 'role': 'clien
 def _sessions_active(monkeypatch):
     """jti obligatorio: la cookie de test lleva jti pero no está en la allowlist →
     stubbeamos is_active para darla por activa y que el request llegue al guard."""
-    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
+    monkeypatch.setattr("auth.queries.sessions.is_active", lambda jti: {"jti": jti})
 
 
 # ── Fakes de DB ───────────────────────────────────────────────────────────────

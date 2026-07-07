@@ -736,6 +736,8 @@ export interface Movimiento {
   cuenta_destino_nombre: string | null;
   categoria_nombre: string | null;
   moneda: string;
+  cotizacion: number | null;
+  movimiento_par_id: number | null;
 }
 export interface MovimientoInput {
   tipo: TipoMovimiento;
@@ -747,6 +749,20 @@ export interface MovimientoInput {
   fecha?: string | null;
   nota?: string | null;
   beneficiario?: string | null;
+}
+export interface CambioDivisaInput {
+  cuenta_origen_id: number;
+  cuenta_destino_id: number;
+  monto_origen?: number | null;
+  monto_destino?: number | null;
+  cotizacion?: number | null;
+  fecha?: string | null;
+  nota?: string | null;
+}
+export interface CambioDivisaResult {
+  origen: Movimiento;
+  destino: Movimiento;
+  cotizacion: number;
 }
 export interface GastosPorCategoria {
   por_categoria: { categoria: string; monto: number }[];
@@ -846,9 +862,12 @@ export type ClientePerfilFiscalRow = {
 
 export type ClienteProductoraRow = {
   id: number;
-  cuit: string;
-  perfil_impuestos: string;
+  // Nullable (#1251 Fase 3): productora BORRADOR (creada solo con nombre, sin
+  // CUIT todavía) — no facturable hasta que se le asigne uno.
+  cuit: string | null;
+  perfil_impuestos: string | null;
   razon_social: string | null;
+  nombre: string | null;
 };
 
 export type ClientePerfilesFiscales = {
@@ -1006,6 +1025,10 @@ export type Cliente = {
   tipo_documento_renaper: string | null;
   estado_civil_renaper: string | null;
   apodo: string | null;
+  // Resueltos server-side (mismo criterio que GET /api/cliente/me): RENAPER
+  // si está verificado, si no el nombre/dirección base — no recomponer en TS.
+  nombre_legal: string;
+  direccion_legal: string | null;
 };
 export type ClientesListResp = {
   total: number;
@@ -1085,6 +1108,10 @@ export type Pedido = {
   cliente_telefono: string | null;
   cliente_perfil_impuestos: string | null;
   cliente_dni_validado_at?: string | null;
+  /** A nombre de quién se factura este pedido (#1251) — mutuamente excluyentes,
+   *  NULL/NULL = perfil default de la cuenta. El renter sigue siendo `cliente_id`. */
+  perfil_fiscal_id?: number | null;
+  productora_id?: number | null;
   fecha_desde: string | null;
   fecha_hasta: string | null;
   estado: PedidoEstado;
@@ -1163,6 +1190,8 @@ export type PedidoDatosInput = {
   descuento_pct: number | null;
   descuento_manual_tipo?: "pct" | "monto" | null;
   descuento_manual_monto?: number | null;
+  perfil_fiscal_id?: number | null;
+  productora_id?: number | null;
 };
 
 // ── Estudio (singleton E1) ───────────────────────────────────────────────────
@@ -1322,3 +1351,98 @@ export type EstudioPackEquipoCurado = {
 // ── Descuentos por jornadas ──────────────────────────────────────────────────
 
 export type DescuentoJornada = { id: number; jornadas: number; pct: number };
+
+// ── Talleres ──────────────────────────────────────────────────────────────────
+
+export type ClaseBody = { fecha: string; hora_inicio: number; hora_fin: number };
+
+export type EdicionAdmin = {
+  id: number;
+  taller_id: number;
+  numero_edicion: number;
+  slug: string;
+  tipo_taller: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  horario: string;
+  cupos_total: number;
+  cupos_confirmados: number;
+  cupos_disponibles: number;
+  precio_total: number;
+  precio_sena: number;
+  pago_alias: string;
+  pago_cbu: string;
+  pago_banco: string;
+  direccion: string;
+  activo: boolean;
+  frozen_at: string | null;
+  clases: ClaseBody[];
+};
+
+export type TallerConcepto = {
+  id: number;
+  slug_base: string;
+  nombre: string;
+  subtitulo: string;
+  instructor_nombre: string;
+  instructor_bio: string;
+  instructor_proyectos: string;
+  descripcion: string;
+  publico_objetivo: string;
+  programa_teorica: string[];
+  programa_practica: string[];
+  instructor_foto_url: string;
+  instructor_media_id: number | null;
+  notif_email: string;
+  ediciones: EdicionAdmin[];
+};
+
+export type Inscripcion = {
+  id: number;
+  nombre: string;
+  email: string;
+  telefono: string;
+  experiencia: string | null;
+  comprobante_url: string | null;
+  en_lista_espera: boolean;
+  estado: string | null;
+  edicion_id: number | null;
+  numero_edicion: number | null;
+  edicion_slug: string | null;
+  created_at: string | null;
+};
+
+// ── Solicitudes ───────────────────────────────────────────────────────────────
+export type ModificacionItem = { equipo_id: number; cantidad: number };
+export type CambiosJson = {
+  fecha_desde?: string | null;
+  fecha_hasta?: string | null;
+  items: ModificacionItem[];
+  mensaje?: string | null;
+};
+export type Solicitud = {
+  id: number;
+  pedido_id: number;
+  cliente_nombre: string;
+  cliente_apellido?: string | null;
+  cliente_email: string | null;
+  numero_pedido: number | null;
+  mensaje: string | null;
+  estado: "pendiente" | "aprobada" | "rechazada" | "cancelada";
+  respuesta: string | null;
+  cambios_json: CambiosJson | null;
+  tipo: "directo" | "aprobacion";
+  resolved_at: string | null;
+  resolved_by: string | null;
+  created_at: string;
+  pedido_fecha_desde: string | null;
+  pedido_fecha_hasta: string | null;
+  monto_total: number;
+};
+export type PedidoLite = {
+  id: number;
+  numero_pedido: number | null;
+  fecha_desde: string | null;
+  fecha_hasta: string | null;
+  items: { equipo_id: number; cantidad: number; nombre: string; nombre_publico?: string | null }[];
+};

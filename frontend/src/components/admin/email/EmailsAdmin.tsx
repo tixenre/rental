@@ -110,7 +110,7 @@ export function EmailsAdmin() {
       {statusQ.data && <EmailChannelBanner status={statusQ.data} />}
 
       {/* Plantillas */}
-      <section className="rounded-lg border hairline bg-background p-4 space-y-3">
+      <section className="card p-4 space-y-3">
         <div>
           <h2 className="font-display text-lg text-ink">Plantillas</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -253,7 +253,7 @@ function RecordatorioControls() {
   const dirty = horaInput !== hora || diasInput !== dias;
 
   return (
-    <section className="rounded-lg border hairline bg-background p-4 space-y-3">
+    <section className="card p-4 space-y-3">
       <div>
         <h2 className="font-display text-lg text-ink">Recordatorio de retiro</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
@@ -346,7 +346,7 @@ function EmailsLog() {
   const items = data?.items ?? [];
 
   return (
-    <section className="rounded-lg border hairline bg-background p-4 space-y-3">
+    <section className="card p-4 space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div>
           <h2 className="font-display text-lg text-ink">Log de envíos</h2>

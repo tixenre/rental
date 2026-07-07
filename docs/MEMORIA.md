@@ -691,10 +691,13 @@ A pedido del dueño, tras la auditoría de `contabilidad/`, ante el miedo de "dr
 motores tocando dinero sin un mapa único. 6 auditorías paralelas sobre `services/precios`,
 `reportes/liquidacion`+`comisiones`+`cierres`+`reconciliacion`, `services/facturacion`, el camino de
 congelamiento de precio en pedidos, y un trace end-to-end + estado del semáforo de reconciliación.
-**Hallazgo crítico de proceso:** el PR #1181 (fix original del bug #405 — editor de pedidos admin
-cotizando con precio de catálogo en vez del precio de línea congelado) **nunca se mergeó** a `dev`/`main`
-— `respetar_precio_item` no existe en ningún branch real, solo en la rama del PR sin mergear. La sesión
-anterior lo había registrado como shippeado por error. **El bug #405 sigue potencialmente activo hoy.**
+**Hallazgo crítico de proceso (en el momento de esta auditoría):** el PR #1181 (fix original del bug
+#405 — editor de pedidos admin cotizando con precio de catálogo en vez del precio de línea congelado)
+**no estaba mergeado** a `dev`/`main` — `respetar_precio_item` no existía en ningún branch real, solo
+en la rama del PR sin mergear. La sesión anterior lo había registrado como shippeado por error.
+**Corrección (2026-07-05):** el PR #1181 SÍ se mergeó a `dev` ese mismo día, horas después de esta
+auditoría (commit `9cc4924`) — `respetar_precio_item` está presente y activo en
+`backend/routes/alquileres/cotizacion.py` en `dev` hoy. **El bug #405 está resuelto, no activo.**
 Nuevo manual **`docs/SISTEMA_PLATA.md`** (fuente única de cada número de plata + el semáforo de
 reconciliación, cruzado entre motores) — no repite invariantes de cada `CLAUDE.md`/`SISTEMA_*.md` local,
 los referencia. Hallazgos priorizados (14 ítems + el PR sin mergear) documentados ahí, no acá — evita
@@ -1016,6 +1019,28 @@ por `verificar_y_crear_perfil_fiscal`/`verificar_y_crear_productora`; un consumi
 fiscales de un pedido que no pase por `_resolver_datos_fiscales_pedido`; una tabla nueva con FK a
 `clientes` sin clasificar en `identity/merge.py`. Cómo → docstrings de `services/facturacion/padron.py`
 y `services/pedidos_enriquecimiento.py`; tracking #1240.
+
+### 2026-07-05 — `arca_fe` cruza el gate de "primera emisión real": arranca SemVer en 0.1.0
+
+`arca_fe.__version__` estaba fijo en `"0.0.0"` a propósito hasta la primera emisión real en
+producción (política que solo vivía como comentario en el código, nunca registrada en la memoria).
+El dueño confirmó que esa emisión real ya pasó → arranca el versionado SemVer real en **`0.1.0`**
+(conservador, no `1.0.0` — la API puede seguir evolucionando mientras se suman features como WSFEXv1).
+De acá en adelante, todo cambio de `__all__` bumpea MINOR/MAJOR según corresponda; `1.0.0` queda
+reservado para cuando el contrato público se declare estable. `pyproject.toml` se sincroniza a mano
+(sin build tooling), verificado por `test_portabilidad.py`.
+
+### 2026-07-05 — El front no calcula stock: el "X libres" del editor sale del motor (draft-aware, con signo)
+
+Generaliza _El front no calcula plata (2026-06-29)_ al stock: **ninguna resta de disponibilidad se hace
+en el front**. El "X libres" del editor de pedidos (admin y modificación del cliente) sale de
+`reservas.calcular_disponibilidad_draft` — resta TODO el draft con la MISMA expansión del gate
+(estricta: incluye best-effort, a diferencia del catálogo C2) y devuelve valores CON SIGNO (negativo =
+cuántas faltan) — vía `items=` de `/api/disponibilidad` y el hook único `useDisponibilidadDraft`. Raíz:
+kit + componente en el mismo pedido no se descontaban entre sí ("2 libres" con 0 reales, bug 2026-07-05).
+Gotcha: `get_disponibilidad` se llama DIRECTO desde `routes/estudio.py` → el default de `items` es None
+plano, NUNCA `Query(None)` (truthy → rompía el Estudio con 500). El supervisor marca una resta de
+disponibilidad recalculada en el front, o un editor/buscador de pedido que no consuma el hook único.
 
 ---
 

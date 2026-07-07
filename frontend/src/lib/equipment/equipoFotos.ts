@@ -5,6 +5,7 @@
  *   GET    /api/admin/equipos/{id}/fotos
  *   POST   /api/admin/equipos/{id}/fotos              (multipart/form-data)
  *   POST   /api/admin/equipos/{id}/fotos/from-url     (JSON {url})
+ *   POST   /api/admin/equipos/{id}/fotos/from-urls    (JSON {urls: [...]}, hasta 20 — #1051 Stream B)
  *   DELETE /api/admin/equipos/{id}/fotos/{foto_id}
  *   PATCH  /api/admin/equipos/{id}/fotos/orden        (JSON {fotos: [...]})
  */
@@ -59,6 +60,31 @@ export async function uploadEquipoFotoFromUrl(equipoId: number, url: string): Pr
     throw new Error(detail.detail ?? `upload-foto-from-url → ${res.status}`);
   }
   return res.json() as Promise<EquipoFoto>;
+}
+
+export type EquipoFotosFromUrlsResult = {
+  agregadas: EquipoFoto[];
+  fallidas: { url: string; error: string }[];
+};
+
+/** Batch de `uploadEquipoFotoFromUrl` (hasta 20 URLs) — best-effort: una URL
+ *  que falla no aborta el resto, viene reportada en `fallidas`. Pensado para
+ *  agregar de un saque la galería que trae un HTML recién enriquecido
+ *  (`adminApi.enriquecerFromHtml` → `foto_candidates`). */
+export async function uploadEquipoFotosFromUrls(
+  equipoId: number,
+  urls: string[],
+): Promise<EquipoFotosFromUrlsResult> {
+  const res = await authedFetch(`/api/admin/equipos/${equipoId}/fotos/from-urls`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ urls }),
+  });
+  if (!res.ok) {
+    const detail = (await res.json().catch(() => ({}))) as { detail?: string };
+    throw new Error(detail.detail ?? `fotos-from-urls → ${res.status}`);
+  }
+  return res.json() as Promise<EquipoFotosFromUrlsResult>;
 }
 
 export async function deleteEquipoFoto(equipoId: number, fotoId: number): Promise<void> {

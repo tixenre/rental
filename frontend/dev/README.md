@@ -9,11 +9,16 @@ donde el proxy `/api → :8000` falla y el catálogo queda vacío.
 - `api-fixtures/*.json` — snapshots de los endpoints públicos del catálogo
   (`/api/equipos`, `/api/categorias`, `/api/marcas`) generados desde la DB.
 - `api-fixtures-plugin.ts` — plugin de Vite (`apply: "serve"`) que intercepta
-  esos GET y responde con los JSON. **No afecta el build de producción** ni los
-  endpoints autenticados (auth, pedidos, etc. siguen yendo al proxy real).
+  esos GET (+ `POST /api/cotizar`), pero **prueba el backend real primero**
+  (`probeBackend`, timeout ~1.5s) y solo cae al JSON estático si esa prueba
+  falla (backend caído/inalcanzable). Con el backend local corriendo, el
+  catálogo/cotización salen siempre de tu BD real — no hace falta borrar nada.
+  **No afecta el build de producción** ni los endpoints autenticados (auth,
+  pedidos, etc. siguen yendo al proxy real).
 
-Para desactivarlo, borrá la carpeta `dev/api-fixtures/` (si tenés el backend
-real corriendo, el proxy retoma el control automáticamente).
+Si por algún motivo querés forzar el fixture viejo aun con el backend arriba
+(no debería hacer falta), la única forma es apagar el backend o borrar la
+carpeta `dev/api-fixtures/`.
 
 ## Regenerar los fixtures
 

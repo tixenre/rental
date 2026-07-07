@@ -9,13 +9,13 @@
  * contacto en vivo desde la ficha.
  */
 
-import { useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { Input } from "@/design-system/ui/input";
+import { SearchInput } from "@/design-system/ui/search-input";
 import { adminApi, type Cliente } from "@/lib/admin/api";
 import { nombreCliente } from "@/lib/cliente-nombre";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 export function ClienteAutocomplete({
   onPick,
@@ -28,14 +28,7 @@ export function ClienteAutocomplete({
 }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
-  const [debouncedQ, setDebouncedQ] = useState("");
-
-  // Debounce real: useEffect respeta el cleanup (clearTimeout), así cada
-  // tecla cancela el timer anterior y se dispara una sola búsqueda al frenar.
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(q.trim()), 250);
-    return () => clearTimeout(t);
-  }, [q]);
+  const debouncedQ = useDebouncedValue(q.trim(), 250);
 
   const clientesQ = useQuery({
     queryKey: ["admin", "clientes", { q: debouncedQ }],
@@ -46,28 +39,26 @@ export function ClienteAutocomplete({
   return (
     <div className={className}>
       <div className="relative">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <Input
+        <SearchInput
           value={q}
           role="combobox"
           aria-expanded={open && q.trim().length > 0}
           aria-haspopup="listbox"
           aria-autocomplete="list"
           aria-controls="cliente-autocomplete-list"
-          onChange={(e) => {
-            setQ(e.target.value);
+          onValueChange={(v) => {
+            setQ(v);
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           placeholder={placeholder}
-          className="pl-9 text-base sm:text-sm"
         />
         {open && q.trim().length > 0 && (
           <div
             role="listbox"
             id="cliente-autocomplete-list"
-            className="absolute z-30 left-0 right-0 mt-1 rounded-md border hairline bg-background shadow-md max-h-52 overflow-auto"
+            className="absolute z-30 left-0 right-0 mt-1 card shadow-md max-h-52 overflow-auto"
           >
             {clientesQ.isLoading && (
               <div className="p-3 text-xs text-muted-foreground">Buscando…</div>

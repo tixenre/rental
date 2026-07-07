@@ -164,7 +164,7 @@
   .t-small {
     font-family: var(--font-sans);
     font-weight: 400;
-    font-size: 0.875rem;
+    font-size: 0.9375rem; /* 15px — igual que text-sm tras la subida de escala (2026-07) */
     line-height: 1.5;
     color: var(--color-muted-foreground);
   }
@@ -177,6 +177,17 @@
     font-weight: 500;
     font-size: 0.625rem;
     letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--color-muted-foreground);
+  }
+  /* Heading de sección real (h2/h3) con el lenguaje visual del eyebrow —
+     mono/uppercase/tracked — pero en var(--text-xs) (13px), no 10px: un
+     heading real no puede resolver como un label decorativo. t-eyebrow
+     sigue siendo el único que va a 10px (uso puramente decorativo). */
+  .t-section {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--color-muted-foreground);
   }
@@ -281,6 +292,25 @@
       padding-inline: 1.125rem;
     }
   }
+}
+
+/* ── Card: receta única de panel con borde+fondo ──────────────
+   Consolida el patrón `rounded-lg border hairline bg-surface` (y su variante
+   `bg-surface-elevated`) que aparecía copy-pasteado por el admin. A propósito
+   SIN padding — el default es p-4 (ver "Spacing" en DESIGN_SYSTEM.md), pero
+   cada consumidor lo pisa si hace falta (dialogs, drawers). `@utility` (no
+   `@layer utilities`) para que soporte variantes (hover:card, dark:card…). */
+@utility card {
+  border-radius: var(--radius-lg);
+  border-width: 1px;
+  border-color: var(--color-hairline);
+  background-color: var(--color-surface);
+}
+@utility card-elevated {
+  border-radius: var(--radius-lg);
+  border-width: 1px;
+  border-color: var(--color-hairline);
+  background-color: var(--color-surface-elevated);
 }
 
 /* ── prefers-reduced-motion: kill ALL CSS animations ───────── */

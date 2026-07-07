@@ -17,18 +17,7 @@ import { toast } from "sonner";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 import { adminApi } from "@/lib/admin/api";
-import { authedJson } from "@/lib/authedFetch";
-
-type Setting = { key: string; value: string; updated_at: string | null; updated_by: string | null };
-
-async function fetchSetting(key: string): Promise<string | null> {
-  try {
-    const s = await authedJson<Setting>(`/api/settings/${key}`);
-    return s.value;
-  } catch {
-    return null;
-  }
-}
+import { fetchSetting } from "@/lib/settings";
 
 type FieldKey =
   | "business_address"
@@ -144,7 +133,7 @@ function FieldRow({ field }: { field: FieldDef }) {
 
 export function ContactoSection() {
   return (
-    <div className="rounded-lg border hairline bg-background p-4 space-y-5">
+    <div className="card p-4 space-y-5">
       <div>
         <h2 className="font-display text-lg text-ink">Datos de contacto</h2>
         <p className="text-xs text-muted-foreground mt-0.5">

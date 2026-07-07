@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { authedFetch, authedJson } from "@/lib/authedFetch";
+import { solicitudesAdminApi } from "@/lib/admin/api/solicitudes";
+import type { CambiosJson, Solicitud } from "@/lib/admin/api/types";
 import { fmtArs, formatFechaDisplay } from "@/lib/format";
 import { nombreCliente } from "@/lib/cliente-nombre";
 import { Button } from "@/design-system/ui/button";
@@ -22,6 +23,7 @@ import { Input } from "@/design-system/ui/input";
 import { QtyInput } from "@/design-system/ui/qty-input";
 import { Label } from "@/design-system/ui/label";
 import { Textarea } from "@/design-system/ui/textarea";
+import { AdminPage } from "@/components/admin/AdminPage";
 import { QueryState } from "@/components/admin/QueryState";
 import { ListSkeleton } from "@/components/admin/skeletons";
 import { EmptyState } from "@/design-system/composites/EmptyState";
@@ -40,42 +42,6 @@ export const Route = createLazyFileRoute("/admin/solicitudes")({
   component: SolicitudesPage,
 });
 
-type ModificacionItem = { equipo_id: number; cantidad: number };
-type CambiosJson = {
-  fecha_desde?: string | null;
-  fecha_hasta?: string | null;
-  items: ModificacionItem[];
-  mensaje?: string | null;
-};
-type Solicitud = {
-  id: number;
-  pedido_id: number;
-  cliente_nombre: string;
-  cliente_apellido?: string | null;
-  cliente_email: string | null;
-  numero_pedido: number | null;
-  mensaje: string | null;
-  estado: "pendiente" | "aprobada" | "rechazada" | "cancelada";
-  respuesta: string | null;
-  cambios_json: CambiosJson | null;
-  tipo: "directo" | "aprobacion";
-  resolved_at: string | null;
-  resolved_by: string | null;
-  created_at: string;
-  pedido_fecha_desde: string | null;
-  pedido_fecha_hasta: string | null;
-  monto_total: number;
-};
-
-type Equipo = { id: number; nombre: string; nombre_publico?: string | null };
-type PedidoLite = {
-  id: number;
-  numero_pedido: number | null;
-  fecha_desde: string | null;
-  fecha_hasta: string | null;
-  items: { equipo_id: number; cantidad: number; nombre: string; nombre_publico?: string | null }[];
-};
-
 function fmtFecha(s?: string | null) {
   return formatFechaDisplay(s);
 }
@@ -84,31 +50,16 @@ function SolicitudesPage() {
   const qc = useQueryClient();
   const listQ = useQuery({
     queryKey: ["admin", "solicitudes"],
-    queryFn: () => authedJson<Solicitud[]>("/api/admin/solicitudes"),
+    queryFn: () => solicitudesAdminApi.list(),
   });
 
   const resolverMut = useMutation({
-    mutationFn: async (args: {
+    mutationFn: (args: {
       id: number;
       estado: "aprobada" | "rechazada";
       respuesta: string;
       cambios_override?: CambiosJson;
-    }) => {
-      const body: Record<string, unknown> = {
-        estado: args.estado,
-        respuesta: args.respuesta,
-      };
-      if (args.cambios_override) body.cambios_override = args.cambios_override;
-      const res = await authedFetch(`/api/admin/solicitudes/${args.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const detail = await res.json().catch(() => ({}));
-        throw new Error(detail?.detail ?? `PATCH → ${res.status}`);
-      }
-    },
+    }) => solicitudesAdminApi.resolver(args),
     onSuccess: (_d, vars) => {
       const label =
         vars.estado === "aprobada"
@@ -128,15 +79,11 @@ function SolicitudesPage() {
   const resueltas = solicitudes.filter((s) => s.estado !== "pendiente");
 
   return (
-    <div className="space-y-6 p-4 md:p-6 max-w-4xl mx-auto">
-      <header>
-        <div className="t-eyebrow">Operaciones · Solicitudes</div>
-        <h1 className="font-display text-3xl text-ink">Solicitudes</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Cambios pedidos por clientes en pedidos confirmados.
-        </p>
-      </header>
-
+    <AdminPage
+      title="Solicitudes"
+      maxW="detail"
+      description="Cambios pedidos por clientes en pedidos confirmados."
+    >
       <QueryState
         query={listQ}
         isEmpty={(d) => d.length === 0}
@@ -186,7 +133,7 @@ function SolicitudesPage() {
           </>
         )}
       </QueryState>
-    </div>
+    </AdminPage>
   );
 }
 
@@ -210,7 +157,7 @@ function SolicitudCard({
 
   const pedidoQ = useQuery({
     queryKey: ["admin", "pedido", solicitud.pedido_id],
-    queryFn: () => authedJson<PedidoLite>(`/api/alquileres/${solicitud.pedido_id}`),
+    queryFn: () => solicitudesAdminApi.getPedido(solicitud.pedido_id),
   });
 
   const cambios = solicitud.cambios_json;
@@ -321,7 +268,7 @@ function SolicitudCard({
   }
 
   return (
-    <article className="rounded-lg border hairline bg-background p-4 space-y-4">
+    <article className="card p-4 space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">

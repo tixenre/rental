@@ -1,0 +1,604 @@
+import { es } from "date-fns/locale";
+import { addDays, format, startOfDay } from "date-fns";
+import {
+  X,
+  Calendar as CalendarIcon,
+  Clock,
+  Eraser,
+  Minus,
+  Plus,
+  AlertTriangle,
+} from "lucide-react";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/design-system/ui/dialog";
+import { Calendar } from "@/design-system/ui/calendar";
+import { Button } from "@/design-system/ui/button";
+import { Pill } from "@/design-system/ui/Pill";
+import {
+  computeJornadas,
+  deriveEndDate,
+  diaAbierto,
+  earliestRetiro,
+  franjaParaFecha,
+  laterTime,
+  minTimeForDate,
+  timeToMinutes,
+  toLocalISO,
+  ymd,
+} from "@/lib/rental-dates";
+import { useHorarios } from "@/lib/horarios";
+import { useAntelacionMinimaHorasQuery } from "@/hooks/useSettings";
+import { useBusinessPhone } from "@/lib/business";
+import { whatsappLink } from "@/lib/whatsapp";
+import { apiGetDiasBloqueados, apiGetDisclaimersRetiro } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { TimeStepSelect } from "./TimeStepSelect";
+import { useEffect, useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
+
+/**
+ * Opciones de comportamiento del selector. Permiten reusar el mismo modal en
+ * el carrito público (con restricciones de horarios/días pasados/stock) y en
+ * el back-office admin (sin restricciones — el admin manda).
+ */
+export type DateRangePickerOptions = {
+  /** Permitir elegir días pasados (admin = true). Default false. */
+  allowPast?: boolean;
+  /** Respetar horarios habilitados: clamp de hora a franja, días cerrados,
+   * bloqueo de "Aplicar" si la devolución cae en día cerrado. Default true. */
+  respectHorarios?: boolean;
+  /** Items del carrito (`"id:qty,..."`) para chequear días sin stock. ""=sin chequeo. */
+  itemsParam?: string;
+};
+
+type Props = {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  startDate: Date | undefined;
+  endDate: Date | undefined;
+  startTime: string;
+  endTime: string;
+  /** Espejo de `setDates` del carrito (start+end juntos). */
+  onDatesChange: (start?: Date, end?: Date) => void;
+  /** Espejo de `setStartTime` del carrito. */
+  onStartTimeChange: (t: string) => void;
+  /** Espejo de `setEndTime` del carrito. */
+  onEndTimeChange: (t: string) => void;
+  options?: DateRangePickerOptions;
+};
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return isMobile;
+}
+
+export function DateRangePickerModal({
+  open,
+  onOpenChange,
+  startDate,
+  endDate,
+  startTime,
+  endTime,
+  onDatesChange,
+  onStartTimeChange,
+  onEndTimeChange,
+  options,
+}: Props) {
+  const allowPast = options?.allowPast ?? false;
+  const respectHorarios = options?.respectHorarios ?? true;
+  const itemsParam = options?.itemsParam ?? "";
+
+  const jornadas = computeJornadas(startDate, endDate, startTime, endTime);
+  const isMobile = useIsMobile();
+  // useHorarios() se llama SIEMPRE (regla de hooks); sus valores solo se usan
+  // si respectHorarios. En modo admin pasamos null efectivo abajo.
+  const horariosRaw = useHorarios();
+  const horarios = respectHorarios ? horariosRaw : null;
+  // Estable durante el ciclo de vida del modal — evita recomputar memos por render.
+  const today = useMemo(() => startOfDay(new Date()), []);
+  const now = useMemo(() => new Date(), []);
+
+  // ── Piso de retiro: "ahora" + antelación mínima (#1126) ────────────────
+  // Solo aplica al carrito público (`!allowPast`): el admin nunca queda
+  // limitado (carga urgencias/retroactivo a mano), mismo criterio que el
+  // backend (`services/fechas.py`). `earliest` queda `undefined` hasta que el
+  // setting realmente resuelve (`leadTimeReady`) — el 0 con el que arranca la
+  // query mientras carga es indistinguible de "antelación apagada de verdad",
+  // y ya clampeó la hora a "ahora" con ese 0 falso antes de que llegara el
+  // valor real (la fecha se corregía después, pero la hora clampeada de más
+  // quedaba pisada — visto en prod). Mientras no está listo, ningún piso de
+  // antelación se aplica (nada se clampea de más).
+  const { horas: leadTimeHorasRaw, ready: leadTimeReady } = useAntelacionMinimaHorasQuery();
+  const leadTimeHoras = allowPast ? 0 : leadTimeHorasRaw;
+  const leadTimeKnown = allowPast || leadTimeReady;
+  const earliest = useMemo(
+    () => (leadTimeKnown ? earliestRetiro(now, leadTimeHoras) : undefined),
+    [now, leadTimeHoras, leadTimeKnown],
+  );
+  // Mismo helper que el disclaimer de urgencia del carrito (CartDrawer) — una
+  // sola forma de armar el link de WhatsApp, no una URL ad-hoc acá.
+  const businessPhone = useBusinessPhone();
+  const urgenciaWhatsappUrl = whatsappLink({
+    phone: businessPhone,
+    message: "¡Hola! Necesito reservar con menos anticipación de la mínima. ¿Me pueden ayudar?",
+  });
+
+  // ── Avisos del picker (antelación / horarios reducidos de fin de semana) ─
+  // La regla ("¿corresponde avisar?") y el texto viven en el backend
+  // (`services.fechas.disclaimers_retiro`, #1237) — acá solo se pide con la
+  // selección actual y se muestra `mensaje`, nada se decide en TS.
+  const fechaDesdeISO = !allowPast && startDate ? toLocalISO(startDate, startTime) : undefined;
+  const fechaHastaISO = !allowPast && endDate ? toLocalISO(endDate, endTime) : undefined;
+  const disclaimersQ = useQuery({
+    queryKey: ["rental-disclaimers", fechaDesdeISO, fechaHastaISO],
+    queryFn: () => apiGetDisclaimersRetiro(fechaDesdeISO, fechaHastaISO),
+    enabled: open && !allowPast,
+    staleTime: 30_000,
+  });
+  const disclaimers = allowPast ? [] : (disclaimersQ.data?.disclaimers ?? []);
+
+  // ── Días bloqueados (sin stock) ──────────────────────────────────────
+  const ventanaDesde = ymd(today);
+  const ventanaHasta = ymd(addDays(today, 120));
+  const diasBloqueadosQ = useQuery({
+    queryKey: ["dias-bloqueados", itemsParam, ventanaDesde, ventanaHasta],
+    queryFn: () => apiGetDiasBloqueados(itemsParam, ventanaDesde, ventanaHasta),
+    enabled: open && itemsParam !== "",
+    staleTime: 60_000,
+  });
+  const diasBloqueados = useMemo(
+    () => new Set(diasBloqueadosQ.data?.dias_bloqueados ?? []),
+    [diasBloqueadosQ.data],
+  );
+
+  // ── Validaciones del rango ────────────────────────────────────────────
+  const rangoCruzaBloqueado = useMemo(() => {
+    if (!startDate || !endDate || diasBloqueados.size === 0) return false;
+    for (let d = startOfDay(startDate); d <= startOfDay(endDate); d = addDays(d, 1)) {
+      if (diasBloqueados.has(ymd(d))) return true;
+    }
+    return false;
+  }, [startDate, endDate, diasBloqueados]);
+
+  const franjaRetiro = franjaParaFecha(horarios, startDate);
+  const franjaDevolucion = franjaParaFecha(horarios, endDate);
+  // Solo cuando respetamos horarios un día puede estar "cerrado".
+  const devolucionCerrada = respectHorarios && !!endDate && !diaAbierto(horarios, endDate);
+
+  // Devolver más tarde que el retiro suma una jornada
+  const sumaJornadaPorHora =
+    !!startDate && !!endDate && timeToMinutes(endTime) > timeToMinutes(startTime);
+
+  // Solo bloquea "Aplicar" si el día de devolución está cerrado (error real).
+  // El stock insuficiente es una advertencia — el usuario elige fechas y ve
+  // en el carrito qué ítems no están disponibles para ese período.
+  const blocked = devolucionCerrada;
+
+  // ── Si el DÍA de retiro quedó entero antes del piso, mover la fecha ─────
+  // `minTimeForDate` no da piso cuando `startDate` es un día ANTERIOR al de
+  // `earliest` (ese día no tiene ninguna hora válida) — por diseño, para no
+  // pisar un día POSTERIOR (que no necesita piso). Pero un carrito con una
+  // fecha vieja persistida (de antes de que la antelación empujara el piso a
+  // otro día, o simplemente porque pasaron las horas) queda mostrando esa
+  // fecha/hora inválida sin corregirse: el clamp de hora de abajo no alcanza
+  // porque no hay NINGUNA hora válida ese día. Se mueve la fecha completa al
+  // primer día válido (preservando la cantidad de jornadas); el clamp de hora
+  // de abajo corre de nuevo en el siguiente render y ajusta la hora.
+  useEffect(() => {
+    if (allowPast || !startDate || !earliest) return;
+    const pisoDia = startOfDay(earliest);
+    if (startOfDay(startDate).getTime() >= pisoDia.getTime()) return;
+    onDatesChange(
+      pisoDia,
+      endDate ? deriveEndDate(pisoDia, jornadas, startTime, endTime) : undefined,
+    );
+  }, [allowPast, startDate, endDate, earliest, jornadas, startTime, endTime, onDatesChange]);
+
+  // ── Clamp de la hora de retiro: franja horaria + antelación mínima ──────
+  // Los dos pisos/techos se combinan en UN solo efecto que calcula el valor
+  // final de una — dos efectos independientes, cada uno empujando hacia su
+  // propio límite, pueden pisarse en loop infinito cuando el rango entre
+  // ambos queda vacío (piso de antelación > cierre de la franja): A sube,
+  // B baja, A vuelve a subir… nunca converge (visto en prod, #maximum-update-
+  // depth). Si el rango queda vacío, la antelación (piso duro — el backend
+  // igual la re-valida) se acota al cierre de la franja para no ofrecer un
+  // slot imposible ni loopear.
+  const pisoHoraRetiro = allowPast ? undefined : minTimeForDate(startDate, earliest);
+  const hiHoraRetiro = respectHorarios ? franjaRetiro?.hasta : undefined;
+  let loHoraRetiro = respectHorarios
+    ? laterTime(franjaRetiro?.desde, pisoHoraRetiro)
+    : pisoHoraRetiro;
+  if (loHoraRetiro && hiHoraRetiro && timeToMinutes(loHoraRetiro) > timeToMinutes(hiHoraRetiro)) {
+    loHoraRetiro = hiHoraRetiro;
+  }
+  useEffect(() => {
+    if (!startDate) return;
+    let next = startTime;
+    if (loHoraRetiro && next < loHoraRetiro) next = loHoraRetiro;
+    if (hiHoraRetiro && next > hiHoraRetiro) next = hiHoraRetiro;
+    if (next !== startTime) onStartTimeChange(next);
+  }, [startDate, loHoraRetiro, hiHoraRetiro, startTime, onStartTimeChange]);
+  useEffect(() => {
+    if (!respectHorarios) return;
+    if (franjaDevolucion && endTime < franjaDevolucion.desde)
+      onEndTimeChange(franjaDevolucion.desde);
+    else if (franjaDevolucion && endTime > franjaDevolucion.hasta)
+      onEndTimeChange(franjaDevolucion.hasta);
+  }, [respectHorarios, franjaDevolucion, endTime, onEndTimeChange]);
+
+  const setJornadas = (target: number, base?: Date) => {
+    const start = base ?? startDate;
+    if (!start) return;
+    onDatesChange(start, deriveEndDate(start, target, startTime, endTime));
+  };
+
+  const handleStartSelect = (d: Date | undefined) => {
+    if (!d) {
+      onDatesChange(undefined, undefined);
+      return;
+    }
+    setJornadas(startDate && endDate ? jornadas : 1, d);
+  };
+
+  const incJornada = () => setJornadas(jornadas + 1);
+  const decJornada = () => {
+    if (jornadas <= 1) return;
+    setJornadas(jornadas - 1);
+  };
+  const apply = () => onOpenChange(false);
+  const clear = () => onDatesChange(undefined, undefined);
+  const hasStart = !!startDate;
+  const hasRange = hasStart && !!endDate;
+
+  // ── Calendar modifiers ────────────────────────────────────────────────
+  // closed: días cerrados según horarios (fondo rojo, tachado)
+  // rango:  período seleccionado (fondo amber soft)
+  // nostock no se muestra en el calendario — el feedback de disponibilidad
+  // vive en el CartDrawer, donde el usuario puede actuar directamente.
+  const closedDates = useMemo(() => {
+    if (!respectHorarios || !horarios) return [];
+    const out: Date[] = [];
+    for (let i = 0; i < 120; i++) {
+      const d = addDays(today, i);
+      if (!diaAbierto(horarios, d)) out.push(d);
+    }
+    return out;
+  }, [respectHorarios, horarios, today]);
+
+  const calModifiers = {
+    ...(hasRange ? { rango: { from: startDate!, to: endDate! } } : {}),
+    ...(closedDates.length > 0 ? { closed: closedDates } : {}),
+  };
+
+  const calModifiersClassNames = {
+    rango: "bg-amber-soft/70 text-ink",
+    closed: "rdp-closed", // → src/styles.css (@layer utilities)
+  };
+
+  // ── Footer label contextual ───────────────────────────────────────────
+  // Orden de prioridad: error > sin fechas > ok
+  const footerLabel = !hasStart
+    ? "sin fechas"
+    : devolucionCerrada
+      ? "día cerrado"
+      : `${jornadas} ${jornadas === 1 ? "jornada" : "jornadas"}`;
+
+  const footerLabelMuted = !hasStart || blocked;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        hideClose
+        className="max-w-3xl p-0 gap-0 overflow-hidden bg-background flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90dvh] sm:rounded-2xl rounded-none border-0 sm:border shadow-2xl"
+      >
+        <VisuallyHidden>
+          <DialogTitle>Tu Rental — Seleccionar fechas</DialogTitle>
+          <DialogDescription>
+            Elegí la fecha de retiro y la cantidad de jornadas del alquiler.
+          </DialogDescription>
+        </VisuallyHidden>
+
+        {/* ── Header ──────────────────────────────────────────────── */}
+        <div
+          className="flex items-center justify-between px-5 sm:px-6 py-4 border-b hairline shrink-0 bg-surface/30"
+          style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
+        >
+          <div>
+            <div className="t-eyebrow">Fechas del alquiler</div>
+            <h2 className="font-display text-xl sm:text-2xl text-ink leading-tight">
+              Elegí tus fechas
+            </h2>
+          </div>
+          <button
+            onClick={() => onOpenChange(false)}
+            className="hit-area-44 grid h-9 w-9 place-items-center rounded-full hover:bg-muted transition focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
+            aria-label="Cerrar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* ── Retiro + Jornadas + Devolución ──────────────────────── */}
+        {/* Mobile: compacto (pt/pb/space chicos) para dejarle alto al calendario,
+            que es la interacción principal. Desktop (sm:) mantiene el aire. */}
+        <div className="px-5 sm:px-6 pt-3 sm:pt-5 pb-3 sm:pb-4 shrink-0 space-y-2.5 sm:space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+            {/* ── Retiro ─────────────────────────────────────────── */}
+            <div
+              className={cn(
+                "rounded-xl px-3.5 py-2.5 sm:py-3 border bg-surface/40",
+                hasStart
+                  ? "border-ink/15" // fecha elegida: borde sutil
+                  : "border-dashed hairline", // vacío: borde dashed
+              )}
+            >
+              <div className="t-eyebrow mb-1.5">Retiro</div>
+              <div className="flex items-center justify-between gap-3">
+                {hasStart ? (
+                  <>
+                    <span className="tabular-nums text-base font-display leading-none text-ink">
+                      {format(startDate!, "dd MMM yyyy", { locale: es })}
+                    </span>
+                    <TimeStepSelect
+                      value={startTime}
+                      onChange={onStartTimeChange}
+                      min={loHoraRetiro}
+                      max={hiHoraRetiro}
+                      aria-label="Hora de retiro"
+                      className="text-sm font-mono tabular-nums text-ink/80 hover:text-ink rounded-md px-2 py-1 bg-background border hairline"
+                    />
+                  </>
+                ) : (
+                  /* Estado vacío — placeholder amigable, no "--/--/----" */
+                  <span className="text-sm font-sans text-muted-foreground/60 leading-none">
+                    elegí en el calendario
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* ── Jornadas stepper ──── Mobile: una sola fila compacta
+                 (eyebrow + stepper inline). Desktop (sm:): 2 líneas como las
+                 demás cards del grid, para igualar alto con Retiro. */}
+            <div className="rounded-xl border border-ink/15 bg-amber-soft/40 px-3.5 py-2 sm:py-3">
+              <div className="flex items-center justify-between gap-2 sm:block">
+                <div className="t-eyebrow sm:mb-1.5">Jornadas</div>
+                <div className="flex items-center gap-2 sm:justify-between">
+                  <button
+                    onClick={decJornada}
+                    disabled={!hasStart || jornadas <= 1}
+                    aria-label="Quitar una jornada"
+                    className="grid h-8 w-8 place-items-center rounded-full border hairline bg-background text-ink transition hover:border-ink disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <div className="flex items-baseline gap-1.5 leading-none">
+                    <span
+                      data-testid="jornadas-count"
+                      className="font-display text-xl sm:text-2xl font-black text-ink tabular-nums"
+                    >
+                      {hasStart ? jornadas : "—"}
+                    </span>
+                    <span className="t-eyebrow">{jornadas === 1 ? "jornada" : "jornadas"}</span>
+                  </div>
+                  <button
+                    onClick={incJornada}
+                    disabled={!hasStart}
+                    aria-label="Agregar una jornada"
+                    className="grid h-8 w-8 place-items-center rounded-full border hairline bg-background text-ink transition hover:border-ink hover:bg-amber disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Devolución calculada (solo si hay rango) ───────────── */}
+          {/* La explicación de por qué (día cerrado / suma jornada) vive DENTRO
+              de esta misma caja — antes era una caja aparte repitiendo el
+              mismo dato con otro color, dos avisos por una sola cosa. */}
+          {hasRange && (
+            <div
+              className={cn(
+                "rounded-xl border px-3.5 py-2.5 sm:py-3",
+                // Jerarquía de estados visuales (de mayor a menor prioridad):
+                // 1. devolucionCerrada → destructive (bloquea)
+                // 2. sumaJornadaPorHora → naranja (advierte, color de warning)
+                // 3. normal → amber (ok)
+                devolucionCerrada
+                  ? "border-destructive/40 bg-destructive/10"
+                  : sumaJornadaPorHora
+                    ? "border-naranja/45 bg-naranja/12"
+                    : "border-amber/40 bg-amber-soft/60",
+              )}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="t-eyebrow mb-1">Devolución</div>
+                  <div className="flex items-center gap-1.5 leading-none">
+                    <span
+                      className={cn(
+                        "tabular-nums text-base font-display leading-none",
+                        devolucionCerrada ? "text-destructive" : "text-ink",
+                      )}
+                    >
+                      {format(endDate!, "dd MMM yyyy", { locale: es })}
+                    </span>
+                    {/* Badge "+1 J" — solo cuando suma jornada por hora */}
+                    {sumaJornadaPorHora && !devolucionCerrada && (
+                      <Pill className="bg-naranja/20 px-1.5 font-mono font-semibold uppercase tracking-wider text-ink">
+                        +1 J
+                      </Pill>
+                    )}
+                  </div>
+                </div>
+                {/* Hora de devolución — "—" si el día está cerrado */}
+                {devolucionCerrada ? (
+                  <span className="font-mono text-sm text-muted-foreground/50">—</span>
+                ) : (
+                  <TimeStepSelect
+                    value={endTime}
+                    onChange={onEndTimeChange}
+                    min={franjaDevolucion?.desde}
+                    max={franjaDevolucion?.hasta}
+                    aria-label="Hora de devolución"
+                    className="text-sm font-mono tabular-nums text-ink/80 hover:text-ink rounded-md px-2 py-1 bg-background border hairline"
+                  />
+                )}
+              </div>
+              {devolucionCerrada ? (
+                <p className="flex items-start gap-1.5 mt-2 pt-2 border-t border-destructive/20 text-xs text-destructive">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  Cae en un día cerrado. Ajustá las jornadas o la fecha de retiro.
+                </p>
+              ) : (
+                sumaJornadaPorHora && (
+                  <p className="flex items-center gap-1.5 mt-2 pt-2 border-t border-naranja/20 text-xs text-ink">
+                    <Clock className="h-3.5 w-3.5 shrink-0 text-naranja" />
+                    <span>
+                      Más tarde que tu retiro ({startTime}) → <strong>suma 1 jornada</strong>.
+                      Devolvé a las {startTime} o antes para mantener {jornadas - 1}{" "}
+                      {jornadas - 1 === 1 ? "jornada" : "jornadas"}.
+                    </span>
+                  </p>
+                )
+              )}
+            </div>
+          )}
+
+          {/* ── Feedback general (stock > hint sin fecha) ────────────────────
+              Sin inconveniente no se aclara nada: la regla de jornada solo se
+              explica cuando realmente aplica (dentro de la caja de Devolución,
+              arriba) — no como advertencia permanente aunque todo esté bien. */}
+          {rangoCruzaBloqueado ? (
+            /* WARN: sin stock en el rango — no bloquea Aplicar, advierte para revisar el carrito.
+               Naranja (`--color-naranja`, status "Aviso"), no amber — el amber es el color de
+               marca y se usa en toda la chrome del picker (botones, jornadas, calendario), así
+               que un aviso real en amber se pierde contra el fondo. */
+            <p className="flex items-start gap-1.5 rounded-md bg-naranja/12 border border-naranja/45 px-2.5 py-2 text-sm text-ink">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-naranja" />
+              <span>
+                Algunos equipos del carrito no tienen stock en estas fechas —{" "}
+                <strong className="font-semibold">revisá el carrito</strong> antes de solicitar.
+              </span>
+            </p>
+          ) : !hasStart ? (
+            /* HINT: sin fecha elegida aún */
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              Tocá un día en el calendario para fijar el retiro. La devolución se calcula sola.
+            </p>
+          ) : null}
+
+          {/* Avisos del backend (#1237) — contextuales a la fecha elegida; ver
+              `disclaimersQ` arriba. Un solo box aunque vengan varios avisos
+              (ej. antelación + horarios de finde a la vez), con un único CTA
+              de WhatsApp al pie en vez de repetirlo por aviso. */}
+          {disclaimers.length > 0 && (
+            /* Naranja (`--color-naranja`, status "Aviso"), no amber — mismo criterio que
+               el aviso de stock de arriba: el amber es color de marca (chrome del picker),
+               un aviso real necesita un color que no compita con eso. El backend manda el
+               mensaje completo (fuente de la REGLA, #1237); acá solo separamos la cláusula
+               antes de la primera coma para resaltarla en negrita — presentación, no criterio. */
+            <div className="rounded-md bg-naranja/12 border border-naranja/45 px-2.5 py-2 text-sm text-ink space-y-1.5">
+              {disclaimers.map((d) => {
+                const [headline, ...restParts] = d.mensaje.split(", ");
+                const rest = restParts.join(", ");
+                return (
+                  <p key={d.check} className="flex items-start gap-1.5">
+                    <Clock className="h-4 w-4 shrink-0 text-naranja mt-0.5" />
+                    <span>
+                      <strong className="font-semibold">{headline}</strong>
+                      {rest && <>, {rest}</>}
+                    </span>
+                  </p>
+                );
+              })}
+              <p className="pl-[22px]">
+                {urgenciaWhatsappUrl ? (
+                  <>
+                    ¿Urgencia o necesitás otro horario?{" "}
+                    <a
+                      href={urgenciaWhatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold underline underline-offset-2 hover:text-naranja"
+                    >
+                      Escribinos por WhatsApp
+                    </a>
+                    .
+                  </>
+                ) : (
+                  "¿Urgencia o necesitás otro horario? Escribinos para coordinar."
+                )}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* ── Calendario ────────────────────────────────────────────── */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex justify-center px-2 sm:px-4 pb-2 border-t hairline">
+          <Calendar
+            mode="single"
+            selected={startDate}
+            onSelect={handleStartSelect}
+            numberOfMonths={isMobile ? 1 : 2}
+            locale={es}
+            disabled={(date: Date) =>
+              (!allowPast && date < (earliest ? startOfDay(earliest) : today)) ||
+              (respectHorarios && !diaAbierto(horarios, date))
+            }
+            modifiers={calModifiers}
+            modifiersClassNames={calModifiersClassNames}
+            showOutsideDays={false}
+            className="p-2 sm:p-4 pointer-events-auto"
+          />
+        </div>
+
+        {/* ── Footer ────────────────────────────────────────────────── */}
+        <div
+          className="border-t hairline bg-surface/50 px-5 sm:px-6 pt-3 pb-3 shrink-0 flex items-center justify-between gap-3"
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        >
+          <button
+            onClick={clear}
+            disabled={!hasStart}
+            className="hit-area-44 flex items-center gap-1.5 text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition px-2 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Eraser className="h-3.5 w-3.5" />
+            Limpiar
+          </button>
+
+          {/* Label contextual — refleja el estado del modal */}
+          <div
+            className={cn(
+              "flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.18em]",
+              footerLabelMuted ? "text-muted-foreground" : "text-ink",
+            )}
+          >
+            <CalendarIcon className="h-3.5 w-3.5" />
+            {footerLabel}
+          </div>
+
+          <Button
+            variant="amber"
+            shape="pill"
+            onClick={apply}
+            disabled={!hasStart || blocked}
+            className="min-h-11 h-auto px-6 py-2.5 sm:py-2 font-semibold focus-visible:ring-2 focus-visible:ring-ink disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Aplicar
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

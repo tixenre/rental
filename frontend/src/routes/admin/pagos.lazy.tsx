@@ -12,9 +12,10 @@ import { Receipt } from "lucide-react";
 
 import { adminApi, DESTINATARIOS_PAGO, METODOS_PAGO } from "@/lib/admin/api";
 import { formatARS, formatFechaDisplay } from "@/lib/format";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Badge } from "@/design-system/ui/badge";
 import { Input } from "@/design-system/ui/input";
+import { FieldLabel } from "@/design-system/ui/Field";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { AdminTable, type Column } from "@/components/admin/AdminTable";
 import { QueryState } from "@/components/admin/QueryState";
@@ -107,7 +108,7 @@ function PagosLogPage() {
       title="Cobros de pedidos"
       eyebrow="Finanzas"
       backTo={{ to: "/admin/contabilidad/movimientos", label: "Movimientos" }}
-      maxW="max-w-5xl"
+      maxW="list"
       description={
         <>
           Registro de todos los cobros de pedidos (la fuente única de "pagado"). Cada cobro lleva a
@@ -189,8 +190,4 @@ function PagosLogPage() {
       </div>
     </AdminPage>
   );
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <label className="block t-eyebrow">{children}</label>;
 }

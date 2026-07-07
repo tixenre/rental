@@ -1,5 +1,5 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Check, ChevronLeft, GripVertical, Tag, X } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, Building2, Check, ChevronLeft, GripVertical, Tag, X } from "lucide-react";
 import { toast } from "sonner";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -7,8 +7,10 @@ import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/design-system/ui/button";
 import { IconButton } from "@/design-system/ui/icon-button";
 import { Input } from "@/design-system/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/design-system/ui/radio-group";
 import { DraftNumberInput } from "@/design-system/ui/draft-number-input";
 import { QtyInput } from "@/design-system/ui/qty-input";
+import { Section } from "@/design-system/composites/Section";
 import { cn } from "@/lib/utils";
 import { adminApi } from "@/lib/admin/api";
 import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
@@ -87,7 +89,9 @@ export function ItemRow({
   removeItem,
 }: {
   it: DraftItem;
-  stock?: { cantidad: number; reservado: number };
+  /** Libres del equipo tras TODO el draft (backend, expansión de kits incluida).
+   *  Con signo: negativo = faltan unidades. undefined = sin dato (sin fechas). */
+  stock?: number;
   jornadas: number;
   updateItem: (uid: string, patch: Partial<DraftItem>) => void;
   removeItem: (uid: string) => void;
@@ -96,9 +100,10 @@ export function ItemRow({
     id: it.uid,
   });
   const esLibre = it.equipo_id == null;
-  const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : it.cantidad;
-  const disponible = max - it.cantidad;
-  const overstock = it.cantidad > max && !!stock;
+  // El backend ya descontó el draft completo (incluida esta línea y los kits
+  // que consumen sus componentes) — acá NO se resta nada más.
+  const disponible = stock;
+  const overstock = disponible !== undefined && disponible < 0;
   const subtotal = subtotalDraftItem(it, jornadas);
 
   return (
@@ -145,7 +150,7 @@ export function ItemRow({
               <div className="text-sm text-ink truncate">{it.nombre_publico || it.nombre}</div>
               <div className="mt-0.5 flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
                 {it.marca && <span className="truncate">{it.marca}</span>}
-                {stock && (
+                {disponible !== undefined && (
                   <span
                     className={cn(
                       "inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-2xs",
@@ -247,43 +252,70 @@ export function SaveIndicator({ status }: { status: string }) {
   );
 }
 
-export function Section({
-  icon: Icon,
-  title,
-  aside,
-  children,
+/** "Facturar a nombre de" (#1251) — el renter sigue siendo `cliente_id`; esto
+ * solo elige a quién se factura: la cuenta default, un perfil fiscal personal,
+ * o una productora vinculada al cliente. Mismo patrón que el selector del
+ * checkout (`CheckoutResumen.tsx`), reusado acá para el admin. Solo se
+ * renderiza si el pedido tiene cliente Y ese cliente tiene más de una opción
+ * (si no hay nada para elegir, no tiene sentido mostrar el selector). */
+export function FacturacionTargetSection({
+  clienteId,
+  perfilFiscalId,
+  productoraId,
+  onChange,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  aside?: React.ReactNode;
-  children: React.ReactNode;
+  clienteId: number | null;
+  perfilFiscalId: number | null;
+  productoraId: number | null;
+  onChange: (v: { perfilFiscalId: number | null; productoraId: number | null }) => void;
 }) {
-  return (
-    <section className="rounded-xl border hairline bg-surface-elevated">
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b hairline">
-        <Icon className="h-4 w-4 text-muted-foreground" />
-        <span className="font-medium text-sm text-ink">{title}</span>
-        {aside && <span className="ml-auto">{aside}</span>}
-      </div>
-      <div className="p-4">{children}</div>
-    </section>
-  );
-}
+  const q = useQuery({
+    queryKey: ["admin", "cliente-perfiles-fiscales", clienteId],
+    queryFn: () => adminApi.getClientePerfilesFiscales(clienteId!),
+    enabled: !!clienteId,
+  });
+  const perfiles = q.data?.perfiles ?? [];
+  // Excluye productoras BORRADOR (sin CUIT, #1251 Fase 3) — no son facturables,
+  // mismo criterio que `productoras_vinculadas(solo_facturables=True)` del checkout.
+  const productoras = (q.data?.productoras ?? []).filter((pr) => pr.cuit);
+  if (!clienteId || perfiles.length + productoras.length === 0) return null;
 
-export function FieldLabel({
-  label,
-  className,
-  children,
-}: {
-  label: string;
-  className?: string;
-  children: React.ReactNode;
-}) {
+  const value = perfilFiscalId
+    ? `perfil-${perfilFiscalId}`
+    : productoraId
+      ? `productora-${productoraId}`
+      : "default";
+
+  function handleChange(v: string) {
+    if (v === "default") return onChange({ perfilFiscalId: null, productoraId: null });
+    const [tipo, idStr] = v.split("-");
+    const id = Number(idStr);
+    return tipo === "perfil"
+      ? onChange({ perfilFiscalId: id, productoraId: null })
+      : onChange({ perfilFiscalId: null, productoraId: id });
+  }
+
   return (
-    <label className={cn("block", className)}>
-      <span className="block t-eyebrow mb-1">{label}</span>
-      {children}
-    </label>
+    <Section variant="card" tone="elevated" icon={Building2} title="Facturar a nombre de">
+      <RadioGroup value={value} onValueChange={handleChange} className="gap-2">
+        <label className="flex items-center gap-2 text-sm text-ink">
+          <RadioGroupItem value="default" />
+          Cuenta del cliente (default)
+        </label>
+        {perfiles.map((p) => (
+          <label key={`perfil-${p.id}`} className="flex items-center gap-2 text-sm text-ink">
+            <RadioGroupItem value={`perfil-${p.id}`} />
+            {p.etiqueta || p.razon_social || p.cuit}
+          </label>
+        ))}
+        {productoras.map((pr) => (
+          <label key={`productora-${pr.id}`} className="flex items-center gap-2 text-sm text-ink">
+            <RadioGroupItem value={`productora-${pr.id}`} />
+            {pr.nombre || pr.razon_social || pr.cuit}
+          </label>
+        ))}
+      </RadioGroup>
+    </Section>
   );
 }
 

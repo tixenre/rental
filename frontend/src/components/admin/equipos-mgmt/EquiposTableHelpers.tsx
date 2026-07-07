@@ -1,14 +1,26 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
-import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/design-system/ui/select";
 import { useUsdRate, calcularPrecioJornada } from "@/hooks/useSettings";
 
-import { adminApi, type Equipo, type EquipoInput, type FaltaField } from "@/lib/admin/api";
+import {
+  adminApi,
+  type Equipo,
+  type EquipoInput,
+  type FaltaField,
+  type Categoria,
+} from "@/lib/admin/api";
 
 /**
  * Editor inline del stock (cantidad). Click → input numérico → Enter/blur guarda.
@@ -59,6 +71,82 @@ export function StockInline({ equipo, onSaved }: { equipo: Equipo; onSaved: () =
       disabled={saveMut.isPending}
       className="h-7 w-14 ml-auto text-right text-xs tabular-nums px-2 py-0"
     />
+  );
+}
+
+/**
+ * Editor inline de la categoría (dropdown). Reemplaza TODAS las categorías
+ * del equipo por la elegida — mismo criterio "reemplaza" que el bulk
+ * "Asignar categoría…" de la barra flotante (`set_categoria_masivo`). Si el
+ * equipo tenía más de una asignada, el "+N" avisa antes de que el cambio
+ * las deje en una sola (la ficha completa, con checkboxes multi-categoría,
+ * sigue siendo `EquipoFormDialogV2` — esto es el atajo rápido de la lista).
+ */
+export function CategoriaInline({
+  equipo,
+  categorias,
+  onSaved,
+}: {
+  equipo: Equipo;
+  categorias: Categoria[];
+  onSaved: () => void;
+}) {
+  const catsFlat = useMemo(() => {
+    const roots = categorias
+      .filter((c) => (c.parent_id ?? null) == null && c.id != null)
+      .sort((a, b) => a.prioridad - b.prioridad || a.nombre.localeCompare(b.nombre));
+    const out: { id: number; path: string }[] = [];
+    for (const root of roots) {
+      out.push({ id: root.id!, path: root.nombre });
+      const hijos = categorias
+        .filter((c) => c.parent_id === root.id && c.id != null)
+        .sort((a, b) => a.prioridad - b.prioridad || a.nombre.localeCompare(b.nombre));
+      for (const h of hijos) out.push({ id: h.id!, path: `${root.nombre} › ${h.nombre}` });
+    }
+    return out;
+  }, [categorias]);
+
+  const actual = equipo.categorias?.[0];
+  const extra = (equipo.categorias?.length ?? 0) - 1;
+
+  const saveMut = useMutation({
+    mutationFn: (categoriaId: number | null) =>
+      adminApi.setCategorias(equipo.id, categoriaId != null ? [categoriaId] : []),
+    onSuccess: () => onSaved(),
+    onError: (e: Error) => toast.error(`No se pudo actualizar categoría: ${e.message}`),
+  });
+
+  return (
+    <div className="flex items-center gap-1">
+      <Select
+        value={actual?.id != null ? String(actual.id) : "__none"}
+        onValueChange={(v) => saveMut.mutate(v === "__none" ? null : Number(v))}
+        disabled={saveMut.isPending}
+      >
+        <SelectTrigger className="h-7 text-xs">
+          <SelectValue placeholder="Sin categoría" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none">Sin categoría</SelectItem>
+          {catsFlat.map((c) => (
+            <SelectItem key={c.id} value={String(c.id)}>
+              {c.path}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {extra > 0 && (
+        <span
+          className="shrink-0 text-2xs text-muted-foreground"
+          title={`También en: ${equipo.categorias
+            ?.slice(1)
+            .map((c) => c.nombre)
+            .join(", ")} — cambiar acá reemplaza todas por la elegida`}
+        >
+          +{extra}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -279,37 +367,6 @@ const FALTA_LABELS: Record<FaltaField, string> = {
   serie: "sin número de serie",
   valor_reposicion: "sin valor de reposición",
 };
-
-export function KpiCard({
-  label,
-  value,
-  meta,
-  warn = false,
-}: {
-  label: string;
-  value: number;
-  meta: string;
-  warn?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border bg-card px-3.5 py-3 sm:px-4 sm:py-3.5",
-        warn
-          ? "border-[color-mix(in_oklch,var(--amber)_45%,transparent)] bg-amber-soft/40"
-          : "hairline",
-      )}
-    >
-      <div className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground">
-        {label}
-      </div>
-      <div className="font-display text-2xl sm:text-3xl font-black text-ink tabular-nums leading-none mt-1">
-        {value}
-      </div>
-      <div className="font-sans text-xs text-muted-foreground mt-1">{meta}</div>
-    </div>
-  );
-}
 
 export function FaltaBanner({
   falta,

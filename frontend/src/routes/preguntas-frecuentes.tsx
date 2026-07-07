@@ -8,7 +8,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/design-system/ui/accordion";
-import { PublicLayout } from "@/components/rental/PublicLayout";
+import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { useFaqGroups } from "@/data/faq";
 import { whatsappUrl } from "@/data/contact";
 import { SITE_URL } from "@/lib/site";
@@ -74,9 +74,7 @@ function FaqPage() {
   return (
     <PublicLayout>
       <div className="px-6 lg:px-12 py-12 max-w-3xl mx-auto w-full">
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Ayuda
-        </div>
+        <div className="t-eyebrow">Ayuda</div>
         <h1 className="mt-2 wordmark text-5xl text-ink">Preguntas frecuentes</h1>
         <p className="mt-3 text-muted-foreground">
           Todo lo que solés preguntar antes de reservar. Si tu duda no está acá, escribinos por
@@ -86,9 +84,7 @@ function FaqPage() {
         <div className="mt-10 space-y-10">
           {groups.map((group) => (
             <section key={group.title}>
-              <h2 className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-3">
-                {group.title}
-              </h2>
+              <h2 className="t-section mb-3">{group.title}</h2>
               <Accordion type="multiple" className="rounded-lg border hairline divide-y hairline">
                 {group.items.map((item, i) => (
                   <AccordionItem
@@ -96,10 +92,10 @@ function FaqPage() {
                     value={`${group.title}-${i}`}
                     className="border-0 px-4"
                   >
-                    <AccordionTrigger className="text-left text-sm font-medium text-ink hover:no-underline py-4">
+                    <AccordionTrigger className="text-left text-base font-medium text-ink hover:no-underline py-4">
                       {item.q}
                     </AccordionTrigger>
-                    <AccordionContent className="text-sm text-muted-foreground pb-4 leading-relaxed">
+                    <AccordionContent className="text-base text-muted-foreground pb-4 leading-relaxed">
                       {item.a}
                     </AccordionContent>
                   </AccordionItem>

@@ -23,7 +23,9 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-import { PublicLayout } from "@/components/rental/PublicLayout";
+import { PublicLayout } from "@/components/rental/shell/PublicLayout";
+import { Skeleton } from "@/design-system/ui/skeleton";
+import { Button } from "@/design-system/ui/button";
 import { EmptyImage } from "@/components/rental/EmptyImage";
 import { KitSection, BoxItemsSection } from "@/components/rental/KitSection";
 import { KeywordChips } from "@/components/rental/KeywordChips";
@@ -217,8 +219,8 @@ function EquipoPage() {
   if (isLoading) {
     return (
       <PublicLayout>
-        <div className="max-w-4xl mx-auto w-full px-6 py-10 text-center text-muted-foreground">
-          Cargando equipo…
+        <div className="max-w-7xl mx-auto w-full px-4 md:px-8 py-6 md:py-10">
+          <EquipoDetailSkeleton />
         </div>
       </PublicLayout>
     );
@@ -250,6 +252,29 @@ function EquipoPage() {
         <EquipmentDetailBody item={equipo} />
       </div>
     </PublicLayout>
+  );
+}
+
+// ── Skeleton — espeja el shape real (galería + precio a la izq., specs a la
+//    der. en desktop) para que la carga no salte de layout al llegar la data.
+function EquipoDetailSkeleton() {
+  return (
+    <div>
+      <Skeleton className="h-3 w-24 mb-3" />
+      <Skeleton className="h-9 w-2/3 mb-6" />
+      <div className="space-y-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-10 md:items-start">
+        <div className="space-y-6">
+          <Skeleton className="aspect-[4/3] w-full rounded-xl" />
+          <Skeleton className="h-16 w-full rounded-xl" />
+        </div>
+        <div className="space-y-3">
+          <Skeleton className="h-5 w-1/3" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -420,14 +445,16 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
         </div>
         <div className="flex items-start justify-between gap-3">
           <h1 className="font-display text-3xl md:text-4xl text-ink leading-tight">{item.name}</h1>
-          <button
+          <Button
+            variant="outline"
+            shape="pill"
             onClick={handleShare}
-            className="flex items-center justify-center gap-1.5 rounded-full border hairline px-3 py-1.5 text-xs hover:border-foreground/40 transition shrink-0 min-h-11 min-w-11 sm:min-w-0"
+            className="min-h-11 min-w-11 h-auto py-1.5 text-xs sm:min-w-0"
             aria-label="Compartir"
           >
             {copied ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
             <span className="hidden sm:inline">{copied ? "Copiado" : "Compartir"}</span>
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -525,7 +552,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           )}
 
           {/* Precio + agregar (desktop — en la col visual) */}
-          <div className="hidden md:flex items-center justify-between gap-3 rounded-xl border hairline bg-surface px-4 py-3">
+          <div className="hidden md:flex items-center justify-between gap-3 card px-4 py-3">
             <PriceBlock perDay={item.pricePerDay} jornadas={jornadas} conIva={conIva} size="lg" />
             <CartButtons
               qty={qty}
@@ -564,9 +591,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           {/* Descripción */}
           {desc && (
             <section className="space-y-2">
-              <h2 className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                Descripción
-              </h2>
+              <h2 className="t-section">Descripción</h2>
               <p className="text-base leading-relaxed text-foreground/90 whitespace-pre-line">
                 {shownDesc}
               </p>
@@ -606,7 +631,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
                 aria-expanded={specsOpen}
                 className="flex w-full items-center justify-between gap-3 py-1 text-left transition hover:text-ink"
               >
-                <h2 className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+                <h2 className="t-section">
                   Ficha técnica
                   <span className="ml-2 text-ink/40">({item.specs.length})</span>
                 </h2>
@@ -618,8 +643,8 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
                 <dl className="border-t hairline pt-2">
                   {item.specs.map((s, i) => (
                     <div key={i} className="flex justify-between gap-4 border-b hairline py-2">
-                      <dt className="text-sm text-muted-foreground shrink-0">{s.label}</dt>
-                      <dd className="text-sm font-mono tabular-nums text-ink text-right">
+                      <dt className="text-base text-muted-foreground shrink-0">{s.label}</dt>
+                      <dd className="text-base font-mono tabular-nums text-ink text-right">
                         {s.value}
                       </dd>
                     </div>
@@ -676,13 +701,14 @@ function CartButtons({
 }) {
   if (qty === 0) {
     return (
-      <button
+      <Button
+        variant="primary"
         onClick={() => !sinStock && onAdd()}
         disabled={sinStock}
-        className="inline-flex items-center justify-center gap-1.5 min-h-11 rounded-md bg-ink px-4 py-2.5 text-sm font-medium uppercase tracking-wider text-[var(--area-accent)] transition hover:bg-foreground disabled:cursor-not-allowed disabled:opacity-40"
+        className="min-h-11 uppercase tracking-wider text-[var(--area-accent)] hover:bg-foreground hover:text-[var(--area-accent)]"
       >
         <Plus className="h-4 w-4" /> {sinStock ? "Sin stock" : "Agregar"}
-      </button>
+      </Button>
     );
   }
   // Stepper canónico de la librería (equipment/shared) — el único de la web.
@@ -701,14 +727,12 @@ function CartButtons({
 function FichaPillSection({ title, items }: { title: string; items: string[] }) {
   return (
     <section className="space-y-2">
-      <h2 className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-        {title}
-      </h2>
+      <h2 className="t-section">{title}</h2>
       <div className="flex flex-wrap gap-1.5">
         {items.map((it, i) => (
           <span
             key={`${title}-${i}`}
-            className="inline-flex items-center rounded-md border hairline bg-background px-2 py-1 text-xs text-ink/90"
+            className="inline-flex items-center card px-2 py-1 text-xs text-ink/90"
           >
             {it}
           </span>

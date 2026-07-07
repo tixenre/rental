@@ -28,7 +28,7 @@ router = APIRouter(tags=["productoras"])
 
 _CAMPOS_PRODUCTORA = (
     "id, cuit, perfil_impuestos, razon_social, domicilio_fiscal, "
-    "email_facturacion, notas, verificado_at, created_at, updated_at"
+    "email_facturacion, notas, nombre, redes_sociales, verificado_at, created_at, updated_at"
 )
 
 
@@ -54,8 +54,15 @@ def listar_productoras(request: Request, q: Optional[str] = None):
 
 
 class ProductoraCreate(BaseModel):
-    cuit: str
+    # Opcional (#1251 Fase 3): "podemos crear una productora sin el CUIT, solo
+    # el nombre" — sin cuit queda como BORRADOR (no facturable hasta asignarle
+    # uno, ver `productoras_vinculadas(solo_facturables=True)`).
+    cuit: Optional[str] = None
     notas: Optional[str] = None
+    # Manuales, no vienen de AFIP (#1251 Fase 2) — razon_social puede quedar
+    # vacía para ciertos CUIT, "nombre" es el label amigable que siempre queda.
+    nombre: Optional[str] = None
+    redes_sociales: Optional[str] = None
 
 
 @router.post("/admin/productoras", status_code=201)
@@ -63,16 +70,33 @@ class ProductoraCreate(BaseModel):
 @map_pg_errors
 def crear_productora(request: Request, body: ProductoraCreate):
     """Alta bloqueante: si AFIP no puede confirmar el CUIT, 422 con el motivo
-    real — no se crea nada a medias."""
+    real — no se crea nada a medias. Sin CUIT, se crea directo como borrador
+    (necesita `nombre` para ser identificable)."""
     require_admin(request)
-    cuit = body.cuit.strip()
+    cuit = (body.cuit or "").strip() or None
+
+    if cuit is None:
+        if not (body.nombre or "").strip():
+            raise HTTPException(400, "Una productora sin CUIT necesita al menos un nombre.")
+        with get_db() as conn:
+            row = conn.execute(
+                f"""INSERT INTO productoras (nombre, notas, redes_sociales)
+                    VALUES (%s, %s, %s)
+                    RETURNING {_CAMPOS_PRODUCTORA}""",
+                (body.nombre, body.notas, body.redes_sociales),
+            ).fetchone()
+            conn.commit()
+        return row_to_dict(row)
+
     if not cuil_valido(cuit):
         raise HTTPException(400, "CUIT inválido — verificá el dígito verificador.")
 
     from services.facturacion.padron import verificar_y_crear_productora
     with get_db() as conn:
         try:
-            verificar_y_crear_productora(cuit, conn, notas=body.notas)
+            verificar_y_crear_productora(
+                cuit, conn, notas=body.notas, nombre=body.nombre, redes_sociales=body.redes_sociales
+            )
         except RuntimeError as e:
             conn.rollback()
             raise HTTPException(422, f"AFIP no pudo confirmar este CUIT: {e}")
@@ -110,7 +134,14 @@ class ProductoraUpdate(BaseModel):
     # Re-verifica el CUIT contra ARCA (refresca razón social/domicilio/condición
     # IVA) — no se edita a mano, mismo criterio "AFIP siempre gana" del resto.
     reverificar: bool = False
+    # Asigna un CUIT a una productora BORRADOR (#1251 Fase 3) — solo válido si
+    # la productora todavía no tiene uno; no reemplaza un CUIT ya verificado.
+    cuit: Optional[str] = None
     notas: Optional[str] = None
+    # Manuales, no vienen de AFIP (#1251 Fase 2) — se pueden editar con o sin
+    # reverificar (a diferencia de razon_social/domicilio_fiscal/perfil_impuestos).
+    nombre: Optional[str] = None
+    redes_sociales: Optional[str] = None
 
 
 @router.patch("/admin/productoras/{productora_id}")
@@ -126,18 +157,56 @@ def actualizar_productora(productora_id: int, request: Request, body: Productora
             raise HTTPException(404, "Productora no encontrada")
         cuit = row["cuit"]
 
-        if body.reverificar:
-            from services.facturacion.padron import verificar_y_crear_productora
+        if body.cuit and not cuit:
+            nuevo_cuit = body.cuit.strip()
+            if not cuil_valido(nuevo_cuit):
+                raise HTTPException(400, "CUIT inválido — verificá el dígito verificador.")
+            from services.facturacion.padron import verificar_y_asignar_cuit
             try:
-                verificar_y_crear_productora(cuit, conn, notas=body.notas)
+                verificar_y_asignar_cuit(productora_id, nuevo_cuit, conn)
             except RuntimeError as e:
                 conn.rollback()
                 raise HTTPException(422, f"AFIP no pudo confirmar este CUIT: {e}")
-        elif body.notas is not None:
-            conn.execute(
-                "UPDATE productoras SET notas = %s, updated_at = now() WHERE id = %s",
-                (body.notas, productora_id),
-            )
+            if body.notas is not None or body.nombre is not None or body.redes_sociales is not None:
+                updates = {
+                    k: v
+                    for k, v in {
+                        "notas": body.notas,
+                        "nombre": body.nombre,
+                        "redes_sociales": body.redes_sociales,
+                    }.items()
+                    if v is not None
+                }
+                set_clause = ", ".join(f"{k}=%s" for k in updates) + ", updated_at=now()"
+                conn.execute(
+                    f"UPDATE productoras SET {set_clause} WHERE id = %s",
+                    list(updates.values()) + [productora_id],
+                )
+        elif body.reverificar:
+            from services.facturacion.padron import verificar_y_crear_productora
+            try:
+                verificar_y_crear_productora(
+                    cuit, conn, notas=body.notas, nombre=body.nombre, redes_sociales=body.redes_sociales
+                )
+            except RuntimeError as e:
+                conn.rollback()
+                raise HTTPException(422, f"AFIP no pudo confirmar este CUIT: {e}")
+        else:
+            updates = {
+                k: v
+                for k, v in {
+                    "notas": body.notas,
+                    "nombre": body.nombre,
+                    "redes_sociales": body.redes_sociales,
+                }.items()
+                if v is not None
+            }
+            if updates:
+                set_clause = ", ".join(f"{k}=%s" for k in updates) + ", updated_at=now()"
+                conn.execute(
+                    f"UPDATE productoras SET {set_clause} WHERE id = %s",
+                    list(updates.values()) + [productora_id],
+                )
         conn.commit()
         result = conn.execute(
             f"SELECT {_CAMPOS_PRODUCTORA} FROM productoras WHERE id = %s", (productora_id,)

@@ -1,20 +1,12 @@
 /**
  * Sección Contenedores & Datos — superficies que envuelven y muestran datos.
- * Card (panel con header/footer), Table (primitivo), AdminTable (shell de tabla
- * del back-office con column-def), Alert (avisos inline) y Progress (barra determinada).
+ * Table (primitivo), AdminTable (shell de tabla del back-office con
+ * column-def) y Alert (avisos inline).
  */
 import { useState } from "react";
 
 import { type CatalogSection } from "../types";
 import { Caption, Stack } from "../catalog-kit";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from "@/design-system/ui/card";
 import {
   Table,
   TableHeader,
@@ -26,8 +18,6 @@ import {
   TableFooter,
 } from "@/design-system/ui/table";
 import { Alert, AlertTitle, AlertDescription } from "@/design-system/ui/alert";
-import { Progress } from "@/design-system/ui/progress";
-import { Button } from "@/design-system/ui/button";
 import { Info, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import { AdminTable, type Column } from "@/components/admin/AdminTable";
 
@@ -92,34 +82,8 @@ function AdminTableDemo() {
 export const containersSection: CatalogSection = {
   id: "contenedores",
   title: "Contenedores & Datos",
-  hint: "Superficies que envuelven y muestran datos: panel, tabla, aviso y barra de progreso.",
+  hint: "Superficies que envuelven y muestran datos: tabla y aviso.",
   specimens: [
-    {
-      name: "Card",
-      files: ["design-system/ui/card.tsx"],
-      blurb: "Panel con header/contenido/footer. Para agrupar info en bloques con borde y sombra.",
-      render: () => (
-        <Card className="max-w-sm">
-          <CardHeader>
-            <CardTitle>Pedido #1042</CardTitle>
-            <CardDescription>Confirmado · retira el 12/07</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              3 ítems · seña parcial cobrada. Falta el saldo antes del retiro.
-            </p>
-          </CardContent>
-          <CardFooter className="gap-2">
-            <Button variant="primary" size="sm">
-              Ver pedido
-            </Button>
-            <Button variant="outline" size="sm">
-              Cobrar saldo
-            </Button>
-          </CardFooter>
-        </Card>
-      ),
-    },
     {
       name: "Table",
       files: ["design-system/ui/table.tsx"],
@@ -190,27 +154,6 @@ export const containersSection: CatalogSection = {
               El cliente debe el saldo y el retiro es mañana. Cobrá antes de entregar.
             </AlertDescription>
           </Alert>
-        </Stack>
-      ),
-    },
-    {
-      name: "Progress",
-      files: ["design-system/ui/progress.tsx"],
-      blurb: "Barra determinada por value 0–100. Para avances medibles (carga, cobrado vs. total).",
-      render: () => (
-        <Stack className="max-w-md">
-          <div className="space-y-1.5">
-            <Progress value={25} />
-            <Caption>25%</Caption>
-          </div>
-          <div className="space-y-1.5">
-            <Progress value={60} />
-            <Caption>60%</Caption>
-          </div>
-          <div className="space-y-1.5">
-            <Progress value={100} />
-            <Caption>100%</Caption>
-          </div>
         </Stack>
       ),
     },

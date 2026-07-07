@@ -1,6 +1,6 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { AdminSection } from "@/components/admin/AdminSection";
 import { EmailsAdmin } from "@/components/admin/email/EmailsAdmin";
@@ -12,8 +12,6 @@ import { HorariosSection } from "@/components/admin/settings/HorariosSection";
 import { FaqSection } from "@/components/admin/settings/FaqSection";
 import { RankingSection } from "@/components/admin/settings/RankingSection";
 import { CambioYPreciosSection } from "@/components/admin/settings/CambioYPreciosSection";
-import { PasskeysSection } from "@/components/admin/settings/PasskeysSection";
-import { SessionsSection } from "@/components/admin/settings/SessionsSection";
 import { FacturacionSection } from "@/components/admin/settings/FacturacionSection";
 
 export const Route = createLazyFileRoute("/admin/settings")({
@@ -26,24 +24,12 @@ function SettingsPage() {
   return (
     <AdminPage
       title="Settings"
-      maxW="max-w-4xl"
+      maxW="detail"
       description="Configuración del sistema y herramientas de mantenimiento."
     >
       <div className="space-y-6">
         <AdminSection title="Descuentos por jornadas" storageKey="settings:descuentos">
           <DescuentosJornadaSection />
-        </AdminSection>
-
-        <AdminSection
-          title="Claves de acceso (acceso sin contraseña)"
-          storageKey="settings:passkeys"
-          defaultOpen={false}
-        >
-          <PasskeysSection />
-        </AdminSection>
-
-        <AdminSection title="Sesiones activas" storageKey="settings:sesiones" defaultOpen={false}>
-          <SessionsSection />
         </AdminSection>
 
         <AdminSection title="Horarios" storageKey="settings:horarios">

@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminApi, type Equipo, type EquipoInput } from "@/lib/admin/api";
 import { EquipoFormDialogV2 } from "@/components/admin/equipo-form-v2/EquipoFormDialogV2";
 import { popEquiposReturnSearch } from "@/lib/admin/equiposReturnSearch";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export const Route = createLazyFileRoute("/admin/equipos/nuevo")({
   component: NuevoEquipoRoute,

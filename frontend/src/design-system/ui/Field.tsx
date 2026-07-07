@@ -48,3 +48,14 @@ export function Field({
     </div>
   );
 }
+
+/**
+ * FieldLabel — label suelto en voz eyebrow (mono/uppercase/tracked), para
+ * cuando un form denso (filtros, grillas compactas) quiere esa voz en vez
+ * del `label` plano que ya trae `Field`. Consolida las 4 copias locales que
+ * habían aparecido en el repo. Uso: `<div className="space-y-1"><FieldLabel>
+ * Desde</FieldLabel><Input .../></div>` — sin envolver el control.
+ */
+export function FieldLabel({ children, className }: { children: ReactNode; className?: string }) {
+  return <label className={cn("block t-eyebrow", className)}>{children}</label>;
+}

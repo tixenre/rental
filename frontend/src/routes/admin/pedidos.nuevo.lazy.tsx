@@ -1,9 +1,9 @@
-import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
+import { createLazyFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Spinner } from "@/design-system/ui/spinner";
 import { adminApi } from "@/lib/admin/api";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export const Route = createLazyFileRoute("/admin/pedidos/nuevo")({
   component: NuevoPedidoPage,
@@ -14,6 +14,10 @@ function NuevoPedidoPage() {
   useDocumentTitle("Nuevo pedido · Back-office");
   const navigate = useNavigate();
   const started = useRef(false);
+  // ?cliente_id=123 (ej. "Nuevo pedido" desde la ficha de un cliente) precarga
+  // el borrador ya vinculado — el editor lo muestra solo (contacto en vivo,
+  // enriquecido por el backend).
+  const search = useSearch({ strict: false }) as { cliente_id?: string | number };
 
   useEffect(() => {
     if (started.current) return;
@@ -24,10 +28,12 @@ function NuevoPedidoPage() {
     const manana = new Date(hoy);
     manana.setDate(manana.getDate() + 1);
     const ymd = (d: Date) => d.toISOString().slice(0, 10);
+    const clienteId = Number(search.cliente_id);
     adminApi
       .createPedido({
         estado: "borrador",
         cliente_nombre: "",
+        cliente_id: Number.isFinite(clienteId) && clienteId > 0 ? clienteId : undefined,
         fecha_desde: ymd(hoy),
         fecha_hasta: ymd(manana),
         items: [],
@@ -39,7 +45,7 @@ function NuevoPedidoPage() {
         toast.error(`No se pudo crear el borrador: ${e.message}`);
         navigate({ to: "/admin/pedidos", replace: true });
       });
-  }, [navigate]);
+  }, [navigate, search.cliente_id]);
 
   return (
     <div className="flex items-center justify-center h-[60vh] text-muted-foreground gap-2">

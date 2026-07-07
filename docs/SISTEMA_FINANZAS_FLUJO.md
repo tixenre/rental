@@ -115,18 +115,23 @@ debe depender de un route).
   del precio de línea persistido (Fase 2).
 - Facturación: candados propios en `docs/SISTEMA_FACTURACION.md`.
 
-## Hallazgos de la auditoría cruzada (2026-07-02) — estado: por priorizar con el dueño
+## Hallazgos de la auditoría cruzada (2026-07-02) — iniciativa #1184 CERRADA (2026-07-03)
 
 Verificado con 6 auditorías paralelas independientes (no solo lectura de código — cruzando
-call-sites reales). Priorizado por impacto real, no por tier de origen.
+call-sites reales). Priorizado por impacto real, no por tier de origen. **Todos los ítems marcados
+✅/~~tachado~~ están resueltos y mergeados a `dev`** (tracking #1184, cerrado 2026-07-03). Lo que
+queda abierto son los ítems 5 (parcial, alcance acotado a propósito), 6 (aclarado con el dueño: NO es
+un bug — el descuento ganador depende de cliente+fechas, no hay forma de mostrar un número confiable
+antes del carrito; la forma exacta de comunicarlo, ej. un aviso sin número, queda abierta si se
+quiere explorar), 7 (dormido), y 11/13/14 (bajo impacto, documentados) — ninguno es un bug activo
+conocido hoy.
 
-### 🚨 Descubrimiento crítico de proceso (no de código)
+### 🚨 Descubrimiento crítico de proceso (no de código) — ✅ RESUELTO
 **El PR #1181 — el fix ORIGINAL del bug #405 (editor de pedidos cotizando con precio de catálogo en
-vez del precio de línea congelado) — nunca se mergeó.** Sigue **abierto, sin tocar `dev` ni `main`**
-(confirmado: `respetar_precio_item` no existe en ningún branch real, solo en la rama de PR sin
-mergear). El registro en `MEMORIA.md`/`DECISIONES.md` lo daba por shippeado — era incorrecto. **El
-bug #405 está potencialmente activo en producción hoy mismo.** Mergeable state: `clean`. Prioridad
-máxima: mergear #1181 antes que cualquier otra cosa de esta lista.
+vez del precio de línea congelado) —** se creyó sin mergear al momento de esta auditoría, pero
+**sí se mergeó a `dev` el mismo día** (commit `9cc4924`, 2026-07-05) — `respetar_precio_item` está
+presente y activo en `backend/routes/alquileres/cotizacion.py`. **El bug #405 está resuelto, no
+activo.** Corrección registrada en `MEMORIA.md` (entrada 2026-07-02, "Auditoría cruzada de plata").
 
 ### Bugs reales (activos hoy)
 1. ~~**`_enriquecer_pedido_con_total` (`routes/alquileres/core.py`) ignora `cobro_modo`**~~ —
@@ -171,12 +176,16 @@ máxima: mergear #1181 antes que cualquier otra cosa de esta lista.
      precio cacheado, no el bug concreto). Documentado como fase futura opcional.
    - En ambos casos lo persistido/cobrado sigue siendo correcto — es el número que se MUESTRA el que
      puede no coincidir.
-6. **`frontend/src/lib/pricing.ts`** — TODO explícito en el código dice "por ahora es lineal, sin
-   descuentos" (#73) pero el backend YA implementó descuentos hace tiempo. Se usa en `PriceBlock`
-   (la pieza canónica de precio del catálogo, `equipment/shared/`) — el precio que ve el cliente en
-   la card/ficha **no incluye descuentos**, mientras el total real al cotizar/confirmar sí. Puede ser
-   intencional ("precio de lista" vs. "precio final"), pero vale la pena que el dueño lo confirme —
-   hoy es discrepancia visual entre catálogo y checkout.
+6. **`frontend/src/lib/pricing.ts`** — ✅ **aclarado con el dueño (2026-07-05), NO es un bug.** Sigue
+   siendo pura multiplicación (`perDay × jornadas × qty`, sin descuento); lo usa `PriceBlock` (la
+   pieza canónica de precio del catálogo, `equipment/shared/`), así que el precio que ve el cliente en
+   la card/ficha no incluye descuentos, mientras el total real al cotizar/confirmar sí. Motivo: los
+   descuentos NO son acumulables (gana el mayor entre cliente/jornadas/manual) y cuál gana depende de
+   **quién** está mirando y **cuántos días** eligió — ninguno de los dos se conoce en el catálogo. Mostrar
+   el descuento por jornadas solo (sin saber si el de cliente es mayor) sería mostrar un número que
+   después puede no cumplirse. **Decisión: el catálogo muestra precio de lista; el descuento real
+   aparece recién en el carrito**, una vez que el sistema conoce cliente + fechas. Explorar un aviso
+   sin número (ej. "puede tener descuento") queda como mejora opcional futura, no como fix pendiente.
 
 ### Bug dormido (no activo hoy, pero listo para revivir)
 7. **`PedidoPage.tsx` (editor de pedido del portal CLIENTE)** — mismo patrón que el bug original
@@ -208,11 +217,18 @@ máxima: mergear #1181 antes que cualquier otra cosa de esta lista.
 11. `/api/cotizar`, rama de línea personalizada (`equipo_id=None`) — no chequea `es_admin` en ese
     punto específico del código (aunque los endpoints que sí persisten ya exigen `require_admin` por
     fuera). Bajo riesgo real hoy; vale la pena que quede explícito si se toca ese código.
-12. **N+1 en 2 caminos que resuelven precio por ítem** — `services/carrito/readiness.py` (creación
-    real de pedido del cliente, no solo preview) y `services/carrito/activos.py` (heartbeat del
-    carrito, se llama en cada autosave) — ninguno usa `precios_combo_batch`, que ya existe y evita
-    exactamente este patrón en el catálogo. El de `/api/cotizar` es DELIBERADO (revertido un batch
-    tras causar totales en $0 en prod, incidente #643) — ese no es un hallazgo, es una decisión.
+12. ~~**N+1 en `services/carrito/readiness.py`**~~ — **RESUELTO.** `precios_catalogo_para_reserva`
+    (creación real de pedido del cliente, no solo preview) resolvía el gate de visibilidad + el
+    precio de cada ítem del carrito uno por uno. Nueva `services.precios.precios_efectivos_batch`
+    (mezcla equipos simples + combos en 2 queries totales, `= ANY(%s)` — mismo patrón ya probado de
+    `precios_combo_batch`/`tipos_equipo_batch`, NO el `IN (...)` armado a mano que #643 revirtió en
+    `/api/cotizar`) + el gate de visibilidad batcheado (`_equipos_visibles_catalogo`, mismo predicado
+    que `equipo_visible_catalogo`, sin duplicar el SQL). Candado:
+    `test_precios_batch_db.py` (Postgres real, confirma resultado byte-idéntico al ítem-por-ítem para
+    un mix simple+combo). `services/carrito/activos.py` (heartbeat del carrito, autosave) **sigue
+    ítem-por-ítem a propósito** — ya evaluado y aceptado (MEMORIA 2026-07-03: carrito de un heartbeat
+    es chico, no hot-path). El de `/api/cotizar` sigue siendo DELIBERADO (mismo motivo, incidente #643)
+    — ninguno de los dos es un hallazgo pendiente.
 13. `ingresos_derivados` (contabilidad) vs. `SALDADO_CTE` (liquidación) — dos queries SQL
     independientes sobre `alquiler_pagos` (percibido vs. devengado, intencional) que podrían divergir
     si el criterio de filtrado de una cambia sin replicarse en la otra. Documentado, no roto hoy.
@@ -237,6 +253,6 @@ incidente real en prod), no un descuido.
 
 ---
 
-_Reglas/criterio en MEMORIA: **auditoría cruzada de plata (2026-07-02, a proponer)**. Motores
+_Reglas/criterio en MEMORIA: **auditoría cruzada de plata (2026-07-02)**. Motores
 referenciados: `backend/contabilidad/CLAUDE.md`, `backend/reservas/CLAUDE.md`,
-`docs/SISTEMA_FACTURACION.md`, `docs/SISTEMA_CARRITO.md`. Iniciativa: #1184 (fase 3)._
+`docs/SISTEMA_FACTURACION.md`, `docs/SISTEMA_CARRITO.md`. Iniciativa: #1184 (CERRADA 2026-07-03)._

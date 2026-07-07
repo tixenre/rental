@@ -36,6 +36,11 @@
   --color-border: oklch(0.18 0.01 60 / 12%);
   --color-input: oklch(0.18 0.01 60 / 16%);
 
+  /* ── Overlays ──────────────────────────────────────────── */
+  /* Scrim de sheets/modales hechos a mano (fondo oscuro detrás del panel) —
+     fuente única, reemplaza los rgba/oklch a mano que había en 3 lugares. */
+  --color-scrim: rgba(20, 16, 12, 0.5);
+
   /* ── shadcn semantic ───────────────────────────────────── */
   --color-primary: oklch(0.18 0.01 60);
   --color-primary-foreground: oklch(0.985 0.005 90);

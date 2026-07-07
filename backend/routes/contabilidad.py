@@ -24,6 +24,7 @@ from contabilidad.queries.categorias import listar_categorias
 from contabilidad.commands.movimientos import (
     actualizar_comprobante,
     anular_movimiento,
+    crear_cambio_divisa,
     crear_movimiento,
     editar_movimiento,
 )
@@ -250,6 +251,16 @@ class AnularBody(BaseModel):
     motivo: str = Field(max_length=500)
 
 
+class CambioDivisaCreate(BaseModel):
+    cuenta_origen_id: int = Field(gt=0, lt=2_147_483_647)
+    cuenta_destino_id: int = Field(gt=0, lt=2_147_483_647)
+    monto_origen: int | None = Field(default=None, gt=0, le=2_000_000_000)
+    monto_destino: int | None = Field(default=None, gt=0, le=2_000_000_000)
+    cotizacion: float | None = Field(default=None, gt=0, le=1_000_000)
+    fecha: str | None = Field(default=None, max_length=10)
+    nota: str | None = Field(default=None, max_length=500)
+
+
 @router.get("/admin/contabilidad/movimientos")
 def get_movimientos(
     request: Request,
@@ -309,6 +320,33 @@ def post_movimiento(request: Request, body: MovimientoCreate):
             )
             conn.commit()
             return mov
+        except ValueError as e:
+            conn.rollback()
+            raise HTTPException(400, str(e))
+        except Exception:
+            conn.rollback()
+            raise
+
+
+@router.post("/admin/contabilidad/cambio-divisa")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
+def post_cambio_divisa(request: Request, body: CambioDivisaCreate):
+    """Compra/venta de divisa (ej. pesos → dólares): registra los dos `ajuste`
+    atados de `crear_cambio_divisa`. Mandá 2 de {monto_origen, monto_destino,
+    cotizacion} — el tercero se deriva."""
+    admin = require_admin(request)
+    with get_db() as conn:
+        try:
+            resultado = crear_cambio_divisa(
+                conn, cuenta_origen_id=body.cuenta_origen_id,
+                cuenta_destino_id=body.cuenta_destino_id,
+                monto_origen=body.monto_origen, monto_destino=body.monto_destino,
+                cotizacion=body.cotizacion, fecha=body.fecha, nota=body.nota,
+                por=admin.get("email"),
+            )
+            conn.commit()
+            return resultado
         except ValueError as e:
             conn.rollback()
             raise HTTPException(400, str(e))

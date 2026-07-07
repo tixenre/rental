@@ -172,6 +172,11 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
         pedido["items"] = [row_to_dict(i) for i in items]
         _add_componentes(conn, pedido["items"])
         _enriquecer_pedido_con_cliente(conn, pedido)
+        # Dato fiscal (CUIT): "Detalle de seguro" era el único de los 4
+        # documentos que no lo traía, pese a que su propia plantilla
+        # (`_cliente_block`, compartida con Remito/Checklist/Contrato) ya sabe
+        # mostrarlo si está presente. Hallazgo de auditoría, #1254.
+        _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
         # Check físico → agrupar por categoría (#814).
         pedido["grupos"] = _agrupar_items_por_categoria(conn, pedido["items"])
         return _albaran_html(pedido), _pedido_filename(pedido, doc="albaran")

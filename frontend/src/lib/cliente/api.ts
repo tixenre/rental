@@ -85,9 +85,12 @@ export const clienteApi = {
     }
   },
 
-  /** Disponibilidad por equipo en un rango, excluyendo el pedido actual. */
-  getDisponibilidad: (pedidoId: number, fechaDesde: string, fechaHasta: string) => {
+  /** Disponibilidad por equipo en un rango, excluyendo el pedido actual.
+   *  `items` ("id:cantidad,...", el draft de modificación): el backend descuenta
+   *  todo el draft con la expansión de kits del motor → valores con signo. */
+  getDisponibilidad: (pedidoId: number, fechaDesde: string, fechaHasta: string, items?: string) => {
     const sp = new URLSearchParams({ fecha_desde: fechaDesde, fecha_hasta: fechaHasta });
+    if (items) sp.set("items", items);
     return authedJson<Record<string, number>>(
       `/api/cliente/pedidos/${pedidoId}/disponibilidad?${sp.toString()}`,
     );

@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft,
+  ChevronDown,
   User,
   Calendar,
   Box,
@@ -82,38 +83,46 @@ import {
   type Equipo,
   type Factura,
 } from "@/lib/admin/api";
-import { FacturaBadge } from "@/components/kit/FacturaBadge";
+import { FacturaBadge } from "@/design-system/ui/FacturaBadge";
 import {
   usePedidoDraft,
   nuevoUidLinea,
   type DraftItem,
 } from "@/components/admin/pedido/usePedidoDraft";
+import { useDisponibilidadDraft } from "@/components/admin/pedido/useDisponibilidadDraft";
 import { ClienteAutocomplete } from "@/components/admin/pedido/ClienteAutocomplete";
 import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
-import { DateRangePickerModal } from "@/components/rental/DateRangePickerModal";
+import { DateRangePickerModal } from "@/components/rental/dates/DateRangePickerModal";
 import { computeJornadas, parseDateTimeParts, toLocalISO } from "@/lib/rental-dates";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
 import { SegmentedControl } from "@/design-system/ui/segmented-control";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { fmtArs } from "@/lib/format";
 import { nombreCliente } from "@/lib/cliente-nombre";
 import { EquipoComboSearch } from "@/components/admin/pedido/EquipoComboSearch";
 import { EnviarDocsDialog, DOCS_PEDIDO } from "@/components/admin/pedido/EnviarDocsDialog";
 import { RegistrarPagoModal } from "@/components/admin/pedido/RegistrarPagoModal";
-import { FLOW, transiciones, nextStep } from "@/lib/pedido-estados";
+import { FLOW, transiciones, nextStep, otrosDestinos } from "@/lib/pedido-estados";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/design-system/ui/dropdown-menu";
 import {
   PagoRow,
   ItemRow,
   BackLink,
   SaveIndicator,
-  Section,
-  FieldLabel,
   RailSection,
   BdRow,
+  FacturacionTargetSection,
 } from "@/components/admin/pedido/PedidoPageHelpers";
+import { Section } from "@/design-system/composites/Section";
+import { FieldLabel } from "@/design-system/ui/Field";
 
 export const Route = createLazyFileRoute("/admin/pedidos/$id")({
   component: PedidoEditorRoute,
@@ -160,18 +169,14 @@ function PedidoEditorPage() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  // Disponibilidad (stock) — enabled cuando hay ambas fechas
-  const dispoQ = useQuery({
-    queryKey: [
-      "admin",
-      "disponibilidad",
-      draft.datos?.fecha_desde,
-      draft.datos?.fecha_hasta,
-      pedidoId,
-    ],
-    queryFn: () =>
-      adminApi.getDisponibilidad(draft.datos!.fecha_desde, draft.datos!.fecha_hasta, pedidoId),
-    enabled: !!p && !!draft.datos?.fecha_desde && !!draft.datos?.fecha_hasta,
+  // Disponibilidad (stock) draft-aware — el backend descuenta TODO el draft con
+  // la expansión de kits del motor (fuente única). Enabled cuando hay fechas.
+  const dispo = useDisponibilidadDraft({
+    pedidoId,
+    fechaDesde: draft.datos?.fecha_desde,
+    fechaHasta: draft.datos?.fecha_hasta,
+    items: draft.items,
+    enabled: !!p,
   });
 
   // Cotización en vivo (useCotizacion) — recalcula al editar items/fechas/descuento
@@ -188,6 +193,13 @@ function PedidoEditorPage() {
     descuentoPct: draft.datos?.descuento_pct ?? null,
     descuentoTipo: draft.datos?.descuento_manual_tipo ?? null,
     descuentoMonto: draft.datos?.descuento_manual_monto ?? null,
+    // Pedido ya existente: el total en vivo tiene que coincidir con lo que
+    // persiste el guardado (`_recalcular_total_pedido`, que usa el precio de
+    // línea congelado) — no con el precio de catálogo de hoy. Regresión: este
+    // flag se agregó en #1181 (commit 21642e70) pero se perdió al tocar este
+    // mismo bloque en la Fase C de descuentos (#1219) — el editor volvió a
+    // mostrar el precio de catálogo en vivo en vez del congelado.
+    respetarPrecioItem: true,
     // Defensa en profundidad (sumado a `key={id}` en `PedidoEditorRoute`,
     // arriba): aunque este panel ya se remonta al cambiar de pedido, el hook
     // en sí queda protegido para cualquier otro consumidor que no lo haga.
@@ -240,6 +252,7 @@ function PedidoEditorPage() {
 
   const { datos, setDatos, items, setItems, saveStatus, estadoMut } = draft;
   const ns = nextStep(p);
+  const otrosDestinosPedido = otrosDestinos(p);
 
   const clienteSinVerificar = !!p.cliente_id && !p.cliente_dni_validado_at;
   const ESTADOS_CON_AVISO: PedidoEstado[] = ["confirmado", "retirado"];
@@ -305,19 +318,9 @@ function PedidoEditorPage() {
   const pagadoMonto = p.monto_pagado ?? 0;
   const restante = Math.max(0, total - pagadoMonto);
 
-  // stockMap: { equipo_id → { cantidad: libres, reservado: 0 } }
-  const stockMap: Record<string, { cantidad: number; reservado: number }> = Object.fromEntries(
-    Object.entries(dispoQ.data ?? {}).map(([k, v]) => [
-      k,
-      { cantidad: Number(v) || 0, reservado: 0 },
-    ]),
-  );
-
-  const hasOverstock = items.some((it) => {
-    const s = stockMap[String(it.equipo_id)];
-    if (!s) return false;
-    return it.cantidad > Math.max(0, s.cantidad - s.reservado);
-  });
+  // stockMap: { equipo_id → libres tras TODO el draft } (con signo; negativo =
+  // faltan unidades). hasOverstock lo deriva el hook con la misma regla.
+  const { stockMap, hasOverstock } = dispo;
 
   // Las líneas se identifican por `uid` (las personalizadas no tienen equipo_id).
   const updateItem = (uid: string, patch: Partial<DraftItem>) =>
@@ -408,7 +411,7 @@ function PedidoEditorPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-0 lg:gap-0 min-h-0">
         {/* ── Columna de trabajo ── */}
-        <div className="px-4 md:px-6 py-5 space-y-5 lg:border-r hairline pb-28 lg:pb-5">
+        <div className="min-w-0 px-4 md:px-6 py-5 space-y-5 lg:border-r hairline pb-28 lg:pb-5">
           {/* Banner solicitud pendiente (deferido — solo aviso read-only) */}
           {p.tiene_solicitud_pendiente && (
             <div className="flex items-start gap-2 rounded-lg border border-amber/40 bg-amber/5 px-3 py-2.5 text-sm">
@@ -424,7 +427,7 @@ function PedidoEditorPage() {
           )}
 
           {/* Cliente */}
-          <Section icon={User} title="Cliente">
+          <Section variant="card" tone="elevated" icon={User} title="Cliente">
             {/* Buscar ficha existente: al elegirla, el contacto y el descuento
                 se completan solos. También se puede tipear a mano abajo (pedido
                 sin ficha vinculada). */}
@@ -467,8 +470,11 @@ function PedidoEditorPage() {
                 </button>
               </div>
             ) : (
-              // Sin ficha: buscar una, o cargar el contacto a mano abajo.
-              <div className="mb-3">
+              // Sin ficha: buscar una, o cargar el contacto a mano abajo. Estos
+              // 3 inputs son SOLO para este caso — con ficha vinculada, editarlos
+              // acá no servía de nada: el contacto es en vivo (2026-06-06) y la
+              // próxima lectura los pisaba en silencio con los datos del cliente.
+              <div>
                 <ClienteAutocomplete
                   placeholder="Buscar cliente por nombre, email o teléfono…"
                   onPick={(c) =>
@@ -493,36 +499,60 @@ function PedidoEditorPage() {
                 <p className="mt-1.5 font-mono text-xs text-muted-foreground">
                   O cargá el contacto a mano abajo (pedido sin ficha vinculada).
                 </p>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <FieldLabel>Nombre</FieldLabel>
+                    <Input
+                      value={datos.cliente_nombre}
+                      onChange={(e) =>
+                        setDatos((d) => d && { ...d, cliente_nombre: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <FieldLabel>Teléfono</FieldLabel>
+                    <Input
+                      value={datos.cliente_telefono}
+                      onChange={(e) =>
+                        setDatos((d) => d && { ...d, cliente_telefono: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <FieldLabel>Email</FieldLabel>
+                    <Input
+                      value={datos.cliente_email}
+                      placeholder="—"
+                      onChange={(e) =>
+                        setDatos((d) => d && { ...d, cliente_email: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
               </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <FieldLabel label="Nombre">
-                <Input
-                  value={datos.cliente_nombre}
-                  onChange={(e) => setDatos((d) => d && { ...d, cliente_nombre: e.target.value })}
-                />
-              </FieldLabel>
-              <FieldLabel label="Teléfono">
-                <Input
-                  value={datos.cliente_telefono}
-                  onChange={(e) => setDatos((d) => d && { ...d, cliente_telefono: e.target.value })}
-                />
-              </FieldLabel>
-              <FieldLabel label="Email" className="sm:col-span-2">
-                <Input
-                  value={datos.cliente_email}
-                  placeholder="—"
-                  onChange={(e) => setDatos((d) => d && { ...d, cliente_email: e.target.value })}
-                />
-              </FieldLabel>
-            </div>
           </Section>
+
+          {/* Facturar a nombre de (#1251) — solo si el cliente tiene perfiles
+              fiscales personales o productoras vinculadas para elegir. */}
+          <FacturacionTargetSection
+            clienteId={datos.cliente_id}
+            perfilFiscalId={datos.perfil_fiscal_id}
+            productoraId={datos.productora_id}
+            onChange={({ perfilFiscalId, productoraId }) =>
+              setDatos(
+                (d) => d && { ...d, perfil_fiscal_id: perfilFiscalId, productora_id: productoraId },
+              )
+            }
+          />
 
           {/* Fechas — editables con re-validación de stock */}
           <Section
+            variant="card"
+            tone="elevated"
             icon={Calendar}
             title="Fechas del alquiler"
-            aside={
+            actions={
               !datos.fecha_desde || !datos.fecha_hasta ? (
                 <span className="inline-flex items-center gap-1 font-mono text-2xs uppercase tracking-[0.2em] text-destructive">
                   <AlertTriangle className="h-3 w-3" /> sin fechas
@@ -556,7 +586,7 @@ function PedidoEditorPage() {
                       {format(endDate, "dd MMM yyyy", { locale: es })} · {endTime}
                     </span>
                   </div>
-                  <span className="ml-auto rounded-md border hairline bg-background px-2.5 py-1 text-center shrink-0">
+                  <span className="ml-auto card px-2.5 py-1 text-center shrink-0">
                     <span className="font-mono text-base font-semibold leading-none">
                       {jornadas}
                     </span>
@@ -577,7 +607,7 @@ function PedidoEditorPage() {
           </Section>
 
           {/* Equipos */}
-          <Section icon={Box} title={`Equipos · ${items.length}`}>
+          <Section variant="card" tone="elevated" icon={Box} title={`Equipos · ${items.length}`}>
             {/* Buscador inline: resultados en dropdown debajo (no tapa el form) */}
             <EquipoComboSearch
               existing={items}
@@ -630,7 +660,7 @@ function PedidoEditorPage() {
           </Section>
 
           {/* Notas */}
-          <Section icon={FileText} title="Notas internas">
+          <Section variant="card" tone="elevated" icon={FileText} title="Notas internas">
             <Textarea
               value={datos.notas}
               placeholder="Notas para el equipo de Rambla…"
@@ -656,6 +686,31 @@ function PedidoEditorPage() {
                 <ArrowRight className="h-4 w-4 mr-1" />
                 {ns.blocked ? `Falta: ${ns.blocked}` : ns.label}
               </Button>
+            )}
+            {otrosDestinosPedido.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full mt-1 text-muted-foreground"
+                    disabled={estadoMut.isPending}
+                  >
+                    Cambiar a otro estado
+                    <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="center"
+                  className="w-full min-w-[--radix-dropdown-menu-trigger-width]"
+                >
+                  {otrosDestinosPedido.map((estado) => (
+                    <DropdownMenuItem key={estado} onClick={() => handleNextStep(estado)}>
+                      {ESTADO_LABEL[estado]}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </RailSection>
 
@@ -1169,21 +1224,17 @@ function FacturacionRailSection({
 
   return (
     <RailSection label="Factura ARCA">
-      {q.isLoading && (
-        // eslint-disable-next-line no-restricted-syntax -- text-[11px]: entre text-2xs(10px) y text-xs(12px), sin equiv DS
-        <div className="text-[11px] text-muted-foreground">Cargando…</div>
-      )}
+      {q.isLoading && <div className="text-xs text-muted-foreground">Cargando…</div>}
 
       {principal && (
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5">
             <FacturaBadge estado={principal.estado} />
             {cbteLetra && (
-              // eslint-disable-next-line no-restricted-syntax -- text-[11px]: entre text-2xs y text-xs, sin equiv DS
-              <span className="font-mono text-[11px] text-muted-foreground">Fact. {cbteLetra}</span>
+              <span className="font-mono text-xs text-muted-foreground">Fact. {cbteLetra}</span>
             )}
             {principal.ambiente === "homologacion" && (
-              // eslint-disable-next-line no-restricted-syntax -- text-[10px] alias text-2xs; amber: paleta categórica homologación (Tier 3)
+              // eslint-disable-next-line no-restricted-syntax -- amber: paleta categórica homologación (Tier 3)
               <span className="font-mono text-2xs text-amber-600 border border-amber-400/50 rounded px-1">
                 TEST
               </span>
@@ -1191,21 +1242,18 @@ function FacturacionRailSection({
           </div>
 
           {principal.cbte_nro && (
-            // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
-            <div className="font-mono text-[11px] text-muted-foreground">
+            <div className="font-mono text-xs text-muted-foreground">
               {String(principal.pto_vta).padStart(5, "0")}-
               {String(principal.cbte_nro).padStart(8, "0")}
             </div>
           )}
 
           {principal.cae && (
-            // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
-            <div className="font-mono text-[11px] text-muted-foreground">CAE {principal.cae}</div>
+            <div className="font-mono text-xs text-muted-foreground">CAE {principal.cae}</div>
           )}
 
           {principal.estado === "error" && principal.errores && (
-            // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
-            <div className="text-[11px] text-destructive rounded border border-destructive/20 bg-destructive/5 px-2 py-1.5">
+            <div className="text-xs text-destructive rounded border border-destructive/20 bg-destructive/5 px-2 py-1.5">
               {Array.isArray(principal.errores)
                 ? principal.errores.join(" / ")
                 : String(principal.errores)}
@@ -1351,11 +1399,11 @@ function FacturacionRailSection({
           </div>
 
           <div
-            className="relative h-full shrink-0 overflow-hidden bg-[#e5e5e5]"
+            className="relative h-full shrink-0 overflow-hidden bg-muted"
             style={{ aspectRatio: LAYOUT_ASPECT[layout] ?? LAYOUT_ASPECT.simplificada }}
           >
             {!facturaHtmlError && (!facturaBlobUrl || !facturaIframeReady) && (
-              <div className="absolute inset-0 flex items-center justify-center gap-2 bg-[#e5e5e5] text-sm text-muted-foreground">
+              <div className="absolute inset-0 flex items-center justify-center gap-2 bg-muted text-sm text-muted-foreground">
                 <Spinner size="sm" />
                 Armando la factura…
               </div>

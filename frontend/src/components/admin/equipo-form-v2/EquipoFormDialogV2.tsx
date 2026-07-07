@@ -24,6 +24,7 @@ import {
   Link as LinkIcon,
   Image as ImageIcon,
   FileCode,
+  ClipboardPaste,
   Printer,
 } from "lucide-react";
 import { Spinner } from "@/design-system/ui/spinner";
@@ -62,11 +63,12 @@ import {
 import { DUENOS, isCanonicalDueno } from "@/lib/admin/duenos";
 import { MonthYearPicker } from "@/components/admin/MonthYearPicker";
 import { useConfirm } from "@/components/admin/useConfirm";
+import { AdminPage } from "@/components/admin/AdminPage";
 
 import { adminApi, type Equipo, type EquipoInput } from "@/lib/admin/api";
 import type { ContenidoIncluidoItem } from "@/data/equipment";
 import { uploadFileToBucket, uploadExternalUrlToBucket, isHostedUrl } from "@/lib/equipment/photos";
-import { uploadEquipoFotoFromUrl } from "@/lib/equipment/equipoFotos";
+import { uploadEquipoFotoFromUrl, uploadEquipoFotosFromUrls } from "@/lib/equipment/equipoFotos";
 import { PhotoGallery } from "@/components/common/PhotoGallery";
 import { authedJson } from "@/lib/authedFetch";
 import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/useSettings";
@@ -224,6 +226,15 @@ export function EquipoFormDialogV2({
   useEffect(() => {
     setHtmlSourceUrl(initial?.html_source_url ?? null);
   }, [initial?.html_source_url]);
+
+  // ── Pegar HTML (#1051 Stream B) — hermano de "Subir HTML" sin archivo/R2 ──
+  const [htmlPasteOpen, setHtmlPasteOpen] = useState(false);
+  const [htmlPasteText, setHtmlPasteText] = useState("");
+  const [enriqueciendo, setEnriqueciendo] = useState(false);
+  // Fotos que trajo el último "Pegar HTML" (para el botón "agregar todas" —
+  // distinto de `photoCands`, que también junta lo de "Buscar foto").
+  const [lastEnrichPhotoCands, setLastEnrichPhotoCands] = useState<string[]>([]);
+  const [addingAllPhotos, setAddingAllPhotos] = useState(false);
 
   // ── Buscar fotos ───────────────────────────────────────────────────
   const [photoSearching, setPhotoSearching] = useState(false);
@@ -791,6 +802,55 @@ export function EquipoFormDialogV2({
   };
 
   // ════════════════════════════════════════════════════════════════════
+  // Pegar HTML (#1051 Stream B) — hermano JSON de "Subir HTML": el mismo
+  // extractor, pero recibe texto pegado (Chrome MCP, portapapeles) en vez de
+  // un archivo, y NO persiste nada en R2/`html_source_url`. Comparte
+  // `_aplicarSpecsExtraidos` (misma lógica de aplicar specs) — no hay una
+  // segunda forma de procesar el resultado.
+  // ════════════════════════════════════════════════════════════════════
+  const handleEnriquecerFromHtml = async () => {
+    if (!initial?.id) return;
+    const html = htmlPasteText.trim();
+    if (!html) {
+      toast.error("Pegá el HTML antes de extraer");
+      return;
+    }
+    setEnriqueciendo(true);
+    try {
+      const r = await adminApi.enriquecerFromHtml(initial.id, html);
+      _aplicarSpecsExtraidos(r.specs ?? [], "HTML procesado");
+      const nuevas = (r.foto_candidates ?? []).filter((u) => !photoCands.includes(u));
+      if (nuevas.length > 0) {
+        setPhotoCands((prev) => [...prev, ...nuevas]);
+        setLastEnrichPhotoCands(nuevas);
+      }
+      setHtmlPasteOpen(false);
+      setHtmlPasteText("");
+    } catch (e) {
+      toast.error(`Error al procesar HTML: ${e instanceof Error ? e.message : ""}`);
+    } finally {
+      setEnriqueciendo(false);
+    }
+  };
+
+  const handleAgregarTodasLasFotos = async () => {
+    if (!initial?.id || lastEnrichPhotoCands.length === 0) return;
+    setAddingAllPhotos(true);
+    try {
+      const r = await uploadEquipoFotosFromUrls(initial.id, lastEnrichPhotoCands);
+      await qc.invalidateQueries({ queryKey: ["admin", "equipo-fotos", initial.id] });
+      void qc.invalidateQueries({ queryKey: ["admin", "equipos"] });
+      if (r.agregadas.length) toast.success(`${r.agregadas.length} fotos agregadas a la galería`);
+      if (r.fallidas.length) toast.error(`${r.fallidas.length} fotos no se pudieron agregar`);
+      setLastEnrichPhotoCands([]);
+    } catch (e) {
+      toast.error(`Error agregando fotos: ${e instanceof Error ? e.message : ""}`);
+    } finally {
+      setAddingAllPhotos(false);
+    }
+  };
+
+  // ════════════════════════════════════════════════════════════════════
   // Submit — mismo flow que el viejo (delegamos en adminApi).
   // ════════════════════════════════════════════════════════════════════
   // Keyboard shortcut: Cmd/Ctrl+S guarda el form (Esc lo maneja el Dialog).
@@ -1241,6 +1301,16 @@ export function EquipoFormDialogV2({
                   </>
                 )}
               </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setHtmlPasteOpen(true)}
+                title="Pegá el HTML de la página del producto (ej. copiado con Chrome MCP) sin subir un archivo"
+              >
+                <ClipboardPaste className="h-3.5 w-3.5 mr-1" />
+                Pegar HTML
+              </Button>
               {htmlSourceUrl && (
                 <>
                   <span className="flex items-center gap-1 text-xs text-verde-ink font-medium">
@@ -1380,9 +1450,29 @@ export function EquipoFormDialogV2({
         {/* Candidatos de foto (si hay) */}
         {photoCands.length > 0 && (
           <div>
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-              Fotos encontradas ({photoCands.length}) · click para elegir
-            </Label>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                Fotos encontradas ({photoCands.length}) · click para elegir
+              </Label>
+              {lastEnrichPhotoCands.length > 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void handleAgregarTodasLasFotos()}
+                  disabled={addingAllPhotos}
+                  title="Sube de un saque las fotos que trajo el último HTML pegado"
+                >
+                  {addingAllPhotos ? (
+                    <>
+                      <Spinner size="xs" className="mr-1" /> Agregando…
+                    </>
+                  ) : (
+                    `Agregar las ${lastEnrichPhotoCands.length} del HTML`
+                  )}
+                </Button>
+              )}
+            </div>
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {photoCands.map((u) => {
                 const isPicking = pickingPhotoUrl === u;
@@ -1923,12 +2013,7 @@ ${fotoTag}
       typeof n === "number" && !Number.isNaN(n) ? n.toLocaleString("es-AR") : "—";
     return (
       <>
-        <div className="px-4 md:px-6 py-6 pb-28 max-w-6xl mx-auto">
-          <header className="mb-6">
-            <div className="t-eyebrow">Inventario · Equipos</div>
-            <h1 className="font-display text-3xl text-ink">{titleText}</h1>
-            {publicHint}
-          </header>
+        <AdminPage title={titleText} maxW="list" description={publicHint} className="pb-28">
           <div className="grid lg:[grid-template-columns:minmax(0,1fr)_320px] gap-6 items-start">
             <form id={formId} onSubmit={submit} className="space-y-5 min-w-0" data-equipo-form-v2>
               {formSections}
@@ -1981,7 +2066,7 @@ ${fotoTag}
               </div>
             </aside>
           </div>
-        </div>
+        </AdminPage>
         <div className="sticky bottom-0 z-20 border-t hairline bg-background/95 backdrop-blur px-4 md:px-6 py-3 flex justify-end gap-2">
           {footerActions}
         </div>
@@ -2005,6 +2090,50 @@ ${fotoTag}
         </DialogContent>
       </Dialog>
       {confirmCloseDialog}
+      <Dialog open={htmlPasteOpen} onOpenChange={(v) => !enriqueciendo && setHtmlPasteOpen(v)}>
+        <DialogContent className="w-full sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Pegar HTML del producto</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Pegá el HTML completo de la página del producto (ej. copiado con Chrome MCP o
+              Cmd+A/Cmd+C sobre "Ver código fuente"). Mismo extractor que "Subir HTML", pero acá no
+              queda un archivo guardado.
+            </p>
+            <Textarea
+              value={htmlPasteText}
+              onChange={(e) => setHtmlPasteText(e.target.value)}
+              placeholder="<html>…</html>"
+              className="min-h-[240px] font-mono text-xs"
+              disabled={enriqueciendo}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setHtmlPasteOpen(false)}
+              disabled={enriqueciendo}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleEnriquecerFromHtml()}
+              disabled={enriqueciendo}
+            >
+              {enriqueciendo ? (
+                <>
+                  <Spinner size="xs" className="mr-1" /> Extrayendo…
+                </>
+              ) : (
+                "Extraer specs y fotos"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

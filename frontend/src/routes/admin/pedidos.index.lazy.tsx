@@ -2,7 +2,6 @@ import { createLazyFileRoute, useNavigate, useSearch } from "@tanstack/react-rou
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Search,
   Plus,
   PanelLeft,
   Pencil,
@@ -17,6 +16,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 import { Button } from "@/design-system/ui/button";
+import { AdminPage } from "@/components/admin/AdminPage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/design-system/ui/alert-dialog";
-import { Input } from "@/design-system/ui/input";
+import { SearchInput } from "@/design-system/ui/search-input";
 import { Skeleton } from "@/design-system/ui/skeleton";
 import { adminApi, ESTADO_LABEL, type Pedido } from "@/lib/admin/api";
 import { nextStep, type EstadoPedido } from "@/lib/pedido-estados";
@@ -39,7 +39,7 @@ import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { RegistrarPagoModal } from "@/components/admin/pedido/RegistrarPagoModal";
 import { EnviarDocsDialog } from "@/components/admin/pedido/EnviarDocsDialog";
 import { AdminCard, FAB } from "@/components/mobile";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
 
 export const Route = createLazyFileRoute("/admin/pedidos/")({
@@ -128,6 +128,7 @@ function PedidosPage() {
     search.f && search.f in DAY_FILTER_LABEL ? (search.f as DayFilter) : null;
 
   const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
   const [estadoF, setEstadoF] = useState<EstadoFilter>("todos");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
@@ -136,8 +137,8 @@ function PedidosPage() {
 
   // Lista de pedidos (per_page alto cubre el volumen real).
   const pedidosQ = useQuery({
-    queryKey: ["admin", "pedidos", { q }],
-    queryFn: () => adminApi.listPedidos({ q: q || undefined, per_page: 200 }),
+    queryKey: ["admin", "pedidos", { q: debouncedQ }],
+    queryFn: () => adminApi.listPedidos({ q: debouncedQ || undefined, per_page: 200 }),
     refetchInterval: 60_000,
     staleTime: 0,
   });
@@ -193,48 +194,47 @@ function PedidosPage() {
   });
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-var(--admin-topbar-h,56px))] min-h-0">
-      {/* Header */}
-      <div className="px-4 md:px-6 pt-3 md:pt-5 pb-2 md:pb-3 shrink-0">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-          <div>
-            <div className="t-eyebrow">Operaciones · Pedidos</div>
-            <h1 className="font-display text-2xl md:text-3xl text-ink">Pedidos</h1>
-            <p className="hidden md:block text-sm text-muted-foreground mt-1 max-w-[540px]">
-              Reservas activas y solicitudes de cambio de tus clientes.{" "}
-              {pedidosQ.isLoading ? "Cargando…" : `${total} en total.`}
-            </p>
-          </div>
-          <div className="hidden md:flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => navigate({ to: "/admin/solicitudes" })}
-              className="relative"
-            >
-              <Pencil className="h-4 w-4 mr-1" /> Solicitudes
-              {pendientes > 0 && (
-                <span className="ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-amber px-1.5 font-mono text-2xs font-bold text-ink">
-                  {pendientes}
-                </span>
-              )}
-            </Button>
-            <Button onClick={() => navigate({ to: "/admin/pedidos/nuevo" })}>
-              <Plus className="h-4 w-4 mr-1" /> Nuevo pedido
-            </Button>
-          </div>
+    <AdminPage
+      layout="fullHeight"
+      title="Pedidos"
+      description={
+        <>
+          Reservas activas y solicitudes de cambio de tus clientes.{" "}
+          {pedidosQ.isLoading ? "Cargando…" : `${total} en total.`}
+        </>
+      }
+      actions={
+        <div className="hidden md:flex md:flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate({ to: "/admin/solicitudes" })}
+            className="relative"
+          >
+            <Pencil className="h-4 w-4 mr-1" /> Solicitudes
+            {pendientes > 0 && (
+              <span className="ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-amber px-1.5 font-mono text-2xs font-bold text-ink">
+                {pendientes}
+              </span>
+            )}
+          </Button>
+          <Button onClick={() => navigate({ to: "/admin/pedidos/nuevo" })}>
+            <Plus className="h-4 w-4 mr-1" /> Nuevo pedido
+          </Button>
         </div>
-
-        {/* Búsqueda + chips de estado */}
-        <div className="flex flex-col md:flex-row md:items-center gap-2 mt-3 md:mt-4">
-          <div className="relative md:max-w-sm flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar cliente o número…"
-              className="pl-9"
-            />
-          </div>
+      }
+      className="flex flex-col"
+    >
+      {/* Búsqueda + chips de estado */}
+      <div className="px-4 md:px-6 pb-2 md:pb-3 shrink-0">
+        <div className="flex flex-col md:flex-row md:items-center gap-2">
+          <SearchInput
+            value={q}
+            onValueChange={setQ}
+            debounceMs={300}
+            onDebouncedChange={setDebouncedQ}
+            placeholder="Buscar cliente o número…"
+            wrapperClassName="md:max-w-sm flex-1"
+          />
           {dayFilter ? (
             // Atajo del día activo (vino del Dashboard) — mostrar y permitir limpiar.
             <button
@@ -407,7 +407,7 @@ function PedidosPage() {
         onClick={() => navigate({ to: "/admin/pedidos/nuevo" })}
         label="Nuevo pedido"
       />
-    </div>
+    </AdminPage>
   );
 }
 
@@ -645,7 +645,7 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
 
         {/* Fechas + total */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="rounded-xl border hairline bg-surface-elevated px-4 py-3">
+          <div className="card-elevated px-4 py-3">
             <div className="t-eyebrow">Fechas</div>
             <div className="mt-1 text-ink font-medium tabular-nums">
               {fechaDia(p.fecha_desde)} → {fechaDia(p.fecha_hasta)}
@@ -654,7 +654,7 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
               {jornadas} jornada{jornadas !== 1 ? "s" : ""}
             </div>
           </div>
-          <div className="rounded-xl border hairline bg-surface-elevated px-4 py-3">
+          <div className="card-elevated px-4 py-3">
             <div className="t-eyebrow">Total neto</div>
             <div className="mt-1 font-mono text-2xl font-semibold tabular-nums text-ink">
               {fmtArs(total)}
@@ -670,7 +670,7 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
         </div>
 
         {/* Equipos */}
-        <div className="rounded-xl border hairline bg-surface-elevated">
+        <div className="card-elevated">
           <div className="flex items-center justify-between px-4 py-2.5 border-b hairline">
             <span className="t-eyebrow">Equipos · {nItems}</span>
             {nItems > 0 && <span className="t-eyebrow">precio / jornada</span>}

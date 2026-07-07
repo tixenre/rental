@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from auth.guards import require_admin
 from database import MARCA_SUBQUERY, get_db, now_ar, to_datetime
-from routes.clientes import nombre_completo_cliente
+from clientes.queries.identidad import nombre_completo_cliente
 from reservas import ESTADOS_RESERVADO, validar_stock as _check_stock
 from routes.alquileres import (
     _dispatch_pedido_creado_emails,

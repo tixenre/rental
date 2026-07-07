@@ -32,21 +32,20 @@ test.describe("Admin equipos — form V2", () => {
 
     // Botones principales
     await expect(page.getByRole("button", { name: /Nuevo equipo/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Batch specs/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /Uso/i })).toBeVisible();
 
     // Barra de búsqueda
     await expect(page.getByPlaceholder(/Buscar/i)).toBeVisible();
   });
 
-  test("Click en Nuevo equipo abre el dialog V2", async ({ page }) => {
+  test("Click en Nuevo equipo abre el editor V2 (página completa, no modal)", async ({ page }) => {
     await page.goto("/admin/equipos");
     await page.waitForLoadState("networkidle");
 
     await page.getByRole("button", { name: /Nuevo equipo/i }).click();
 
-    // El dialog abre con el título correcto
-    await expect(page.getByRole("dialog")).toBeVisible();
+    // El form V2 es una página completa (variant="page"), no un dialog modal.
+    await page.waitForURL(/\/admin\/equipos\/nuevo/);
     await expect(page.getByRole("heading", { name: /Nuevo equipo/i })).toBeVisible();
 
     // Status switches del top
@@ -56,7 +55,6 @@ test.describe("Admin equipos — form V2", () => {
     // Link bar arriba
     await expect(page.getByText(/Link del producto/i)).toBeVisible();
     await expect(page.getByRole("button", { name: /Buscar foto/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Buscar specs/i })).toBeVisible();
   });
 
   test("Cmd+S dispara submit del form abierto", async ({ page }) => {
@@ -64,17 +62,17 @@ test.describe("Admin equipos — form V2", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByRole("button", { name: /Nuevo equipo/i }).click();
-    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.waitForURL(/\/admin\/equipos\/nuevo/);
+    await expect(page.getByRole("heading", { name: /Nuevo equipo/i })).toBeVisible();
 
     // Llenar nombre (campo requerido)
     await page.locator('input[name="nombre"]').first().fill("Test E2E");
 
-    // Cmd+S → debería triggerear submit. Si no hay errores, el dialog cierra.
+    // Cmd+S → debería triggerear submit. Si no hay errores, navega de vuelta a la lista.
     await page.keyboard.press("Meta+s");
 
-    // Esperamos a que cierre (o que aparezca un toast)
     // Sin backend real no podemos verificar el save; verificamos que el handler
-    // disparó (network request al endpoint correcto, o dialog se cerró).
+    // disparó (network request al endpoint correcto, o volvió a /admin/equipos).
     await page.waitForTimeout(1000);
     // Smoke: no debería haber crasheado.
   });

@@ -25,7 +25,7 @@ import {
 import { AdminPage } from "@/components/admin/AdminPage";
 import { PrecioUnidad } from "@/components/admin/Monto";
 import { QueryState } from "@/components/admin/QueryState";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export const Route = createLazyFileRoute("/admin/equipos/calidad")({
   component: CalidadPage,
@@ -42,7 +42,7 @@ function CalidadPage() {
   return (
     <AdminPage
       title="Calidad del inventario"
-      maxW="max-w-3xl"
+      maxW="form"
       description="Qué equipos tienen datos faltantes. Solo lectura — los CTAs para completar llegan en una segunda iteración (#350)."
     >
       <QueryState

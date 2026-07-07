@@ -47,7 +47,7 @@ def _sessions_active(monkeypatch):
     La cookie de contrato lleva jti pero no está en la tabla → stubbeamos `is_active`
     para darla por activa, así pasa el chequeo de revocación y llega al require_admin
     del handler (que es lo que estos tests verifican)."""
-    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
+    monkeypatch.setattr("auth.queries.sessions.is_active", lambda jti: {"jti": jti})
 
 
 # ── ADMIN con guard ANTES de DB/validación: anon → 401; no-admin → 403 ────────
@@ -107,7 +107,9 @@ _ADMIN_EXIST = [
     ("POST", "/api/admin/categorias/reorder"),
     ("POST", "/api/admin/equipos/1/upload-foto-from-url"),
     ("POST", "/api/admin/equipos/1/fotos/from-url"),
+    ("POST", "/api/admin/equipos/1/fotos/from-urls"),
     ("PATCH", "/api/admin/equipos/1/fotos/orden"),
+    ("POST", "/api/admin/equipos/1/enriquecer-from-html"),
     # specs.py
     ("GET", "/api/admin/spec-definitions"),
     ("GET", "/api/admin/specs/por-categoria"),

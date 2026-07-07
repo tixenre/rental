@@ -611,9 +611,19 @@ def test_verificar_y_crear_productora_upsert_por_cuit(monkeypatch):
     )
     conn = _FakeConnProductoras()
 
-    persona = verificar_y_crear_productora("30712345678", conn=conn, notas="Ref: rodaje X")
+    persona = verificar_y_crear_productora(
+        "30712345678", conn=conn, notas="Ref: rodaje X", nombre="Estudio Norte", redes_sociales="@estudionorte"
+    )
 
     assert persona.razon_social == "Empresa Nueva SA"
     assert len(conn.inserts) == 1
     _, params = conn.inserts[0]
-    assert params == ("30712345678", "responsable_inscripto", "Empresa Nueva SA", "Calle Nueva 123", "Ref: rodaje X")
+    assert params == (
+        "30712345678",
+        "responsable_inscripto",
+        "Empresa Nueva SA",
+        "Calle Nueva 123",
+        "Ref: rodaje X",
+        "Estudio Norte",
+        "@estudionorte",
+    )

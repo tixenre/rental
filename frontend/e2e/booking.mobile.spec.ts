@@ -7,8 +7,24 @@ import { test, expect } from "@playwright/test";
  * jornada extra en un navegador real (viewport mobile). API mockeada con page.route().
  */
 
+// Reloj fijo (mismo criterio que booking.desktop.spec.ts): el picker clampea la
+// hora de retiro a "ahora" redondeado a los 30 min (piso de antelación mínima,
+// #1126 / DateRangePickerModal). Sin congelar el reloj, este test es un
+// time-bomb que falla cada vez que el reloj REAL del runner pasa las ~10:30
+// UTC (el retiro clampeado ≥ "11:00" deja de ser "más tarde que el retiro") —
+// reproducido determinísticamente congelando el reloj a la hora exacta de la
+// corrida de CI que falló (2026-07-06T12:10Z). 06:00 deja el piso bien por
+// debajo del "09:00" default y del "11:00" que fija el test, sin margen ambiguo.
+const HORA_FIJA = new Date("2026-06-01T06:00:00");
+
 test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(HORA_FIJA);
   await page.route("**/api/settings/horarios_retiro", (r) =>
+    r.fulfill({ status: 404, contentType: "application/json", body: "{}" }),
+  );
+  // Antelación mínima "apagada" explícito (no depender de que el backend esté
+  // ausente en este workflow para que el catch-a-null la deje en 0).
+  await page.route("**/api/settings/antelacion_minima_horas", (r) =>
     r.fulfill({ status: 404, contentType: "application/json", body: "{}" }),
   );
   await page.route("**/api/disponibilidad-dias**", (r) =>

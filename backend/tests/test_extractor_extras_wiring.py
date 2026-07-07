@@ -66,17 +66,43 @@ def test_bucket_curado_gana_en_colision():
 
 
 def test_unmatched_expone_labels_sin_match_del_registry():
-    """`secciones` (raw label→value del DOM) con un label que ningún spec_key/
-    alias de Cámaras reconoce → aparece en `unmatched`, explícito."""
+    """`secciones` es dict[nombre_sección, list[{label, value}]] — el shape REAL
+    que arma BHSpecsParser/merge_jsonld_into_secciones (parsers/base.py,
+    parse/secciones.py), NO un dict plano label→value. Con un label que ningún
+    spec_key/alias de Cámaras reconoce → aparece en `unmatched`, explícito."""
     r = build_result(
         marca="Sony", modelo="FX6", specs={}, extras={},
         image=None, url="http://x", title="Sony FX6",
-        secciones={"Weight": "1050 g", "Campo Inventado XYZ": "un valor"},
+        secciones={
+            "Specs (JSON-LD)": [{"label": "Weight", "value": "1050 g"}],
+            "General": [{"label": "Campo Inventado XYZ", "value": "un valor"}],
+        },
         categoria_sugerida="Cámaras",
     )
     unmatched_labels = {p["label"] for p in r["unmatched"]}
     assert "Campo Inventado XYZ" in unmatched_labels
     assert "Weight" not in unmatched_labels, "Weight resuelve a peso_g — no es unmatched"
+
+
+def test_unmatched_multiples_secciones_no_confunde_nombre_de_seccion_con_label():
+    """Regresión del bug de shape: `resultado.py` trataba el NOMBRE de sección
+    como label y la LISTA de items como value (`is_garbage(list)` reventaba,
+    tragado por el except) → `unmatched` daba SIEMPRE `[]` para las 6
+    categorías con parser bespoke, pese a labels sin match reales en 2+
+    secciones distintas."""
+    r = build_result(
+        marca="Sony", modelo="FX6", specs={}, extras={},
+        image=None, url="http://x", title="Sony FX6",
+        secciones={
+            "Specs (JSON-LD)": [{"label": "Sensor XYZ Raro", "value": "algo"}],
+            "General": [{"label": "Otro Campo Raro", "value": "otro valor"}],
+        },
+        categoria_sugerida="Cámaras",
+    )
+    unmatched_labels = {p["label"] for p in r["unmatched"]}
+    assert unmatched_labels == {"Sensor XYZ Raro", "Otro Campo Raro"}
+    assert "Specs (JSON-LD)" not in unmatched_labels
+    assert "General" not in unmatched_labels
 
 
 def test_unmatched_vacio_si_secciones_vacio():

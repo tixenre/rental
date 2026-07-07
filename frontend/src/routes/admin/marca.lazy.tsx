@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { Megaphone } from "lucide-react";
 import { AdminPage } from "@/components/admin/AdminPage";
-import { useDocumentTitle } from "@/lib/use-document-title";
+import { Section } from "@/design-system/composites/Section";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export const Route = createLazyFileRoute("/admin/marca")({
   component: MarcaPage,
@@ -13,7 +14,7 @@ function MarcaPage() {
   return (
     <AdminPage
       title="Identidad de marca"
-      maxW="max-w-4xl"
+      maxW="detail"
       description={
         <>
           Hub canónico de marca. Los contenidos con{" "}
@@ -22,7 +23,7 @@ function MarcaPage() {
       }
     >
       <div className="space-y-8">
-        <Section title="Quiénes somos">
+        <Section variant="plain" title="Quiénes somos">
           <div className="space-y-3">
             <div className="rounded-xl border border-border bg-surface px-4 py-3">
               <p className="t-eyebrow mb-1">Tagline</p>
@@ -36,7 +37,7 @@ function MarcaPage() {
           </div>
         </Section>
 
-        <Section title="Rental" subtitle="rambla.house/rental">
+        <Section variant="plain" title="Rental" subtitle="rambla.house/rental">
           <div className="space-y-3">
             <TaglineCard text="Ahora alquilás todo desde la web." />
             <div className="space-y-2">
@@ -66,15 +67,15 @@ function MarcaPage() {
           </div>
         </Section>
 
-        <Section title="Estudio" subtitle="rambla.house/estudio">
+        <Section variant="plain" title="Estudio" subtitle="rambla.house/estudio">
           <TodoBanner area="Estudio" />
         </Section>
 
-        <Section title="Workshops" subtitle="rambla.house/talleres">
+        <Section variant="plain" title="Workshops" subtitle="rambla.house/talleres">
           <TodoBanner area="Workshops" />
         </Section>
 
-        <Section title="Assets canónicos">
+        <Section variant="plain" title="Assets canónicos">
           <div className="rounded-xl border border-border overflow-hidden">
             {/* eslint-disable-next-line no-restricted-syntax -- tabla key/value de layout (label↔valor), no es data-table; AdminTable no aplica */}
             <table className="w-full text-sm">
@@ -98,7 +99,7 @@ function MarcaPage() {
           </div>
         </Section>
 
-        <Section title="Inventario de features">
+        <Section variant="plain" title="Inventario de features">
           <p className="text-sm text-muted-foreground">
             El listado detallado de features de cara al usuario (seleccionadas para comunicar,
             disponibles y no listas todavía) vive en{" "}
@@ -112,26 +113,6 @@ function MarcaPage() {
         </Section>
       </div>
     </AdminPage>
-  );
-}
-
-function Section({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="space-y-3">
-      <div>
-        <h2 className="font-display text-xl text-ink">{title}</h2>
-        {subtitle && <p className="t-eyebrow">{subtitle}</p>}
-      </div>
-      {children}
-    </section>
   );
 }
 

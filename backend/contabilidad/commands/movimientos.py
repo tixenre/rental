@@ -11,6 +11,10 @@ cuentas se usan:
 | aporte        | —      | ✓       | —         | un socio mete plata                      |
 | ajuste        | ✓ o —  | ✓ o —   | —         | conciliación manual (con nota)           |
 
+Un **cambio de divisa** (comprar/vender USD con ARS) NO es un tipo nuevo: son dos
+`ajuste` atados por `movimiento_par_id`, uno por cuenta — ver `crear_cambio_divisa`
+(única puerta; `transferencia` no sirve porque exige la misma moneda en ambos lados).
+
 Los ingresos por alquiler NO viven acá: derivan de `alquiler_pagos` (Fase 1). El
 saldo de cada cuenta se deriva de estos movimientos + esos cobros
 (`queries/saldos.py`).
@@ -180,11 +184,14 @@ def _exigir_mes_abierto(conn, fecha) -> None:
 
 def crear_movimiento(conn, *, tipo, monto, cuenta_origen_id=None, cuenta_destino_id=None,
                      categoria_id=None, metodo=None, fecha=None, nota=None, beneficiario=None,
-                     por=None, es_rendicion=False, rendicion_mes=None) -> dict:
+                     por=None, es_rendicion=False, rendicion_mes=None, cotizacion=None,
+                     movimiento_par_id=None) -> dict:
     """Crea un movimiento (valida estructura + existencia de cuentas/categoría).
     `fecha` None → hoy. `es_rendicion`/`rendicion_mes` marcan un saldado de
     rendición entre socios (lo usa `commands/rendicion.py::saldar`, no la UI
-    general). Devuelve el movimiento con nombres resueltos."""
+    general). `cotizacion`/`movimiento_par_id` los usa `crear_cambio_divisa`
+    (no se exponen en el form general de movimientos). Devuelve el movimiento
+    con nombres resueltos."""
     monto = int(monto or 0)
     validar_estructura_movimiento(tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id)
     _validar_metodo(metodo)
@@ -195,11 +202,14 @@ def crear_movimiento(conn, *, tipo, monto, cuenta_origen_id=None, cuenta_destino
     cur = conn.execute(
         """INSERT INTO movimientos
                (tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id,
-                metodo, fecha, nota, beneficiario, es_rendicion, rendicion_mes, created_by, updated_by)
-           VALUES (%s, %s, %s, %s, %s, %s, COALESCE(%s::date, CURRENT_DATE), %s, %s, %s, %s, %s, %s)
+                metodo, fecha, nota, beneficiario, es_rendicion, rendicion_mes,
+                cotizacion, movimiento_par_id, created_by, updated_by)
+           VALUES (%s, %s, %s, %s, %s, %s, COALESCE(%s::date, CURRENT_DATE), %s, %s, %s, %s,
+                   %s, %s, %s, %s)
            RETURNING id""",
         (tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id,
-         metodo, fecha, nota, beneficiario, bool(es_rendicion), rendicion_mes, por, por),
+         metodo, fecha, nota, beneficiario, bool(es_rendicion), rendicion_mes,
+         cotizacion, movimiento_par_id, por, por),
     )
     new_id = cur.fetchone()[0]
     movs = listar_movimientos(conn, incluir_anulados=True)
@@ -207,6 +217,108 @@ def crear_movimiento(conn, *, tipo, monto, cuenta_origen_id=None, cuenta_destino
         if m["id"] == new_id:
             return m
     return obtener_movimiento(conn, new_id)
+
+
+def _validar_montos_cambio_divisa(monto_origen, monto_destino, cotizacion) -> None:
+    for m in (monto_origen, monto_destino):
+        if m is not None and (not isinstance(m, int) or isinstance(m, bool) or m <= 0):
+            raise ValueError("Los montos deben ser enteros positivos (sin centavos).")
+    if cotizacion is not None and float(cotizacion) <= 0:
+        raise ValueError("La cotización debe ser mayor a cero.")
+
+
+def derivar_cambio_divisa(moneda_origen, moneda_destino, monto_origen=None,
+                          monto_destino=None, cotizacion=None) -> tuple[int, int, float]:
+    """PURA — la aritmética de un cambio de divisa, sin tocar DB (testeable
+    aparte, igual que `validar_estructura_movimiento`). Exige distinta moneda a
+    cada lado y que una de las dos sea ARS (hoy `MONEDAS` solo tiene ARS/USD).
+    La `cotizacion` es siempre "pesos por dólar" — no depende de cuál lado es
+    origen/destino, así que sirve igual para comprar o vender dólares. Acepta
+    2 de {monto_origen, monto_destino, cotizacion}; deriva el que falte.
+    Devuelve `(monto_origen, monto_destino, cotizacion)` ya enteros/redondeados."""
+    _validar_montos_cambio_divisa(monto_origen, monto_destino, cotizacion)
+    if moneda_origen == moneda_destino:
+        raise ValueError(
+            "Un cambio de divisa necesita cuentas de distinta moneda "
+            "(para la misma moneda usá una transferencia)."
+        )
+    if "ARS" not in (moneda_origen, moneda_destino):
+        raise ValueError("Un cambio de divisa necesita que una de las dos cuentas sea en pesos (ARS).")
+
+    lado_ars = "origen" if moneda_origen == "ARS" else "destino"
+    monto_ars = monto_origen if lado_ars == "origen" else monto_destino
+    monto_divisa = monto_destino if lado_ars == "origen" else monto_origen
+    if cotizacion is not None:
+        cotizacion = float(cotizacion)
+
+    provistos = sum(x is not None for x in (monto_ars, monto_divisa, cotizacion))
+    if provistos < 2:
+        raise ValueError(
+            "Necesito al menos dos de estos tres datos: el monto en pesos, el monto en la "
+            "otra moneda, o la cotización."
+        )
+    if monto_ars is None:
+        monto_ars = round(monto_divisa * cotizacion)
+    elif monto_divisa is None:
+        monto_divisa = round(monto_ars / cotizacion)
+    if cotizacion is None:
+        cotizacion = round(monto_ars / monto_divisa, 4)
+    cotizacion = round(float(cotizacion), 4)
+
+    monto_origen = monto_ars if lado_ars == "origen" else monto_divisa
+    monto_destino = monto_divisa if lado_ars == "origen" else monto_ars
+    return int(monto_origen), int(monto_destino), cotizacion
+
+
+def crear_cambio_divisa(conn, *, cuenta_origen_id, cuenta_destino_id, monto_origen=None,
+                        monto_destino=None, cotizacion=None, fecha=None, nota=None,
+                        por=None) -> dict:
+    """Compra/venta de divisa: registra DOS `ajuste` atados (uno por cuenta), la
+    única forma soportada de mover plata entre cajas de distinta moneda —
+    `transferencia` exige la misma moneda en origen y destino (ver docstring del
+    módulo), así que una conversión real necesita su propio flujo explícito
+    (DECISIONES.md 2026-06-07). No es un tipo de movimiento nuevo: reusa `ajuste`
+    dos veces, cada pata pasa por `crear_movimiento` (misma validación de
+    siempre) y quedan linkeadas por `movimiento_par_id`. La aritmética
+    (qué monto/cotización se deriva) vive en `derivar_cambio_divisa` (pura)."""
+    if not cuenta_origen_id or not cuenta_destino_id:
+        raise ValueError("Un cambio de divisa necesita cuenta de origen y de destino.")
+    if cuenta_origen_id == cuenta_destino_id:
+        raise ValueError("El origen y el destino no pueden ser la misma cuenta.")
+
+    validas = _cuentas_validas(conn)
+    if cuenta_origen_id not in validas or cuenta_destino_id not in validas:
+        raise ValueError("La cuenta indicada no existe o está inactiva.")
+    rows = conn.execute(
+        "SELECT id, moneda FROM cuentas WHERE id IN (%s, %s)",
+        (cuenta_origen_id, cuenta_destino_id),
+    ).fetchall()
+    moneda_por_id = {r["id"]: r["moneda"] for r in rows}
+
+    monto_origen, monto_destino, cotizacion = derivar_cambio_divisa(
+        moneda_por_id[cuenta_origen_id], moneda_por_id[cuenta_destino_id],
+        monto_origen=monto_origen, monto_destino=monto_destino, cotizacion=cotizacion,
+    )
+
+    nota = (nota or "").strip() or None
+    mov_origen = crear_movimiento(
+        conn, tipo="ajuste", monto=monto_origen, cuenta_origen_id=cuenta_origen_id,
+        fecha=fecha, nota=nota, por=por, cotizacion=cotizacion,
+    )
+    mov_destino = crear_movimiento(
+        conn, tipo="ajuste", monto=monto_destino, cuenta_destino_id=cuenta_destino_id,
+        fecha=fecha, nota=nota, por=por, cotizacion=cotizacion,
+        movimiento_par_id=mov_origen["id"],
+    )
+    conn.execute(
+        "UPDATE movimientos SET movimiento_par_id = %s WHERE id = %s",
+        (mov_destino["id"], mov_origen["id"]),
+    )
+    return {
+        "origen": obtener_movimiento(conn, mov_origen["id"]),
+        "destino": mov_destino,
+        "cotizacion": cotizacion,
+    }
 
 
 def editar_movimiento(conn, mov_id: int, *, campos: dict, por=None) -> dict:
