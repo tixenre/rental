@@ -364,9 +364,6 @@ function EmisorFormModal({
   const [iibb, setIibb] = useState(emisor?.iibb ?? "");
   const [inicioActividades, setInicioActividades] = useState(emisor?.inicio_actividades ?? "");
   const [notas, setNotas] = useState(emisor?.notas ?? "");
-  const [habilitadoExportacion, setHabilitadoExportacion] = useState(
-    emisor?.habilitado_exportacion ?? false,
-  );
   // Cert opcional al crear
   const [cert, setCert] = useState("");
   const [key, setKey] = useState("");
@@ -463,7 +460,6 @@ function EmisorFormModal({
         inicio_actividades: inicioActividades || null,
         notas: notas || null,
         activo: emisor?.activo ?? true,
-        habilitado_exportacion: habilitadoExportacion,
       };
       if (emisor) return facturacionApi.updateEmisor(emisor.id, body);
       const created = await facturacionApi.createEmisor(body);
@@ -778,21 +774,6 @@ function EmisorFormModal({
             placeholder="Persona física, período vigencia cert, etc."
             className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm"
           />
-        </Field>
-        <Field
-          label="Habilitado para Factura de Exportación (WSFEXv1)"
-          hint="Requiere la relación de servicio 'wsfex' delegada en AFIP, aparte de la de facturación normal"
-        >
-          <label className="flex items-center gap-2 text-sm">
-            {/* eslint-disable-next-line no-restricted-syntax -- checkbox nativo: el DS Checkbox es Radix (otra API) */}
-            <input
-              type="checkbox"
-              checked={habilitadoExportacion}
-              onChange={(e) => setHabilitadoExportacion(e.target.checked)}
-              className="cursor-pointer"
-            />
-            Habilitado para exportación
-          </label>
         </Field>
 
         {/* Cert opcional al crear */}

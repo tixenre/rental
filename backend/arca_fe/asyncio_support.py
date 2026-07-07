@@ -14,10 +14,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .modelos import CaeResult, ComprobanteRequest
-    from .modelos_exportacion import ComprobanteExportacionRequest
     from .padron import PadronClient, PersonaArca
     from .wsfe import WsfeClient
-    from .wsfex import WsfexClient
 
 
 async def solicitar_cae_async(
@@ -26,15 +24,6 @@ async def solicitar_cae_async(
     """Wrapper cooperativo de `WsfeClient.solicitar_cae` — corre la llamada SOAP bloqueante en un
     thread aparte, no bloquea el event loop del consumidor."""
     return await asyncio.to_thread(client.solicitar_cae, comprobante, numero)
-
-
-async def autorizar_async(
-    client: "WsfexClient", comprobante: "ComprobanteExportacionRequest", numero: int
-) -> "CaeResult":
-    """Wrapper cooperativo de `WsfexClient.autorizar` (WSFEXv1, Factura de Exportación) — mismo
-    criterio que `solicitar_cae_async` para WSFEv1: corre la llamada SOAP bloqueante en un thread
-    aparte, no bloquea el event loop del consumidor."""
-    return await asyncio.to_thread(client.autorizar, comprobante, numero)
 
 
 async def get_persona_async(client: "PadronClient", cuit: str) -> "PersonaArca":

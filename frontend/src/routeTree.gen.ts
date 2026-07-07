@@ -79,9 +79,6 @@ const AdminPedidosNuevoLazyRouteImport = createFileRoute(
   '/admin/pedidos/nuevo',
 )()
 const AdminPedidosIdLazyRouteImport = createFileRoute('/admin/pedidos/$id')()
-const AdminFacturacionExportacionLazyRouteImport = createFileRoute(
-  '/admin/facturacion/exportacion',
-)()
 const AdminFacturacionEmisoresLazyRouteImport = createFileRoute(
   '/admin/facturacion/emisores',
 )()
@@ -441,14 +438,6 @@ const AdminPedidosIdLazyRoute = AdminPedidosIdLazyRouteImport.update({
 } as any).lazy(() =>
   import('./routes/admin/pedidos.$id.lazy').then((d) => d.Route),
 )
-const AdminFacturacionExportacionLazyRoute =
-  AdminFacturacionExportacionLazyRouteImport.update({
-    id: '/facturacion/exportacion',
-    path: '/facturacion/exportacion',
-    getParentRoute: () => AdminRoute,
-  } as any).lazy(() =>
-    import('./routes/admin/facturacion.exportacion.lazy').then((d) => d.Route),
-  )
 const AdminFacturacionEmisoresLazyRoute =
   AdminFacturacionEmisoresLazyRouteImport.update({
     id: '/facturacion/emisores',
@@ -606,7 +595,6 @@ export interface FileRoutesByFullPath {
   '/admin/equipos/nuevo': typeof AdminEquiposNuevoLazyRoute
   '/admin/equipos/specs': typeof AdminEquiposSpecsLazyRoute
   '/admin/facturacion/emisores': typeof AdminFacturacionEmisoresLazyRoute
-  '/admin/facturacion/exportacion': typeof AdminFacturacionExportacionLazyRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdLazyRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoLazyRoute
   '/admin/specs/definitions': typeof AdminSpecsDefinitionsLazyRoute
@@ -671,7 +659,6 @@ export interface FileRoutesByTo {
   '/admin/equipos/nuevo': typeof AdminEquiposNuevoLazyRoute
   '/admin/equipos/specs': typeof AdminEquiposSpecsLazyRoute
   '/admin/facturacion/emisores': typeof AdminFacturacionEmisoresLazyRoute
-  '/admin/facturacion/exportacion': typeof AdminFacturacionExportacionLazyRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdLazyRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoLazyRoute
   '/admin/specs/definitions': typeof AdminSpecsDefinitionsLazyRoute
@@ -744,7 +731,6 @@ export interface FileRoutesById {
   '/admin/equipos/nuevo': typeof AdminEquiposNuevoLazyRoute
   '/admin/equipos/specs': typeof AdminEquiposSpecsLazyRoute
   '/admin/facturacion/emisores': typeof AdminFacturacionEmisoresLazyRoute
-  '/admin/facturacion/exportacion': typeof AdminFacturacionExportacionLazyRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdLazyRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoLazyRoute
   '/admin/specs/definitions': typeof AdminSpecsDefinitionsLazyRoute
@@ -818,7 +804,6 @@ export interface FileRouteTypes {
     | '/admin/equipos/nuevo'
     | '/admin/equipos/specs'
     | '/admin/facturacion/emisores'
-    | '/admin/facturacion/exportacion'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
     | '/admin/specs/definitions'
@@ -883,7 +868,6 @@ export interface FileRouteTypes {
     | '/admin/equipos/nuevo'
     | '/admin/equipos/specs'
     | '/admin/facturacion/emisores'
-    | '/admin/facturacion/exportacion'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
     | '/admin/specs/definitions'
@@ -955,7 +939,6 @@ export interface FileRouteTypes {
     | '/admin/equipos/nuevo'
     | '/admin/equipos/specs'
     | '/admin/facturacion/emisores'
-    | '/admin/facturacion/exportacion'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
     | '/admin/specs/definitions'
@@ -1381,13 +1364,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPedidosIdLazyRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/facturacion/exportacion': {
-      id: '/admin/facturacion/exportacion'
-      path: '/facturacion/exportacion'
-      fullPath: '/admin/facturacion/exportacion'
-      preLoaderRoute: typeof AdminFacturacionExportacionLazyRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/facturacion/emisores': {
       id: '/admin/facturacion/emisores'
       path: '/facturacion/emisores'
@@ -1559,7 +1535,6 @@ interface AdminRouteChildren {
   AdminContabilidadMovimientosLazyRoute: typeof AdminContabilidadMovimientosLazyRoute
   AdminContabilidadReporteLazyRoute: typeof AdminContabilidadReporteLazyRoute
   AdminFacturacionEmisoresLazyRoute: typeof AdminFacturacionEmisoresLazyRoute
-  AdminFacturacionExportacionLazyRoute: typeof AdminFacturacionExportacionLazyRoute
   AdminPedidosIdLazyRoute: typeof AdminPedidosIdLazyRoute
   AdminPedidosNuevoLazyRoute: typeof AdminPedidosNuevoLazyRoute
   AdminSpecsDefinitionsLazyRoute: typeof AdminSpecsDefinitionsLazyRoute
@@ -1597,7 +1572,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminContabilidadMovimientosLazyRoute: AdminContabilidadMovimientosLazyRoute,
   AdminContabilidadReporteLazyRoute: AdminContabilidadReporteLazyRoute,
   AdminFacturacionEmisoresLazyRoute: AdminFacturacionEmisoresLazyRoute,
-  AdminFacturacionExportacionLazyRoute: AdminFacturacionExportacionLazyRoute,
   AdminPedidosIdLazyRoute: AdminPedidosIdLazyRoute,
   AdminPedidosNuevoLazyRoute: AdminPedidosNuevoLazyRoute,
   AdminSpecsDefinitionsLazyRoute: AdminSpecsDefinitionsLazyRoute,

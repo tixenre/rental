@@ -28,7 +28,6 @@ class EmisorArca:
     notas: Optional[str]
     created_at: datetime
     updated_at: datetime
-    habilitado_exportacion: bool = False  # relación de servicio WSFEXv1 delegada aparte de "wsfe"
 
 
 def _row_to_emisor(row: dict) -> EmisorArca:
@@ -44,7 +43,6 @@ def _row_to_emisor(row: dict) -> EmisorArca:
         domicilio=row["domicilio"],
         iibb=row["iibb"],
         inicio_actividades=row["inicio_actividades"],
-        habilitado_exportacion=row["habilitado_exportacion"],
         notas=row["notas"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -128,7 +126,6 @@ def create_emisor(
     domicilio: Optional[str] = None,
     iibb: Optional[str] = None,
     inicio_actividades: Optional[str] = None,
-    habilitado_exportacion: bool = False,
     notas: Optional[str] = None,
 ) -> int:
     _validate_condicion_iva(condicion_iva)
@@ -136,15 +133,14 @@ def create_emisor(
         """
         INSERT INTO emisores_arca (
             nombre, cuit, pto_vta, condicion_iva, razon_social,
-            domicilio, iibb, inicio_actividades, habilitado_exportacion, notas
+            domicilio, iibb, inicio_actividades, notas
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """,
         (
             nombre, cuit.strip(), pto_vta, condicion_iva, razon_social or None,
-            domicilio or None, iibb or None, inicio_actividades or None,
-            habilitado_exportacion, notas,
+            domicilio or None, iibb or None, inicio_actividades or None, notas,
         ),
     ).fetchone()
     return row["id"]
@@ -163,7 +159,6 @@ def update_emisor(
     domicilio: Optional[str] = None,
     iibb: Optional[str] = None,
     inicio_actividades: Optional[str] = None,
-    habilitado_exportacion: Optional[bool] = None,
     notas: Optional[str] = None,
 ) -> None:
     sets: list[str] = ["updated_at = now()"]
@@ -188,8 +183,6 @@ def update_emisor(
         sets.append("iibb = %s"); params.append(iibb or None)
     if inicio_actividades is not None:
         sets.append("inicio_actividades = %s"); params.append(inicio_actividades or None)
-    if habilitado_exportacion is not None:
-        sets.append("habilitado_exportacion = %s"); params.append(habilitado_exportacion)
     if notas is not None:
         sets.append("notas = %s"); params.append(notas)
 

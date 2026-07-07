@@ -107,77 +107,6 @@ cert_pem, key_pem = generar_cert_autofirmado("Mi Empresa — Comprobantes")  # g
 pdf_protegido = asegurar_pdf(pdf_bytes, cert_pem, key_pem)
 ```
 
-## Quickstart — Factura de Exportación (WSFEXv1)
-
-Webservice de AFIP **distinto** de WSFEv1 (RG 2758, `FEXAuthorize`) — el receptor es un comprador
-del exterior (sin CUIT argentino), con país destino/Incoterm/permiso de embarque en vez de
-condición IVA/domicilio local. Requiere una relación de servicio delegada APARTE de "wsfe" en el
-portal de AFIP — ver [`TRAMITES_AFIP.md`](TRAMITES_AFIP.md).
-
-```python
-from datetime import date
-from decimal import Decimal
-
-from arca_fe import (
-    Emisor, CondicionIva, Concepto,
-    ReceptorExterior, DatosExportacion, ComprobanteExportacionRequest,
-    WsfexClient, WSFEX_WSAA_SERVICIO, construir_tra, firmar_tra, login,
-)
-
-# 1. Armar el request (sin red — puro). La exportación está exenta de IVA — `importe_neto` es el
-#    importe TOTAL de la operación, no hay desglose de alícuotas.
-emisor = Emisor(cuit="20-30123456-3", punto_venta=3, condicion_iva=CondicionIva.RESPONSABLE_INSCRIPTO)
-receptor = ReceptorExterior(razon_social="Acme Corp", pais_destino_id=203, domicilio="123 Main St")
-exportacion = DatosExportacion(incoterm="FOB", permiso_embarque="24001EC01000123X")
-comprobante = ComprobanteExportacionRequest(
-    emisor=emisor, receptor=receptor, exportacion=exportacion, concepto=Concepto.PRODUCTOS,
-    importe_neto=Decimal("1000.00"), fecha=date.today(), moneda="USD", cotizacion=Decimal("1000"),
-)
-
-# 2. Autenticar contra WSAA — MISMO mecanismo que WSFEv1, pero para el servicio de exportación
-#    (un TA autentica una relación CUIT↔servicio; "wsfe" y "wsfex" NO comparten TA).
-tra = construir_tra(servicio=WSFEX_WSAA_SERVICIO)
-cms = firmar_tra(tra, cert_pem=b"...", key_pem=b"...")
-token, sign, expira_at = login(cms, endpoint="https://wsaahomo.afip.gov.ar/ws/services/LoginCms")
-
-# 3. Pedir el CAE de exportación.
-client = WsfexClient(endpoint="https://wswhomo.afip.gov.ar/wsfexv1/service.asmx?WSDL",
-                      cuit=20301234563, token=token, sign=sign)
-ultimo = client.ultimo_autorizado(pto_vta=3, cbte_tipo=19)
-resultado = client.autorizar(comprobante, numero=ultimo + 1)
-print(resultado.cae, resultado.cae_vto)
-```
-
-**Advertencia de implementación**: los nombres de operación/campo SOAP de WSFEXv1 usados acá
-(`FEXAuthorize`, `FEXGetLast_CMP`, catálogos `FEXGetPARAM_*`, nodos `Cmp`/`Permisos`/`Cbtes_asoc`)
-son la mejor referencia disponible sin acceso al WSDL real de homologación — se confirman/ajustan
-contra AFIP antes de usar en producción (ver `arca_fe/wsfex.py`/`comprobante_exportacion.py`
-docstrings). Nunca reemplazarlos por versión de un guess: probar contra homologación real primero.
-
-Para renderizar el documento ya emitido (mismo criterio que `renderizar_comprobante_html`, ver
-arriba), construí un `ComprobanteFiscalExportacion` con el CAE/QR ya resueltos y pasalo a
-`renderizar_factura_exportacion_html` (`arca_fe/render_exportacion.py`) — UN solo layout A4, sin
-discriminación de IVA (la exportación está exenta), con país destino/Incoterm/permiso de embarque en
-vez de condición IVA receptor/condición de venta:
-
-```python
-from arca_fe import ComprobanteFiscalExportacion, renderizar_factura_exportacion_html
-
-datos = ComprobanteFiscalExportacion(
-    cbte_tipo=19, pto_vta=3, numero=resultado.numero, fecha_emision=date.today(),
-    emisor_cuit="20301234563", emisor_razon_social="Mi Empresa", emisor_condicion_iva_label="IVA Responsable Inscripto",
-    emisor_domicilio="Av. Siempre Viva 742", receptor_razon_social="Acme Corp",
-    receptor_pais_destino_label="Estados Unidos", receptor_domicilio="123 Main St", receptor_id_impositivo="",
-    incoterm="FOB", permiso_embarque="24001EC01000123X", moneda="USD", cotizacion=Decimal("1000"),
-    items=(ItemFactura(codigo="001", descripcion="Exportación #1", precio_unitario=Decimal("1000"), subtotal=Decimal("1000")),),
-    importe_total=Decimal("1000"), cae=resultado.cae, cae_vto=resultado.cae_vto,
-    qr_url=armar_qr(cuit_emisor=20301234563, pto_vta=3, cbte_tipo=19, nro_cmp=resultado.numero,
-                     importe_total=Decimal("1000"), doc_tipo_rec=99, doc_nro_rec=0, cae=resultado.cae,
-                     fecha=date.today(), moneda="USD", ctz=Decimal("1000")),
-)
-html = renderizar_factura_exportacion_html(datos)
-```
-
 ## Previsualizar cómo se ve un comprobante (sin CAE real)
 
 `arca_fe.ejemplos.generar_galeria_html()` arma una página HTML con varios comprobantes de muestra
@@ -249,6 +178,9 @@ directorio `arca_fe/` completo a otro proyecto Python y funciona igual (verifica
 
 ## Qué NO cubre (explícitamente fuera de alcance)
 
+- **Factura E (exportación)** — webservice DISTINTO de AFIP (WSFEXv1, `FEXAuthorize`), con su
+  propio modelo de datos. No es una extensión de este motor.
+  Ver `## Backlog futuro` en el plan de la iniciativa que llevó esto a `0.3.0`.
 - Vigencia de catálogos vivos de AFIP (¿este código de moneda/tributo existe HOY?) — la librería
   valida FORMATO (forma fija del campo) pero no vigencia; para eso, consultar
   `WsfeClient.param_tipos_monedas()`/`param_tipos_tributos()`/etc. en vivo.

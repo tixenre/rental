@@ -19,11 +19,6 @@ export type {
   FacturaEstado,
   Factura,
   FacturasListResp,
-  FacturaExportacion,
-  FacturaExportacionEstado,
-  FacturasExportacionListResp,
-  CatalogoItem,
-  NuevaFacturaExportacion,
 } from "./facturacion";
 
 // URL absoluta para abrir PDFs en nueva pestaña

@@ -14,15 +14,9 @@ from dataclasses import dataclass
 
 _WSAA_HOMO = "https://wsaahomo.afip.gov.ar/ws/services/LoginCms"
 _WSFE_HOMO = "https://wswhomo.afip.gov.ar/wsfev1/service.asmx?WSDL"
-# WSFEXv1 (Factura de Exportación) — mismo host que WSFEv1, path distinto (wsfexv1 en vez de
-# wsfev1), siguiendo la convención pública de endpoints de AFIP. NO verificado contra un fetch
-# real del WSDL — confirmar contra homologación antes de emitir el primer comprobante real
-# (ver arca_fe/wsfex.py docstring).
-_WSFEX_HOMO = "https://wswhomo.afip.gov.ar/wsfexv1/service.asmx?WSDL"
 
 _WSAA_PROD = "https://wsaa.afip.gov.ar/ws/services/LoginCms"
 _WSFE_PROD = "https://servicios1.afip.gov.ar/wsfev1/service.asmx?WSDL"
-_WSFEX_PROD = "https://servicios1.afip.gov.ar/wsfexv1/service.asmx?WSDL"
 
 
 @dataclass(frozen=True)
@@ -39,7 +33,6 @@ class CredARCA:
     key_pem: bytes
     endpoint_wsaa: str
     endpoint_wsfe: str
-    endpoint_wsfex: str = ""
 
 
 def credenciales(nombre_emisor: str, conn) -> CredARCA:
@@ -72,7 +65,6 @@ def credenciales(nombre_emisor: str, conn) -> CredARCA:
     ambiente = "produccion" if app_settings.is_production else "homologacion"
     endpoint_wsaa = _WSAA_PROD if ambiente == "produccion" else _WSAA_HOMO
     endpoint_wsfe = _WSFE_PROD if ambiente == "produccion" else _WSFE_HOMO
-    endpoint_wsfex = _WSFEX_PROD if ambiente == "produccion" else _WSFEX_HOMO
 
     try:
         cuit_int = int(emisor.cuit.replace("-", "").replace(".", ""))
@@ -92,7 +84,6 @@ def credenciales(nombre_emisor: str, conn) -> CredARCA:
         key_pem=key_pem,
         endpoint_wsaa=endpoint_wsaa,
         endpoint_wsfe=endpoint_wsfe,
-        endpoint_wsfex=endpoint_wsfex,
     )
 
 

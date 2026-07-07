@@ -7,7 +7,6 @@ from __future__ import annotations
 import pytest
 
 from arca_fe.asyncio_support import (
-    autorizar_async,
     get_persona_async,
     login_async,
     login_con_cert_async,
@@ -22,11 +21,6 @@ class _FakeWsfeClient:
         return ("cae-resultado", comprobante, numero)
 
 
-class _FakeWsfexClient:
-    def autorizar(self, comprobante, numero):
-        return ("cae-exportacion-resultado", comprobante, numero)
-
-
 class _FakePadronClient:
     def get_persona(self, cuit):
         return ("persona-resultado", cuit)
@@ -37,13 +31,6 @@ async def test_solicitar_cae_async_delega_al_cliente_sync():
     client = _FakeWsfeClient()
     resultado = await solicitar_cae_async(client, "comprobante-fake", 7)
     assert resultado == ("cae-resultado", "comprobante-fake", 7)
-
-
-@pytest.mark.asyncio
-async def test_autorizar_async_delega_al_cliente_sync():
-    client = _FakeWsfexClient()
-    resultado = await autorizar_async(client, "comprobante-exportacion-fake", 3)
-    assert resultado == ("cae-exportacion-resultado", "comprobante-exportacion-fake", 3)
 
 
 @pytest.mark.asyncio
