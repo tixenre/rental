@@ -113,7 +113,7 @@ export function DescuentosJornadaSection() {
       )}
 
       {/* Agregar punto */}
-      <div className="flex items-end gap-2">
+      <div className="flex flex-wrap items-end gap-2">
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">Jornadas</label>
           <Input

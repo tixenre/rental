@@ -76,7 +76,7 @@ function EmisoresPage() {
       maxW="form"
       description="CUITs habilitados para emitir comprobantes electrónicos. Las claves se cifran con AES antes de guardarse."
       actions={
-        <div className="flex items-center gap-2">
+        <>
           <Button variant="outline" onClick={() => setShowGuia(true)}>
             <BookOpen className="h-3.5 w-3.5 mr-1.5" />
             Guía de AFIP
@@ -90,7 +90,7 @@ function EmisoresPage() {
             <Plus className="h-3.5 w-3.5 mr-1.5" />
             Nuevo emisor
           </Button>
-        </div>
+        </>
       }
     >
       <div className="space-y-6">

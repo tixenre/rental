@@ -77,7 +77,7 @@ function ClientesPage() {
       title="Clientes"
       description={listQ.isLoading ? "Cargando…" : `${total} clientes`}
       actions={
-        <div className="flex items-center gap-2">
+        <>
           <Button variant="outline" onClick={() => setShowDuplicados(true)}>
             <Users className="h-4 w-4 mr-1" /> Duplicados
           </Button>
@@ -87,7 +87,7 @@ function ClientesPage() {
           <Button onClick={() => setCreating(true)}>
             <Plus className="h-4 w-4 mr-1" /> Nuevo cliente
           </Button>
-        </div>
+        </>
       }
     >
       <div className="space-y-6">

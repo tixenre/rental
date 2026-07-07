@@ -488,7 +488,7 @@ function EquiposPage() {
 
         {/* Barra flotante de bulk actions */}
         {selectedIds.size > 0 && (
-          <div className="sticky top-0 z-10 flex items-center gap-2 rounded-md border hairline bg-ink text-background px-3 py-2 shadow-md">
+          <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-md border hairline bg-ink text-background px-3 py-2 shadow-md">
             <span className="text-sm font-medium flex-1">
               {selectedIds.size} seleccionado{selectedIds.size === 1 ? "" : "s"}
             </span>

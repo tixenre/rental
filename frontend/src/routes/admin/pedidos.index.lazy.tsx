@@ -204,7 +204,7 @@ function PedidosPage() {
         </>
       }
       actions={
-        <div className="hidden md:flex items-center gap-2">
+        <div className="hidden md:flex md:flex-wrap items-center gap-2">
           <Button
             variant="outline"
             onClick={() => navigate({ to: "/admin/solicitudes" })}
