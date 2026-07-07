@@ -16,8 +16,8 @@ import {
   type NuevaFacturaExportacion,
 } from "@/lib/admin/api";
 import { formatARS, formatFechaDisplay } from "@/lib/format";
-import { useDocumentTitle } from "@/lib/use-document-title";
-import { FacturaBadge } from "@/components/kit/FacturaBadge";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { FacturaBadge } from "@/design-system/ui/FacturaBadge";
 import { cn } from "@/lib/utils";
 
 export const Route = createLazyFileRoute("/admin/facturacion/exportacion")({
