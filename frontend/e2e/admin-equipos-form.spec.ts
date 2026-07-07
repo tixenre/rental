@@ -38,9 +38,7 @@ test.describe("Admin equipos — form V2", () => {
     await expect(page.getByPlaceholder(/Buscar/i)).toBeVisible();
   });
 
-  test("Click en Nuevo equipo abre el editor V2 (página completa, no modal)", async ({
-    page,
-  }) => {
+  test("Click en Nuevo equipo abre el editor V2 (página completa, no modal)", async ({ page }) => {
     await page.goto("/admin/equipos");
     await page.waitForLoadState("networkidle");
 
