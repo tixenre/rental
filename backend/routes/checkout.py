@@ -25,6 +25,7 @@ from pydantic import BaseModel
 from auth.stepup import has_recent_stepup
 from database import get_db, now_ar, row_to_dict, MARCA_SUBQUERY
 from pdf import _contrato_html
+from rate_limit import limiter
 from routes.cliente_portal import require_cliente
 from services.carrito import desde_items_json
 from services.checkout import registrar_aceptacion, validar_checkout
@@ -78,6 +79,7 @@ class CheckoutValidarIn(BaseModel):
 
 
 @router.post("/checkout/validar")
+@limiter.limit("30/minute")
 def checkout_validar(data: CheckoutValidarIn, request: Request):
     """Portero del checkout — devuelve {listo, faltan}."""
     try:
@@ -112,6 +114,7 @@ def checkout_validar(data: CheckoutValidarIn, request: Request):
 
 
 @router.post("/checkout/aceptar-tyc")
+@limiter.limit("30/minute")
 def checkout_aceptar_tyc(request: Request):
     """Registra la aceptación de T&C (versión actual) para el cliente logueado."""
     session = require_cliente(request)
@@ -157,6 +160,7 @@ def _marcar_como_simulacion(html_str: str) -> str:
 
 
 @router.post("/checkout/contrato-preview")
+@limiter.limit("30/minute")
 def checkout_contrato_preview(data: ContratoPreviewIn, request: Request):
     """Preview del CONTRATO del pedido EN CURSO — antes de crearlo. Arma un
     `pedido` equivalente en memoria desde el carrito de la sesión (mismo

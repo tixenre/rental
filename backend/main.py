@@ -269,6 +269,12 @@ async def security_headers(request, call_next):
     # pise de vuelta a DENY.
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # El propio origen no usa cámara/micrófono/geolocalización/pagos vía Web API (la
+    # verificación de identidad corre en el dominio de Didit, no embebida acá) — las
+    # bloqueamos explícitamente (auditoría de seguridad, 2026-07-08).
+    response.headers["Permissions-Policy"] = (
+        "camera=(), microphone=(), geolocation=(), payment=()"
+    )
     # HSTS solo en prod: fuerza HTTPS por 1 año (incluye subdominios). NO en
     # dev/staging (no pinear sus dominios a HTTPS). `is_production` falla-a-prod ante
     # un env desconocido → del lado seguro (todo Railway es HTTPS; sobre HTTP el header
