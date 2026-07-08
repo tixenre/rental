@@ -75,6 +75,10 @@ router = APIRouter()
 # el webhook (el webhook es asíncrono, puede tardar unos segundos).
 _RETURN_PATH = "/cliente/portal?verificacion=pendiente"
 
+# Cooldown anti-ráfaga entre sesiones Didit creadas por el mismo cliente — ver
+# docstring de `cliente_iniciar_verificacion`. #1169 seguimiento.
+_COOLDOWN_SEGUNDOS = 90
+
 
 class SesionVerificacionIn(BaseModel):
     return_to: Optional[str] = None
@@ -225,7 +229,18 @@ def cliente_iniciar_verificacion(request: Request, body: Optional[SesionVerifica
     En cambio re-chequea contra Didit al toque (por si el webhook de la
     aprobación/rechazo ya llegó y no se reflejó): si sigue en revisión o recién
     se verificó, devuelve 409 con el estado actual en vez de una sesión nueva.
-    Rate-limit 5/min de defensa en profundidad contra reintentos en ráfaga.
+
+    Cooldown anti-ráfaga (#1169 seguimiento): el gate de arriba depende de
+    `dni_verificacion_estado`, que solo pasa a "en_revision" cuando llega el
+    webhook — es decir, DESPUÉS de que el cliente completó el flujo del lado de
+    Didit. Un cliente que reintenta el botón ANTES de terminar ese flujo (doble
+    click, se le cerró la pestaña, ansiedad) no tiene webhook todavía, así que
+    ese gate no lo frena — cada click crearía una sesión Didit nueva (costo real
+    por sesión completada). Por eso, además, bloqueamos si el cliente ya generó
+    una sesión en los últimos `_COOLDOWN_SEGUNDOS`: no depende del webhook, solo
+    de que YA le dimos una sesión hace instantes.
+
+    Rate-limit 5/min de defensa en profundidad adicional (scripts/abuso de API).
 
     503 si DIDIT_API_KEY no está configurada.
     """
@@ -262,6 +277,21 @@ def cliente_iniciar_verificacion(request: Request, body: Optional[SesionVerifica
         # Si el recheck la resolvió a "rechazado" (o falló y sigue en_revision
         # pero el UPDATE de arriba no corrió — caso cubierto arriba), seguimos
         # abajo: es un reintento legítimo.
+
+    with get_db() as conn:
+        reciente = conn.execute(
+            """SELECT 1 FROM kyc_events
+               WHERE cliente_id=%s AND evento='iniciado'
+                 AND created_at > NOW() - make_interval(secs => %s)
+               LIMIT 1""",
+            (cliente_id, _COOLDOWN_SEGUNDOS),
+        ).fetchone()
+    if reciente:
+        raise HTTPException(
+            429,
+            "Ya iniciaste tu verificación hace instantes — si no se abrió bien, "
+            "esperá un momento y volvé a intentar.",
+        )
 
     return_url = f"{settings.SITE_URL}{_RETURN_PATH}"
     rt = body.return_to if body else None

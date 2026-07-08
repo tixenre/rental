@@ -21,8 +21,11 @@ import { FieldLabel } from "@/design-system/ui/Field";
 import { cn } from "@/lib/utils";
 import { formatARS } from "@/lib/format";
 import { authedFetch } from "@/lib/authedFetch";
-import { iniciarVerificacionIdentidad } from "@/lib/verificacion";
-import { VerificacionRequeridaPanel } from "@/components/rental/account/VerificacionRequeridaPanel";
+import { chequearEstadoVerificacion, iniciarVerificacionIdentidad } from "@/lib/verificacion";
+import {
+  VerificacionRequeridaPanel,
+  type VerificacionPanelEstado,
+} from "@/components/rental/account/VerificacionRequeridaPanel";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
 import { apiGetEstudioDisponibilidad, apiCrearReservaEstudio } from "@/lib/api";
 
@@ -148,6 +151,12 @@ export function StudioBookingForm({
 
   const [auth, setAuth] = useState<"checking" | "in" | "out">("checking");
   const [verificado, setVerificado] = useState(false);
+  // Sub-estado de identidad (no-verificado / en-revision / rechazado) — mismo
+  // patrón que CheckoutResumen/IdentidadSection: sin esto, un cliente en
+  // revisión o rechazado veía el CTA genérico "Verificar mi identidad" y podía
+  // reintentar creyendo que nunca había empezado (#1169 seguimiento).
+  const [identidadEstado, setIdentidadEstado] = useState<VerificacionPanelEstado>("no-verificado");
+  const [identidadMotivo, setIdentidadMotivo] = useState<string | null>(null);
   useEffect(() => {
     let cancelado = false;
     authedFetch("/api/cliente/me")
@@ -164,6 +173,13 @@ export function StudioBookingForm({
       .catch(() => {
         if (!cancelado) setAuth("out");
       });
+    void chequearEstadoVerificacion().then(({ estado, motivo }) => {
+      if (cancelado) return;
+      if (estado === "en-revision" || estado === "rechazado") {
+        setIdentidadEstado(estado);
+        setIdentidadMotivo(motivo ?? null);
+      }
+    });
     return () => {
       cancelado = true;
     };
@@ -555,6 +571,8 @@ export function StudioBookingForm({
 
         {needsVerif ? (
           <VerificacionRequeridaPanel
+            estado={identidadEstado}
+            motivo={identidadMotivo}
             onVerificar={() => void handleVerificar()}
             iniciando={iniciandoVerif}
           />

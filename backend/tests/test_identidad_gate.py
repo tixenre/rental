@@ -53,12 +53,16 @@ class _FakeCursor:
 
 class _FakeConn:
     """Conn fake que siempre devuelve la misma fila de cliente para cualquier
-    SELECT. Suficiente para que el gate (único SELECT antes del rechazo) decida."""
+    SELECT sobre `clientes`. Suficiente para que el gate decida. El cooldown
+    anti-ráfaga (#1169) consulta `kyc_events` aparte — sin fila "reciente" acá
+    (None), o los tests de creación exitosa quedarían siempre bloqueados con 429."""
 
     def __init__(self, cliente_row):
         self._row = cliente_row
 
     def execute(self, sql, params=()):
+        if "kyc_events" in sql:
+            return _FakeCursor(None)
         return _FakeCursor(self._row)
 
     def commit(self):
