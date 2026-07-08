@@ -19,6 +19,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Receipt } from "lucide-react";
 import { authedFetch } from "@/lib/authedFetch";
+import { syncCartHeartbeat } from "@/hooks/useCartHeartbeat";
 import { cn } from "@/lib/utils";
 import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
 import { Button } from "@/design-system/ui/button";
@@ -172,6 +173,7 @@ export default function ClienteRegistroPage() {
         body: JSON.stringify({ token, ...form, direccion }),
       });
       if (r.ok) {
+        syncCartHeartbeat();
         navigate({ to: "/cliente/portal" });
       } else {
         const d = await r.json().catch(() => ({}));
