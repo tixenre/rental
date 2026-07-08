@@ -28,6 +28,13 @@ class TestCSPReportOnly:
         assert "*.r2.dev" in csp  # imágenes R2
         assert "www.youtube.com" in csp  # embeds de video
         assert "maps.google.com" in csp  # embed del mapa
+        # sumadas tras la auditoría de seguridad (2026-07-08), confirmadas contra
+        # los reportes reales acumulados en prod — sin esto, enforcing rompería
+        # analytics, error tracking y el beacon de Cloudflare en silencio
+        assert "analytics.google.com" in csp  # GA4 usa este dominio, no solo google-analytics.com
+        assert "stats.g.doubleclick.net" in csp  # GA4 (conversiones/audiencias)
+        assert "ingest.us.sentry.io" in csp  # Sentry — error tracking del panel admin
+        assert "static.cloudflareinsights.com" in csp  # beacon de Cloudflare
         # los style={} de React + el <style> de Google Fonts exigen unsafe-inline
         assert "style-src 'self' 'unsafe-inline'" in csp
 

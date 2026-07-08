@@ -28,7 +28,9 @@ class _Cur:
 
 class _Conn:
     """Devuelve `estado_row` para cualquier SELECT sobre `clientes` (alcanza para
-    el gate, que solo lee `dni_verificacion_estado`/`dni_verificacion_motivo`)."""
+    el gate, que solo lee `dni_verificacion_estado`/`dni_verificacion_motivo`). El
+    cooldown anti-ráfaga (#1169) consulta `kyc_events` aparte — sin fila "reciente"
+    acá (None), o quedaría siempre bloqueado con 429."""
 
     def __init__(self, estado_row):
         self.estado_row = estado_row
@@ -36,6 +38,8 @@ class _Conn:
 
     def execute(self, sql, params=()):
         self.executed.append((sql, params))
+        if "kyc_events" in sql:
+            return _Cur(None)
         return _Cur(self.estado_row)
 
     def commit(self):
@@ -113,8 +117,9 @@ def test_en_revision_resuelta_a_rechazado_por_recheck_permite_reintentar(monkeyp
     class _ConnSecuencial:
         def execute(self, sql, params=()):
             # Solo los dos SELECT de estado (antes/después del recheck) consumen
-            # del iterador — el UPDATE de didit_session_id que sigue no lee nada.
-            if "SELECT" in sql:
+            # del iterador — el cooldown anti-ráfaga (#1169) sobre `kyc_events` y
+            # el UPDATE de didit_session_id que siguen no leen de acá.
+            if "SELECT" in sql and "kyc_events" not in sql:
                 return _Cur(next(it))
             return _Cur(None)
         def commit(self):
@@ -135,6 +140,37 @@ def test_en_revision_resuelta_a_rechazado_por_recheck_permite_reintentar(monkeyp
 
     res = cliente_iniciar_verificacion.__wrapped__(request=object(), body=None)
     assert res == {"session_id": "sess-reintento", "url": "https://verify.didit.me/z"}
+
+
+def test_cooldown_bloquea_sesion_creada_hace_instantes(monkeypatch):
+    """#1169 seguimiento — el gate `en_revision` no alcanza a frenar reintentos
+    ANTES de que llegue el webhook de Didit (el estado sigue `no_verificado`
+    hasta entonces). El cooldown sobre `kyc_events.evento='iniciado'` sí: si el
+    cliente ya generó una sesión hace instantes, bloquea con 429 SIN llamar a
+    create_session (evita el caso real de #1169: hasta 10 sesiones/persona)."""
+    llamado = []
+
+    class _ConnConSesionReciente:
+        def execute(self, sql, params=()):
+            if "kyc_events" in sql:
+                return _Cur(True)  # hay una fila "iniciado" dentro del cooldown
+            return _Cur({"dni_verificacion_estado": "no_verificado"})
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr("routes.didit.require_cliente", lambda request: {"cliente_id": 7})
+    monkeypatch.setattr("routes.didit.get_db", lambda: _ConnConSesionReciente())
+    monkeypatch.setattr(
+        "routes.didit.create_session",
+        lambda **kw: llamado.append(1) or DiditSession(session_id="x", url="https://verify.didit.me/x"),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        cliente_iniciar_verificacion.__wrapped__(request=object(), body=None)
+    assert exc.value.status_code == 429
+    assert llamado == []
 
 
 def test_cliente_recheck_delega_al_motor_compartido(monkeypatch):

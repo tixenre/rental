@@ -112,10 +112,15 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.exception_handler(Exception)
 async def _global_exception_handler(request: Request, exc: Exception):
     """Captura cualquier excepción no manejada, la persiste en server_errors y
-    devuelve el tipo + mensaje al cliente (en vez de "Internal Server Error").
+    devuelve un 500 al cliente.
 
     HTTPException y RateLimitExceeded se propagan normalmente — este handler
-    solo atrapa lo inesperado.
+    solo atrapa lo inesperado. El detalle completo (tipo + mensaje) SIEMPRE
+    queda en `server_errors` (`log_server_error`) y en el log — al cliente solo
+    le llega tipo+mensaje crudo en local (`not settings.is_railway`); en
+    Railway (dev/staging incluido — corre con datos copiados de prod, ver
+    MEMORIA) y en prod devolvemos un mensaje genérico, para no filtrar nombres
+    de constraint/columna/librería a un caller externo.
     """
     from fastapi import HTTPException as _HTTPException
     from fastapi.responses import JSONResponse as _JSONResponse
@@ -130,9 +135,14 @@ async def _global_exception_handler(request: Request, exc: Exception):
     logger.exception("Error no manejado en %s (rid=%s)", route, rid)
     log_server_error(route, exc, request_id=rid)
 
+    detail = (
+        f"{type(exc).__name__}: {exc}"
+        if not settings.is_railway
+        else "Ocurrió un error inesperado — ya quedó registrado."
+    )
     return _JSONResponse(
         status_code=500,
-        content={"detail": f"{type(exc).__name__}: {exc}"},
+        content={"detail": detail},
     )
 
 
@@ -200,11 +210,15 @@ if os.getenv("RAILWAY_ENVIRONMENT"):
 # Arranca en Report-Only: NO bloquea nada, solo reporta violaciones a /csp-report
 # para mapear las fuentes reales en prod antes de pasar a enforcing. Fuentes
 # relevadas del código: self · Google Fonts (googleapis/gstatic) · GA4
-# (googletagmanager/google-analytics) · R2 (imágenes, *.r2.dev) · embeds (Google
-# Maps, YouTube, Instagram embed.js + cdninstagram/fbcdn) · simpleicons (logos de
-# marca). 'unsafe-inline' en style-src es
-# inevitable por los `style={}` de React + el <style> que inyecta Google Fonts.
-# Solo se aplica al HTML del SPA (no a /api ni assets, que no ejecutan nada).
+# (googletagmanager/google-analytics/analytics.google.com/doubleclick — GA4 usa
+# varios subdominios, no solo google-analytics.com) · Sentry (ingest.us.sentry.io,
+# error tracking del panel admin) · Cloudflare Insights (beacon automático) · R2
+# (imágenes, *.r2.dev) · embeds (Google Maps, YouTube, Instagram embed.js +
+# cdninstagram/fbcdn) · simpleicons (logos de marca). Confirmado/ajustado contra
+# los reportes reales acumulados en prod (auditoría de seguridad, 2026-07-08).
+# 'unsafe-inline' en style-src es inevitable por los `style={}` de React + el
+# <style> que inyecta Google Fonts. Solo se aplica al HTML del SPA (no a /api ni
+# assets, que no ejecutan nada).
 CSP_REPORT_ONLY = "; ".join(
     [
         "default-src 'self'",
@@ -212,14 +226,16 @@ CSP_REPORT_ONLY = "; ".join(
         "object-src 'none'",
         "frame-ancestors 'self'",
         "form-action 'self'",
-        "script-src 'self' https://www.googletagmanager.com https://www.instagram.com",
+        "script-src 'self' https://www.googletagmanager.com https://www.instagram.com "
+        "https://static.cloudflareinsights.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
         "img-src 'self' data: blob: https://*.r2.dev https://www.googletagmanager.com "
-        "https://*.google-analytics.com https://cdn.simpleicons.org "
+        "https://*.google-analytics.com https://www.google.com.ar https://cdn.simpleicons.org "
         "https://*.cdninstagram.com https://*.fbcdn.net",
         "connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com "
-        "https://*.r2.dev https://www.instagram.com",
+        "https://analytics.google.com https://stats.g.doubleclick.net https://www.google.com.ar "
+        "https://*.ingest.us.sentry.io https://*.r2.dev https://www.instagram.com",
         "frame-src 'self' blob: https://www.google.com https://maps.google.com "
         "https://www.youtube.com https://*.r2.dev https://www.instagram.com",
         "report-uri /csp-report",
@@ -259,6 +275,12 @@ async def security_headers(request, call_next):
     # pise de vuelta a DENY.
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # El propio origen no usa cámara/micrófono/geolocalización/pagos vía Web API (la
+    # verificación de identidad corre en el dominio de Didit, no embebida acá) — las
+    # bloqueamos explícitamente (auditoría de seguridad, 2026-07-08).
+    response.headers["Permissions-Policy"] = (
+        "camera=(), microphone=(), geolocation=(), payment=()"
+    )
     # HSTS solo en prod: fuerza HTTPS por 1 año (incluye subdominios). NO en
     # dev/staging (no pinear sus dominios a HTTPS). `is_production` falla-a-prod ante
     # un env desconocido → del lado seguro (todo Railway es HTTPS; sobre HTTP el header

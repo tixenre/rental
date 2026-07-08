@@ -57,7 +57,7 @@ export function IdentidadSection({
 
       {/* Badge de estado */}
       {confirmando && !verificado ? (
-        <div className="flex items-center gap-3 card px-4 py-4 mb-6">
+        <div role="status" className="flex items-center gap-3 card px-4 py-4 mb-6">
           <ShieldCheck className="h-7 w-7 text-muted-foreground shrink-0 animate-pulse" />
           <div>
             <div className="font-sans font-semibold text-15 text-ink">
@@ -69,7 +69,10 @@ export function IdentidadSection({
           </div>
         </div>
       ) : estado === "rechazado" ? (
-        <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-4 mb-6">
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-4 mb-6"
+        >
           <XCircle className="h-7 w-7 text-destructive shrink-0 mt-0.5" />
           <div>
             <div className="font-sans font-semibold text-15 text-ink">Verificación rechazada</div>
@@ -79,7 +82,10 @@ export function IdentidadSection({
           </div>
         </div>
       ) : estado === "en_revision" ? (
-        <div className="flex items-center gap-3 rounded-xl border border-amber bg-amber-soft px-4 py-4 mb-6">
+        <div
+          role="status"
+          className="flex items-center gap-3 rounded-xl border border-amber bg-amber-soft px-4 py-4 mb-6"
+        >
           <Clock className="h-7 w-7 text-amber shrink-0" />
           <div>
             <div className="font-sans font-semibold text-15 text-ink">En revisión</div>
@@ -90,6 +96,7 @@ export function IdentidadSection({
         </div>
       ) : (
         <div
+          role="status"
           className={cn(
             "flex items-center gap-3 rounded-xl border px-4 py-4 mb-6",
             verificado ? "border-verde/30 bg-verde/8" : "border-amber bg-amber-soft",
