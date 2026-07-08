@@ -27,6 +27,15 @@ válidos.
 Este módulo devuelve HTML (string), no PDF — no carga la dependencia de un motor de render
 (Playwright/Chromium). Convertir a PDF, firmarlo/protegerlo (`arca_fe.seguridad.asegurar_pdf`) y
 decidir el canal de entrega (descarga, mail, portal) es responsabilidad del consumidor.
+
+Tema tipográfico: `detallada`/`simplificada` usan la familia CSS lógica `'ComprobanteSans'` (más
+`'JetBrains Mono'` para los datos tabulares) — nunca el nombre de una tipografía de marca puntual.
+Si el caller no pasa `fonts_css`, `renderizar_comprobante_html` embebe un default agnóstico de
+marca (Inter + JetBrains Mono, ambas SIL OFL — ver `assets/fonts/LICENSE-fonts.txt`) bajo esos
+mismos nombres lógicos, así CUALQUIER consumidor que no personalice nada obtiene el mismo resultado
+visual. Un consumidor que quiera su propia tipografía (ej. rambla con TT Commons) pasa su propio
+`fonts_css` declarando `@font-face{font-family:'ComprobanteSans';...}` con sus propios archivos —
+el HTML nunca hardcodea el nombre de una marca puntual, solo el rol lógico que cumple.
 """
 from __future__ import annotations
 
@@ -173,6 +182,48 @@ def _arca_logo(width: int) -> str:
     return svg.replace(
         "<svg ", f'<svg style="width:{width}px;height:auto;display:block" ', 1
     )
+
+
+# ---------------------------------------------------------------------------
+# Tema tipográfico DEFAULT — Inter + JetBrains Mono, ambas SIL OFL (embebibles/
+# redistribuibles sin restricción, ver assets/fonts/LICENSE-fonts.txt). Ninguna
+# de las dos es la marca de ningún consumidor puntual (ni de rambla, ni de
+# quien use esto después) — es el tema neutral que aplica cuando el caller no
+# pasa su propio `fonts_css`. Se embeben bajo el nombre lógico 'ComprobanteSans'
+# (nunca 'Inter' hardcodeado en los templates) para que un consumidor pueda
+# reemplazar el default por su propia tipografía sin tocar el HTML — solo tiene
+# que declarar su `@font-face` bajo ese mismo nombre lógico.
+# ---------------------------------------------------------------------------
+
+_DEFAULT_FONT_FILES = [
+    ("inter-400.woff2", "ComprobanteSans", 400),
+    ("inter-500.woff2", "ComprobanteSans", 500),
+    ("inter-600.woff2", "ComprobanteSans", 600),
+    ("inter-700.woff2", "ComprobanteSans", 700),
+    ("inter-800.woff2", "ComprobanteSans", 800),
+    ("jetbrains-mono-400.woff2", "JetBrains Mono", 400),
+    ("jetbrains-mono-500.woff2", "JetBrains Mono", 500),
+]
+
+
+@lru_cache(maxsize=1)
+def _default_fonts_css() -> str:
+    import base64
+
+    faces = []
+    for fname, family, weight in _DEFAULT_FONT_FILES:
+        path = os.path.join(_ASSETS_DIR, "fonts", fname)
+        try:
+            with open(path, "rb") as fh:
+                b64 = base64.b64encode(fh.read()).decode("ascii")
+        except OSError:
+            continue
+        faces.append(
+            f"@font-face{{font-family:'{family}';font-weight:{weight};"
+            f"font-style:normal;font-display:swap;"
+            f"src:url(data:font/woff2;base64,{b64}) format('woff2')}}"
+        )
+    return "<style>" + "".join(faces) + "</style>"
 
 
 # ---------------------------------------------------------------------------
@@ -568,7 +619,7 @@ def _factura_simplificada_html(f: dict, fonts_css: str) -> str:
   * {{ box-sizing:border-box; margin:0; padding:0; }}
   html,body {{ height:100%; background:{_SIMPLIFICADA_FONDO}; }}
   body {{ min-height:100vh; display:flex; align-items:center; justify-content:center;
-          font-family:'TT Commons',ui-sans-serif,sans-serif; color:#16202b; }}
+          font-family:'ComprobanteSans',ui-sans-serif,sans-serif; color:#16202b; }}
   /* El diseño está afinado en unidades NATIVAS (tarjeta de {_SIMPLIFICADA_DISENO_ANCHO}px) — acá
      `.page` declara ese tamaño nativo y le suma `zoom:{_SIMPLIFICADA_ZOOM}`, que Chromium aplica a
      TODO el árbol (fuentes, radios, el QR) antes de imprimir/capturar: el resultado siempre sale a
@@ -715,7 +766,7 @@ def _factura_detallada_html(f: dict, fonts_css: str) -> str:
 <style>
   * {{ box-sizing:border-box; margin:0; padding:0; }}
   html,body {{ background:#fff; }}
-  body {{ width:794px; min-height:1123px; background:#fff; font-family:'TT Commons',ui-sans-serif,sans-serif;
+  body {{ width:794px; min-height:1123px; background:#fff; font-family:'ComprobanteSans',ui-sans-serif,sans-serif;
           color:#16202b; display:flex; flex-direction:column; }}
 </style>
 </head>
@@ -842,10 +893,13 @@ def renderizar_comprobante_html(
     pero con el detalle completo). Un valor desconocido cae a `"simplificada"` — usar
     `LAYOUTS_INFO` para mostrarle al usuario nombre/descripción/advertencia de cada opción antes de
     que elija, en vez de hardcodear copy propio.
-    `fonts_css`: bloque `<style>@font-face{...}</style>` ya armado, para tipografías propias del
-    caller (la oficial no lo usa — solo detallada/simplificada). Sin este parámetro (default
-    `""`), el HTML sigue siendo válido: cae a los fallbacks de sistema ya declarados en el CSS — la
-    marca nunca es requisito de validez fiscal.
+    `fonts_css`: bloque `<style>@font-face{...}</style>` ya armado, para que el caller reemplace el
+    tema tipográfico bajo los nombres lógicos `'ComprobanteSans'`/`'JetBrains Mono'` (la oficial no
+    lo usa — solo detallada/simplificada). Sin este parámetro (default `""`), se embebe un tema
+    neutral agnóstico de marca (Inter + JetBrains Mono, SIL OFL — ver
+    `assets/fonts/LICENSE-fonts.txt`) bajo esos mismos nombres, así cualquier consumidor que no
+    personalice nada obtiene el mismo resultado visual que cualquier otro. La marca nunca es
+    requisito de validez fiscal — con o sin override, el comprobante es igual de válido.
 
     Devuelve el HTML como string; no convierte a PDF (eso es responsabilidad del caller, junto con
     `arca_fe.seguridad.asegurar_pdf` si hace falta el documento certificado).
@@ -859,4 +913,4 @@ def renderizar_comprobante_html(
         _validar_apto_para_simplificada(datos.items)
     builder = _LAYOUTS[layout_resuelto]
     ctx = _build_ctx(datos)
-    return builder(ctx, fonts_css)
+    return builder(ctx, fonts_css or _default_fonts_css())

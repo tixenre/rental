@@ -1129,3 +1129,16 @@ En la práctica (iniciativa #1029, F5–F7): `import pytest` sin usar, columnas 
 URL apuntando a un archivo borrado, test con paths eliminados — todos encontrados por el supervisor.
 **No skippearlo aunque el cambio parezca mecánico**: es una segunda revisión de código, no solo un gate
 de scope. Los bugs concretos que encuentra son distintos a los que caza CI (tipos, lint, tests unitarios).
+
+### 2026-07-08 — `arca_fe` gana un tema tipográfico default, agnóstico de marca (Inter + JetBrains Mono)
+
+Preparando la integración de `arca_fe` en Freelo (otro proyecto propio) con el requisito explícito
+de "cero drift" entre plataformas, `renderizar_comprobante_html` gana un tema default embebido
+(Inter + JetBrains Mono, SIL OFL) para cuando el caller no pasa `fonts_css` — antes caía a fuentes
+de sistema. Los templates dejan de referenciar `'TT Commons'` literal (la marca de Rambla filtrada
+en una librería agnóstica) y pasan a un nombre lógico `'ComprobanteSans'`; `comprobante_render.py`
+de Rambla se actualizó para embeber sus mismos bytes de TT Commons bajo ese nombre — cero cambio
+visual en las facturas reales de Rambla (decisión explícita: no adoptar el default nuevo todavía,
+cambiar la tipografía de un documento fiscal en producción es una decisión de producto aparte). 294
+tests de `arca_fe` en verde, `__version__` 0.1.0→0.2.0. Detalle completo en `docs/DECISIONES.md`
+esta fecha.
