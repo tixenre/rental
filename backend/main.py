@@ -210,11 +210,15 @@ if os.getenv("RAILWAY_ENVIRONMENT"):
 # Arranca en Report-Only: NO bloquea nada, solo reporta violaciones a /csp-report
 # para mapear las fuentes reales en prod antes de pasar a enforcing. Fuentes
 # relevadas del código: self · Google Fonts (googleapis/gstatic) · GA4
-# (googletagmanager/google-analytics) · R2 (imágenes, *.r2.dev) · embeds (Google
-# Maps, YouTube, Instagram embed.js + cdninstagram/fbcdn) · simpleicons (logos de
-# marca). 'unsafe-inline' en style-src es
-# inevitable por los `style={}` de React + el <style> que inyecta Google Fonts.
-# Solo se aplica al HTML del SPA (no a /api ni assets, que no ejecutan nada).
+# (googletagmanager/google-analytics/analytics.google.com/doubleclick — GA4 usa
+# varios subdominios, no solo google-analytics.com) · Sentry (ingest.us.sentry.io,
+# error tracking del panel admin) · Cloudflare Insights (beacon automático) · R2
+# (imágenes, *.r2.dev) · embeds (Google Maps, YouTube, Instagram embed.js +
+# cdninstagram/fbcdn) · simpleicons (logos de marca). Confirmado/ajustado contra
+# los reportes reales acumulados en prod (auditoría de seguridad, 2026-07-08).
+# 'unsafe-inline' en style-src es inevitable por los `style={}` de React + el
+# <style> que inyecta Google Fonts. Solo se aplica al HTML del SPA (no a /api ni
+# assets, que no ejecutan nada).
 CSP_REPORT_ONLY = "; ".join(
     [
         "default-src 'self'",
@@ -222,14 +226,16 @@ CSP_REPORT_ONLY = "; ".join(
         "object-src 'none'",
         "frame-ancestors 'self'",
         "form-action 'self'",
-        "script-src 'self' https://www.googletagmanager.com https://www.instagram.com",
+        "script-src 'self' https://www.googletagmanager.com https://www.instagram.com "
+        "https://static.cloudflareinsights.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
         "img-src 'self' data: blob: https://*.r2.dev https://www.googletagmanager.com "
-        "https://*.google-analytics.com https://cdn.simpleicons.org "
+        "https://*.google-analytics.com https://www.google.com.ar https://cdn.simpleicons.org "
         "https://*.cdninstagram.com https://*.fbcdn.net",
         "connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com "
-        "https://*.r2.dev https://www.instagram.com",
+        "https://analytics.google.com https://stats.g.doubleclick.net https://www.google.com.ar "
+        "https://*.ingest.us.sentry.io https://*.r2.dev https://www.instagram.com",
         "frame-src 'self' blob: https://www.google.com https://maps.google.com "
         "https://www.youtube.com https://*.r2.dev https://www.instagram.com",
         "report-uri /csp-report",
