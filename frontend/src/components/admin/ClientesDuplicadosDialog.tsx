@@ -155,8 +155,8 @@ function FusionManual({ onMerged }: { onMerged: () => void }) {
             <AlertDialogTitle>¿Fusionar estas cuentas?</AlertDialogTitle>
             <AlertDialogDescription>
               Se conserva <strong>{target ? nombreCliente(target) : "—"}</strong>.{" "}
-              <strong>{source ? nombreCliente(source) : "—"}</strong> se borra y sus pedidos,
-              listas y datos pasan a la que queda. Es <strong>irreversible</strong>.
+              <strong>{source ? nombreCliente(source) : "—"}</strong> se borra y sus pedidos, listas
+              y datos pasan a la que queda. Es <strong>irreversible</strong>.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
