@@ -16,7 +16,7 @@ export function VerificacionRequeridaPanel({
 }) {
   if (estado === "en-revision") {
     return (
-      <div className="rounded-md border border-amber/40 bg-amber-soft p-3 space-y-1">
+      <div role="status" className="rounded-md border border-amber/40 bg-amber-soft p-3 space-y-1">
         <p className="text-sm font-medium text-ink flex items-center gap-2">
           <Clock className="h-4 w-4 shrink-0" />
           Tu identidad está en revisión
@@ -31,7 +31,7 @@ export function VerificacionRequeridaPanel({
 
   if (estado === "rechazado") {
     return (
-      <div className="rounded-md border border-amber/40 bg-amber-soft p-3 space-y-2">
+      <div role="alert" className="rounded-md border border-amber/40 bg-amber-soft p-3 space-y-2">
         <p className="text-sm font-medium text-ink flex items-center gap-2">
           <ShieldAlert className="h-4 w-4 shrink-0" />
           No pudimos validar tu identidad
@@ -54,7 +54,7 @@ export function VerificacionRequeridaPanel({
   }
 
   return (
-    <div className="rounded-md border border-amber/40 bg-amber-soft p-3 space-y-2">
+    <div role="status" className="rounded-md border border-amber/40 bg-amber-soft p-3 space-y-2">
       <p className="text-sm font-medium text-ink">Verificá tu identidad para continuar</p>
       <p className="text-xs text-muted-foreground">
         Alquilamos equipo de valor: necesitamos confirmar tu DNI (consulta RENAPER vía Didit). Es un

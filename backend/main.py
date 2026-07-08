@@ -112,10 +112,15 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.exception_handler(Exception)
 async def _global_exception_handler(request: Request, exc: Exception):
     """Captura cualquier excepción no manejada, la persiste en server_errors y
-    devuelve el tipo + mensaje al cliente (en vez de "Internal Server Error").
+    devuelve un 500 al cliente.
 
     HTTPException y RateLimitExceeded se propagan normalmente — este handler
-    solo atrapa lo inesperado.
+    solo atrapa lo inesperado. El detalle completo (tipo + mensaje) SIEMPRE
+    queda en `server_errors` (`log_server_error`) y en el log — al cliente solo
+    le llega tipo+mensaje crudo en local (`not settings.is_railway`); en
+    Railway (dev/staging incluido — corre con datos copiados de prod, ver
+    MEMORIA) y en prod devolvemos un mensaje genérico, para no filtrar nombres
+    de constraint/columna/librería a un caller externo.
     """
     from fastapi import HTTPException as _HTTPException
     from fastapi.responses import JSONResponse as _JSONResponse
@@ -130,9 +135,14 @@ async def _global_exception_handler(request: Request, exc: Exception):
     logger.exception("Error no manejado en %s (rid=%s)", route, rid)
     log_server_error(route, exc, request_id=rid)
 
+    detail = (
+        f"{type(exc).__name__}: {exc}"
+        if not settings.is_railway
+        else "Ocurrió un error inesperado — ya quedó registrado."
+    )
     return _JSONResponse(
         status_code=500,
-        content={"detail": f"{type(exc).__name__}: {exc}"},
+        content={"detail": detail},
     )
 
 
