@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Upload,
   Trash2,
@@ -154,25 +154,15 @@ export function EquipoFormDialogV2({
     },
   });
 
-  // ── HTML source (estado efímero de UI; hidratación → draft) ────────
-  const [uploadingHtml, setUploadingHtml] = useState(false);
-  const [reExtracting, setReExtracting] = useState(false);
-
   // ── Pegar HTML (#1051 Stream B) — hermano de "Subir HTML" sin archivo/R2 ──
   const [htmlPasteOpen, setHtmlPasteOpen] = useState(false);
   const [htmlPasteText, setHtmlPasteText] = useState("");
-  const [enriqueciendo, setEnriqueciendo] = useState(false);
   // Fotos que trajo el último "Pegar HTML" (para el botón "agregar todas" —
   // distinto de `photoCands`, que también junta lo de "Buscar foto").
   const [lastEnrichPhotoCands, setLastEnrichPhotoCands] = useState<string[]>([]);
-  const [addingAllPhotos, setAddingAllPhotos] = useState(false);
 
   // ── Buscar fotos ───────────────────────────────────────────────────
-  const [photoSearching, setPhotoSearching] = useState(false);
   const [photoCands, setPhotoCands] = useState<string[]>([]);
-  const [pickingPhotoUrl, setPickingPhotoUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadingToR2, setUploadingToR2] = useState(false);
 
   // ── Galería multi-foto (edit mode) ────────────────────────────────
   // Concern decoupled del form → useEquipoFotos (query + mutaciones + handlers).
@@ -360,39 +350,55 @@ export function EquipoFormDialogV2({
   ]);
 
   // ════════════════════════════════════════════════════════════════════
-  // Buscar fotos (solo foto, ~5s)
+  // Buscar fotos (solo foto, ~5s) — mismo patrón useMutation que
+  // useEquipoFotos.ts (F1 #1263: los 8 handlers async del form).
   // ════════════════════════════════════════════════════════════════════
-  const buscarFotos = async () => {
-    const u = (form.getValues("bh_url") ?? "").trim();
-    setPhotoSearching(true);
-    const ctrl = new AbortController();
-    const timeoutId = setTimeout(() => ctrl.abort(), 30_000);
-    try {
-      const r = await adminApi.buscarFotos(
-        {
-          nombre: form.getValues("nombre"),
-          marca: form.getValues("marca") || null,
-          modelo: form.getValues("modelo") || null,
-          // Si hay URL en el autocompletar bar, usarla como fuente directa.
-          ...(u ? { url: u } : {}),
-          exclude: photoCands,
-        },
-        ctrl.signal,
-      );
+  const buscarFotosMut = useMutation({
+    mutationFn: async () => {
+      const u = (form.getValues("bh_url") ?? "").trim();
+      const ctrl = new AbortController();
+      const timeoutId = setTimeout(() => ctrl.abort(), 30_000);
+      try {
+        return await adminApi.buscarFotos(
+          {
+            nombre: form.getValues("nombre"),
+            marca: form.getValues("marca") || null,
+            modelo: form.getValues("modelo") || null,
+            // Si hay URL en el autocompletar bar, usarla como fuente directa.
+            ...(u ? { url: u } : {}),
+            exclude: photoCands,
+          },
+          ctrl.signal,
+        );
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    },
+    onSuccess: (r) => {
       const news = (r.foto_candidates ?? []).filter((x) => !photoCands.includes(x));
       setPhotoCands((prev) => [...prev, ...news]);
       if (news.length === 0) toast.info("No se encontraron más fotos");
       else toast.success(`${news.length} fotos encontradas`);
-    } catch (e) {
+    },
+    onError: (e) => {
       if (e instanceof Error && e.name === "AbortError") toast.error("Timeout (30s)");
       else toast.error(e instanceof Error ? e.message : "Error buscando fotos");
-    } finally {
-      clearTimeout(timeoutId);
-      setPhotoSearching(false);
-    }
-  };
+    },
+  });
+  const buscarFotos = () => buscarFotosMut.mutate();
 
-  const elegirFoto = async (externalUrl: string) => {
+  // CREATE mode elige la foto sin subir nada (queda pendiente hasta crear el
+  // equipo); EDIT mode sube ya mismo — solo esa segunda mitad es mutación.
+  const elegirFotoMut = useMutation({
+    mutationFn: (externalUrl: string) => uploadEquipoFotoFromUrl(initial!.id, externalUrl),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["admin", "equipo-fotos", initial?.id] });
+      void qc.invalidateQueries({ queryKey: ["admin", "equipos"] });
+      toast.success("Foto seleccionada y subida");
+    },
+    onError: (e) => toast.error(`No se pudo subir: ${e instanceof Error ? e.message : ""}`),
+  });
+  const elegirFoto = (externalUrl: string) => {
     if (!initial?.id) {
       if (pendingFile) {
         setPendingFile(null);
@@ -403,36 +409,35 @@ export function EquipoFormDialogV2({
       toast.info("Foto elegida (se subirá al crear el equipo)");
       return;
     }
-    setPickingPhotoUrl(externalUrl);
-    try {
-      await uploadEquipoFotoFromUrl(initial.id, externalUrl);
-      await qc.invalidateQueries({ queryKey: ["admin", "equipo-fotos", initial.id] });
-      void qc.invalidateQueries({ queryKey: ["admin", "equipos"] });
-      toast.success("Foto seleccionada y subida");
-    } catch (e) {
-      toast.error(`No se pudo subir: ${e instanceof Error ? e.message : ""}`);
-    } finally {
-      setPickingPhotoUrl(null);
-    }
+    elegirFotoMut.mutate(externalUrl);
   };
 
-  const subirFotoUrlAR2 = async () => {
+  const subirFotoUrlAR2Mut = useMutation({
+    mutationFn: (url: string) => uploadExternalUrlToBucket(initial!.id, url),
+    onSuccess: (r2url) => {
+      form.setValue("foto_url", r2url, { shouldDirty: true });
+      toast.success("Foto subida a R2");
+    },
+    onError: (e) => toast.error(`No se pudo subir a R2: ${e instanceof Error ? e.message : ""}`),
+  });
+  const subirFotoUrlAR2 = () => {
     if (!initial?.id) return;
     const url = form.getValues("foto_url");
     if (!url || isHostedUrl(url)) return;
-    setUploadingToR2(true);
-    try {
-      const r2url = await uploadExternalUrlToBucket(initial.id, url);
-      form.setValue("foto_url", r2url, { shouldDirty: true });
-      toast.success("Foto subida a R2");
-    } catch (e) {
-      toast.error(`No se pudo subir a R2: ${e instanceof Error ? e.message : ""}`);
-    } finally {
-      setUploadingToR2(false);
-    }
+    subirFotoUrlAR2Mut.mutate(url);
   };
 
-  const handleUpload = async (file: File) => {
+  // CREATE mode: archivo local que se sube después de crear el equipo (sync,
+  // no es mutación); EDIT mode sube ya mismo.
+  const handleUploadMut = useMutation({
+    mutationFn: (file: File) => uploadFileToBucket(initial!.id, file),
+    onSuccess: (publicUrl) => {
+      form.setValue("foto_url", publicUrl, { shouldDirty: true });
+      toast.success("Foto subida");
+    },
+    onError: (e) => toast.error(`Error al subir: ${e instanceof Error ? e.message : ""}`),
+  });
+  const handleUpload = (file: File) => {
     if (!file) return;
     if (!initial?.id) {
       setPendingFile(file);
@@ -442,16 +447,7 @@ export function EquipoFormDialogV2({
       toast.info("Foto lista — se va a subir cuando crees el equipo");
       return;
     }
-    setUploading(true);
-    try {
-      const publicUrl = await uploadFileToBucket(initial.id, file);
-      form.setValue("foto_url", publicUrl, { shouldDirty: true });
-      toast.success("Foto subida");
-    } catch (e) {
-      toast.error(`Error al subir: ${e instanceof Error ? e.message : ""}`);
-    } finally {
-      setUploading(false);
-    }
+    handleUploadMut.mutate(file);
   };
 
   // ════════════════════════════════════════════════════════════════════
@@ -460,31 +456,28 @@ export function EquipoFormDialogV2({
   // archivo — comparten `aplicarSpecsExtraidos` (del draft; aplica al
   // template o manda a revisión), no hay 2 formas de procesar el resultado.
   // ════════════════════════════════════════════════════════════════════
-  const handleHtmlUpload = async (file: File) => {
-    if (!initial?.id) return;
-    setUploadingHtml(true);
-    try {
-      const r = await adminApi.uploadHtmlSource(initial.id, file);
+  const handleHtmlUploadMut = useMutation({
+    mutationFn: (file: File) => adminApi.uploadHtmlSource(initial!.id, file),
+    onSuccess: (r) => {
       setHtmlSourceUrl(r.html_source_url);
       aplicarSpecsExtraidos(r.specs ?? [], "HTML guardado");
-    } catch (e) {
-      toast.error(`Error al subir HTML: ${e instanceof Error ? e.message : ""}`);
-    } finally {
-      setUploadingHtml(false);
-    }
+    },
+    onError: (e) => toast.error(`Error al subir HTML: ${e instanceof Error ? e.message : ""}`),
+  });
+  const handleHtmlUpload = (file: File) => {
+    if (!initial?.id) return;
+    handleHtmlUploadMut.mutate(file);
   };
 
-  const handleReExtractSpecs = async () => {
+  const handleReExtractSpecsMut = useMutation({
+    mutationFn: () => adminApi.reExtractSpecs(initial!.id),
+    onSuccess: (r) => aplicarSpecsExtraidos(r.specs ?? [], "HTML re-procesado"),
+    onError: (e) =>
+      toast.error(`Error al re-extraer specs: ${e instanceof Error ? e.message : ""}`),
+  });
+  const handleReExtractSpecs = () => {
     if (!initial?.id) return;
-    setReExtracting(true);
-    try {
-      const r = await adminApi.reExtractSpecs(initial.id);
-      aplicarSpecsExtraidos(r.specs ?? [], "HTML re-procesado");
-    } catch (e) {
-      toast.error(`Error al re-extraer specs: ${e instanceof Error ? e.message : ""}`);
-    } finally {
-      setReExtracting(false);
-    }
+    handleReExtractSpecsMut.mutate();
   };
 
   // ════════════════════════════════════════════════════════════════════
@@ -494,16 +487,9 @@ export function EquipoFormDialogV2({
   // `aplicarSpecsExtraidos` (misma lógica de aplicar specs) — no hay una
   // segunda forma de procesar el resultado.
   // ════════════════════════════════════════════════════════════════════
-  const handleEnriquecerFromHtml = async () => {
-    if (!initial?.id) return;
-    const html = htmlPasteText.trim();
-    if (!html) {
-      toast.error("Pegá el HTML antes de extraer");
-      return;
-    }
-    setEnriqueciendo(true);
-    try {
-      const r = await adminApi.enriquecerFromHtml(initial.id, html);
+  const handleEnriquecerFromHtmlMut = useMutation({
+    mutationFn: (html: string) => adminApi.enriquecerFromHtml(initial!.id, html),
+    onSuccess: (r) => {
       aplicarSpecsExtraidos(r.specs ?? [], "HTML procesado");
       const nuevas = (r.foto_candidates ?? []).filter((u) => !photoCands.includes(u));
       if (nuevas.length > 0) {
@@ -512,28 +498,33 @@ export function EquipoFormDialogV2({
       }
       setHtmlPasteOpen(false);
       setHtmlPasteText("");
-    } catch (e) {
-      toast.error(`Error al procesar HTML: ${e instanceof Error ? e.message : ""}`);
-    } finally {
-      setEnriqueciendo(false);
+    },
+    onError: (e) => toast.error(`Error al procesar HTML: ${e instanceof Error ? e.message : ""}`),
+  });
+  const handleEnriquecerFromHtml = () => {
+    if (!initial?.id) return;
+    const html = htmlPasteText.trim();
+    if (!html) {
+      toast.error("Pegá el HTML antes de extraer");
+      return;
     }
+    handleEnriquecerFromHtmlMut.mutate(html);
   };
 
-  const handleAgregarTodasLasFotos = async () => {
-    if (!initial?.id || lastEnrichPhotoCands.length === 0) return;
-    setAddingAllPhotos(true);
-    try {
-      const r = await uploadEquipoFotosFromUrls(initial.id, lastEnrichPhotoCands);
-      await qc.invalidateQueries({ queryKey: ["admin", "equipo-fotos", initial.id] });
+  const handleAgregarTodasLasFotosMut = useMutation({
+    mutationFn: (urls: string[]) => uploadEquipoFotosFromUrls(initial!.id, urls),
+    onSuccess: (r) => {
+      void qc.invalidateQueries({ queryKey: ["admin", "equipo-fotos", initial?.id] });
       void qc.invalidateQueries({ queryKey: ["admin", "equipos"] });
       if (r.agregadas.length) toast.success(`${r.agregadas.length} fotos agregadas a la galería`);
       if (r.fallidas.length) toast.error(`${r.fallidas.length} fotos no se pudieron agregar`);
       setLastEnrichPhotoCands([]);
-    } catch (e) {
-      toast.error(`Error agregando fotos: ${e instanceof Error ? e.message : ""}`);
-    } finally {
-      setAddingAllPhotos(false);
-    }
+    },
+    onError: (e) => toast.error(`Error agregando fotos: ${e instanceof Error ? e.message : ""}`),
+  });
+  const handleAgregarTodasLasFotos = () => {
+    if (!initial?.id || lastEnrichPhotoCands.length === 0) return;
+    handleAgregarTodasLasFotosMut.mutate(lastEnrichPhotoCands);
   };
 
   // ════════════════════════════════════════════════════════════════════
@@ -950,9 +941,9 @@ export function EquipoFormDialogV2({
             size="sm"
             variant="outline"
             onClick={buscarFotos}
-            disabled={photoSearching}
+            disabled={buscarFotosMut.isPending}
           >
-            {photoSearching ? (
+            {buscarFotosMut.isPending ? (
               <>
                 <Spinner size="xs" className="mr-1" /> Buscando…
               </>
@@ -972,7 +963,7 @@ export function EquipoFormDialogV2({
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) void handleHtmlUpload(f);
+                  if (f) handleHtmlUpload(f);
                   e.target.value = "";
                 }}
               />
@@ -981,9 +972,9 @@ export function EquipoFormDialogV2({
                 size="sm"
                 variant="outline"
                 onClick={() => htmlInputRef.current?.click()}
-                disabled={uploadingHtml}
+                disabled={handleHtmlUploadMut.isPending}
               >
-                {uploadingHtml ? (
+                {handleHtmlUploadMut.isPending ? (
                   <>
                     <Spinner size="xs" className="mr-1" /> Subiendo…
                   </>
@@ -1013,11 +1004,11 @@ export function EquipoFormDialogV2({
                     type="button"
                     size="sm"
                     variant="outline"
-                    onClick={() => void handleReExtractSpecs()}
-                    disabled={reExtracting || uploadingHtml}
+                    onClick={() => handleReExtractSpecs()}
+                    disabled={handleReExtractSpecsMut.isPending || handleHtmlUploadMut.isPending}
                     title="Re-corre la extracción sobre el HTML ya guardado, sin resubirlo — útil después de agregar un spec nuevo al registry"
                   >
-                    {reExtracting ? (
+                    {handleReExtractSpecsMut.isPending ? (
                       <>
                         <Spinner size="xs" className="mr-1" /> Buscando…
                       </>
@@ -1052,8 +1043,8 @@ export function EquipoFormDialogV2({
                 }}
                 onUpload={handleUpload}
                 onSubirAR2={subirFotoUrlAR2}
-                uploading={uploading}
-                uploadingToR2={uploadingToR2}
+                uploading={handleUploadMut.isPending}
+                uploadingToR2={subirFotoUrlAR2Mut.isPending}
               />
             </div>
           )}
@@ -1152,11 +1143,11 @@ export function EquipoFormDialogV2({
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() => void handleAgregarTodasLasFotos()}
-                  disabled={addingAllPhotos}
+                  onClick={() => handleAgregarTodasLasFotos()}
+                  disabled={handleAgregarTodasLasFotosMut.isPending}
                   title="Sube de un saque las fotos que trajo el último HTML pegado"
                 >
-                  {addingAllPhotos ? (
+                  {handleAgregarTodasLasFotosMut.isPending ? (
                     <>
                       <Spinner size="xs" className="mr-1" /> Agregando…
                     </>
@@ -1168,7 +1159,7 @@ export function EquipoFormDialogV2({
             </div>
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {photoCands.map((u) => {
-                const isPicking = pickingPhotoUrl === u;
+                const isPicking = elegirFotoMut.isPending && elegirFotoMut.variables === u;
                 // `fotoActual` (no `form.watch("foto_url")` crudo): en EDIT
                 // mode, elegir un candidato sube directo a la galería sin
                 // tocar el campo del form (mismo bug ya arreglado en el
@@ -1664,7 +1655,10 @@ export function EquipoFormDialogV2({
       {/* "Pegar HTML" (#1051 Stream B) — vivía en la variante "dialog", que
        *  ningún caller usaba: el botón de abajo seteaba htmlPasteOpen pero
        *  nada lo mostraba nunca. Bug real, confirmado en #1263 Fase 0. */}
-      <Dialog open={htmlPasteOpen} onOpenChange={(v) => !enriqueciendo && setHtmlPasteOpen(v)}>
+      <Dialog
+        open={htmlPasteOpen}
+        onOpenChange={(v) => !handleEnriquecerFromHtmlMut.isPending && setHtmlPasteOpen(v)}
+      >
         <DialogContent className="w-full sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Pegar HTML del producto</DialogTitle>
@@ -1680,7 +1674,7 @@ export function EquipoFormDialogV2({
               onChange={(e) => setHtmlPasteText(e.target.value)}
               placeholder="<html>…</html>"
               className="min-h-[240px] font-mono text-xs"
-              disabled={enriqueciendo}
+              disabled={handleEnriquecerFromHtmlMut.isPending}
             />
           </div>
           <DialogFooter>
@@ -1688,16 +1682,16 @@ export function EquipoFormDialogV2({
               type="button"
               variant="outline"
               onClick={() => setHtmlPasteOpen(false)}
-              disabled={enriqueciendo}
+              disabled={handleEnriquecerFromHtmlMut.isPending}
             >
               Cancelar
             </Button>
             <Button
               type="button"
-              onClick={() => void handleEnriquecerFromHtml()}
-              disabled={enriqueciendo}
+              onClick={() => handleEnriquecerFromHtml()}
+              disabled={handleEnriquecerFromHtmlMut.isPending}
             >
-              {enriqueciendo ? (
+              {handleEnriquecerFromHtmlMut.isPending ? (
                 <>
                   <Spinner size="xs" className="mr-1" /> Extrayendo…
                 </>
