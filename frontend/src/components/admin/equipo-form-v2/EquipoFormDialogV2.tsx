@@ -51,7 +51,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/design-system/ui/select";
-import { DUENOS, isCanonicalDueno } from "@/lib/admin/duenos";
 import { MonthYearPicker } from "@/components/admin/MonthYearPicker";
 import { useConfirm } from "@/components/admin/useConfirm";
 import { AdminPage } from "@/components/admin/AdminPage";
@@ -61,13 +60,10 @@ import { uploadFileToBucket, uploadExternalUrlToBucket, isHostedUrl } from "@/li
 import { uploadEquipoFotoFromUrl, uploadEquipoFotosFromUrls } from "@/lib/equipment/equipoFotos";
 import { PhotoGallery } from "@/components/common/PhotoGallery";
 import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/useSettings";
-import { KitEditor } from "./KitEditor";
-import { ComboEditor } from "./ComboEditor";
 import { ContenidoIncluidoEditor } from "./ContenidoIncluidoEditor";
-import { SpecsDiffEditor } from "./SpecsDiffEditor";
 import { buildContenidoIncluidoPrintHtml } from "./contenido-incluido-print";
 import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
-import { Field, CollapsibleSection, CategoriasPicker, TipoGlosario } from "./form-helpers";
+import { Field, CollapsibleSection, CategoriasPicker } from "./form-helpers";
 import {
   buildSchema,
   type FormValues,
@@ -80,6 +76,9 @@ import { useEquipoFormDraft } from "./useEquipoFormDraft";
 import { AutocompletarBarSection } from "./AutocompletarBarSection";
 import { IdentificacionSection } from "./IdentificacionSection";
 import { EquipoPreviewAside } from "./EquipoPreviewAside";
+import { PrecioYStockSection } from "./PrecioYStockSection";
+import { FichaTecnicaSection } from "./FichaTecnicaSection";
+import { KitComboSection } from "./KitComboSection";
 
 // ════════════════════════════════════════════════════════════════════
 // Componente principal
@@ -970,128 +969,12 @@ export function EquipoFormDialogV2({
         </section>
       )}
 
-      {/* ════════════════════════════════════════════════════════════════
-              PRECIO Y STOCK
-          ════════════════════════════════════════════════════════════════ */}
-      <section className="space-y-3 pt-2 border-t hairline">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <Field label="Stock">
-            {esCombo ? (
-              <div className="flex items-center h-9 px-3 rounded-md border hairline bg-muted/30 text-sm text-muted-foreground">
-                Sentinel (9999) — derivado de componentes
-              </div>
-            ) : (
-              <div className="flex gap-1">
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  className="h-9 w-9 shrink-0"
-                  onClick={() => {
-                    const raw = Number(form.getValues("cantidad") ?? 0);
-                    const current = Number.isFinite(raw) ? raw : 0;
-                    form.setValue("cantidad", Math.max(0, current - 1), { shouldDirty: true });
-                  }}
-                  aria-label="Restar 1 al stock"
-                >
-                  −
-                </Button>
-                <Input
-                  type="number"
-                  min={0}
-                  className="text-center"
-                  {...form.register("cantidad")}
-                />
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  className="h-9 w-9 shrink-0"
-                  onClick={() => {
-                    const raw = Number(form.getValues("cantidad") ?? 0);
-                    const current = Number.isFinite(raw) ? raw : 0;
-                    form.setValue("cantidad", current + 1, { shouldDirty: true });
-                  }}
-                  aria-label="Sumar 1 al stock"
-                >
-                  +
-                </Button>
-              </div>
-            )}
-          </Field>
-          <Field label="Valor USD">
-            <Input type="number" step="0.01" {...form.register("precio_usd")} />
-          </Field>
-          <Field label="% día">
-            <Input type="number" step="0.1" {...form.register("roi_pct")} />
-          </Field>
-          <Field label={precioJornadaManual ? "Precio/jornada (manual)" : "Precio/jornada (auto)"}>
-            <div className="flex gap-1">
-              <Input
-                type="number"
-                {...form.register("precio_jornada", {
-                  onChange: () => setPrecioJornadaManual(true),
-                })}
-              />
-              {precioJornadaManual && (
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  title="Recalcular automático"
-                  onClick={() => setPrecioJornadaManual(false)}
-                >
-                  ↺
-                </Button>
-              )}
-            </div>
-          </Field>
-        </div>
-
-        <div className="space-y-2">
-          <Field label="Tipo de producto">
-            <Select
-              value={form.watch("tipo")}
-              onValueChange={(v) =>
-                form.setValue("tipo", v as FormValues["tipo"], { shouldDirty: true })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="simple">Equipo</SelectItem>
-                <SelectItem value="kit">Kit</SelectItem>
-                <SelectItem value="combo">Combo</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-          <TipoGlosario tipo={form.watch("tipo")} />
-        </div>
-
-        <Field label="Dueño">
-          <Select
-            value={form.watch("dueno") ?? ""}
-            onValueChange={(v) => form.setValue("dueno", v, { shouldDirty: true })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccionar…" />
-            </SelectTrigger>
-            <SelectContent>
-              {DUENOS.map((d) => (
-                <SelectItem key={d} value={d}>
-                  {d}
-                </SelectItem>
-              ))}
-              {form.watch("dueno") && !isCanonicalDueno(form.watch("dueno") ?? "") && (
-                <SelectItem value={form.watch("dueno") ?? ""}>
-                  {form.watch("dueno")} (custom)
-                </SelectItem>
-              )}
-            </SelectContent>
-          </Select>
-        </Field>
-      </section>
+      <PrecioYStockSection
+        form={form}
+        esCombo={esCombo}
+        precioJornadaManual={precioJornadaManual}
+        setPrecioJornadaManual={setPrecioJornadaManual}
+      />
 
       {/* ════════════════════════════════════════════════════════════════
               DESCRIPCIÓN — campo de marketing/catálogo, separado de la
@@ -1109,48 +992,7 @@ export function EquipoFormDialogV2({
         </Field>
       </CollapsibleSection>
 
-      {/* ════════════════════════════════════════════════════════════════
-              FICHA TÉCNICA — colapsable. Solo specs estructuradas (template
-              + custom). La descripción está separada en su propia sección.
-          ════════════════════════════════════════════════════════════════ */}
-      <CollapsibleSection
-        title="Ficha técnica"
-        defaultOpen={specsPropuestos.length > 0 || specs.length > 0 || !!categoriaSpecs}
-      >
-        <div className="space-y-3">
-          <Field label="Categoría de specs">
-            <Select
-              value={categoriaSpecs || "__none__"}
-              onValueChange={(v) => setCategoriaSpecs(v === "__none__" ? "" : v)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Sin categoría de specs" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Sin categoría de specs</SelectItem>
-                {specCatOptions.map((c) => (
-                  <SelectItem key={c.id} value={c.nombre}>
-                    {c.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Define qué specs técnicas aplican y el nombre público. Al elegirla aparecen los specs
-              abajo. Independiente del catálogo.
-            </p>
-          </Field>
-
-          <SpecsDiffEditor
-            specs={specs}
-            propuestos={specsPropuestos}
-            templateItems={templateItems}
-            onChange={setSpecs}
-            onAceptarPropuesto={aceptarPropuesto}
-            onDescartarPropuesto={descartarPropuesto}
-          />
-        </div>
-      </CollapsibleSection>
+      <FichaTecnicaSection draft={draft} specCatOptions={specCatOptions} />
 
       {/* ════════════════════════════════════════════════════════════════
               CATEGORÍAS DEL CATÁLOGO — agrupación para el front-office, separada
@@ -1169,16 +1011,7 @@ export function EquipoFormDialogV2({
         </div>
       </section>
 
-      {/* ════════════════════════════════════════════════════════════════
-              KIT — colapsable, solo en EDIT (necesita id del equipo)
-          ════════════════════════════════════════════════════════════════ */}
-      {mostrarSeccionesEdit && (
-        <CollapsibleSection
-          title={esCombo ? "Componentes del combo" : "Kit (componentes incluidos)"}
-        >
-          {esCombo ? <ComboEditor equipoId={initial.id} /> : <KitEditor equipoId={initial.id} />}
-        </CollapsibleSection>
-      )}
+      {mostrarSeccionesEdit && <KitComboSection esCombo={esCombo} equipoId={initial.id} />}
 
       {/* ════════════════════════════════════════════════════════════════
               CONTENIDO INCLUIDO — B1 #635 (solo en EDIT)
