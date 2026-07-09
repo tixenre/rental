@@ -17,17 +17,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Upload, Trash2, Search, Printer } from "lucide-react";
+import { Upload, Trash2, Search } from "lucide-react";
 import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/design-system/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,14 +37,6 @@ import { Button } from "@/design-system/ui/button";
 import { Switch } from "@/design-system/ui/switch";
 import { Textarea } from "@/design-system/ui/textarea";
 import { Badge } from "@/design-system/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/design-system/ui/select";
-import { MonthYearPicker } from "@/components/admin/MonthYearPicker";
 import { useConfirm } from "@/components/admin/useConfirm";
 import { AdminPage } from "@/components/admin/AdminPage";
 
@@ -60,8 +45,6 @@ import { uploadFileToBucket, uploadExternalUrlToBucket, isHostedUrl } from "@/li
 import { uploadEquipoFotoFromUrl, uploadEquipoFotosFromUrls } from "@/lib/equipment/equipoFotos";
 import { PhotoGallery } from "@/components/common/PhotoGallery";
 import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/useSettings";
-import { ContenidoIncluidoEditor } from "./ContenidoIncluidoEditor";
-import { buildContenidoIncluidoPrintHtml } from "./contenido-incluido-print";
 import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
 import { Field, CollapsibleSection, CategoriasPicker } from "./form-helpers";
 import {
@@ -79,6 +62,9 @@ import { EquipoPreviewAside } from "./EquipoPreviewAside";
 import { PrecioYStockSection } from "./PrecioYStockSection";
 import { FichaTecnicaSection } from "./FichaTecnicaSection";
 import { KitComboSection } from "./KitComboSection";
+import { ContenidoIncluidoSection } from "./ContenidoIncluidoSection";
+import { AvanzadoSection } from "./AvanzadoSection";
+import { PegarHtmlDialog } from "./PegarHtmlDialog";
 
 // ════════════════════════════════════════════════════════════════════
 // Componente principal
@@ -1013,89 +999,15 @@ export function EquipoFormDialogV2({
 
       {mostrarSeccionesEdit && <KitComboSection esCombo={esCombo} equipoId={initial.id} />}
 
-      {/* ════════════════════════════════════════════════════════════════
-              CONTENIDO INCLUIDO — B1 #635 (solo en EDIT)
-          ════════════════════════════════════════════════════════════════ */}
       {mostrarSeccionesEdit && (
-        <CollapsibleSection title="Contenido de la caja" defaultOpen={contenidoIncluido.length > 0}>
-          <div className="flex items-start justify-between mb-2 gap-2">
-            <p className="text-xs text-muted-foreground">
-              Qué viene en la caja (reflector, fuente, cables, estuche). Solo informativo — no
-              afecta reservas ni stock.
-            </p>
-            {contenidoIncluido.length > 0 && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="shrink-0"
-                onClick={() => {
-                  const html = buildContenidoIncluidoPrintHtml(initial, contenidoIncluido);
-                  const w = window.open("", "_blank", "width=700,height=600");
-                  if (w) {
-                    w.document.write(html);
-                    w.document.close();
-                  }
-                }}
-              >
-                <Printer className="h-3 w-3 mr-1" />
-                Imprimir contenido
-              </Button>
-            )}
-          </div>
-          <ContenidoIncluidoEditor
-            equipoId={initial.id}
-            items={contenidoIncluido}
-            onChange={setContenidoIncluido}
-          />
-        </CollapsibleSection>
+        <ContenidoIncluidoSection
+          equipo={initial}
+          items={contenidoIncluido}
+          onChange={setContenidoIncluido}
+        />
       )}
 
-      {/* ════════════════════════════════════════════════════════════════
-              AVANZADO — colapsable
-          ════════════════════════════════════════════════════════════════ */}
-      <CollapsibleSection title="Avanzado">
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <Field label="Estado">
-              <Select
-                value={form.watch("estado")}
-                onValueChange={(v) =>
-                  form.setValue("estado", v as FormValues["estado"], { shouldDirty: true })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="operativo">Operativo</SelectItem>
-                  <SelectItem value="en_mantenimiento">En mantenimiento</SelectItem>
-                  <SelectItem value="fuera_servicio">Fuera de servicio</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <Field label="Valor reposición (USD)">
-              <Input type="number" step="0.01" {...form.register("valor_reposicion")} />
-            </Field>
-            <Field label="Fecha de compra">
-              <MonthYearPicker
-                value={form.watch("fecha_compra") ?? ""}
-                onChange={(v) => form.setValue("fecha_compra", v, { shouldDirty: true })}
-              />
-            </Field>
-            <Field label="N° de serie">
-              <Input {...form.register("serie")} placeholder="N/A si no tenés" />
-            </Field>
-          </div>
-
-          <Field label="Notas internas (no se muestran al cliente)">
-            <Textarea rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} />
-          </Field>
-        </div>
-      </CollapsibleSection>
+      <AvanzadoSection form={form} notas={notas} setNotas={setNotas} />
     </>
   );
 
@@ -1200,56 +1112,15 @@ export function EquipoFormDialogV2({
         {footerActions}
       </div>
       {confirmCloseDialog}
-      {/* "Pegar HTML" (#1051 Stream B) — vivía en la variante "dialog", que
-       *  ningún caller usaba: el botón de abajo seteaba htmlPasteOpen pero
-       *  nada lo mostraba nunca. Bug real, confirmado en #1263 Fase 0. */}
-      <Dialog
+      <PegarHtmlDialog
         open={htmlPasteOpen}
-        onOpenChange={(v) => !handleEnriquecerFromHtmlMut.isPending && setHtmlPasteOpen(v)}
-      >
-        <DialogContent className="w-full sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Pegar HTML del producto</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              Pegá el HTML completo de la página del producto (ej. copiado con Chrome MCP o
-              Cmd+A/Cmd+C sobre "Ver código fuente"). Mismo extractor que "Subir HTML", pero acá no
-              queda un archivo guardado.
-            </p>
-            <Textarea
-              value={htmlPasteText}
-              onChange={(e) => setHtmlPasteText(e.target.value)}
-              placeholder="<html>…</html>"
-              className="min-h-[240px] font-mono text-xs"
-              disabled={handleEnriquecerFromHtmlMut.isPending}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setHtmlPasteOpen(false)}
-              disabled={handleEnriquecerFromHtmlMut.isPending}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              onClick={() => handleEnriquecerFromHtml()}
-              disabled={handleEnriquecerFromHtmlMut.isPending}
-            >
-              {handleEnriquecerFromHtmlMut.isPending ? (
-                <>
-                  <Spinner size="xs" className="mr-1" /> Extrayendo…
-                </>
-              ) : (
-                "Extraer specs y fotos"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onOpenChange={setHtmlPasteOpen}
+        text={htmlPasteText}
+        onTextChange={setHtmlPasteText}
+        pending={handleEnriquecerFromHtmlMut.isPending}
+        onCancel={() => setHtmlPasteOpen(false)}
+        onExtract={handleEnriquecerFromHtml}
+      />
     </>
   );
 }
