@@ -3107,3 +3107,57 @@ cancel-in-progress` ya cancela corridas viejas.
   conocido (menor, sin issue todavía): el catálogo del cliente capea el stepper con la
   disponibilidad por equipo sin descontar los kits del propio carrito — el checkout igual lo frena
   (dry-run del gate); es UX, no sobreventa. Commits `06d837bf` + `effafdac` (dev).
+
+### 2026-07-08 — `arca_fe` gana un tema tipográfico default, agnóstico de marca (Inter + JetBrains Mono)
+
+**Contexto.** El dueño está evaluando integrar `arca_fe` en Freelo (otro proyecto propio, Django en
+vez de FastAPI) y pidió explícitamente que "no haya drift" entre lo que ven las dos plataformas —
+toda mejora al motor tiene que quedar en el módulo compartido, no parcheada por consumidor. Hoy
+`renderizar_comprobante_html(..., fonts_css="")` sin override caía a los fallbacks de sistema
+(`ui-sans-serif`) — cada consumidor que quisiera verse bien tenía que traer su propia tipografía a
+mano (Rambla ya lo hace: `services/facturacion/comprobante_render.py` embebe TT Commons +
+JetBrains Mono). Sin un default real, el "look" de un consumidor que no personalizara nada quedaba
+librado al navegador, no era realmente compartido.
+
+**Decisión.** `arca_fe.render` gana un tema default embebido (Inter + JetBrains Mono, ambas SIL
+Open Font License — libres de embeber/redistribuir, ver `assets/fonts/LICENSE-fonts.txt`) que se
+aplica automáticamente cuando el caller no pasa su propio `fonts_css`. Ninguna de las dos es la
+marca de Rambla ni la de ningún consumidor puntual — es deliberadamente neutral, coherente con que
+los 3 layouts ya se documentan como "agnósticos de marca" (usan el logo oficial de ARCA, no el del
+emisor).
+
+**El punto clave del diseño — nombre lógico, no nombre de marca.** Los templates de `render.py`
+(`detallada`/`simplificada`) referenciaban literalmente `font-family:'TT Commons'` en su CSS — eso
+filtraba la marca de Rambla adentro de una librería que se supone agnóstica. Se reemplazó por el
+nombre lógico `'ComprobanteSans'` (JetBrains Mono, ya neutral, se mantiene con su nombre real). El
+default nuevo embebe Inter bajo `'ComprobanteSans'`; y **`comprobante_render.py` de Rambla se
+actualizó para embeber SUS bytes de TT Commons bajo ese mismo nombre lógico** (mismos archivos
+`.woff2`, solo se renombró la etiqueta CSS) — cero cambio visual en las facturas reales de Rambla,
+verificado además porque ningún test de la suite asertaba el string `'TT Commons'` literal. Un
+consumidor futuro con su propia marca hace exactamente lo mismo: declara su `@font-face` bajo
+`'ComprobanteSans'`, sin tocar ningún template.
+
+**Por qué Rambla NO adoptó el default nuevo (decisión explícita, no un olvido).** Se evaluó que
+Rambla dejara de pasar su propio `fonts_css` y usara el default compartido — el dueño lo descartó
+para esta vuelta: cambiar la tipografía real de facturas ya en producción es una decisión de
+producto aparte, no un efecto colateral de compartir infraestructura. Rambla sigue viéndose
+exactamente igual; el default nuevo aplica a quien no pase nada (hoy, ningún consumidor real
+todavía — Freelo cuando se construya el adapter).
+
+**Fuentes.** Inter (`rsms/inter`, SIL OFL) y JetBrains Mono (`JetBrains/JetBrainsMono`, SIL OFL) —
+bajadas de sus releases oficiales, no de un CDN de terceros (nada de llamada de red en tiempo de
+render; todo se embebe en base64 en el HTML, igual que ya hacía TT Commons).
+
+**Verificación.** Suite completa de `arca_fe` (294 tests) verde sin cambios — ninguno testeaba el
+string de fuente. Smoke test manual: HTML default con Inter embebido (864KB vs. 20KB del override
+manual, confirma el embed real) + captura de pantalla con Playwright del layout `simplificada`
+default. `ruff check` limpio (el archivo ya tenía drift de formato preexistente con `ruff format`,
+no introducido por este cambio — no se tocó, fuera de alcance). `__version__`
+(`arca_fe/__init__.py`) sube `0.1.0` → `0.2.0` (agregado retrocompatible, no breaking) en paridad
+con `pyproject.toml` (verificado por `test_pyproject_version_coincide_con_init`).
+
+**Archivos:** `backend/arca_fe/render.py` (tema default + rename `'TT Commons'`→`'ComprobanteSans'`
+en los templates), `backend/arca_fe/assets/fonts/` (nuevo, .woff2 + `LICENSE-fonts.txt`),
+`backend/arca_fe/pyproject.toml` (package-data + version), `backend/arca_fe/__init__.py` (version),
+`backend/arca_fe/FEATURES.md` (doc), `backend/services/facturacion/comprobante_render.py` (rename
+de la etiqueta CSS de sus propias fuentes, mismos bytes).

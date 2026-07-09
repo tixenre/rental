@@ -75,8 +75,11 @@ WhatsApp o redes — **resume cada ítem a descripción e importe, sin cantidad 
 si una operación tiene varios productos o cantidades que necesitan ese desglose, la librería
 **rechaza** generarla en este formato en vez de mostrar un comprobante incompleto — para eso están
 Oficial o Detallada). Incluye el QR fiscal oficial (el mismo que cualquiera puede escanear para
-verificar el comprobante contra ARCA) y podés inyectarle tu propia tipografía de marca sin tocar
-el layout. ¿Querés ver cómo se ven antes de integrar la librería? `arca_fe.ejemplos` genera una
+verificar el comprobante contra ARCA). Trae un tema tipográfico default agnóstico de marca (Inter +
+JetBrains Mono, ambas de uso libre) — no hace falta pasar nada para que se vea bien: cualquier
+consumidor que no personalice nada obtiene el mismo resultado visual que cualquier otro. Y si
+querés tu propia identidad, podés inyectar tu tipografía de marca (`fonts_css`) sin tocar el
+layout. ¿Querés ver cómo se ven antes de integrar la librería? `arca_fe.ejemplos` genera una
 galería HTML de muestra con datos ficticios (`python -m arca_fe.ejemplos`).
 
 ## Documento protegido — no un PDF cualquiera

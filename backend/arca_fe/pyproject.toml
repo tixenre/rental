@@ -1,6 +1,6 @@
 [project]
 name = "arca-fe"
-version = "0.1.0"
+version = "0.2.0"
 description = "Motor portable de facturación electrónica ARCA (ex-AFIP) — WSFEv1 + WSAA + padrón, sin dependencias de ningún framework."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -37,7 +37,8 @@ build-backend = "setuptools.build_meta"
 where = [".."]
 include = ["arca_fe*"]
 
-# El logo oficial de ARCA (agnóstico de marca, usado por `arca_fe.render`) — asset propio
-# del paquete, empaquetado como cualquier ícono de una librería instalable.
+# El logo oficial de ARCA + el tema tipográfico default (Inter + JetBrains Mono, SIL OFL — ver
+# assets/fonts/LICENSE-fonts.txt), ambos agnósticos de marca, usados por `arca_fe.render` — assets
+# propios del paquete, empaquetados como cualquier ícono/fuente de una librería instalable.
 [tool.setuptools.package-data]
-arca_fe = ["assets/*.svg"]
+arca_fe = ["assets/*.svg", "assets/fonts/*.woff2", "assets/fonts/*.txt"]

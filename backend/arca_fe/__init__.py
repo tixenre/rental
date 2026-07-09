@@ -17,7 +17,7 @@ reservado para cuando el contrato público se declare estable. Un test de portab
 core nunca importe `backend.*`.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from .modelos import (
     CondicionIva,
