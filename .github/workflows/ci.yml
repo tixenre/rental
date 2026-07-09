@@ -373,6 +373,16 @@ jobs:
           cat /tmp/backend.log
           exit 1
 
+      # init_db()/Alembic crean el esquema pero NO siembran el árbol de
+      # categorías del catálogo (a diferencia del registry de specs, que sí se
+      # siembra en boot) — en un dev DB normal se acumulan con el uso; una DB
+      # de CI arranca en cero. Sin esto, "Categorías del catálogo" no tiene
+      # ningún botón para clickear y varios tests cuelgan 30s c/u.
+      - name: Seedear 1 categoría mínima (el árbol de catálogo no viene en init_db())
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d rambla_rental_test \
+            -c "INSERT INTO categorias (nombre) VALUES ('Cámaras') ON CONFLICT (nombre) DO NOTHING;"
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
