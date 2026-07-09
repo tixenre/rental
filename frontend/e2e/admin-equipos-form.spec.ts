@@ -30,6 +30,12 @@ async function crearEquipoYAbrirEdit(page: Page, nombre: string) {
   await page.waitForLoadState("networkidle");
 
   await page.locator('input[name="nombre"]').first().fill(nombre);
+  // Marca y precio/jornada son obligatorios en el schema (equipo-form-schema.ts)
+  // en creación — sin esto el submit falla validación client-side y "Guardar"
+  // no dispara nada (ni request ni toast, silencioso). precio_jornada se
+  // autocalcula desde "Valor USD", que no llenamos — lo seteamos directo.
+  await page.locator('input[name="marca"]').first().fill("Marca E2E");
+  await page.locator('input[name="precio_jornada"]').first().fill("1000");
   // Una categoría es obligatoria para guardar — la primera disponible alcanza,
   // el test no depende de cuál sea.
   await page
@@ -158,17 +164,10 @@ test.describe("Admin equipos — form V2", () => {
   test("EDIT: Pegar HTML abre el modal (regresión #1263 — antes no abría nunca)", async ({
     page,
   }) => {
-    await page.goto("/admin/equipos");
-    await page.waitForLoadState("networkidle");
-
-    // Entrar al editor de un equipo cualquiera vía el ActionMenu (bottom sheet)
-    // de la fila — este suite corre a 375px (mobile-chrome, playwright.config.ts),
-    // así que el trigger visible es "Más acciones" (botones planos en un Drawer,
-    // no el DropdownMenuItem de escritorio). No hardcodeamos un id — el test
-    // corre contra la data real de la DB local.
-    await page.getByRole("button", { name: "Más acciones" }).first().click();
-    await page.getByRole("button", { name: /^Editar$/i }).click();
-    await page.waitForURL(/\/admin\/equipos\/\d+\/editar/);
+    // Crea su propio equipo en vez de depender de que la lista tenga alguno
+    // (una DB fresca — ej. CI — arranca sin equipos visibles: el único que
+    // puede existir es el centinela del Estudio, que la lista excluye siempre).
+    await crearEquipoYAbrirEdit(page, `Test E2E Pegar HTML ${Date.now()}`);
 
     // "Pegar HTML" es edit-only (isEdit && ...) — antes del fix, este click
     // seteaba htmlPasteOpen pero ningún <Dialog> lo mostraba (variant="page"
@@ -193,6 +192,10 @@ test.describe("Admin equipos — form V2", () => {
     await page.waitForLoadState("networkidle");
 
     await page.locator('input[name="nombre"]').first().fill(nombre);
+    // Marca y precio/jornada son obligatorios en el schema — sin esto
+    // "Guardar" no dispara nada (falla validación client-side, silencioso).
+    await page.locator('input[name="marca"]').first().fill("Marca E2E");
+    await page.locator('input[name="precio_jornada"]').first().fill("1000");
     await page
       .locator("section", { hasText: "Categorías del catálogo" })
       .getByRole("button")
@@ -219,9 +222,17 @@ test.describe("Admin equipos — form V2", () => {
     await expect(page.getByLabel("Restar 1 al stock")).toBeVisible();
     await expect(page.getByText("Kit (componentes incluidos)")).toBeVisible();
 
+    // La sección "Kit" es un CollapsibleSection con defaultOpen=false (siempre
+    // arranca cerrada, sin excepción) — hay que abrirla para que el <Select>
+    // de tipo exista en el DOM.
+    await page.getByRole("button", { name: "Kit (componentes incluidos)" }).click();
+
     // El trigger del <Select> muestra el value actual como texto — "Equipo"
     // es el label de tipo="simple" (default de un equipo recién creado).
-    await page.getByRole("combobox", { name: "Equipo" }).click();
+    // Se matchea por texto visible (hasText), no por accessible-name
+    // (getByRole con name colgaba: el cómputo de accname de Chromium para
+    // este trigger no resolvía "Equipo" de forma confiable en CI).
+    await page.locator('[role="combobox"]', { hasText: "Equipo" }).click();
     await page.getByRole("option", { name: "Combo" }).click();
 
     // Sentinel: el stock deja de ser editable a mano (#635 — cantidad=9999,
