@@ -3161,3 +3161,80 @@ en los templates), `backend/arca_fe/assets/fonts/` (nuevo, .woff2 + `LICENSE-fon
 `backend/arca_fe/pyproject.toml` (package-data + version), `backend/arca_fe/__init__.py` (version),
 `backend/arca_fe/FEATURES.md` (doc), `backend/services/facturacion/comprobante_render.py` (rename
 de la etiqueta CSS de sus propias fuentes, mismos bytes).
+
+### 2026-07-08 — `arca_fe` gana conversión HTML→PDF/imagen (Chromium vía Playwright)
+
+**Contexto.** Mismo trabajo de integrar `arca_fe` en Freelo bajo el requisito de "cero drift": Rambla
+ya convierte el HTML de sus comprobantes a PDF/imagen (`backend/pdf.py`, genérico — lo usa para más
+que facturas), pero esa pieza vivía fuera de `arca_fe`, en el adapter de cada consumidor. Dos
+consumidores reales convirtiendo el MISMO HTML con motores/versiones de Chromium distintas podían
+producir PDFs sutilmente distintos (kerning, saltos de página) — el mismo riesgo de drift que ya
+motivó centralizar el tema tipográfico. Además Freelo necesita ofrecer **las tres capas
+(oficial/detallada/simplificada) en PDF y en PNG/JPEG por igual** (no solo la simplificada como
+imagen, que era el único caso real que Rambla usa hoy) — pedido explícito del dueño ("no sé qué van a
+querer los usuarios").
+
+**Decisión.** Nuevo módulo `arca_fe.pdf` con dos funciones públicas, `renderizar_pdf`/
+`renderizar_imagen`, ambas intercambiables sobre el mismo `html` de `renderizar_comprobante_html` —
+ningún layout queda reservado a un formato. Un solo motor fijo (Chromium headless vía Playwright,
+browser compartido entre llamadas vía un singleton de módulo con lock async) en vez de un motor
+configurable/pluggable — mismo criterio de cero-drift que el tema tipográfico: si `arca_fe` dejara
+el motor a elección de cada consumidor, dos consumidores podrían volver a divergir en el output.
+Extra opcional `pdf` (`pip install arca-fe[pdf]`, agrega `playwright>=1.40`) — el import es lazy,
+no hace falta para el resto de la librería; `playwright install chromium` queda como responsabilidad
+del consumidor (el binario no es parte del paquete pip).
+
+**API async-nativa, no sync como el resto de `arca_fe`.** El resto del motor es sync-first (con
+`asyncio_support` como fachada opcional vía `asyncio.to_thread`); acá se invirtió el criterio a
+propósito — Playwright se usa mejor con su API async nativa dentro de un proceso de server de larga
+vida, reusando un único Chromium entre requests. Un wrapper sync escondería ese costo (relanzar
+Chromium por request), no lo evitaría.
+
+**`page_size` explícito, resuelto por layout.** `renderizar_pdf`/`renderizar_imagen` aceptan
+`page_size: (width_px, height_px | None)` — `None` global = A4 (para oficial/detallada);
+`arca_fe.render.tamano_pagina_layout(layout)` ya resolvía el tamaño correcto por layout (`(1080,
+1350)` para simplificada) desde antes de este cambio, ahora se conecta directo acá.
+`height_px=None` dentro de la tupla mide el alto real del contenido
+(`document.body.scrollHeight`) para no cortar el comprobante ni dejar espacio de más — necesario
+porque un comprobante con muchos ítems no tiene una altura fija conocida de antemano.
+
+**`executable_path` — parámetro real de despliegue, no un parche de sandbox.** Se agregó porque el
+propio entorno de test de este cambio tiene un Chromium pre-provisto en un path fijo (revisión
+distinta a la que Playwright pip resuelve sola) — pero el parámetro en sí es genuinamente útil para
+cualquier despliegue con un Chromium propio (serverless, contenedor con binario fijo), no algo
+hardcodeado para este sandbox puntual. Solo aplica al primer llamado que levanta el browser
+compartido; llamadas posteriores lo ignoran (pensado como config de proceso, no por-request). El
+test suite lee un path opcional vía la env var `PLAYWRIGHT_CHROMIUM_EXECUTABLE` (no committeada con
+ningún default, `None` en el caso normal donde `playwright install` corrió bien).
+
+**Versión.** `__version__`/`pyproject.toml` `0.2.0`→`0.3.0` (agregado retrocompatible — nuevo módulo,
+nada existente cambia de forma). Se corrigió de paso una referencia obsoleta en `README.md` que
+apuntaba a un futuro bump de Factura E como "`0.3.0`" — ese ítem queda de backlog sin versión
+asignada, ya que este cambio tomó el próximo MINOR primero.
+
+**Tests.** `arca_fe/tests/test_pdf.py`, marcados `integration` (no `unit` — a diferencia del resto
+de la suite, sí lanzan un Chromium real; mockear Playwright no probaría nada del render real).
+Cubren: PDF/imagen con `page_size` default y explícito, cualquier layout como cualquier formato
+(no exclusividad simplificada↔imagen), reuso del browser compartido entre llamadas, y
+`cerrar_navegador` dejando el módulo re-arrancable. 6/6 verdes localmente; suite completa (300
+tests) verde. `ruff check` limpio.
+
+**CI, ajustado tras un fallo real (mismo PR).** El job `python-tests` de CI corrió estos tests sin
+tener el binario de Chromium instalado (`playwright==1.60.0` ya era dependencia de producción vía
+`backend/pdf.py` de Rambla, pero ningún workflow corría `playwright install` nunca) — falló con
+"Executable doesn't exist". Investigando la convención ya existente del repo para tests
+`integration` que necesitan infra que el job default no provee (`tests/test_alembic_upgrade_db.py`,
+gateado tras `ALEMBIC_DB_TEST=1` + `DATABASE_URL` real) y confirmando que los tests de PDF de
+Rambla (`tests/test_facturacion_routes.py`, `test_cliente_pedido_factura.py`) **siempre** mockean el
+límite de Chromium (`monkeypatch.setattr("pdf._render_pdf", ...)`) en vez de lanzarlo real en CI —
+nunca hubo Chromium real corriendo en este pipeline. En vez de sumarle un paso de instalación de
+browser a un workflow compartido por todo el repo para servir el extra opcional de una sola
+librería, `test_pdf.py` sigue el mismo patrón de opt-in ya establecido: `pytest.mark.skipif` tras
+`ARCA_FE_PDF_TEST=1` (+ `playwright install chromium`) — se saltea limpio en CI normal, corre real
+solo cuando alguien lo pide explícitamente (verificado: sin la env var, 6 skipped; con ella, 6
+passed).
+
+**Archivos:** `backend/arca_fe/pdf.py` (nuevo), `backend/arca_fe/tests/test_pdf.py` (nuevo),
+`backend/arca_fe/__init__.py` (imports/`__all__`/version), `backend/arca_fe/pyproject.toml` (extra
+`pdf` + version), `backend/arca_fe/README.md` (instalación, Quickstart, sección nueva "Render a
+PDF/imagen", "Qué NO cubre").
