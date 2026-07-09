@@ -76,7 +76,15 @@ import { KitEditor } from "./KitEditor";
 import { ComboEditor } from "./ComboEditor";
 import { ContenidoIncluidoEditor } from "./ContenidoIncluidoEditor";
 import { SpecsDiffEditor } from "./SpecsDiffEditor";
-import { type Spec, newSpec, withIds, sameLabel, uniq } from "./spec-helpers";
+import {
+  type Spec,
+  newSpec,
+  withIds,
+  sameLabel,
+  uniq,
+  findTemplateMatch,
+  upsertTemplateSpec,
+} from "./spec-helpers";
 import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
 import {
   Field,
@@ -719,41 +727,15 @@ export function EquipoFormDialogV2({
       toast.success(tituloSinSpecs, { description: "No se extrajeron specs del archivo" });
       return;
     }
-    const tmplByKey = new Map<string, import("@/lib/admin/api").SpecTemplate>();
-    const tmplByLabel = new Map<string, import("@/lib/admin/api").SpecTemplate>();
-    for (const t of templateItems ?? []) {
-      if (t.spec_key) tmplByKey.set(t.spec_key, t);
-      if (t.label?.trim()) tmplByLabel.set(t.label.trim().toLowerCase(), t);
-    }
-    const findTmpl = (p: Spec) =>
-      (p.spec_key ? tmplByKey.get(p.spec_key) : undefined) ??
-      tmplByLabel.get(p.label.trim().toLowerCase());
-
-    const autoAplicables = propuestos.filter((p) => !!findTmpl(p));
-    const requierenRevision = propuestos.filter((p) => !findTmpl(p));
+    const autoAplicables = propuestos.filter((p) => !!findTemplateMatch(templateItems, p));
+    const requierenRevision = propuestos.filter((p) => !findTemplateMatch(templateItems, p));
 
     if (autoAplicables.length > 0) {
       setSpecs((prev) => {
-        const next = [...prev];
+        let next = prev;
         for (const p of autoAplicables) {
-          const tmpl = findTmpl(p)!;
-          const targetId = `spec-${tmpl.spec_def_id}`;
-          const idx = next.findIndex(
-            (x) =>
-              x.id === targetId ||
-              x.id === `tmpl-${tmpl.spec_def_id}` ||
-              sameLabel(x.label, tmpl.label),
-          );
-          if (idx >= 0) {
-            next[idx] = { ...next[idx], value: p.value };
-          } else {
-            next.push({
-              id: targetId,
-              label: tmpl.label,
-              value: p.value,
-              spec_key: p.spec_key,
-            });
-          }
+          const tmpl = findTemplateMatch(templateItems, p)!;
+          next = upsertTemplateSpec(next, tmpl, p.value, p.spec_key);
         }
         return next;
       });
@@ -1705,39 +1687,8 @@ export function EquipoFormDialogV2({
             onChange={setSpecs}
             onAceptarPropuesto={(s) => {
               setSpecs((prev) => {
-                // Buscar template por spec_key primero, label como fallback.
-                const byKey = new Map<string, import("@/lib/admin/api").SpecTemplate>(
-                  (templateItems ?? []).filter((t) => t.spec_key).map((t) => [t.spec_key, t]),
-                );
-                const byLabel = new Map<string, import("@/lib/admin/api").SpecTemplate>(
-                  (templateItems ?? [])
-                    .filter((t) => t.label?.trim())
-                    .map((t) => [t.label.trim().toLowerCase(), t]),
-                );
-                const tmpl =
-                  (s.spec_key ? byKey.get(s.spec_key) : undefined) ??
-                  byLabel.get(s.label.trim().toLowerCase());
-                if (tmpl) {
-                  const targetId = `spec-${tmpl.spec_def_id}`;
-                  const next = [...prev];
-                  const idx = next.findIndex(
-                    (x) =>
-                      x.id === targetId ||
-                      x.id === `tmpl-${tmpl.spec_def_id}` ||
-                      sameLabel(x.label, tmpl.label),
-                  );
-                  if (idx >= 0) {
-                    next[idx] = { ...next[idx], value: s.value };
-                  } else {
-                    next.push({
-                      id: targetId,
-                      label: tmpl.label,
-                      value: s.value,
-                      spec_key: s.spec_key,
-                    });
-                  }
-                  return next;
-                }
+                const tmpl = findTemplateMatch(templateItems, s);
+                if (tmpl) return upsertTemplateSpec(prev, tmpl, s.value, s.spec_key);
                 // Sin template match: spec custom con UUID id.
                 const idx = prev.findIndex((x) => sameLabel(x.label, s.label));
                 if (idx >= 0) {
