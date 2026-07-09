@@ -70,7 +70,6 @@ import type { ContenidoIncluidoItem } from "@/data/equipment";
 import { uploadFileToBucket, uploadExternalUrlToBucket, isHostedUrl } from "@/lib/equipment/photos";
 import { uploadEquipoFotoFromUrl, uploadEquipoFotosFromUrls } from "@/lib/equipment/equipoFotos";
 import { PhotoGallery } from "@/components/common/PhotoGallery";
-import { authedJson } from "@/lib/authedFetch";
 import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/useSettings";
 import { Monto, PrecioUnidad } from "@/components/admin/Monto";
 import { KitEditor } from "./KitEditor";
@@ -619,19 +618,17 @@ export function EquipoFormDialogV2({
     const ctrl = new AbortController();
     const timeoutId = setTimeout(() => ctrl.abort(), 30_000);
     try {
-      const r = await authedJson<{ foto_candidates: string[] }>("/api/admin/equipos/buscar-fotos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const r = await adminApi.buscarFotos(
+        {
           nombre: form.getValues("nombre"),
           marca: form.getValues("marca") || null,
           modelo: form.getValues("modelo") || null,
           // Si hay URL en el autocompletar bar, usarla como fuente directa.
           ...(u ? { url: u } : {}),
           exclude: photoCands,
-        }),
-        signal: ctrl.signal,
-      });
+        },
+        ctrl.signal,
+      );
       const news = (r.foto_candidates ?? []).filter((x) => !photoCands.includes(x));
       setPhotoCands((prev) => [...prev, ...news]);
       if (news.length === 0) toast.info("No se encontraron más fotos");
@@ -773,12 +770,7 @@ export function EquipoFormDialogV2({
     if (!initial?.id) return;
     setUploadingHtml(true);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const r = await authedJson<{
-        html_source_url: string;
-        specs?: { label: string; value: string; spec_key?: string }[];
-      }>(`/api/admin/equipos/${initial.id}/upload-html-source`, { method: "POST", body: fd });
+      const r = await adminApi.uploadHtmlSource(initial.id, file);
       setHtmlSourceUrl(r.html_source_url);
       _aplicarSpecsExtraidos(r.specs ?? [], "HTML guardado");
     } catch (e) {

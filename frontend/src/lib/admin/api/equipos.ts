@@ -59,6 +59,25 @@ export const equiposMethods = {
   restoreEquipo: (id: number) =>
     authedPostJson<{ ok: true; message?: string }>(`/api/equipos/${id}/restore`, {}),
   getEquipo: (id: number) => authedJson<Equipo>(`/api/equipos/${id}`),
+  /** Busca candidatas de foto por nombre/marca/modelo (o una URL directa del
+   *  autocompletar bar). `exclude` evita repetir candidatas ya mostradas.
+   *  Timeout de 30s a cargo del caller (pasa `signal`). */
+  buscarFotos: (
+    input: {
+      nombre: string;
+      marca: string | null;
+      modelo: string | null;
+      url?: string;
+      exclude: string[];
+    },
+    signal?: AbortSignal,
+  ) =>
+    authedJson<{ foto_candidates: string[] }>("/api/admin/equipos/buscar-fotos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+      signal,
+    }),
   /** Calidad del inventario — métricas + breakdown por campo faltante. Issue #349. */
   getCalidadInventario: () => authedJson<CalidadInventario>("/api/admin/inventario/calidad"),
   /** Sugerencias automáticas para mejorar el inventario. Issue #352. */
