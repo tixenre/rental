@@ -1015,9 +1015,9 @@ export function EquipoFormDialogV2({
   const formId = "equipo-form-v2";
 
   const publicHint = nombrePublico ? (
-    <p className="text-xs text-muted-foreground">
+    <span className="text-xs text-muted-foreground">
       Se ve en la web como: <span className="text-ink font-medium italic">{nombrePublico}</span>
-    </p>
+    </span>
   ) : null;
 
   // En edit: dos botones — "Aplicar" persiste sin cerrar (para iterar sin
