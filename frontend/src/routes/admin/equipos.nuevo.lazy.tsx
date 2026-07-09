@@ -25,7 +25,6 @@ function NuevoEquipoRoute() {
 
   return (
     <EquipoFormDialogV2
-      variant="page"
       open
       initial={null}
       saving={saveMut.isPending}

@@ -53,7 +53,6 @@ function EditarEquipoRoute() {
 
   return (
     <EquipoFormDialogV2
-      variant="page"
       open
       initial={equipoQ.data}
       saving={saveMut.isPending}
