@@ -1154,4 +1154,8 @@ Freelo, que no sabe de antemano qué van a preferir sus usuarios. API async-nati
 resto de `arca_fe`, sync-first) porque Playwright rinde mejor así en un proceso de server de larga
 vida. Nuevo parámetro `executable_path` (útil para despliegues con Chromium propio, no solo para
 este sandbox). 6 tests nuevos (`integration`, Chromium real) + suite completa (300) en verde,
-`__version__` 0.2.0→0.3.0. Detalle completo en `docs/DECISIONES.md` esta fecha.
+`__version__` 0.2.0→0.3.0. CI ajustado tras un fallo real: el job `python-tests` nunca instaló
+Chromium (ningún test de Rambla lo hace, siempre mockean `pdf._render_pdf`) — `test_pdf.py` pasa a
+saltearse por opt-in (`ARCA_FE_PDF_TEST=1`), mismo patrón ya usado por `test_alembic_upgrade_db.py`
+para integration tests que necesitan infra que el job default no provee. Detalle completo en
+`docs/DECISIONES.md` esta fecha.

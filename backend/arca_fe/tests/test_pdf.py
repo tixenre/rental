@@ -3,7 +3,18 @@
 `integration`, no `unit`: a diferencia del resto de la suite (puros, sin red/proceso externo),
 estos SÍ lanzan un Chromium real — es justamente lo que hay que verificar (que el motor compartido
 produce bytes reales), no algo que tenga sentido mockear (mockear Playwright no probaría nada del
-render real). Requiere el extra `pdf` instalado + `playwright install chromium`."""
+render real). Requiere el extra `pdf` instalado + `playwright install chromium`.
+
+OPT-IN: el job `python-tests` de CI (`.github/workflows/ci.yml`) nunca instaló el binario de
+Chromium (ni falta que le haga — el resto de la suite, incluida la de Rambla que sí usa Playwright
+en producción vía `backend/pdf.py`, mockea el límite de Chromium en vez de lanzarlo real en CI). En
+vez de sumarle ese paso a un workflow compartido por todo el repo para servir un extra opcional de
+una sola librería, esta suite sigue el mismo patrón ya usado acá para integration tests que
+necesitan infra que el job default no provee (ver `tests/test_alembic_upgrade_db.py`, gateado tras
+`ALEMBIC_DB_TEST=1`): se saltea salvo opt-in explícito.
+
+    pip install -e .[pdf] && playwright install chromium
+    ARCA_FE_PDF_TEST=1 python -m pytest arca_fe/tests/test_pdf.py -v"""
 from __future__ import annotations
 
 import os
@@ -12,7 +23,15 @@ import pytest
 
 from arca_fe.pdf import cerrar_navegador, renderizar_imagen, renderizar_pdf
 
-pytestmark = pytest.mark.integration
+_OPT_IN = os.environ.get("ARCA_FE_PDF_TEST") == "1"
+
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not _OPT_IN,
+        reason="opt-in: setear ARCA_FE_PDF_TEST=1 (+ `playwright install chromium`) para correr esta suite",
+    ),
+]
 
 _HTML_SIMPLE = "<html><body style='margin:0;padding:40px;'><h1>Hola ARCA</h1></body></html>"
 

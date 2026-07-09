@@ -3216,8 +3216,23 @@ asignada, ya que este cambio tomó el próximo MINOR primero.
 de la suite, sí lanzan un Chromium real; mockear Playwright no probaría nada del render real).
 Cubren: PDF/imagen con `page_size` default y explícito, cualquier layout como cualquier formato
 (no exclusividad simplificada↔imagen), reuso del browser compartido entre llamadas, y
-`cerrar_navegador` dejando el módulo re-arrancable. 6/6 verdes; suite completa (300 tests) verde.
-`ruff check` limpio.
+`cerrar_navegador` dejando el módulo re-arrancable. 6/6 verdes localmente; suite completa (300
+tests) verde. `ruff check` limpio.
+
+**CI, ajustado tras un fallo real (mismo PR).** El job `python-tests` de CI corrió estos tests sin
+tener el binario de Chromium instalado (`playwright==1.60.0` ya era dependencia de producción vía
+`backend/pdf.py` de Rambla, pero ningún workflow corría `playwright install` nunca) — falló con
+"Executable doesn't exist". Investigando la convención ya existente del repo para tests
+`integration` que necesitan infra que el job default no provee (`tests/test_alembic_upgrade_db.py`,
+gateado tras `ALEMBIC_DB_TEST=1` + `DATABASE_URL` real) y confirmando que los tests de PDF de
+Rambla (`tests/test_facturacion_routes.py`, `test_cliente_pedido_factura.py`) **siempre** mockean el
+límite de Chromium (`monkeypatch.setattr("pdf._render_pdf", ...)`) en vez de lanzarlo real en CI —
+nunca hubo Chromium real corriendo en este pipeline. En vez de sumarle un paso de instalación de
+browser a un workflow compartido por todo el repo para servir el extra opcional de una sola
+librería, `test_pdf.py` sigue el mismo patrón de opt-in ya establecido: `pytest.mark.skipif` tras
+`ARCA_FE_PDF_TEST=1` (+ `playwright install chromium`) — se saltea limpio en CI normal, corre real
+solo cuando alguien lo pide explícitamente (verificado: sin la env var, 6 skipped; con ella, 6
+passed).
 
 **Archivos:** `backend/arca_fe/pdf.py` (nuevo), `backend/arca_fe/tests/test_pdf.py` (nuevo),
 `backend/arca_fe/__init__.py` (imports/`__all__`/version), `backend/arca_fe/pyproject.toml` (extra
