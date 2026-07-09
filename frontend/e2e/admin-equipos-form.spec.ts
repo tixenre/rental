@@ -125,4 +125,31 @@ test.describe("Admin equipos — form V2", () => {
     // Verificar que el botón está activo
     await expect(papeleraBtn).toBeVisible();
   });
+
+  test("EDIT: Pegar HTML abre el modal (regresión #1263 — antes no abría nunca)", async ({
+    page,
+  }) => {
+    await page.goto("/admin/equipos");
+    await page.waitForLoadState("networkidle");
+
+    // Entrar al editor de un equipo cualquiera vía el ActionMenu (bottom sheet)
+    // de la fila — este suite corre a 375px (mobile-chrome, playwright.config.ts),
+    // así que el trigger visible es "Más acciones" (botones planos en un Drawer,
+    // no el DropdownMenuItem de escritorio). No hardcodeamos un id — el test
+    // corre contra la data real de la DB local.
+    await page.getByRole("button", { name: "Más acciones" }).first().click();
+    await page.getByRole("button", { name: /^Editar$/i }).click();
+    await page.waitForURL(/\/admin\/equipos\/\d+\/editar/);
+
+    // "Pegar HTML" es edit-only (isEdit && ...) — antes del fix, este click
+    // seteaba htmlPasteOpen pero ningún <Dialog> lo mostraba (variant="page"
+    // nunca montaba la rama variant="dialog" donde vivía el modal).
+    await page.getByRole("button", { name: /^Pegar HTML$/i }).click();
+    const dialog = page.getByRole("dialog", { name: /Pegar HTML del producto/i });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByPlaceholder("<html>…</html>")).toBeVisible();
+
+    await dialog.getByRole("button", { name: /^Cancelar$/i }).click();
+    await expect(dialog).not.toBeVisible();
+  });
 });
