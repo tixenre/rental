@@ -49,6 +49,7 @@ def _bad_estado():
 class TestChequearYAlertar:
     def test_todo_ok_no_manda_mail(self, monkeypatch):
         monkeypatch.setattr(job, "get_db", lambda: _FakeConn())
+        monkeypatch.setattr(job, "_alertado_recientemente", lambda conn: False)
         monkeypatch.setattr(job, "estado", lambda conn: _ok_estado())
         sent = []
         monkeypatch.setattr(
@@ -62,6 +63,7 @@ class TestChequearYAlertar:
 
         monkeypatch.setattr(settings, "ADMIN_EMAILS", "a@test.com,b@test.com")
         monkeypatch.setattr(job, "get_db", lambda: _FakeConn())
+        monkeypatch.setattr(job, "_alertado_recientemente", lambda conn: False)
         monkeypatch.setattr(job, "estado", lambda conn: _bad_estado())
         sent = []
 
@@ -76,11 +78,29 @@ class TestChequearYAlertar:
 
     def test_send_fallido_no_propaga_y_devuelve_false(self, monkeypatch):
         monkeypatch.setattr(job, "get_db", lambda: _FakeConn())
+        monkeypatch.setattr(job, "_alertado_recientemente", lambda conn: False)
         monkeypatch.setattr(job, "estado", lambda conn: _bad_estado())
         monkeypatch.setattr(
             job, "send_raw_email", lambda **kw: {"ok": False, "error": "smtp caído"}
         )
         assert job.chequear_reconciliacion_y_alertar() is False
+
+    def test_ya_alertado_recientemente_no_recalcula_ni_manda(self, monkeypatch):
+        """El dedup contra `emails_log` corta ANTES de llamar a `estado()` —
+        no solo evita el mail, evita recalcular el semáforo entero."""
+        monkeypatch.setattr(job, "get_db", lambda: _FakeConn())
+        monkeypatch.setattr(job, "_alertado_recientemente", lambda conn: True)
+        estado_calls = []
+        monkeypatch.setattr(
+            job, "estado", lambda conn: (estado_calls.append(1), _bad_estado())[1]
+        )
+        sent = []
+        monkeypatch.setattr(
+            job, "send_raw_email", lambda **kw: (sent.append(kw), {"ok": True})[1]
+        )
+        assert job.chequear_reconciliacion_y_alertar() is False
+        assert not sent
+        assert not estado_calls
 
 
 class TestResumenHtml:

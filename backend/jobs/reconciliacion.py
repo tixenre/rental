@@ -73,6 +73,28 @@ def _resumen_html(data: dict) -> str:
     )
 
 
+def _alertado_recientemente(conn) -> bool:
+    """`True` si ya se mandó `reconciliacion_alerta` en las últimas 20h.
+
+    Dedup contra `emails_log` (sobrevive un restart del proceso): el gate
+    "1×/día" del scheduler (`ultima_reconciliacion` en `jobs/scheduler.py`) es
+    una variable EN MEMORIA que arranca en `None` y se resetea en cada restart
+    del thread — en `dev` (auto-deploy en cada push) eso disparaba un mail
+    completo por cada contenedor nuevo mientras la divergencia seguía sin
+    resolver, en vez de 1×/día real. Ventana de 20h (no medianoche calendario,
+    evita líos de huso horario) calculada en Postgres."""
+    row = conn.execute(
+        """
+        SELECT 1 FROM emails_log
+         WHERE template_key = 'reconciliacion_alerta'
+           AND status = 'sent'
+           AND sent_at > NOW() - INTERVAL '20 hours'
+         LIMIT 1
+        """
+    ).fetchone()
+    return row is not None
+
+
 def chequear_reconciliacion_y_alertar() -> bool:
     """Corre el semáforo unificado; si `ok=False`, manda un mail a cada admin.
     Devuelve `True` si mandó alerta, `False` si todo estaba en orden. Nunca
@@ -81,6 +103,8 @@ def chequear_reconciliacion_y_alertar() -> bool:
     from config import settings
 
     with get_db() as conn:
+        if _alertado_recientemente(conn):
+            return False
         data = estado(conn)
 
     if data.get("ok"):
