@@ -17,16 +17,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Upload,
-  Trash2,
-  Search,
-  Link as LinkIcon,
-  Image as ImageIcon,
-  FileCode,
-  ClipboardPaste,
-  Printer,
-} from "lucide-react";
+import { Upload, Trash2, Search, Printer } from "lucide-react";
 import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
@@ -70,21 +61,13 @@ import { uploadFileToBucket, uploadExternalUrlToBucket, isHostedUrl } from "@/li
 import { uploadEquipoFotoFromUrl, uploadEquipoFotosFromUrls } from "@/lib/equipment/equipoFotos";
 import { PhotoGallery } from "@/components/common/PhotoGallery";
 import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/useSettings";
-import { Monto, PrecioUnidad } from "@/components/admin/Monto";
 import { KitEditor } from "./KitEditor";
 import { ComboEditor } from "./ComboEditor";
 import { ContenidoIncluidoEditor } from "./ContenidoIncluidoEditor";
 import { SpecsDiffEditor } from "./SpecsDiffEditor";
 import { buildContenidoIncluidoPrintHtml } from "./contenido-incluido-print";
 import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
-import {
-  Field,
-  CollapsibleSection,
-  LinkInput,
-  PhotoCard,
-  CategoriasPicker,
-  TipoGlosario,
-} from "./form-helpers";
+import { Field, CollapsibleSection, CategoriasPicker, TipoGlosario } from "./form-helpers";
 import {
   buildSchema,
   type FormValues,
@@ -94,6 +77,9 @@ import {
 } from "./equipo-form-schema";
 import { useEquipoFotos } from "./useEquipoFotos";
 import { useEquipoFormDraft } from "./useEquipoFormDraft";
+import { AutocompletarBarSection } from "./AutocompletarBarSection";
+import { IdentificacionSection } from "./IdentificacionSection";
+import { EquipoPreviewAside } from "./EquipoPreviewAside";
 
 // ════════════════════════════════════════════════════════════════════
 // Componente principal
@@ -870,7 +856,7 @@ export function EquipoFormDialogV2({
   // id todavía) y para el raro caso de un equipo en EDIT sin fotos en la
   // galería.
   const fotoGaleriaActual = gallery.fotos.find((f) => f.es_principal)?.url;
-  const fotoActual = pendingFilePreview || fotoGaleriaActual || form.watch("foto_url");
+  const fotoActual = pendingFilePreview || fotoGaleriaActual || form.watch("foto_url") || undefined;
 
   // ── Confirmación al cerrar con cambios sin guardar (#232) ──────────
   // Detectamos cambios desde 4 fuentes: form fields (react-hook-form),
@@ -922,278 +908,46 @@ export function EquipoFormDialogV2({
         </label>
       </div>
 
-      {/* ════════════════════════════════════════════════════════════════
-              AUTOCOMPLETAR BAR — sticky en mobile para no perderla al scrollear
-          ════════════════════════════════════════════════════════════════ */}
-      <section className="rounded-md border hairline bg-amber-soft/40 p-3 space-y-2 sticky top-0 z-10 sm:static">
-        <div className="flex items-center gap-1.5 text-xs font-medium text-ink/80">
-          <LinkIcon className="h-3.5 w-3.5" />
-          Link del producto (B&amp;H, Adorama, sitio oficial)
-        </div>
-        <LinkInput
-          value={form.watch("bh_url") ?? ""}
-          onChange={(v) => form.setValue("bh_url", v, { shouldDirty: true })}
-          placeholder="https://www.bhphotovideo.com/c/product/..."
-        />
-        <div className="flex flex-wrap gap-1.5">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={buscarFotos}
-            disabled={buscarFotosMut.isPending}
-          >
-            {buscarFotosMut.isPending ? (
-              <>
-                <Spinner size="xs" className="mr-1" /> Buscando…
-              </>
-            ) : (
-              <>
-                <ImageIcon className="h-3.5 w-3.5 mr-1" /> Buscar foto (~5s)
-              </>
-            )}
-          </Button>
-          {isEdit && (
-            <>
-              {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
-              <input
-                ref={htmlInputRef}
-                type="file"
-                accept=".html,.htm"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleHtmlUpload(f);
-                  e.target.value = "";
-                }}
-              />
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => htmlInputRef.current?.click()}
-                disabled={handleHtmlUploadMut.isPending}
-              >
-                {handleHtmlUploadMut.isPending ? (
-                  <>
-                    <Spinner size="xs" className="mr-1" /> Subiendo…
-                  </>
-                ) : (
-                  <>
-                    <FileCode className="h-3.5 w-3.5 mr-1" />
-                    {htmlSourceUrl ? "Reemplazar HTML" : "Subir HTML"}
-                  </>
-                )}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => setHtmlPasteOpen(true)}
-                title="Pegá el HTML de la página del producto (ej. copiado con Chrome MCP) sin subir un archivo"
-              >
-                <ClipboardPaste className="h-3.5 w-3.5 mr-1" />
-                Pegar HTML
-              </Button>
-              {htmlSourceUrl && (
-                <>
-                  <span className="flex items-center gap-1 text-xs text-verde-ink font-medium">
-                    <FileCode className="h-3 w-3" /> HTML guardado
-                  </span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleReExtractSpecs()}
-                    disabled={handleReExtractSpecsMut.isPending || handleHtmlUploadMut.isPending}
-                    title="Re-corre la extracción sobre el HTML ya guardado, sin resubirlo — útil después de agregar un spec nuevo al registry"
-                  >
-                    {handleReExtractSpecsMut.isPending ? (
-                      <>
-                        <Spinner size="xs" className="mr-1" /> Buscando…
-                      </>
-                    ) : (
-                      "Buscar valores actualizados"
-                    )}
-                  </Button>
-                </>
-              )}
-            </>
-          )}
-        </div>
-      </section>
+      <AutocompletarBarSection
+        isEdit={isEdit}
+        bhUrl={form.watch("bh_url") ?? ""}
+        onBhUrlChange={(v) => form.setValue("bh_url", v, { shouldDirty: true })}
+        htmlInputRef={htmlInputRef}
+        htmlSourceUrl={htmlSourceUrl}
+        onBuscarFotos={buscarFotos}
+        buscarFotosPending={buscarFotosMut.isPending}
+        onHtmlFileSelected={handleHtmlUpload}
+        uploadingHtmlPending={handleHtmlUploadMut.isPending}
+        onPegarHtmlClick={() => setHtmlPasteOpen(true)}
+        onReExtractSpecs={handleReExtractSpecs}
+        reExtractPending={handleReExtractSpecsMut.isPending}
+      />
 
-      {/* ════════════════════════════════════════════════════════════════
-              IDENTIFICACIÓN — foto + nombres + marca/modelo
-          ════════════════════════════════════════════════════════════════ */}
-      <section className="space-y-3">
-        <div className={`grid grid-cols-1 ${!isEdit ? "sm:grid-cols-[160px_1fr]" : ""} gap-3`}>
-          {/* Foto card — solo en CREATE mode; en EDIT la galería toma el mando */}
-          {!isEdit && (
-            <div className="space-y-1">
-              <PhotoCard
-                url={fotoActual}
-                pendingFile={pendingFile}
-                hasInitial={false}
-                onClear={() => {
-                  setPendingFile(null);
-                  if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
-                  setPendingFilePreview("");
-                  form.setValue("foto_url", "", { shouldDirty: true });
-                }}
-                onUpload={handleUpload}
-                onSubirAR2={subirFotoUrlAR2}
-                uploading={handleUploadMut.isPending}
-                uploadingToR2={subirFotoUrlAR2Mut.isPending}
-              />
-            </div>
-          )}
-
-          <div className="space-y-3">
-            <Field
-              label="Nombre interno (técnico, para vos)"
-              error={form.formState.errors.nombre?.message}
-            >
-              <Input
-                {...form.register("nombre")}
-                placeholder="Ej: Sony ILME-FX30B Cuerpo"
-                autoFocus
-              />
-            </Field>
-
-            <Field label="Nombre público (cómo se ve en el catálogo)">
-              <div className="space-y-1.5">
-                <Input
-                  value={nombrePublico}
-                  onChange={(e) => {
-                    // Tipear a mano es la señal de "esto es mío" — apaga el
-                    // auto-gen. Sin esto, `nombrePublicoAuto` (default true)
-                    // queda armado en silencio mientras no hay molde (el
-                    // toggle para verlo/apagarlo está oculto), y el texto
-                    // tipeado se borra apenas se elige una categoría de specs
-                    // que sí tiene molde — confirmado en vivo (Angulo 5).
-                    setNombrePublico(e.target.value);
-                    setNombrePublicoAuto(false);
-                  }}
-                  placeholder={
-                    autoGenDisponible
-                      ? "Generado automático según el molde de la categoría"
-                      : "Ej: Cable HDMI 2.0 50cm"
-                  }
-                />
-                {autoGenDisponible && (
-                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Switch checked={nombrePublicoAuto} onCheckedChange={setNombrePublicoAuto} />
-                    Generar automático desde el molde de {categoriaRoot}
-                    {!nombrePublicoAuto && (
-                      <span className="opacity-60">(off — se guarda como nombre fijo)</span>
-                    )}
-                  </label>
-                )}
-                {autoGenDisponible && nombrePublicoAuto && (
-                  <p className="text-2xs text-muted-foreground italic">
-                    Molde vivo de la categoría — si el dueño lo cambia desde /admin/equipos/specs,
-                    este nombre se actualiza solo (toggle OFF para fijarlo a mano).
-                  </p>
-                )}
-                {!nombrePublicoAuto && (
-                  <p className="text-2xs text-muted-foreground italic">
-                    Nombre fijo: gana siempre, aunque cambie el molde de la categoría.
-                  </p>
-                )}
-                {!autoGenDisponible && categoriaRoot && (
-                  <p className="text-xs text-muted-foreground italic">
-                    "{categoriaRoot}" todavía no tiene molde configurado. Escribilo a mano — se
-                    guarda como nombre fijo (o configurá el molde en /admin/equipos/specs).
-                  </p>
-                )}
-              </div>
-            </Field>
-
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="Marca">
-                <Input
-                  {...form.register("marca")}
-                  placeholder="Sony"
-                  list="marca-options"
-                  autoComplete="off"
-                />
-                <datalist id="marca-options">
-                  {marcasOptions.map((m) => (
-                    <option key={m.id} value={m.nombre} />
-                  ))}
-                </datalist>
-              </Field>
-              <Field label="Modelo">
-                <Input {...form.register("modelo")} placeholder="FX30" />
-              </Field>
-            </div>
-          </div>
-        </div>
-
-        {/* Candidatos de foto (si hay) */}
-        {photoCands.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                Fotos encontradas ({photoCands.length}) · click para elegir
-              </Label>
-              {lastEnrichPhotoCands.length > 0 && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleAgregarTodasLasFotos()}
-                  disabled={handleAgregarTodasLasFotosMut.isPending}
-                  title="Sube de un saque las fotos que trajo el último HTML pegado"
-                >
-                  {handleAgregarTodasLasFotosMut.isPending ? (
-                    <>
-                      <Spinner size="xs" className="mr-1" /> Agregando…
-                    </>
-                  ) : (
-                    `Agregar las ${lastEnrichPhotoCands.length} del HTML`
-                  )}
-                </Button>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {photoCands.map((u) => {
-                const isPicking = elegirFotoMut.isPending && elegirFotoMut.variables === u;
-                // `fotoActual` (no `form.watch("foto_url")` crudo): en EDIT
-                // mode, elegir un candidato sube directo a la galería sin
-                // tocar el campo del form (mismo bug ya arreglado en el
-                // preview grande del costado) — comparar contra el mismo
-                // valor derivado mantiene el aro de "seleccionada" correcto
-                // en los dos modos.
-                const isSelected = fotoActual === u;
-                return (
-                  <button
-                    key={u}
-                    type="button"
-                    onClick={() => elegirFoto(u)}
-                    disabled={isPicking}
-                    className={`relative h-14 w-14 rounded border bg-background overflow-hidden ${isSelected ? "ring-2 ring-amber" : ""}`}
-                  >
-                    <img
-                      loading="lazy"
-                      decoding="async"
-                      src={u}
-                      alt=""
-                      className="h-full w-full object-contain"
-                    />
-                    {isPicking && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                        <Spinner size="sm" className="text-white" />
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </section>
+      <IdentificacionSection
+        isEdit={isEdit}
+        form={form}
+        draft={draft}
+        marcasOptions={marcasOptions}
+        fotoActual={fotoActual}
+        pendingFile={pendingFile}
+        onClearPendingFile={() => {
+          setPendingFile(null);
+          if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
+          setPendingFilePreview("");
+          form.setValue("foto_url", "", { shouldDirty: true });
+        }}
+        onUpload={handleUpload}
+        onSubirAR2={subirFotoUrlAR2}
+        uploadingPending={handleUploadMut.isPending}
+        uploadingToR2Pending={subirFotoUrlAR2Mut.isPending}
+        photoCands={photoCands}
+        lastEnrichPhotoCands={lastEnrichPhotoCands}
+        onAgregarTodasLasFotos={handleAgregarTodasLasFotos}
+        agregarTodasPending={handleAgregarTodasLasFotosMut.isPending}
+        onElegirFoto={elegirFoto}
+        elegirFotoPending={elegirFotoMut.isPending}
+        elegirFotoVariable={elegirFotoMut.variables}
+      />
 
       {/* ════════════════════════════════════════════════════════════════
               GALERÍA DE FOTOS — solo en edit mode
@@ -1592,8 +1346,6 @@ export function EquipoFormDialogV2({
 
   // Editor de página completa (mock del handoff) — única forma, no hay
   // variante modal (la había, pero ningún caller la usaba — #1263 Fase 0).
-  const kpiFmt = (n: unknown) =>
-    typeof n === "number" && !Number.isNaN(n) ? n.toLocaleString("es-AR") : "—";
   return (
     <>
       <AdminPage title={titleText} maxW="list" description={publicHint} className="pb-28">
@@ -1601,51 +1353,14 @@ export function EquipoFormDialogV2({
           <form id={formId} onSubmit={submit} className="space-y-5 min-w-0" data-equipo-form-v2>
             {formSections}
           </form>
-          <aside className="space-y-3 lg:sticky lg:top-6">
-            <div className="rounded-lg border hairline bg-card overflow-hidden">
-              <div className="aspect-square bg-white grid place-items-center p-4">
-                {fotoActual ? (
-                  <img
-                    loading="lazy"
-                    decoding="async"
-                    src={fotoActual}
-                    alt=""
-                    className="max-h-full max-w-full object-contain"
-                  />
-                ) : (
-                  <ImageIcon className="h-10 w-10 text-muted-foreground/30" />
-                )}
-              </div>
-              <div className="p-3 border-t hairline">
-                <div className="font-medium text-ink text-sm leading-tight">
-                  {form.watch("nombre") || "Equipo sin nombre"}
-                </div>
-                {nombrePublico && (
-                  <div className="text-xs text-muted-foreground italic mt-0.5">{nombrePublico}</div>
-                )}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-lg border hairline bg-card px-3 py-2.5">
-                <div className="t-eyebrow">$ / jornada</div>
-                <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
-                  <PrecioUnidad value={form.watch("precio_jornada")} />
-                </div>
-              </div>
-              <div className="rounded-lg border hairline bg-card px-3 py-2.5">
-                <div className="t-eyebrow">% día</div>
-                <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
-                  {kpiFmt(form.watch("roi_pct"))}%
-                </div>
-              </div>
-              <div className="rounded-lg border hairline bg-card px-3 py-2.5 col-span-2">
-                <div className="t-eyebrow">Valor reposición</div>
-                <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
-                  <Monto value={form.watch("valor_reposicion")} moneda="USD" />
-                </div>
-              </div>
-            </div>
-          </aside>
+          <EquipoPreviewAside
+            fotoActual={fotoActual}
+            nombre={form.watch("nombre")}
+            nombrePublico={nombrePublico}
+            precioJornada={form.watch("precio_jornada")}
+            roiPct={form.watch("roi_pct")}
+            valorReposicion={form.watch("valor_reposicion")}
+          />
         </div>
       </AdminPage>
       <div className="sticky bottom-0 z-20 border-t hairline bg-background/95 backdrop-blur px-4 md:px-6 py-3 flex justify-end gap-2">
