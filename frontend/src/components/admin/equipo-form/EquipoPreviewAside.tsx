@@ -1,7 +1,7 @@
 /**
  * EquipoPreviewAside — preview sticky del costado (foto + KPIs).
  *
- * Extraído verbatim de `EquipoFormDialogV2.tsx` (split de god-module, Frente E
+ * Extraído verbatim de `EquipoFormDialog.tsx` (split de god-module, Frente E
  * del skill `mantenimiento`, F2a #1263). Puramente de lectura — no dispara
  * ningún cambio, así que recibe los valores ya resueltos en vez de `form`.
  */

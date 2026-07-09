@@ -104,7 +104,7 @@
 
 **Back-office después del seed:** una vez corrido, el dataset JSON queda como bootstrap/archivo (no se consulta en runtime). La DB es la fuente de verdad. Todo lo importado se ve y se edita desde el back-office existente:
 
-- **Equipos** (`/admin/equipos`) — lista admin, form `EquipoFormDialogV2`. Edita precio_jornada, foto_url, marca, modelo, nombre_publico, etc.
+- **Equipos** (`/admin/equipos`) — lista admin, form `EquipoFormDialog`. Edita precio_jornada, foto_url, marca, modelo, nombre_publico, etc.
 - **Specs values por equipo** — en la sección Specs del form admin del equipo.
 - **Spec definitions globales** (`/admin/equipos/specs`) — catálogo de specs (consumo_w, cri, etc.). Edita label, enum_options, ayuda.
 - **Categorías** — admin las gestiona en la UI existente de categorías.

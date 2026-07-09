@@ -15,7 +15,7 @@ import {
 
 /**
  * Centraliza la hidratación de `initial` que antes vivía desparramada en
- * ~12 `useState` + 9 `useEffect` de EquipoFormDialogV2.tsx, cada uno con su
+ * ~12 `useState` + 9 `useEffect` de EquipoFormDialog.tsx, cada uno con su
  * propio parche de "race condition" (4 comentarios casi idénticos: un efecto
  * hidrata, otro lee un booleano derivado antes de que el primer `setState`
  * sea visible en el mismo commit de React, así que cada uno re-chequea

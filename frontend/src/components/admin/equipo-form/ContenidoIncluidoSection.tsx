@@ -2,7 +2,7 @@
  * ContenidoIncluidoSection — qué viene en la caja (B1 #635) + "Imprimir
  * contenido" (packing list). Solo EDIT.
  *
- * Extraído verbatim de `EquipoFormDialogV2.tsx` (split de god-module, Frente E
+ * Extraído verbatim de `EquipoFormDialog.tsx` (split de god-module, Frente E
  * del skill `mantenimiento`, F2c #1263). Cero cambio de comportamiento.
  */
 import { Printer } from "lucide-react";

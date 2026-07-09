@@ -1,6 +1,6 @@
 /**
- * Tipos y helpers para specs del form V2.
- * Compartidos entre EquipoFormDialogV2 y SpecsDiffEditor (#207).
+ * Tipos y helpers para specs del form de equipos.
+ * Compartidos entre EquipoFormDialog y SpecsDiffEditor (#207).
  */
 import type { SpecTemplate } from "@/lib/admin/api";
 
@@ -24,7 +24,7 @@ export const uniq = <T>(arr: T[]): T[] => Array.from(new Set(arr));
 /**
  * Busca el template que corresponde a un spec extraído/propuesto —
  * por `spec_key` primero, por label (case/trim-insensitive) como fallback.
- * Extraído de la lógica que EquipoFormDialogV2 duplicaba dos veces
+ * Extraído de la lógica que EquipoFormDialog duplicaba dos veces
  * (auto-aplicar specs extraídas del HTML, y aceptar una propuesta) — mismo
  * shape, distinto nombre de variable en cada lado.
  */
@@ -48,7 +48,7 @@ export const findTemplateMatch = (
  * Inserta o actualiza, dentro de `specs`, el valor de un spec YA MATCHEADO
  * a un template (`tmpl`) — por id `spec-{spec_def_id}`, el id legacy
  * `tmpl-{spec_def_id}`, o mismo label (por si quedó con un id viejo). Mismo
- * upsert que EquipoFormDialogV2 duplicaba dos veces.
+ * upsert que EquipoFormDialog duplicaba dos veces.
  */
 export const upsertTemplateSpec = (
   specs: Spec[],

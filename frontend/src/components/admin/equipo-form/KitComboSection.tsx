@@ -1,7 +1,7 @@
 /**
  * KitComboSection — editor de componentes del kit/combo (solo EDIT).
  *
- * Extraído verbatim de `EquipoFormDialogV2.tsx` (split de god-module, Frente E
+ * Extraído verbatim de `EquipoFormDialog.tsx` (split de god-module, Frente E
  * del skill `mantenimiento`, F2b #1263). Cero cambio de comportamiento — el
  * gate `mostrarSeccionesEdit` (isEdit && initial) queda en el padre, que
  * decide si monta esta sección.

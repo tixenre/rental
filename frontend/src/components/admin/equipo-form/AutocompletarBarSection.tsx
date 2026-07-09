@@ -2,7 +2,7 @@
  * AutocompletarBarSection — "Link del producto" + Buscar foto / Subir HTML /
  * Pegar HTML / Buscar valores actualizados.
  *
- * Extraído verbatim de `EquipoFormDialogV2.tsx` (split de god-module, Frente E
+ * Extraído verbatim de `EquipoFormDialog.tsx` (split de god-module, Frente E
  * del skill `mantenimiento`, F2a #1263). Cero cambio de comportamiento — las
  * mutaciones quedan en el padre (comparten `photoCands`/specs con
  * `IdentificacionSection`); acá solo llegan los triggers + `isPending`.

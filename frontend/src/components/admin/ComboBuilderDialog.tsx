@@ -29,7 +29,7 @@ import { Button } from "@/design-system/ui/button";
 
 import { adminApi, type Equipo, type CategoriaAdmin } from "@/lib/admin/api";
 import { uploadFileToBucket } from "@/lib/equipment/photos";
-import { ComboEditor } from "./equipo-form-v2/ComboEditor";
+import { ComboEditor } from "./equipo-form/ComboEditor";
 
 const COMBO_SENTINEL_STOCK = 9999;
 const COMBOS_CAT_NOMBRE = "Combos";

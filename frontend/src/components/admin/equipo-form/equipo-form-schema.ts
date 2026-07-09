@@ -1,7 +1,7 @@
 /**
- * equipo-form-schema.ts — schema (zod) y constantes del form de equipos V2.
+ * equipo-form-schema.ts — schema (zod) y constantes del form de equipos.
  *
- * Extraído verbatim de `EquipoFormDialogV2.tsx` (split de god-module, Frente E
+ * Extraído verbatim de `EquipoFormDialog.tsx` (split de god-module, Frente E
  * del skill `mantenimiento`): piezas puras sin estado de componente. Cero cambio
  * de comportamiento.
  */

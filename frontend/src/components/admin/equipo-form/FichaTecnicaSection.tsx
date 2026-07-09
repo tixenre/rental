@@ -1,7 +1,7 @@
 /**
  * FichaTecnicaSection — categoría de specs + editor de specs estructuradas.
  *
- * Extraído verbatim de `EquipoFormDialogV2.tsx` (split de god-module, Frente E
+ * Extraído verbatim de `EquipoFormDialog.tsx` (split de god-module, Frente E
  * del skill `mantenimiento`, F2b #1263). Cero cambio de comportamiento — todo
  * lo que necesita ya vive en `draft` (issue #1263 F1); `specCatOptions` es lo
  * único externo (referencia resuelta por el padre desde `specCatsQ`).

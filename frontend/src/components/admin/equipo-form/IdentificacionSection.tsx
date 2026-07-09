@@ -2,7 +2,7 @@
  * IdentificacionSection — foto (create mode) + nombre interno/público +
  * marca/modelo + grid de candidatos de foto.
  *
- * Extraído verbatim de `EquipoFormDialogV2.tsx` (split de god-module, Frente E
+ * Extraído verbatim de `EquipoFormDialog.tsx` (split de god-module, Frente E
  * del skill `mantenimiento`, F2a #1263). Cero cambio de comportamiento —
  * `draft` cubre nombre público/auto-gen; el resto (fotos, marca/modelo) son
  * props puntuales porque no viven en el hook de hidratación.

@@ -2,7 +2,7 @@
  * AvanzadoSection — estado, valor de reposición, fecha de compra, serie,
  * notas internas.
  *
- * Extraído verbatim de `EquipoFormDialogV2.tsx` (split de god-module, Frente E
+ * Extraído verbatim de `EquipoFormDialog.tsx` (split de god-module, Frente E
  * del skill `mantenimiento`, F2c #1263). Cero cambio de comportamiento.
  */
 import type { UseFormReturn } from "react-hook-form";

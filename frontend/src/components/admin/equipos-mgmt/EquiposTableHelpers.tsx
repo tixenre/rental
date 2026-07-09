@@ -80,7 +80,7 @@ export function StockInline({ equipo, onSaved }: { equipo: Equipo; onSaved: () =
  * "Asignar categoría…" de la barra flotante (`set_categoria_masivo`). Si el
  * equipo tenía más de una asignada, el "+N" avisa antes de que el cambio
  * las deje en una sola (la ficha completa, con checkboxes multi-categoría,
- * sigue siendo `EquipoFormDialogV2` — esto es el atajo rápido de la lista).
+ * sigue siendo `EquipoFormDialog` — esto es el atajo rápido de la lista).
  */
 export function CategoriaInline({
   equipo,

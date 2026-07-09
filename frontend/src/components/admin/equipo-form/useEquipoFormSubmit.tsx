@@ -1,10 +1,10 @@
 /**
- * useEquipoFormSubmit — orquesta el guardado de EquipoFormDialogV2.tsx: valida
+ * useEquipoFormSubmit — orquesta el guardado de EquipoFormDialog.tsx: valida
  * (categoría + duplicado de serie), construye el payload, guarda el equipo y
  * encadena los guardados secundarios (foto/ficha/nombre público/specs/
  * categorías) que no viajan en el mismo POST/PATCH.
  *
- * Extraído verbatim del `submit` de EquipoFormDialogV2.tsx (split de
+ * Extraído verbatim del `submit` de EquipoFormDialog.tsx (split de
  * god-module, Frente E del skill `mantenimiento`, #1263 — última pieza tras
  * F0/F1/F2). Cero cambio de comportamiento: mismo orden de guardados, mismos
  * mensajes, mismo criterio de "avisos" vs "falló todo".

@@ -1,16 +1,14 @@
 /**
- * Rediseño del form de equipos (V2).
+ * Form de alta/edición de equipo. Sin tabs, scroll lineal con secciones
+ * colapsables (Ficha, Kit, Avanzado). Mismo flow CREATE / EDIT.
  *
- * Cambios vs el original:
- *  - Sin tabs. Scroll lineal con secciones colapsables (Ficha, Kit, Avanzado).
- *  - Mismo flow CREATE / EDIT (sin tabs deshabilitados al crear).
  *  - Identificación: nombre interno + nombre público lado a lado, con toggle
  *    de auto-gen por categoría.
  *  - "Link de fuente" como primera cosa del form, con botones para abrir y
  *    copiar al clipboard.
  *  - "Buscar foto" + "Autocompletar todo" como dos botones del mismo widget.
  *  - HTML upload para extraer specs (determinístico, sin LLM).
- *  - Kit con drag-drop (igual que el viejo).
+ *  - Kit con drag-drop.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -64,7 +62,7 @@ import { PegarHtmlDialog } from "./PegarHtmlDialog";
 // Componente principal
 // ════════════════════════════════════════════════════════════════════
 
-export function EquipoFormDialogV2({
+export function EquipoFormDialog({
   open,
   onOpenChange,
   initial,
@@ -495,7 +493,7 @@ export function EquipoFormDialogV2({
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
         if (saving) return;
-        const formEl = document.querySelector<HTMLFormElement>("form[data-equipo-form-v2]");
+        const formEl = document.querySelector<HTMLFormElement>("form[data-equipo-form]");
         formEl?.requestSubmit();
       }
     };
@@ -704,7 +702,7 @@ export function EquipoFormDialogV2({
   );
 
   const titleText = isEdit ? "Editar equipo" : "Nuevo equipo";
-  const formId = "equipo-form-v2";
+  const formId = "equipo-form";
 
   const publicHint = nombrePublico ? (
     <span className="text-xs text-muted-foreground">
@@ -719,7 +717,7 @@ export function EquipoFormDialogV2({
   const triggerApply = () => {
     if (saving) return;
     closeOnSuccessRef.current = false;
-    document.querySelector<HTMLFormElement>(`form[data-equipo-form-v2]`)?.requestSubmit();
+    document.querySelector<HTMLFormElement>(`form[data-equipo-form]`)?.requestSubmit();
   };
   const footerActions = (
     <>
@@ -787,7 +785,7 @@ export function EquipoFormDialogV2({
     <>
       <AdminPage title={titleText} maxW="list" description={publicHint} className="pb-28">
         <div className="grid lg:[grid-template-columns:minmax(0,1fr)_320px] gap-6 items-start">
-          <form id={formId} onSubmit={submit} className="space-y-5 min-w-0" data-equipo-form-v2>
+          <form id={formId} onSubmit={submit} className="space-y-5 min-w-0" data-equipo-form>
             {formSections}
           </form>
           <EquipoPreviewAside

@@ -2,7 +2,7 @@ import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { adminApi, type Equipo, type EquipoInput } from "@/lib/admin/api";
-import { EquipoFormDialogV2 } from "@/components/admin/equipo-form-v2/EquipoFormDialogV2";
+import { EquipoFormDialog } from "@/components/admin/equipo-form/EquipoFormDialog";
 import { popEquiposReturnSearch } from "@/lib/admin/equiposReturnSearch";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
@@ -24,7 +24,7 @@ function NuevoEquipoRoute() {
     navigate({ to: "/admin/equipos", search: popEquiposReturnSearch() as never });
 
   return (
-    <EquipoFormDialogV2
+    <EquipoFormDialog
       open
       initial={null}
       saving={saveMut.isPending}

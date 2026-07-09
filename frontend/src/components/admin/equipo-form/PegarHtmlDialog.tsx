@@ -2,10 +2,10 @@
  * PegarHtmlDialog — "Pegar HTML" (#1051 Stream B): hermano JSON de "Subir
  * HTML" (mismo extractor, sin persistir archivo en R2).
  *
- * Extraído verbatim de `EquipoFormDialogV2.tsx` (split de god-module, Frente E
+ * Extraído verbatim de `EquipoFormDialog.tsx` (split de god-module, Frente E
  * del skill `mantenimiento`, F2c #1263). Cero cambio de comportamiento.
  *
- * Historia: este modal vivía en la variante "dialog" de EquipoFormDialogV2,
+ * Historia: este modal vivía en la variante "dialog" de EquipoFormDialog,
  * que ningún caller usaba — el botón que abre el modal seteaba
  * `htmlPasteOpen` pero nada lo mostraba nunca. Bug real, confirmado y
  * arreglado en #1263 Fase 0 (el modal se movió a la variante que sí se
