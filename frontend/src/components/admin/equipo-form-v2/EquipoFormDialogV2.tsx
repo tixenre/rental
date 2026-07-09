@@ -1187,6 +1187,12 @@ export function EquipoFormDialogV2({
     onOpenChange(next);
   };
 
+  // Se lee 3 veces en el JSX de abajo (stock sentinel, título de sección,
+  // qué editor montar) — un solo lugar, no 3 form.watch() sueltos.
+  const esCombo = form.watch("tipo") === "combo";
+  // Kit/Combo y Contenido de la caja son 2 secciones edit-only con el mismo gate.
+  const mostrarSeccionesEdit = isEdit && initial;
+
   const formSections = (
     <>
       {/* ════════════════════════════════════════════════════════════════
@@ -1513,7 +1519,7 @@ export function EquipoFormDialogV2({
       <section className="space-y-3 pt-2 border-t hairline">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <Field label="Stock">
-            {form.watch("tipo") === "combo" ? (
+            {esCombo ? (
               <div className="flex items-center h-9 px-3 rounded-md border hairline bg-muted/30 text-sm text-muted-foreground">
                 Sentinel (9999) — derivado de componentes
               </div>
@@ -1728,24 +1734,18 @@ export function EquipoFormDialogV2({
       {/* ════════════════════════════════════════════════════════════════
               KIT — colapsable, solo en EDIT (necesita id del equipo)
           ════════════════════════════════════════════════════════════════ */}
-      {isEdit && initial && (
+      {mostrarSeccionesEdit && (
         <CollapsibleSection
-          title={
-            form.watch("tipo") === "combo" ? "Componentes del combo" : "Kit (componentes incluidos)"
-          }
+          title={esCombo ? "Componentes del combo" : "Kit (componentes incluidos)"}
         >
-          {form.watch("tipo") === "combo" ? (
-            <ComboEditor equipoId={initial.id} />
-          ) : (
-            <KitEditor equipoId={initial.id} />
-          )}
+          {esCombo ? <ComboEditor equipoId={initial.id} /> : <KitEditor equipoId={initial.id} />}
         </CollapsibleSection>
       )}
 
       {/* ════════════════════════════════════════════════════════════════
               CONTENIDO INCLUIDO — B1 #635 (solo en EDIT)
           ════════════════════════════════════════════════════════════════ */}
-      {isEdit && initial && (
+      {mostrarSeccionesEdit && (
         <CollapsibleSection title="Contenido de la caja" defaultOpen={contenidoIncluido.length > 0}>
           <div className="flex items-start justify-between mb-2 gap-2">
             <p className="text-xs text-muted-foreground">
