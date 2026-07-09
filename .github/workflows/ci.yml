@@ -311,6 +311,102 @@ jobs:
           export RESERVAS_DB_TEST=1
           python -m pytest tests/test_stream_b_enriquecer_fotos_db.py -v --tb=short -m integration
 
+  e2e-admin:
+    name: E2E admin (Playwright + backend real)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rambla_rental_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Instalar dependencias del backend
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      # admin-equipos-form.spec.ts (#1263) se auto-skipea sin PLAYWRIGHT_ADMIN=1,
+      # que a su vez necesita un backend real con ADMIN_BYPASS_AUTH=1 (dev-only —
+      # se ignora solo si RAILWAY_ENVIRONMENT=production, ver auth/session.py).
+      # Sin este job, esos tests (los nets de hidratación de la Fase 1 + el fix
+      # de Pegar HTML de la Fase 0) solo corrían si alguien se acordaba de
+      # correr `npm run test:admin` a mano con el backend levantado.
+      - name: Levantar el backend (ADMIN_BYPASS_AUTH=1, Postgres real)
+        working-directory: backend
+        run: |
+          nohup uvicorn main:app --port 8000 > /tmp/backend.log 2>&1 &
+          disown
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          SECRET_KEY: ci-test-secret-not-for-production
+          ADMIN_EMAILS: admin@test.com
+          ADMIN_BYPASS_AUTH: "1"
+
+      - name: Esperar a que init_db() termine y el backend responda contra Postgres real
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/api/equipos > /dev/null; then
+              echo "Backend listo"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "El backend no respondió a tiempo:"
+          cat /tmp/backend.log
+          exit 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # Mismo cache que mobile-smoke.yml (browsers de Playwright, ~100 MB).
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install chromium --with-deps
+
+      # El webServer de playwright.config.ts levanta el frontend solo (npm run
+      # dev) — acá solo faltaba el backend, que ya está arriba desde el paso
+      # anterior. Mismo filtro que test:admin en package.json.
+      - name: Run admin e2e tests
+        working-directory: frontend
+        run: PLAYWRIGHT_ADMIN=1 npx playwright test admin-
+        env:
+          CI: true
+
+      - name: Backend logs (si algo falló)
+        if: failure()
+        run: cat /tmp/backend.log || true
+
   build:
     name: Build frontend
     runs-on: ubuntu-latest
