@@ -18,10 +18,14 @@ aislado (por ejemplo, para probarlo en otro proyecto Python):
 pip install -e backend/arca_fe
 ```
 
-Extra opcional para renderizar el QR fiscal como SVG (si no lo necesitás, no hace falta instalarlo):
+Extras opcionales, ninguno hace falta para el core (WSFEv1/WSAA/padrón/render HTML):
 
 ```bash
-pip install -e "backend/arca_fe[qr]"
+pip install -e "backend/arca_fe[qr]"    # QR fiscal como SVG (segno)
+pip install -e "backend/arca_fe[pdf]"   # HTML -> PDF/imagen (playwright — además necesita
+                                         # `playwright install chromium`, el binario no es parte
+                                         # del paquete pip)
+pip install -e "backend/arca_fe[qr,pdf]"  # los dos juntos
 ```
 
 ## Quickstart
@@ -100,12 +104,36 @@ datos = comprobante_fiscal_desde(
 #    al usuario que elige.
 html = renderizar_comprobante_html(datos, layout="simplificada")
 
-# 7. Convertir a PDF y protegerlo — arca_fe NO hace el paso HTML→PDF (ver "Qué NO cubre" abajo).
-#    Acá con un motor cualquiera (ej. Playwright); el ejemplo asume que ya tenés los bytes del PDF.
-pdf_bytes: bytes = mi_motor_de_pdf(html)  # ej. Playwright: page.pdf(...)
+# 7. Convertir a PDF (o imagen) y protegerlo. Requiere el extra `pdf` (`pip install
+#    arca_fe[pdf]` + `playwright install chromium`) — mismo motor (Chromium vía Playwright) para
+#    cualquier consumidor, sin que cada uno traiga el suyo (ver "Render a PDF/imagen" abajo).
+from arca_fe import renderizar_pdf, tamano_pagina_layout
+
+pdf_bytes = await renderizar_pdf(html, page_size=tamano_pagina_layout("simplificada"))
 cert_pem, key_pem = generar_cert_autofirmado("Mi Empresa — Comprobantes")  # generar UNA vez, persistir
 pdf_protegido = asegurar_pdf(pdf_bytes, cert_pem, key_pem)
 ```
+
+## Render a PDF/imagen
+
+`renderizar_pdf`/`renderizar_imagen` (`arca_fe.pdf`, extra `pdf`) convierten el HTML de
+`renderizar_comprobante_html` a bytes de PDF o PNG/JPEG, vía un único Chromium headless compartido
+(reusado entre llamadas, no uno por request). Son intercambiables sobre el MISMO HTML — cualquiera
+de los 3 layouts se puede pedir en cualquiera de los dos formatos, no hay una combinación
+reservada (la simplificada es la pensada para compartir por WhatsApp como imagen, pero nada impide
+pedirla como PDF, ni pedir la oficial como PNG):
+
+```python
+from arca_fe import renderizar_pdf, renderizar_imagen, tamano_pagina_layout
+
+page_size = tamano_pagina_layout(layout)  # None (A4) para oficial/detallada, (1080, 1350) para simplificada
+pdf_bytes = await renderizar_pdf(html, page_size=page_size)
+png_bytes = await renderizar_imagen(html, page_size=page_size)          # o formato="jpeg"
+```
+
+API async (a diferencia del resto de `arca_fe`, sync-first) — Playwright se usa mejor así en un
+proceso de server de larga vida. `arca_fe.cerrar_navegador_pdf()` cierra el browser compartido
+(shutdown prolijo / entre corridas de test).
 
 ## Previsualizar cómo se ve un comprobante (sin CAE real)
 
@@ -179,13 +207,15 @@ directorio `arca_fe/` completo a otro proyecto Python y funciona igual (verifica
 ## Qué NO cubre (explícitamente fuera de alcance)
 
 - **Factura E (exportación)** — webservice DISTINTO de AFIP (WSFEXv1, `FEXAuthorize`), con su
-  propio modelo de datos. No es una extensión de este motor.
-  Ver `## Backlog futuro` en el plan de la iniciativa que llevó esto a `0.3.0`.
+  propio modelo de datos. No es una extensión de este motor. Backlog futuro, sin versión asignada
+  todavía (`renderizar_pdf`/`renderizar_imagen` tomaron el próximo bump de MINOR primero).
 - Vigencia de catálogos vivos de AFIP (¿este código de moneda/tributo existe HOY?) — la librería
   valida FORMATO (forma fija del campo) pero no vigencia; para eso, consultar
   `WsfeClient.param_tipos_monedas()`/`param_tipos_tributos()`/etc. en vivo.
-- **Convertir el HTML del comprobante a PDF** — `renderizar_comprobante_html` devuelve HTML
-  (string), no bytes de PDF; convertirlo requiere un motor de render externo (ej.
-  Playwright/Chromium, WeasyPrint) que esta librería NO trae como dependencia — así se mantiene
-  liviana para quien solo necesita el HTML (ej. un preview rápido o un mail). Ver el paso 7 del
+- **Convertir el HTML del comprobante a un motor distinto de Chromium/Playwright** —
+  `arca_fe.pdf` (extra `pdf`) SÍ convierte HTML a PDF/imagen desde `0.2.0` (ver "Render a
+  PDF/imagen" arriba), pero con un único motor fijo (Chromium headless), no configurable por
+  consumidor — es a propósito (mismo criterio de "cero drift" que el tema tipográfico default):
+  si necesitás otro motor (WeasyPrint, wkhtmltopdf), seguís pudiendo llamarlo vos mismo sobre el
+  HTML crudo, arca_fe no te lo impide, solo no lo trae armado. Ver el paso 7 del
   Quickstart — parte 2, arriba.

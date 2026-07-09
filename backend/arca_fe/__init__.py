@@ -17,7 +17,7 @@ reservado para cuando el contrato público se declare estable. Un test de portab
 core nunca importe `backend.*`.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from .modelos import (
     CondicionIva,
@@ -58,6 +58,7 @@ from .render import (
     LAYOUTS_VALIDOS,
 )
 from .seguridad import generar_cert_autofirmado, asegurar_pdf
+from .pdf import renderizar_pdf, renderizar_imagen, cerrar_navegador as cerrar_navegador_pdf
 from .wsaa import construir_tra, firmar_tra, login, login_con_cert, WSFE_WSAA_SERVICIO
 from .wsfe import WsfeClient, parse_fecha_arca, clear_cache as wsfe_clear_cache
 from .padron import (
@@ -129,6 +130,10 @@ __all__ = [
     "LAYOUTS_VALIDOS",
     "generar_cert_autofirmado",
     "asegurar_pdf",
+    # HTML -> PDF/imagen (extra opcional `pdf`, ver arca_fe/pdf.py)
+    "renderizar_pdf",
+    "renderizar_imagen",
+    "cerrar_navegador_pdf",
     # auth WSAA
     "construir_tra",
     "firmar_tra",

@@ -1142,3 +1142,16 @@ visual en las facturas reales de Rambla (decisión explícita: no adoptar el def
 cambiar la tipografía de un documento fiscal en producción es una decisión de producto aparte). 294
 tests de `arca_fe` en verde, `__version__` 0.1.0→0.2.0. Detalle completo en `docs/DECISIONES.md`
 esta fecha.
+
+### 2026-07-08 — `arca_fe` gana conversión HTML→PDF/imagen (Chromium vía Playwright)
+
+Nuevo módulo `arca_fe.pdf` (extra opcional `pdf`, import lazy): `renderizar_pdf`/`renderizar_imagen`,
+un solo motor fijo (Chromium headless/Playwright, browser compartido) por el mismo criterio de
+cero-drift que el tema tipográfico — un motor configurable por consumidor podía volver a divergir el
+output. Ambas funciones son intercambiables sobre cualquiera de los 3 layouts (oficial/detallada/
+simplificada), no solo la pareja "natural" (imagen para simplificada) — pedido explícito para
+Freelo, que no sabe de antemano qué van a preferir sus usuarios. API async-nativa (a diferencia del
+resto de `arca_fe`, sync-first) porque Playwright rinde mejor así en un proceso de server de larga
+vida. Nuevo parámetro `executable_path` (útil para despliegues con Chromium propio, no solo para
+este sandbox). 6 tests nuevos (`integration`, Chromium real) + suite completa (300) en verde,
+`__version__` 0.2.0→0.3.0. Detalle completo en `docs/DECISIONES.md` esta fecha.

@@ -1,6 +1,6 @@
 [project]
 name = "arca-fe"
-version = "0.2.0"
+version = "0.3.0"
 description = "Motor portable de facturación electrónica ARCA (ex-AFIP) — WSFEv1 + WSAA + padrón, sin dependencias de ningún framework."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -18,10 +18,13 @@ dependencies = [
     "asn1crypto",
 ]
 
-# `segno` (renderizar el QR fiscal como SVG, `arca_fe.qr._build_qr_svg`) es un import
-# LAZY — solo hace falta si se usa esa función puntual, no para el resto de la librería.
+# `segno` (QR fiscal como SVG) y `playwright` (HTML -> PDF/imagen, `arca_fe.pdf`) son imports
+# LAZY — solo hacen falta si se usa esa función puntual, no para el resto de la librería.
+# `playwright` además requiere `playwright install chromium` (el binario del browser no es un
+# paquete pip) — responsabilidad del consumidor, no algo que este pyproject.toml pueda automatizar.
 [project.optional-dependencies]
 qr = ["segno>=1.5.0"]
+pdf = ["playwright>=1.40"]
 
 # Sin build-backend real todavía (no se publica a un índice) — esta metadata alcanza
 # para `pip install -e backend/arca_fe` el día que un segundo consumidor lo necesite.
