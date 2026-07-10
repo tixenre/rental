@@ -12,6 +12,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from fastapi import HTTPException
+from starlette.requests import Request
 
 pytestmark = pytest.mark.unit
 
@@ -125,9 +126,16 @@ class TestBuildResponse:
 
 # ── Guards de admin ───────────────────────────────────────────────────────────
 
-class FakeRequest:
-    def __init__(self, cookies=None):
-        self.cookies = cookies or {}
+def FakeRequest() -> Request:
+    """Request real (no un stub crudo) — varios endpoints de este módulo llevan
+    `@limiter.limit` (barrido de seguimiento #1263/#1265): slowapi exige una
+    instancia genuina de `starlette.requests.Request` (lee `.client`/`.headers`
+    para la IP), un stub crudo la rompe. Sin conexión real — alcanza con el
+    scope ASGI mínimo. Se mantiene el nombre (no una función `_fake_request`)
+    para no tocar los ~13 call-sites de este archivo."""
+    return Request(
+        {"type": "http", "method": "POST", "path": "/admin/estudio", "headers": [], "client": ("127.0.0.1", 0)}
+    )
 
 
 class TestEstudioAdminGuards:

@@ -12,6 +12,7 @@ import os
 from urllib.parse import urlparse
 
 import pytest
+from starlette.requests import Request
 
 _OPT_IN = os.getenv("RESERVAS_DB_TEST") == "1"
 _DB_URL = os.getenv("DATABASE_URL", "")
@@ -37,9 +38,15 @@ pytestmark = [
 FA, FB = 9_600_501, 9_600_502
 
 
-class FakeRequest:
-    def __init__(self, cookies=None):
-        self.cookies = cookies or {}
+def _fake_request() -> Request:
+    """Request real (no un stub crudo) — reorder_fotos lleva `@limiter.limit`
+    (barrido de seguimiento #1263/#1265): slowapi exige una instancia genuina
+    de `starlette.requests.Request`. Sin conexión real — alcanza con el scope
+    ASGI mínimo (ADMIN_BYPASS_AUTH hace que require_admin ni siquiera lo
+    inspeccione)."""
+    return Request(
+        {"type": "http", "method": "PATCH", "path": "/admin/estudio/fotos/orden", "headers": [], "client": ("127.0.0.1", 0)}
+    )
 
 
 def _limpiar(conn):
@@ -94,7 +101,7 @@ def test_reorder_con_el_mismo_orden_no_escribe_nada(setup):
                 FotoOrdenItem(id=FA, orden=0, es_principal=True),
                 FotoOrdenItem(id=FB, orden=1, es_principal=False),
             ]),
-            FakeRequest(),
+            _fake_request(),
         )
         despues = _filas(conn)
 
@@ -117,7 +124,7 @@ def test_reorder_mueve_solo_la_foto_que_cambio(setup):
                 FotoOrdenItem(id=FA, orden=0, es_principal=True),
                 FotoOrdenItem(id=FB, orden=1, es_principal=True),
             ]),
-            FakeRequest(),
+            _fake_request(),
         )
         despues = _filas(conn)
 
