@@ -19,6 +19,7 @@ import os
 from urllib.parse import urlparse
 
 import pytest
+from starlette.requests import Request
 
 _OPT_IN = os.getenv("RESERVAS_DB_TEST") == "1"
 _DB_URL = os.getenv("DATABASE_URL", "")
@@ -44,9 +45,15 @@ pytestmark = [
 EQ, COMP = 9_600_301, 9_600_302
 
 
-class FakeRequest:
-    def __init__(self, cookies=None):
-        self.cookies = cookies or {}
+def _fake_request() -> Request:
+    """Request real (no un stub crudo) — add_kit_item/reorder_kit llevan
+    `@limiter.limit` (auditoría #1263): slowapi exige una instancia genuina
+    de `starlette.requests.Request`. Sin conexión real — alcanza con el
+    scope ASGI mínimo (ADMIN_BYPASS_AUTH hace que require_admin ni siquiera
+    lo inspeccione)."""
+    return Request(
+        {"type": "http", "method": "POST", "path": "/api/equipos/1/kit", "headers": [], "client": ("127.0.0.1", 0)}
+    )
 
 
 def _limpiar(conn):
@@ -92,12 +99,12 @@ def test_reenviar_los_mismos_valores_no_escribe(setup):
 
     conn = get_db()
     try:
-        add_kit_item(EQ, KitItem(componente_id=COMP, cantidad=2, descuento_pct=10.0, esencial=True), FakeRequest())
+        add_kit_item(EQ, KitItem(componente_id=COMP, cantidad=2, descuento_pct=10.0, esencial=True), _fake_request())
         antes = _fila(conn)
 
         # Mismo request (el usuario reabre el editor y no toca nada, o el
         # frontend re-envía el mismo valor) ⇒ no debería tocar la fila.
-        add_kit_item(EQ, KitItem(componente_id=COMP, cantidad=2, descuento_pct=10.0, esencial=True), FakeRequest())
+        add_kit_item(EQ, KitItem(componente_id=COMP, cantidad=2, descuento_pct=10.0, esencial=True), _fake_request())
         despues = _fila(conn)
 
         assert despues["xmin"] == antes["xmin"]
@@ -111,11 +118,11 @@ def test_cambiar_un_solo_campo_si_escribe(setup):
 
     conn = get_db()
     try:
-        add_kit_item(EQ, KitItem(componente_id=COMP, cantidad=2, descuento_pct=10.0, esencial=True), FakeRequest())
+        add_kit_item(EQ, KitItem(componente_id=COMP, cantidad=2, descuento_pct=10.0, esencial=True), _fake_request())
         antes = _fila(conn)
 
         # Solo cambia la cantidad ⇒ tiene que escribir.
-        add_kit_item(EQ, KitItem(componente_id=COMP, cantidad=3, descuento_pct=10.0, esencial=True), FakeRequest())
+        add_kit_item(EQ, KitItem(componente_id=COMP, cantidad=3, descuento_pct=10.0, esencial=True), _fake_request())
         despues = _fila(conn)
 
         assert despues["cantidad"] == 3
@@ -130,13 +137,13 @@ def test_reorder_al_mismo_orden_no_escribe(setup):
 
     conn = get_db()
     try:
-        add_kit_item(EQ, KitItem(componente_id=COMP, cantidad=1), FakeRequest())
+        add_kit_item(EQ, KitItem(componente_id=COMP, cantidad=1), _fake_request())
         conn.execute("UPDATE kit_componentes SET orden=0 WHERE equipo_id=%s AND componente_id=%s", (EQ, COMP))
         conn.commit()
         antes = _fila(conn)
 
         # Reordenar con el MISMO orden (soltar en el mismo lugar) ⇒ no-op.
-        reorder_kit(EQ, KitReorder(orden=[COMP]), FakeRequest())
+        reorder_kit(EQ, KitReorder(orden=[COMP]), _fake_request())
         despues = _fila(conn)
 
         assert despues["orden"] == 0
