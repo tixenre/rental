@@ -570,8 +570,25 @@ export function FacturaPreviewDialog({ f }: { f: FacturacionArca }) {
  * entre copias — exactamente el tipo de drift silencioso que el dueño no
  * quiere: un cambio futuro (label, gate, ícono) ahora se hace una sola vez.
  */
-export function FacturarButton({ f, className }: { f: FacturacionArca; className?: string }) {
+export function FacturarButton({
+  f,
+  className,
+  hideWhenUnavailable,
+}: {
+  f: FacturacionArca;
+  className?: string;
+  /**
+   * Si el pedido todavía no se puede facturar (estado no facturable, sin
+   * factura previa), no renderiza nada en vez de mostrar un botón gris muerto.
+   * Lo usa la barra de acciones del listado (panel de triage — solo lo
+   * accionable). El rail del detalle NO lo pasa: ahí conviene mostrarlo
+   * deshabilitado con el `title` explicativo, porque es la vista donde el
+   * usuario decide qué falta para poder facturar.
+   */
+  hideWhenUnavailable?: boolean;
+}) {
   if (!((!f.principal || f.principal.estado === "error") && !f.q.isLoading)) return null;
+  if (hideWhenUnavailable && !f.puedeFacturar) return null;
   return (
     <Button
       variant="outline"
