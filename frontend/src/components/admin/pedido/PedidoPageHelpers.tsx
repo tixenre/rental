@@ -1,5 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Building2, Check, ChevronLeft, GripVertical, Tag, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Building2,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  GripVertical,
+  Tag,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -11,8 +21,14 @@ import { RadioGroup, RadioGroupItem } from "@/design-system/ui/radio-group";
 import { DraftNumberInput } from "@/design-system/ui/draft-number-input";
 import { QtyInput } from "@/design-system/ui/qty-input";
 import { Section } from "@/design-system/composites/Section";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/design-system/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { adminApi } from "@/lib/admin/api";
+import { adminApi, ESTADO_LABEL, type PedidoEstado } from "@/lib/admin/api";
 import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
 import { type DraftItem, subtotalDraftItem } from "@/components/admin/pedido/usePedidoDraft";
 import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
@@ -324,6 +340,95 @@ export function RailSection({ label, children }: { label: string; children: Reac
     <div className="border-t hairline pt-4 first:border-t-0 first:pt-0">
       <div className="t-eyebrow mb-2">{label}</div>
       <div className="space-y-2">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * Fuente única para cambiar el estado de un pedido: "avanzar al paso feliz"
+ * y "saltar a otro estado" viven en UN solo control (botón dividido) en vez
+ * de 2 botones apilados — antes se leían como la misma acción repetida
+ * (#pedido-estado-ux, a pedido del dueño). El cuerpo principal ejecuta el
+ * paso feliz en 1 click, igual que antes; el chevron abre el menú con los
+ * demás destinos legales (`otrosDestinos`, que ya excluye ese mismo paso).
+ */
+export function EstadoSplitButton({
+  ns,
+  otrosDestinos,
+  onSelect,
+  disabled,
+}: {
+  ns: { target: PedidoEstado; label: string; blocked: string | null } | null;
+  otrosDestinos: PedidoEstado[];
+  onSelect: (target: PedidoEstado) => void;
+  disabled?: boolean;
+}) {
+  const tieneMenu = otrosDestinos.length > 0;
+
+  // Estado terminal sin paso feliz (ej. "finalizado" puede volver a "devuelto"):
+  // no hay cuerpo principal que mostrar — el menú, si existe, es el único control.
+  if (!ns) {
+    if (!tieneMenu) return null;
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="w-full" disabled={disabled}>
+            Cambiar estado
+            <ChevronDown className="h-3.5 w-3.5 ml-1" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="center"
+          className="w-full min-w-[--radix-dropdown-menu-trigger-width]"
+        >
+          {otrosDestinos.map((estado) => (
+            <DropdownMenuItem key={estado} onClick={() => onSelect(estado)}>
+              {ESTADO_LABEL[estado]}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
+  const variant = ns.blocked ? "outline" : "amber";
+  const mainButton = (
+    <Button
+      variant={variant}
+      className={cn("flex-1 justify-center", tieneMenu && "rounded-r-none")}
+      disabled={!!ns.blocked || disabled}
+      title={ns.blocked ?? ""}
+      onClick={() => !ns.blocked && onSelect(ns.target)}
+    >
+      <ArrowRight className="h-4 w-4 mr-1" />
+      {ns.blocked ? `Falta: ${ns.blocked}` : ns.label}
+    </Button>
+  );
+
+  if (!tieneMenu) return mainButton;
+
+  return (
+    <div className="flex w-full">
+      {mainButton}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant={variant}
+            className="rounded-l-none border-l hairline px-2.5 shrink-0"
+            disabled={disabled}
+            aria-label="Elegir otro estado"
+          >
+            <ChevronDown className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {otrosDestinos.map((estado) => (
+            <DropdownMenuItem key={estado} onClick={() => onSelect(estado)}>
+              {ESTADO_LABEL[estado]}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

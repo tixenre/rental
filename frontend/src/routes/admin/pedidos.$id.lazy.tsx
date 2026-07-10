@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft,
-  ChevronDown,
   User,
   Calendar,
   Box,
@@ -107,17 +106,12 @@ import { EnviarDocsDialog, DOCS_PEDIDO } from "@/components/admin/pedido/EnviarD
 import { RegistrarPagoModal } from "@/components/admin/pedido/RegistrarPagoModal";
 import { FLOW, transiciones, nextStep, otrosDestinos } from "@/lib/pedido-estados";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/design-system/ui/dropdown-menu";
-import {
   PagoRow,
   ItemRow,
   BackLink,
   SaveIndicator,
   RailSection,
+  EstadoSplitButton,
   BdRow,
   FacturacionTargetSection,
 } from "@/components/admin/pedido/PedidoPageHelpers";
@@ -675,43 +669,12 @@ function PedidoEditorPage() {
           {/* Estado */}
           <RailSection label="Estado del pedido">
             <FlowStrip estado={p.estado} />
-            {ns && (
-              <Button
-                variant={ns.blocked ? "outline" : "amber"}
-                className="w-full"
-                disabled={!!ns.blocked || estadoMut.isPending}
-                title={ns.blocked ?? ""}
-                onClick={() => !ns.blocked && handleNextStep(ns.target)}
-              >
-                <ArrowRight className="h-4 w-4 mr-1" />
-                {ns.blocked ? `Falta: ${ns.blocked}` : ns.label}
-              </Button>
-            )}
-            {otrosDestinosPedido.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full mt-1 text-muted-foreground"
-                    disabled={estadoMut.isPending}
-                  >
-                    Cambiar a otro estado
-                    <ChevronDown className="h-3.5 w-3.5 ml-1" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="center"
-                  className="w-full min-w-[--radix-dropdown-menu-trigger-width]"
-                >
-                  {otrosDestinosPedido.map((estado) => (
-                    <DropdownMenuItem key={estado} onClick={() => handleNextStep(estado)}>
-                      {ESTADO_LABEL[estado]}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+            <EstadoSplitButton
+              ns={ns}
+              otrosDestinos={otrosDestinosPedido}
+              onSelect={handleNextStep}
+              disabled={estadoMut.isPending}
+            />
           </RailSection>
 
           {/* Identidad del cliente (solo cuando tiene ficha vinculada sin verificar) */}
