@@ -498,7 +498,7 @@ export function PedidoCard({
       </div>
 
       {expanded && (
-        <div className="border-t border-dashed border-[var(--hairline)] px-portal pt-[18px] pb-[22px] grid gap-y-5 gap-x-7 animate-[expand-in_.22s_ease-out] [grid-template-areas:'banner''timeline''main''side'] lg:[grid-template-columns:minmax(0,1fr)_clamp(20rem,26%,25rem)] lg:[grid-template-areas:'banner_banner''timeline_timeline''main_side']">
+        <div className="border-t border-dashed border-[var(--hairline)] px-portal pt-[18px] pb-[22px] grid gap-y-5 gap-x-7 animate-[expand-in_.22s_ease-out] [grid-template-areas:'banner''timeline''docs''main''side'] lg:[grid-template-columns:minmax(0,1fr)_clamp(20rem,26%,25rem)] lg:[grid-template-areas:'banner_banner''timeline_timeline''main_docs''main_side']">
           {/* ── Banner: solicitud pendiente / resuelta / bienvenida (full width) ── */}
           {(pendiente || ultimaResuelta || showWelcome) && (
             <div className="[grid-area:banner] flex flex-col gap-3">
@@ -594,6 +594,70 @@ export function PedidoCard({
             </div>
             <PedidoTimeline pedido={pedido} />
           </section>
+
+          {/* ── Documentos: grid-area propia. En mobile va acá arriba (bajo el
+              estado) para que el cliente los alcance sin scrollear un pedido
+              largo; en desktop la grilla lo ubica igual que antes, arriba de la
+              columna derecha. DOM antes de `main` → orden de lectura correcto
+              para SR en mobile. Solo se muestra si hay algún documento. */}
+          {(docs.remito ||
+            docs.contrato ||
+            docs.albaran ||
+            docs.factura ||
+            docs["packing-list"]) && (
+            <section
+              className="[grid-area:docs] rounded-md border px-3 py-3"
+              style={{
+                background: "color-mix(in oklch, var(--amber) 6%, var(--background))",
+                borderColor: "color-mix(in oklch, var(--amber) 35%, transparent)",
+              }}
+            >
+              <h3 className="font-mono text-xs uppercase tracking-[0.18em] text-ink/70 mb-2">
+                Documentos
+              </h3>
+              <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
+                {docs.remito && (
+                  <DocActions pedidoId={pedido.id} numero={numero} tipo="remito" label="Remito" />
+                )}
+                {docs.contrato && (
+                  <DocActions
+                    pedidoId={pedido.id}
+                    numero={numero}
+                    tipo="contrato"
+                    label="Contrato"
+                    description={DOC_DESCRIPTION.contrato}
+                  />
+                )}
+                {docs.albaran && (
+                  <DocActions
+                    pedidoId={pedido.id}
+                    numero={numero}
+                    tipo="albaran"
+                    label="Detalle de seguro"
+                    description={DOC_DESCRIPTION.albaran}
+                  />
+                )}
+                {docs["packing-list"] && (
+                  <DocActions
+                    pedidoId={pedido.id}
+                    numero={numero}
+                    tipo="packing-list"
+                    label="Checklist de retiro"
+                    description={DOC_DESCRIPTION["packing-list"]}
+                  />
+                )}
+                {docs.factura && (
+                  <DocActions
+                    pedidoId={pedido.id}
+                    numero={numero}
+                    tipo="factura"
+                    label="Factura"
+                    description={DOC_DESCRIPTION.factura}
+                  />
+                )}
+              </div>
+            </section>
+          )}
 
           {/* ── Main (izquierda): período → equipos → acciones ── */}
           <div className="[grid-area:main] flex flex-col gap-5 min-w-0">
@@ -766,67 +830,9 @@ export function PedidoCard({
             })()}
           </div>
 
-          {/* ── Side (derecha): documentos → totales → pagos → notas ── */}
+          {/* ── Side (derecha): totales → pagos → notas (Documentos se movió a su
+              propia grid-area, ver arriba) ── */}
           <aside className="[grid-area:side] flex flex-col gap-4 min-w-0">
-            {(docs.remito ||
-              docs.contrato ||
-              docs.albaran ||
-              docs.factura ||
-              docs["packing-list"]) && (
-              <section
-                className="rounded-md border px-3 py-3"
-                style={{
-                  background: "color-mix(in oklch, var(--amber) 6%, var(--background))",
-                  borderColor: "color-mix(in oklch, var(--amber) 35%, transparent)",
-                }}
-              >
-                <h3 className="font-mono text-xs uppercase tracking-[0.18em] text-ink/70 mb-2">
-                  Documentos
-                </h3>
-                <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
-                  {docs.remito && (
-                    <DocActions pedidoId={pedido.id} numero={numero} tipo="remito" label="Remito" />
-                  )}
-                  {docs.contrato && (
-                    <DocActions
-                      pedidoId={pedido.id}
-                      numero={numero}
-                      tipo="contrato"
-                      label="Contrato"
-                      description={DOC_DESCRIPTION.contrato}
-                    />
-                  )}
-                  {docs.albaran && (
-                    <DocActions
-                      pedidoId={pedido.id}
-                      numero={numero}
-                      tipo="albaran"
-                      label="Detalle de seguro"
-                      description={DOC_DESCRIPTION.albaran}
-                    />
-                  )}
-                  {docs["packing-list"] && (
-                    <DocActions
-                      pedidoId={pedido.id}
-                      numero={numero}
-                      tipo="packing-list"
-                      label="Checklist de retiro"
-                      description={DOC_DESCRIPTION["packing-list"]}
-                    />
-                  )}
-                  {docs.factura && (
-                    <DocActions
-                      pedidoId={pedido.id}
-                      numero={numero}
-                      tipo="factura"
-                      label="Factura"
-                      description={DOC_DESCRIPTION.factura}
-                    />
-                  )}
-                </div>
-              </section>
-            )}
-
             <section className="flex flex-col gap-1.5 rounded-md border border-[var(--hairline)] bg-card px-3.5 py-3">
               <div className="flex justify-between items-baseline font-sans text-sm">
                 <span className="text-muted-foreground">Subtotal equipos</span>
