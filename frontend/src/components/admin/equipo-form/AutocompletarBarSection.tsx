@@ -41,7 +41,7 @@ export function AutocompletarBarSection({
   reExtractPending: boolean;
 }) {
   return (
-    <section className="rounded-md border hairline bg-amber-soft/40 p-3 space-y-2 sticky top-0 z-10 sm:static">
+    <section className="rounded-md border hairline bg-amber-soft/40 p-3 space-y-2">
       <div className="flex items-center gap-1.5 text-xs font-medium text-ink/80">
         <LinkIcon className="h-3.5 w-3.5" />
         Link del producto (B&amp;H, Adorama, sitio oficial)
