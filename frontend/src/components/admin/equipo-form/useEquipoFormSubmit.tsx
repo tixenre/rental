@@ -295,14 +295,25 @@ export function useEquipoFormSubmit({
           });
         }
 
-        // Categorías (en V2 las habilitamos también en CREATE)
-        tareasSecundarias.push(async () => {
-          try {
-            await adminApi.setCategorias(equipoIdOk, [...selectedCats]);
-          } catch (e) {
-            fallidos.push(`categorías (${e instanceof Error ? e.message : "error"})`);
-          }
-        });
+        // Categorías (en V2 las habilitamos también en CREATE) — solo si
+        // cambiaron: en EDIT se pisaba con el mismo set en cada submit, un
+        // round-trip de red innecesario (hallazgo del supervisor, auditoría
+        // de performance #1263). En CREATE no hay set previo, así que
+        // siempre corre la primera vez.
+        const catsIniciales = new Set((initial?.categorias ?? []).map((c) => c.id));
+        const categoriasChanged =
+          !isEdit ||
+          selectedCats.size !== catsIniciales.size ||
+          [...selectedCats].some((catId) => !catsIniciales.has(catId));
+        if (categoriasChanged) {
+          tareasSecundarias.push(async () => {
+            try {
+              await adminApi.setCategorias(equipoIdOk, [...selectedCats]);
+            } catch (e) {
+              fallidos.push(`categorías (${e instanceof Error ? e.message : "error"})`);
+            }
+          });
+        }
 
         await Promise.allSettled(tareasSecundarias.map((t) => t()));
       } catch (e) {
