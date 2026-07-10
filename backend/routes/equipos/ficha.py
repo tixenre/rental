@@ -4,6 +4,7 @@ Extraído de `core` (move-verbatim). Registra sus rutas sobre el router comparti
 `FichaUpdate` lo importan tests vía el `__init__` del paquete (re-export). Las
 specs físicas NO viven acá (van por /admin/equipos/{id}/specs desde Fase F).
 """
+import re
 from typing import Optional
 
 from fastapi import HTTPException, Request
@@ -11,6 +12,7 @@ from pydantic import BaseModel
 
 from auth.guards import require_admin
 from database import get_db, row_to_dict
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
 from services.nombre_service import actualizar_nombres_de
 from routes.equipos.core import router
 
@@ -62,6 +64,19 @@ class FichaUpdate(BaseModel):
             cantidad = item.get("cantidad", 1)
             if not isinstance(cantidad, int) or not (1 <= cantidad <= 999):
                 raise ValueError(f"ítem {idx}: 'cantidad' debe ser un entero entre 1 y 999")
+            # foto_url: nunca se validaba server-side — el frontend ("Imprimir
+            # contenido", contenido-incluido-print.ts) lo interpolaba sin
+            # escapar en un atributo src="...", stored XSS confirmado (#1263).
+            # El frontend ya escapa; esto es la segunda capa — nunca confiar
+            # solo en que la UI restringe el input.
+            foto_url = item.get("foto_url")
+            if foto_url is not None:
+                if not isinstance(foto_url, str) or not (1 <= len(foto_url) <= 2000):
+                    raise ValueError(f"ítem {idx}: 'foto_url' inválida")
+                if not re.match(r"^https?://\S+$", foto_url):
+                    raise ValueError(f"ítem {idx}: 'foto_url' debe ser http(s) sin espacios")
+                if '"' in foto_url or "'" in foto_url or "<" in foto_url or ">" in foto_url:
+                    raise ValueError(f"ítem {idx}: 'foto_url' contiene caracteres no permitidos")
         return v
 
 
@@ -86,6 +101,7 @@ def get_ficha(id: int):
 
 
 @router.put("/equipos/{id}/ficha")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def upsert_ficha(id: int, data: FichaUpdate, request: Request):
     """
     PATCH-style upsert: solo actualiza columnas que vinieron en el body

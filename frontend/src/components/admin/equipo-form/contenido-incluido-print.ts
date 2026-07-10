@@ -1,6 +1,21 @@
 import type { ContenidoIncluidoItem } from "@/data/equipment";
 
 /**
+ * Escapa un valor para contexto de ATRIBUTO HTML (ej. `src="${...}"`) — el
+ * texto-context de abajo (`.replace(/</g,...)`) no alcanza acá: sin escapar
+ * `"` un `foto_url` con comillas rompe el atributo e inyecta HTML/JS
+ * arbitrario (stored XSS confirmado en #1263 — "Imprimir contenido" arma el
+ * doc vía `document.write`, fuera del auto-escape de React).
+ */
+function escapeHtmlAttr(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+/**
  * Arma el documento HTML standalone para "Imprimir contenido" (packing list
  * con checkbox por ítem) — extraído del `onClick` inline que lo armaba como
  * template literal. Pura: no toca el DOM, el caller decide cómo mostrarla
@@ -15,14 +30,14 @@ export function buildContenidoIncluidoPrintHtml(
   const fotoUrl = equipo.foto_url ?? "";
   const fotoAbs = fotoUrl.startsWith("http://") || fotoUrl.startsWith("https://") ? fotoUrl : "";
   const fotoTag = fotoAbs
-    ? `<img src="${fotoAbs}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;display:block;margin:0 0 16px">`
+    ? `<img src="${escapeHtmlAttr(fotoAbs)}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;display:block;margin:0 0 16px">`
     : "";
   const itemsHtml = items
     .map((ci) => {
       const ciNombre = ci.nombre.replace(/</g, "&lt;").replace(/>/g, "&gt;");
       const ciFoto =
         ci.foto_url && (ci.foto_url.startsWith("http://") || ci.foto_url.startsWith("https://"))
-          ? `<img src="${ci.foto_url}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:8px">`
+          ? `<img src="${escapeHtmlAttr(ci.foto_url)}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:8px">`
           : `<span style="display:inline-block;width:40px;height:40px;background:#eee;border-radius:4px;vertical-align:middle;margin-right:8px"></span>`;
       return `<tr>
                         <td style="padding:6px 8px">${ciFoto}</td>
