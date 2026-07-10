@@ -12,6 +12,7 @@ from fastapi import HTTPException, Request
 from pydantic import BaseModel
 
 from database import get_db, row_to_dict, MARCA_SUBQUERY
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
 from services.categorias import expandir_a_descendientes, sql_filtro_equipos_por_categoria, categorias_de_equipos
 from routes.specs.core import router, _require_admin
 
@@ -91,6 +92,7 @@ def listar_compatibilidades(equipo_id: int, request: Request):
 
 
 @router.post("/admin/equipos/{equipo_id}/compatibilidades", status_code=201)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def crear_compatibilidad(equipo_id: int, payload: CompatibilidadInput, request: Request):
     """Crea una relación de compatibilidad. `equipo_id` es A, `equipo_b_id`
     el otro. La tabla tiene CHECK que evita duplicados (a,b,tipo)."""
@@ -130,6 +132,7 @@ def crear_compatibilidad(equipo_id: int, payload: CompatibilidadInput, request: 
 
 
 @router.delete("/admin/compatibilidades/{compat_id}", status_code=204)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def borrar_compatibilidad(compat_id: int, request: Request):
     _require_admin(request)
     with get_db() as conn:
@@ -577,6 +580,7 @@ def listar_compatibles(
 # para escribir compat auto-generadas y propuestas de specs.
 
 @router.post("/admin/compat/bulk")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def compat_bulk(payload: CompatBulkInput, request: Request):
     """Escribe múltiples compat auto-generadas. Para cada equipo en
     equipos_procesados:

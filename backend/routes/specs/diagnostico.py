@@ -9,6 +9,7 @@ sus rutas en el router compartido del paquete `routes.specs`. `_require_admin`
 from fastapi import HTTPException, Request
 
 from database import get_db, row_to_dict
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
 from services.categorias import root_of_categoria, categoria_por_id
 from routes.specs.core import router, _require_admin
 
@@ -252,6 +253,7 @@ def template_debug(categoria_id: int, request: Request):
 
 
 @router.put("/admin/specs/categoria/{categoria_id}/reorder")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def reorder_specs_categoria(categoria_id: int, payload: dict, request: Request):
     """Reordena las specs de una categoría raíz vía drag-and-drop.
 

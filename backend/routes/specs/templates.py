@@ -13,6 +13,7 @@ from fastapi import HTTPException, Request
 from pydantic import BaseModel
 
 from database import get_db, row_to_dict
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
 from services.categorias import root_of_categoria, validar_existe
 from services.categorias.errors import CategoriaNoExiste
 from routes.specs.core import router, _require_admin
@@ -173,6 +174,7 @@ def listar_orphan_specs(categoria_id: int, request: Request):
 
 
 @router.post("/admin/categorias/{categoria_id}/spec-templates", status_code=201)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def asignar_spec_a_categoria(categoria_id: int, payload: SpecAssignmentInput, request: Request):
     """Asigna una spec_definition existente a una categoría con flags propios.
     Para crear una spec nueva globalmente usar POST /admin/spec-definitions
@@ -230,6 +232,7 @@ def asignar_spec_a_categoria(categoria_id: int, payload: SpecAssignmentInput, re
 
 
 @router.patch("/admin/spec-templates/{template_id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def actualizar_asignacion(template_id: int, payload: SpecAssignmentUpdate, request: Request):
     """Actualiza los flags de una asignación en categoria_spec_templates.
     NOTA legacy (Fase 6d): estos flags ya no controlan el catálogo público;
@@ -261,6 +264,7 @@ def actualizar_asignacion(template_id: int, payload: SpecAssignmentUpdate, reque
 
 
 @router.delete("/admin/spec-templates/{template_id}", status_code=204)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def borrar_asignacion(template_id: int, request: Request):
     """Desasigna la spec de la categoría (no toca la spec_definition global)."""
     _require_admin(request)
@@ -274,6 +278,7 @@ def borrar_asignacion(template_id: int, request: Request):
 
 
 @router.post("/admin/spec-templates/reorder")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def reordenar_templates(payload: dict, request: Request):
     """Actualiza la prioridad de categoria_spec_templates en un solo request.
     Body: {"items": [{"id": 1, "prioridad": 10}, {"id": 2, "prioridad": 20}, …]}.

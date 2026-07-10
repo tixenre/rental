@@ -12,6 +12,7 @@ from fastapi import HTTPException, Request
 from pydantic import BaseModel
 
 from database import get_db, row_to_dict, MARCA_SUBQUERY
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
 from services.clasificador_heuristico import clasificar_lote
 from services.categorias import asignar_categorias, equipos_sin_categoria, listar_arbol_admin, sql_filtro_categoria
 from services.nombre_service import (
@@ -46,6 +47,7 @@ class AprobarNombreInput(BaseModel):
 # ── Regenerar nombres masivo ────────────────────────────────────────────
 
 @router.post("/admin/equipos/regenerar-nombres")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def regenerar_nombres(payload: RegenerarNombresInput, request: Request):
     """Recalcula `nombre_publico` y `nombre_publico_largo` de todos los
     equipos. Modo dry-run por default — devuelve preview sin escribir."""
@@ -81,6 +83,7 @@ def preview_nombre_publico(equipo_id: int, request: Request):
 # ── Recalcular ranking ───────────────────────────────────────────────────
 
 @router.post("/admin/equipos/recalcular-ranking")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def recalcular_ranking(payload: RecalcularRankingInput, request: Request):
     """Recalcula `popularidad_score`, `cant_pedidos` e `ingreso_total_ars`
     para todos los equipos, basado en el historial de alquileres en la
@@ -104,6 +107,7 @@ def recalcular_ranking(payload: RecalcularRankingInput, request: Request):
 # ── Clasificación masiva de categorías (PR C) ───────────────────────────
 
 @router.post("/admin/equipos/clasificar-bulk")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def clasificar_bulk(request: Request, payload: dict = None):
     """Genera sugerencias de categoría para los equipos solicitados.
     NO escribe nada. Devuelve `{items: [{equipo_id, nombre, raiz, sub,
@@ -182,6 +186,7 @@ def clasificar_bulk(request: Request, payload: dict = None):
 
 
 @router.post("/admin/equipos/aplicar-clasificacion")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def aplicar_clasificacion(payload: AplicarClasificacionInput, request: Request):
     """Aplica categorías a una lista de equipos. Para cada equipo en
     `asignaciones`, REEMPLAZA las categorías existentes por las nuevas.
@@ -230,6 +235,7 @@ def listar_sin_categoria(request: Request):
 # ── Aprobar / overridear nombre público ─────────────────────────────────
 
 @router.put("/admin/equipos/{equipo_id}/nombre-publico")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def aprobar_o_editar_nombre(equipo_id: int, payload: AprobarNombreInput, request: Request):
     """Marca un nombre como revisado y opcionalmente lo overridea.
       - override=null + revisado=true → mantener el auto-generado, marcar como aprobado.
