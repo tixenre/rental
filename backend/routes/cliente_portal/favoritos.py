@@ -8,6 +8,7 @@ from fastapi import Request, HTTPException
 from pydantic import BaseModel
 
 from database import get_db
+from rate_limit import limiter, CLIENTE_WRITE_LIMIT
 from routes.cliente_portal.core import router, require_cliente
 
 
@@ -31,6 +32,7 @@ class FavSync(BaseModel):
 
 
 @router.post("/api/cliente/favoritos/sync")
+@limiter.limit(CLIENTE_WRITE_LIMIT)
 def sync_favoritos(data: FavSync, request: Request):
     """Merge de favoritos de localStorage al servidor al hacer login. No borra nada."""
     session = require_cliente(request)
@@ -55,6 +57,7 @@ def sync_favoritos(data: FavSync, request: Request):
 
 
 @router.post("/api/cliente/favoritos/{equipo_id}", status_code=201)
+@limiter.limit(CLIENTE_WRITE_LIMIT)
 def add_favorito(equipo_id: int, request: Request):
     """Agrega un equipo a los favoritos del cliente."""
     session = require_cliente(request)
@@ -74,6 +77,7 @@ def add_favorito(equipo_id: int, request: Request):
 
 
 @router.delete("/api/cliente/favoritos/{equipo_id}")
+@limiter.limit(CLIENTE_WRITE_LIMIT)
 def remove_favorito(equipo_id: int, request: Request):
     """Quita un equipo de los favoritos del cliente."""
     session = require_cliente(request)

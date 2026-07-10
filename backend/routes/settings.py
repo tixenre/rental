@@ -15,6 +15,7 @@ import re
 from fastapi import APIRouter, Request, HTTPException
 from database import get_db, MARCA_SUBQUERY
 from auth.guards import require_admin
+from rate_limit import limiter, ADMIN_WRITE_LIMIT, ADMIN_UPLOAD_LIMIT
 from services.media.processing import _optimize_og_image
 
 logger = logging.getLogger(__name__)
@@ -307,6 +308,7 @@ def list_settings(request: Request):
 
 
 @router.put("/admin/settings/{key}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def update_setting(key: str, payload: dict, request: Request):
     """Actualiza una setting (solo admin)."""
     guard = require_admin(request)
@@ -411,6 +413,7 @@ def update_setting(key: str, payload: dict, request: Request):
 # ── Recálculo masivo de precio_jornada según USD rate actual ─────────────────
 
 @router.post("/admin/settings/recalcular-precios")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def recalcular_precios(payload: dict, request: Request):
     """Recalcula el precio_jornada de todos los equipos con precio_usd y
     roi_pct definidos. Fórmula:
@@ -564,6 +567,7 @@ def listar_precios_manuales(request: Request):
 
 
 @router.post("/admin/settings/upload-og-image")
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 async def upload_og_image(request: Request):
     """Sube imagen como preview de Open Graph (1200x630) y guarda la URL
     en `app_settings.og_image_url`.
@@ -696,12 +700,14 @@ async def _upload_brand_svg(request: Request, kind: str):
 
 
 @router.post("/admin/settings/upload-wordmark")
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 async def upload_wordmark(request: Request):
     """SVG del wordmark → deriva el logo del mail (blanco sobre transparente)."""
     return await _upload_brand_svg(request, "wordmark")
 
 
 @router.post("/admin/settings/upload-isologo")
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 async def upload_isologo(request: Request):
     """SVG del isologo → deriva favicon + apple-touch + icon-512 (tile amber + ink)."""
     return await _upload_brand_svg(request, "isologo")
@@ -710,6 +716,7 @@ async def upload_isologo(request: Request):
 # ── Backup manual ─────────────────────────────────────────────────────────────
 
 @router.post("/admin/backup-manual")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def trigger_backup_manual(request: Request):
     """Dispara un pg_dump → R2 on-demand.
 

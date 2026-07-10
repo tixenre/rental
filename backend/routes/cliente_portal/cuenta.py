@@ -18,7 +18,7 @@ from auth.session import signer, _make_session_response
 from identity.anchor import cuil_valido
 from identity.contacts import email_comunicacion, telefono_contacto
 from services.precios import es_responsable_inscripto
-from rate_limit import limiter
+from rate_limit import limiter, CLIENTE_WRITE_LIMIT
 from routes.cliente_portal.core import router, require_cliente, cliente_verificado
 from clientes.queries import identidad as queries_identidad
 from clientes.queries import fiscal as queries_fiscal
@@ -318,6 +318,7 @@ def cliente_crear_perfil_fiscal(data: PerfilFiscalCreate, request: Request):
 
 
 @router.patch("/api/cliente/facturacion/perfiles/{perfil_id}/default")
+@limiter.limit(CLIENTE_WRITE_LIMIT)
 def cliente_marcar_perfil_default(perfil_id: int, request: Request):
     """Marca un perfil como el default de la cuenta — desmarca el anterior en
     la MISMA transacción (el índice único parcial `uq_cliente_perfiles_
@@ -365,6 +366,7 @@ class PerfilUpdate(BaseModel):
 
 
 @router.patch("/api/cliente/me")
+@limiter.limit(CLIENTE_WRITE_LIMIT)
 def cliente_update_me(data: PerfilUpdate, request: Request):
     """Permite al cliente actualizar sus datos personales.
 
