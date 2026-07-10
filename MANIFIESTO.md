@@ -161,7 +161,7 @@ Puntos de entrada para no grepear:
 |---|---|
 | Rutas frontend (file-based) | `src/routes/` |
 | Componentes admin | `src/components/admin/` |
-| Form V2 de equipos | `src/components/admin/equipo-form-v2/` |
+| Form de equipos | `src/components/admin/equipo-form/` |
 | Lógica reusable / utilities UI | `src/lib/` |
 | Endpoints backend | `backend/routes/` (`equipos.py`, `clientes.py`, `dashboard.py`, etc.) |
 | **Motor de reservas (sagrado)** | `backend/reservas/` (`estados.py`, `semantics.py`, `disponibilidad.py`, `gate.py`) — disponibilidad + gate `_check_stock`. Ver MEMORIA 2026-05-30 |
@@ -210,8 +210,7 @@ Puntos de entrada para no grepear:
 
 ### Form de equipos
 
-- **EquipoFormDialogV2** es EL form. Sin tabs, scroll lineal con secciones colapsables. Mismo flow CREATE / EDIT.
-- El form viejo (`EquipoFormDialog.tsx`) fue borrado — no resucitar.
+- **EquipoFormDialog** es EL form (único — el sufijo "V2" se retiró el 2026-07-09; el form original que lo justificaba se había borrado en mayo, no resucitar). Sin tabs, scroll lineal con secciones colapsables. Mismo flow CREATE / EDIT.
 
 ### Sistema de specs / catálogo / datasets / autocompletar / compatibilidad
 

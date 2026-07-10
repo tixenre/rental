@@ -17,6 +17,7 @@ from database import (
     get_db, row_to_dict, attach_categorias,
     MARCA_SUBQUERY,
 )
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
 from services.categorias import (
     crear,
     actualizar,
@@ -41,6 +42,7 @@ class CategoriasUpdate(BaseModel):
 
 
 @router.put("/equipos/{id}/categorias", status_code=200)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def set_categorias(id: int, data: CategoriasUpdate, request: Request):
     """Reemplaza la lista de categorías asignadas al equipo."""
     require_admin(request)
@@ -103,6 +105,7 @@ def admin_list_categorias(request: Request):
 
 
 @router.post("/admin/categorias", status_code=201)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def admin_create_categoria(data: CategoriaCreate, request: Request):
     require_admin(request)
     nombre = (data.nombre or "").strip()
@@ -125,6 +128,7 @@ def admin_create_categoria(data: CategoriaCreate, request: Request):
 
 
 @router.patch("/admin/categorias/{cid}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
     require_admin(request)
     with get_db() as conn:
@@ -154,6 +158,7 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
 
 
 @router.delete("/admin/categorias/{cid}", status_code=204)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def admin_delete_categoria(cid: int, request: Request):
     require_admin(request)
     with get_db() as conn:
@@ -173,6 +178,7 @@ def admin_delete_categoria(cid: int, request: Request):
 
 
 @router.post("/admin/categorias/reorder")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def admin_reorder_categorias(payload: CategoriasReorder, request: Request):
     require_admin(request)
     with get_db() as conn:

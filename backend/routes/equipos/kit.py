@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from auth.guards import require_admin
 from database import get_db
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
 from routes.equipos.core import router
 from services.contenido import contenido_de
 
@@ -82,6 +83,7 @@ def _crea_ciclo_kit(conn, equipo_id: int, componente_id: int) -> bool:
 
 
 @router.post("/equipos/{id}/kit", status_code=201)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def add_kit_item(id: int, data: KitItem, request: Request):
     require_admin(request)
     if id == data.componente_id:
@@ -125,6 +127,7 @@ def add_kit_item(id: int, data: KitItem, request: Request):
 
 
 @router.delete("/equipos/{id}/kit/{componente_id}", status_code=204)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def remove_kit_item(id: int, componente_id: int, request: Request):
     require_admin(request)
     with get_db() as conn:
@@ -140,6 +143,7 @@ def remove_kit_item(id: int, componente_id: int, request: Request):
 
 
 @router.post("/admin/equipos/{id}/kit/reorder")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def reorder_kit(id: int, data: KitReorder, request: Request):
     """Reordena los componentes del kit según el array de componente_id."""
     require_admin(request)

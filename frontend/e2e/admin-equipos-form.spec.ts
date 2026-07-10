@@ -13,9 +13,44 @@
  * agregar un setup que levante el backend + frontend con la flag.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
 const ADMIN_TESTS_ENABLED = process.env.PLAYWRIGHT_ADMIN === "1";
+
+/**
+ * Crea un equipo mínimo (nombre + 1 categoría, sin foto/descripción/serie/
+ * valor de reposición) y sigue el handoff automático "Completar →" hasta el
+ * editor de ESE equipo — setup compartido por los tests de hidratación
+ * (#1263 Fase 1), cada uno con su propio equipo fresco (no comparten estado
+ * entre tests). Devuelve el nombre único usado, para poder buscarlo/afirmarlo
+ * después de un reload.
+ */
+async function crearEquipoYAbrirEdit(page: Page, nombre: string) {
+  await page.goto("/admin/equipos/nuevo");
+  await page.waitForLoadState("networkidle");
+
+  await page.locator('input[name="nombre"]').first().fill(nombre);
+  // Marca y precio/jornada son obligatorios en el schema (equipo-form-schema.ts)
+  // en creación — sin esto el submit falla validación client-side y "Guardar"
+  // no dispara nada (ni request ni toast, silencioso). precio_jornada se
+  // autocalcula desde "Valor USD", que no llenamos — lo seteamos directo.
+  await page.locator('input[name="marca"]').first().fill("Marca E2E");
+  await page.locator('input[name="precio_jornada"]').first().fill("1000");
+  // Una categoría es obligatoria para guardar — la primera disponible alcanza,
+  // el test no depende de cuál sea.
+  await page
+    .locator("section", { hasText: "Categorías del catálogo" })
+    .getByRole("button")
+    .first()
+    .click();
+
+  await page.getByRole("button", { name: "Guardar" }).click();
+  // Sin foto/descripción/serie/valor de reposición, siempre faltan
+  // recomendados → toast con la acción "Completar →" (ver submit handler).
+  await page.getByRole("button", { name: "Completar →" }).click();
+  await page.waitForURL(/\/admin\/equipos\/\d+\/editar/);
+  await page.waitForLoadState("networkidle");
+}
 
 test.describe("Admin equipos — form V2", () => {
   test.skip(
@@ -124,5 +159,127 @@ test.describe("Admin equipos — form V2", () => {
 
     // Verificar que el botón está activo
     await expect(papeleraBtn).toBeVisible();
+  });
+
+  test("EDIT: Pegar HTML abre el modal (regresión #1263 — antes no abría nunca)", async ({
+    page,
+  }) => {
+    // Crea su propio equipo en vez de depender de que la lista tenga alguno
+    // (una DB fresca — ej. CI — arranca sin equipos visibles: el único que
+    // puede existir es el centinela del Estudio, que la lista excluye siempre).
+    await crearEquipoYAbrirEdit(page, `Test E2E Pegar HTML ${Date.now()}`);
+
+    // "Pegar HTML" es edit-only (isEdit && ...) — antes del fix, este click
+    // seteaba htmlPasteOpen pero ningún <Dialog> lo mostraba (variant="page"
+    // nunca montaba la rama variant="dialog" donde vivía el modal).
+    await page.getByRole("button", { name: /^Pegar HTML$/i }).click();
+    const dialog = page.getByRole("dialog", { name: /Pegar HTML del producto/i });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByPlaceholder("<html>…</html>")).toBeVisible();
+
+    await dialog.getByRole("button", { name: /^Cancelar$/i }).click();
+    await expect(dialog).not.toBeVisible();
+  });
+
+  // ── Regresión de hidratación (#1263 Fase 1) ─────────────────────────────
+  // Estos 3 tests fijan el comportamiento ACTUAL antes de centralizar la
+  // hidratación de `initial` en useEquipoFormDraft — tienen que pasar HOY,
+  // contra el código pre-refactor, y seguir pasando después (move-verbatim).
+
+  test("CREATE con recomendados faltantes ofrece completar → handoff a EDIT", async ({ page }) => {
+    const nombre = `Test E2E Handoff ${Date.now()}`;
+    await page.goto("/admin/equipos/nuevo");
+    await page.waitForLoadState("networkidle");
+
+    await page.locator('input[name="nombre"]').first().fill(nombre);
+    // Marca y precio/jornada son obligatorios en el schema — sin esto
+    // "Guardar" no dispara nada (falla validación client-side, silencioso).
+    await page.locator('input[name="marca"]').first().fill("Marca E2E");
+    await page.locator('input[name="precio_jornada"]').first().fill("1000");
+    await page
+      .locator("section", { hasText: "Categorías del catálogo" })
+      .getByRole("button")
+      .first()
+      .click();
+
+    await page.getByRole("button", { name: "Guardar" }).click();
+
+    // Sin foto/descripción/serie/valor de reposición: el submit handler junta
+    // `missing` y ofrece completar en vez de solo confirmar "Equipo creado".
+    await expect(page.getByText(/Faltan datos recomendados/i)).toBeVisible();
+    await page.getByRole("button", { name: "Completar →" }).click();
+
+    // El handoff (onCreatedWithMissingRecommended) reabre en /editar con el
+    // id del equipo recién creado.
+    await page.waitForURL(/\/admin\/equipos\/\d+\/editar/);
+    await expect(page.locator('input[name="nombre"]').first()).toHaveValue(nombre);
+  });
+
+  test("Tipo=Combo muestra el sentinel de stock y monta ComboEditor", async ({ page }) => {
+    await crearEquipoYAbrirEdit(page, `Test E2E Combo ${Date.now()}`);
+
+    // Por default (tipo="simple" recién creado) el stock es +/- editable.
+    await expect(page.getByLabel("Restar 1 al stock")).toBeVisible();
+    await expect(page.getByText("Kit (componentes incluidos)")).toBeVisible();
+
+    // La sección "Kit" es un CollapsibleSection con defaultOpen=false (siempre
+    // arranca cerrada, sin excepción) — hay que abrirla para que el <Select>
+    // de tipo exista en el DOM.
+    await page.getByRole("button", { name: "Kit (componentes incluidos)" }).click();
+
+    // El trigger del <Select> muestra el value actual como texto — "Equipo"
+    // es el label de tipo="simple" (default de un equipo recién creado).
+    // Se matchea por texto visible (hasText), no por accessible-name
+    // (getByRole con name colgaba: el cómputo de accname de Chromium para
+    // este trigger no resolvía "Equipo" de forma confiable en CI).
+    await page.locator('[role="combobox"]', { hasText: "Equipo" }).click();
+    await page.getByRole("option", { name: "Combo" }).click();
+
+    // Sentinel: el stock deja de ser editable a mano (#635 — cantidad=9999,
+    // derivada de los componentes del combo).
+    await expect(page.getByText("Sentinel (9999) — derivado de componentes")).toBeVisible();
+    await expect(page.getByLabel("Restar 1 al stock")).not.toBeVisible();
+    // El título de la sección + qué editor monta cambian juntos (esCombo).
+    await expect(page.getByText("Componentes del combo")).toBeVisible();
+  });
+
+  test("EDIT: nombre público y precio manual sobreviven un reload", async ({ page }) => {
+    const nombrePublicoTest = `Nombre Público E2E ${Date.now()}`;
+    await crearEquipoYAbrirEdit(page, `Test E2E Hidratación ${Date.now()}`);
+    const url = page.url();
+
+    // Nombre público: tipear a mano apaga el auto-gen (setNombrePublicoAuto
+    // (false)) — el placeholder varía según si la categoría elegida tiene
+    // molde o no, así que matcheamos cualquiera de los dos.
+    const nombrePublicoInput = page.getByPlaceholder(
+      /Generado automático según el molde de la categoría|Ej: Cable HDMI 2\.0 50cm/,
+    );
+    await nombrePublicoInput.fill(nombrePublicoTest);
+
+    // Precio manual: escribir a mano en precio_jornada flip-ea
+    // precioJornadaManual → el label del Field lo refleja al toque.
+    const precioInput = page.locator('input[name="precio_jornada"]');
+    await precioInput.fill("54321");
+    await expect(page.getByText("Precio/jornada (manual)")).toBeVisible();
+
+    // "Aplicar" (no "Guardar") — guarda sin cerrar, queda en la misma página.
+    // Es a propósito: el camino de mayor riesgo de esta fase es re-hidratar
+    // DESPUÉS de un save-sin-cerrar (initial cambia de identidad porque la
+    // mutación invalida la query) — el bug real que ya arregló 89a1e978 para
+    // specs. Confirmamos con un reload COMPLETO (re-fetch real, no solo el
+    // form.reset local de "Aplicar").
+    await page.getByRole("button", { name: "Aplicar" }).click();
+    await expect(page.getByText(/Cambios aplicados|Equipo actualizado/i)).toBeVisible();
+
+    await page.goto(url);
+    await page.waitForLoadState("networkidle");
+
+    await expect(
+      page.getByPlaceholder(
+        /Generado automático según el molde de la categoría|Ej: Cable HDMI 2\.0 50cm/,
+      ),
+    ).toHaveValue(nombrePublicoTest);
+    await expect(page.locator('input[name="precio_jornada"]')).toHaveValue("54321");
+    await expect(page.getByText("Precio/jornada (manual)")).toBeVisible();
   });
 });

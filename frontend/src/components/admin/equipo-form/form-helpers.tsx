@@ -128,6 +128,7 @@ export function LinkInput({
             variant="outline"
             title="Copiar al portapapeles"
             onClick={copiar}
+            className="shrink-0"
           >
             <Copy className="h-3.5 w-3.5" />
           </Button>
@@ -136,6 +137,7 @@ export function LinkInput({
             size="icon"
             variant="outline"
             title="Abrir en nueva pestaña"
+            className="shrink-0"
             asChild
           >
             <a href={value} target="_blank" rel="noopener noreferrer">

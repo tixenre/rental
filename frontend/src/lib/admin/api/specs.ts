@@ -155,6 +155,19 @@ export const specsMethods = {
         body: JSON.stringify({ specs }),
       },
     ),
+  /** Sube el HTML fuente de un equipo (guardado en `.html`, generalmente un
+   *  Cmd+S de la página del fabricante) — extrae specs/fotos y persiste el
+   *  archivo en R2 (`html_source_url`). Hermano de `reExtractSpecs` (re-usa
+   *  el HTML ya guardado) y de `enriquecerFromHtml` (recibe texto pegado en
+   *  vez de un archivo). */
+  uploadHtmlSource: (id: number, file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return authedJson<{
+      html_source_url: string;
+      specs?: { label: string; value: string; spec_key?: string }[];
+    }>(`/api/admin/equipos/${id}/upload-html-source`, { method: "POST", body: fd });
+  },
   /** Re-corre la extracción sobre el HTML YA guardado del equipo, sin
    *  resubir el archivo (#1203) — mismo shape que subir el HTML de nuevo.
    *  404 si el equipo no tiene HTML fuente guardado. */

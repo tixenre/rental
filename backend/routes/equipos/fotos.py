@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from auth.guards import require_admin
 from database import get_db
+from rate_limit import limiter, ADMIN_UPLOAD_LIMIT, ADMIN_WRITE_LIMIT
 from routes.equipos.core import router
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,7 @@ MAX_PHOTO_CANDIDATES_BUSCAR_RETURN   = 16
 
 
 @router.post("/admin/equipos/{id}/upload-html-source")
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 async def admin_upload_html_source(
     id: int,
     request: Request,
@@ -66,9 +68,19 @@ async def admin_upload_html_source(
     except Exception:
         raise HTTPException(400, "HTML inválido (no es UTF-8)")
 
+    # Sniff mínimo (#1263): antes, cualquier byte que decodificara como UTF-8
+    # se aceptaba sin chequear que fuera HTML de verdad.
+    if not re.match(r"^\s*(<!doctype\s+html|<html)", html_content, re.IGNORECASE):
+        raise HTTPException(400, "El archivo no parece ser HTML")
+
     path = f"equipos/{id}/source.html"
     with media_http():
-        html_source_url = _put_r2(path, content, "text/html; charset=utf-8")
+        # text/plain (no text/html): este blob queda público en R2 y nada del
+        # producto necesita que el navegador lo renderice vivo — solo se
+        # re-lee server-side (re-extract-specs) para volver a parsear specs.
+        # Servirlo como text/html permitía hostear HTML/JS arbitrario bajo el
+        # dominio/CDN de Rambla con solo credenciales admin.
+        html_source_url = _put_r2(path, content, "text/plain; charset=utf-8")
 
     with get_db() as conn:
         try:
@@ -92,6 +104,7 @@ class EnriquecerFromHtmlBody(BaseModel):
 
 
 @router.post("/admin/equipos/{id}/enriquecer-from-html")
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 def admin_enriquecer_from_html(id: int, body: EnriquecerFromHtmlBody, request: Request) -> dict:
     """Hermano JSON de upload-html-source (#1051 Stream B): mismo extractor
     (`extract_from_html`), mismo aprendizaje (#1203) — pero NO persiste nada
@@ -119,6 +132,7 @@ def admin_enriquecer_from_html(id: int, body: EnriquecerFromHtmlBody, request: R
 
 
 @router.post("/admin/equipos/{id}/re-extract-specs")
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 def admin_re_extract_specs(id: int, request: Request, categoria_hint: Optional[str] = None) -> dict:
     """Re-corre la extracción sobre el HTML YA guardado del equipo, sin
     resubir el archivo (#1203) — típicamente después de agregar un spec
@@ -206,6 +220,7 @@ class BuscarFotosInput(BaseModel):
 
 
 @router.post("/admin/equipos/buscar-fotos")
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
     """Busca fotos del equipo en fuentes optimizadas para imágenes (Wikipedia,
     manufacturer oficial, review sites). Devuelve lista validada de candidatos."""
@@ -213,6 +228,19 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
 
     import httpx
     import re
+    import time as _time
+    from services.media.errors import MediaError
+    from services.media.security import _validate_ssrf_only
+
+    # Timeout server-side (#1263): el AbortController de 30s del front solo
+    # cancela la fetch del lado cliente — un handler sync de FastAPI sigue
+    # corriendo aunque el admin ya haya visto "Timeout" y siguiera de largo.
+    # Deadline propio, independiente de los timeouts por-llamada (Firecrawl
+    # 45s, og:image 15s, validación HEAD 10s × hasta 24 candidatos).
+    _deadline = _time.monotonic() + 25.0
+
+    def _time_left() -> bool:
+        return _time.monotonic() < _deadline
 
     FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
     if not FIRECRAWL_API_KEY:
@@ -221,6 +249,18 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
     direct_url = (payload.url or "").strip() or None
     if direct_url and not direct_url.lower().startswith(("http://", "https://")):
         raise HTTPException(400, "URL inválida")
+    # Anti-SSRF (#1263): direct_url es texto libre del admin — antes de este
+    # fix, _og_images_from_html hacía un GET real desde el server sin chequear
+    # IP privada/interna, a diferencia del endpoint hermano
+    # upload-foto-from-url (que sí usa este mismo guard). Sin whitelist de
+    # dominio (a propósito: acá puede venir cualquier sitio de producto, no
+    # solo los hosts de _ALLOWED_PHOTO_HOSTS) — solo bloquea IP privada/
+    # loopback/puerto raro, igual que los otros uploads manuales del admin.
+    if direct_url:
+        try:
+            _validate_ssrf_only(direct_url)
+        except MediaError as e:
+            raise HTTPException(e.status, e.detail)
 
     query = " ".join(x for x in [payload.marca, payload.nombre, payload.modelo] if x).strip()
     if not direct_url and not query:
@@ -418,23 +458,38 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
     def _og_images_from_html(url: str, client) -> list[str]:
         """Extrae og:image y twitter:image directamente del HTML sin Firecrawl.
         Más rápido y confiable para páginas de producto de B&H y similares."""
-        try:
-            r = client.get(
-                url,
-                headers={
-                    "User-Agent": (
-                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
-                    ),
-                    "Accept": "text/html,application/xhtml+xml,*/*;q=0.9",
-                    "Accept-Language": "en-US,en;q=0.9",
-                },
-                timeout=15.0,
-                follow_redirects=True,
-            )
-        except httpx.HTTPError:
-            return []
-        if r.status_code != 200:
+        og_headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+            ),
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.9",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+        # Anti-SSRF (#1263): follow_redirects=True seguía ciego cualquier
+        # salto sin re-validar — un producto que redirige a una IP interna
+        # se descargaba igual. Re-validamos cada hop (mismo criterio que
+        # _download_with_redirects en services/media/security.py), máximo 3.
+        current = url
+        r = None
+        for _ in range(4):
+            try:
+                _validate_ssrf_only(current)
+            except MediaError:
+                return []
+            try:
+                r = client.get(current, headers=og_headers, timeout=15.0, follow_redirects=False)
+            except httpx.HTTPError:
+                return []
+            if r.status_code in (301, 302, 303, 307, 308):
+                location = r.headers.get("location")
+                if not location:
+                    return []
+                from urllib.parse import urljoin as _urljoin
+                current = _urljoin(current, location)
+                continue
+            break
+        if r is None or r.status_code != 200:
             return []
         html = r.text[:100_000]
         imgs: list[str] = []
@@ -517,7 +572,7 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
                     all_cands.append(u)
         else:
             for q in PHOTO_QUERIES:
-                if len(all_cands) >= 18:
+                if len(all_cands) >= 18 or not _time_left():
                     break
                 for top in _fc_search(q, client)[:2]:
                     for u in _extract_images_from_page(top, client):
@@ -528,11 +583,13 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
         # Validar candidatos — los que vienen de URL directa se saltan la
         # validación (B&H CDN rechaza HEADs cross-origin; el og:image del propio
         # sitio es confiable sin necesidad de un round-trip extra).
+        validated: list[str] = []
         with httpx.Client(timeout=10.0) as vc:
-            validated = [
-                u for u in all_cands[:MAX_PHOTO_CANDIDATES_BUSCAR_VALIDATE]
-                if u.lower() in direct_url_cands or _is_valid_image(u, vc)
-            ][:MAX_PHOTO_CANDIDATES_BUSCAR_RETURN]
+            for u in all_cands[:MAX_PHOTO_CANDIDATES_BUSCAR_VALIDATE]:
+                if len(validated) >= MAX_PHOTO_CANDIDATES_BUSCAR_RETURN or not _time_left():
+                    break
+                if u.lower() in direct_url_cands or _is_valid_image(u, vc):
+                    validated.append(u)
 
     return {"foto_candidates": validated, "total_inspeccionadas": len(all_cands)}
 
@@ -603,6 +660,7 @@ class UploadFotoFromUrlInput(BaseModel):
 
 
 @router.post("/admin/equipos/{equipo_id}/upload-foto-from-url")
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 def admin_upload_foto_from_url(
     equipo_id: int,
     payload: UploadFotoFromUrlInput,
@@ -650,6 +708,7 @@ def admin_upload_foto_from_url(
 # ── Admin: subir bytes de un archivo (multipart) directo a R2 ─────────────
 
 @router.post("/admin/equipos/{equipo_id}/upload-foto")
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 async def admin_upload_foto_file(
     equipo_id: int,
     request: Request,
@@ -853,6 +912,7 @@ def get_equipo_fotos(equipo_id: int, request: Request):
 
 
 @router.post("/admin/equipos/{equipo_id}/fotos", status_code=201)
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 async def upload_equipo_foto(equipo_id: int, request: Request):
     """Sube una foto (multipart, campo 'file') al equipo. Guarda original + variante cuadrada."""
     require_admin(request)
@@ -903,6 +963,7 @@ def _agregar_foto_desde_url(conn, equipo_id: int, url: str, cfg_pub: str) -> dic
 
 
 @router.post("/admin/equipos/{equipo_id}/fotos/from-url", status_code=201)
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 def upload_equipo_foto_from_url(equipo_id: int, body: EquipoFotoFromUrlBody, request: Request):
     """Descarga URL externa y la agrega a la galería del equipo."""
     require_admin(request)
@@ -931,6 +992,7 @@ class EquipoFotosFromUrlsBody(BaseModel):
 
 
 @router.post("/admin/equipos/{equipo_id}/fotos/from-urls", status_code=201)
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 def upload_equipo_fotos_from_urls(equipo_id: int, body: EquipoFotosFromUrlsBody, request: Request):
     """Batch de `fotos/from-url` (#1051 Stream B): agrega hasta 20 fotos de un
     saque — típicamente la galería completa de un HTML recién enriquecido
@@ -973,6 +1035,7 @@ def upload_equipo_fotos_from_urls(equipo_id: int, body: EquipoFotosFromUrlsBody,
 
 
 @router.delete("/admin/equipos/{equipo_id}/fotos/{foto_id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def delete_equipo_foto(equipo_id: int, foto_id: int, request: Request):
     require_admin(request)
 
@@ -1031,6 +1094,7 @@ class EquipoFotoReorderBody(BaseModel):
 
 
 @router.patch("/admin/equipos/{equipo_id}/fotos/orden")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def reorder_equipo_fotos(equipo_id: int, body: EquipoFotoReorderBody, request: Request):
     require_admin(request)
 

@@ -8,6 +8,7 @@ from fastapi import HTTPException, Request
 from pydantic import BaseModel
 
 from database import get_db, row_to_dict
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
 from services.nombre_service import actualizar_nombres_de
 from services.specs import persistir_specs
 from routes.specs.core import router, _require_admin
@@ -114,6 +115,7 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
 
 
 @router.put("/admin/equipos/{equipo_id}/specs")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: Request):
     """Reemplaza TODAS las specs del equipo. Body shape:
     {specs: { "<spec_def_id>": "value" }}. Las keys son ints stringificados."""

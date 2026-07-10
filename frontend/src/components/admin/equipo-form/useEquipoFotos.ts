@@ -1,7 +1,7 @@
 /**
  * useEquipoFotos — concern de la galería multi-foto del form de equipos (edit mode).
  *
- * Extraído verbatim de `EquipoFormDialogV2.tsx` (split de god-module, Frente E del
+ * Extraído verbatim de `EquipoFormDialog.tsx` (split de god-module, Frente E del
  * skill `mantenimiento`). Encapsula query + mutaciones + handlers de la galería,
  * decoupled del estado del form (react-hook-form). Cero cambio de comportamiento.
  */

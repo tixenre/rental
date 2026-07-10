@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Spinner } from "@/design-system/ui/spinner";
 
 import { adminApi, type EquipoInput } from "@/lib/admin/api";
-import { EquipoFormDialogV2 } from "@/components/admin/equipo-form-v2/EquipoFormDialogV2";
+import { EquipoFormDialog } from "@/components/admin/equipo-form/EquipoFormDialog";
 import { popEquiposReturnSearch } from "@/lib/admin/equiposReturnSearch";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
@@ -52,8 +52,7 @@ function EditarEquipoRoute() {
   }
 
   return (
-    <EquipoFormDialogV2
-      variant="page"
+    <EquipoFormDialog
       open
       initial={equipoQ.data}
       saving={saveMut.isPending}

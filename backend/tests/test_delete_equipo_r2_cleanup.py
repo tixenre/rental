@@ -5,6 +5,7 @@ de la URL (sin el prefijo público), usando `_r2_config` para resolver el
 public_base. El cleanup es best-effort (envuelto en try/except).
 """
 import pytest
+from starlette.requests import Request
 
 # `delete_equipo` vive en el submódulo `core` del paquete (#501 fase a). El test
 # parchea sus globals (get_db, _delete_from_r2, _r2_config, require_admin), así
@@ -13,6 +14,17 @@ import pytest
 import routes.equipos.core as eq
 
 pytestmark = pytest.mark.unit
+
+
+def _fake_request() -> Request:
+    """Request real (no `None`/`object()`) — `delete_equipo` lleva
+    `@limiter.limit` (auditoría #1263, mismo patrón que #1251): slowapi exige
+    una instancia genuina de `starlette.requests.Request` (lee `.client`/
+    `.headers` para la IP), un stub crudo la rompe. Sin conexión real —
+    alcanza con el scope ASGI mínimo."""
+    return Request(
+        {"type": "http", "method": "DELETE", "path": "/api/equipos/1", "headers": [], "client": ("127.0.0.1", 0)}
+    )
 
 
 class _FakeCursor:
@@ -68,7 +80,7 @@ def test_delete_equipo_borra_blob_r2(monkeypatch):
     deleted_keys = []
     monkeypatch.setattr(eq, "_delete_from_r2", lambda key: deleted_keys.append(key) or True)
 
-    eq.delete_equipo(7, request=None)
+    eq.delete_equipo(7, _fake_request())
 
     assert deleted_keys == ["equipos/7_cam/scrape.html"]
 
@@ -86,7 +98,7 @@ def test_delete_equipo_sin_html_no_toca_r2(monkeypatch):
         raise AssertionError("no debería tocar R2 sin html_source_url")
     monkeypatch.setattr(eq, "_delete_from_r2", _boom)
 
-    eq.delete_equipo(8, request=None)
+    eq.delete_equipo(8, _fake_request())
     assert called["r2"] is False
 
 

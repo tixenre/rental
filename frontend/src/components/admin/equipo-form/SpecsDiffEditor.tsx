@@ -91,7 +91,7 @@ export function SpecsDiffEditor({
   // El orden del template-bound viene de templateItems (prioridad ASC).
   //
   // Importante: si un template item NO tiene match en specs[] (porque el
-  // useEffect de EquipoFormDialogV2 no ha rellenado specs vacías todavía,
+  // useEffect de EquipoFormDialog no ha rellenado specs vacías todavía,
   // o por algún edge case), igual lo renderizamos con un "ghost spec"
   // (id derivado del spec_def_id). Cuando el admin edita el valor por
   // primera vez, updateSpec lo materializa en specs[]. Esto asegura que
@@ -101,7 +101,7 @@ export function SpecsDiffEditor({
   // El match es por spec_def_id (extraído de `spec-N`/`tmpl-N`), NO por
   // label — bug real encontrado en vivo: el label de una spec guardada
   // arranca como fallback ("spec 3") hasta que un efecto aparte en
-  // EquipoFormDialogV2 lo re-etiqueta contra el template ya cargado. Si
+  // EquipoFormDialog lo re-etiqueta contra el template ya cargado. Si
   // ese re-etiquetado corre DESPUÉS de este render (carrera real, no solo
   // teórica — timing de queries en paralelo), el match por label fallaba
   // en silencio y la spec aparecía duplicada en "Custom" con su label sin
@@ -195,7 +195,7 @@ export function SpecsDiffEditor({
       {/* Propuestos (del autocompletar) — sección oculta.
           Los parsers bespoke llenan el template directamente; lo que no
           matchea no aporta valor visible al admin. El estado y la lógica
-          de auto-apply siguen activos en EquipoFormDialogV2. */}
+          de auto-apply siguen activos en EquipoFormDialog. */}
 
       {/* Sección template-bound */}
       {templateBound.length > 0 && (

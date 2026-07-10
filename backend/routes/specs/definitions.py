@@ -13,6 +13,7 @@ from fastapi import HTTPException, Request
 from pydantic import BaseModel
 
 from database import get_db, row_to_dict
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
 from routes.specs.core import router, _require_admin
 
 
@@ -188,6 +189,7 @@ def _validate_tabla_columnas(cols: Optional[list[dict]]) -> None:
 
 
 @router.post("/admin/spec-definitions", status_code=201)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def crear_spec_definition(payload: SpecDefinitionInput, request: Request):
     _require_admin(request)
     if payload.tipo not in _VALID_SPEC_TIPOS:
@@ -245,6 +247,7 @@ def crear_spec_definition(payload: SpecDefinitionInput, request: Request):
 
 
 @router.patch("/admin/spec-definitions/{def_id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, request: Request):
     _require_admin(request)
     updates = payload.model_dump(exclude_unset=True)
@@ -347,6 +350,7 @@ def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, reque
             raise
 
 @router.delete("/admin/spec-definitions/{def_id}", status_code=204)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def borrar_spec_definition(def_id: int, request: Request):
     _require_admin(request)
     with get_db() as conn:

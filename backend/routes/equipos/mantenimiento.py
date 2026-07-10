@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from auth.guards import require_admin
 from database import get_db, row_to_dict
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
 from routes.equipos.core import router
 
 
@@ -64,6 +65,7 @@ def list_mantenimiento(id: int):
 
 
 @router.post("/equipos/{id}/mantenimiento", status_code=201)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def add_mantenimiento(id: int, data: MantenimientoCreate, request: Request):
     """Agrega un evento de mantenimiento al equipo."""
     require_admin(request)
@@ -90,6 +92,7 @@ def add_mantenimiento(id: int, data: MantenimientoCreate, request: Request):
 
 
 @router.patch("/equipos/{id}/mantenimiento/{log_id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def update_mantenimiento(id: int, log_id: int, data: MantenimientoUpdate, request: Request):
     """Actualiza un evento de mantenimiento existente."""
     require_admin(request)
@@ -124,6 +127,7 @@ def update_mantenimiento(id: int, log_id: int, data: MantenimientoUpdate, reques
 
 
 @router.delete("/equipos/{id}/mantenimiento/{log_id}", status_code=204)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def delete_mantenimiento(id: int, log_id: int, request: Request):
     """Elimina un evento de mantenimiento."""
     require_admin(request)

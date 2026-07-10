@@ -13,6 +13,7 @@ from fastapi import HTTPException, Request
 from pydantic import BaseModel
 
 from database import get_db
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
 from services.specs import aplicar_propuesta, descartar_propuesta, listar_no_reconocidos_agrupados
 from routes.specs.core import router, _require_admin
 
@@ -32,6 +33,7 @@ class ResolverNoReconocidosInput(BaseModel):
 
 
 @router.post("/admin/specs/no-reconocidos/resolver")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def resolver_no_reconocidos(payload: ResolverNoReconocidosInput, request: Request):
     """Cierra en bloque las propuestas subyacentes de un grupo (un label
     agrupado puede tener una fila por equipo). `aplicado`: ya se agregó al

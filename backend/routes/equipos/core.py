@@ -18,6 +18,7 @@ from database import (
     get_db, row_to_dict,
     MARCA_SUBQUERY, MARCA_NOMBRE_EXPR,
 )
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
 from busqueda import construir
 from reservas import (
     reservado_total,
@@ -93,7 +94,7 @@ class EquipoCreate(BaseModel):
     marca:            Optional[str]   = None
     modelo:           Optional[str]   = None
     cantidad:         int             = Field(default=1, ge=0, le=9999)
-    precio_jornada:   Optional[int]   = Field(default=None, ge=0)
+    precio_jornada:   Optional[int]   = Field(default=None, ge=0, le=2_147_483_647)
     precio_usd:       Optional[float] = Field(default=None, ge=0)
     roi_pct:          Optional[float] = Field(default=None, ge=0, le=100)
     valor_reposicion: Optional[float] = Field(default=None, ge=0)
@@ -142,7 +143,7 @@ class EquipoUpdate(BaseModel):
     marca:            Optional[str]   = None
     modelo:           Optional[str]   = None
     cantidad:         Optional[int]   = Field(default=None, ge=0, le=9999)
-    precio_jornada:   Optional[int]   = Field(default=None, ge=0)
+    precio_jornada:   Optional[int]   = Field(default=None, ge=0, le=2_147_483_647)
     # Flag explícito que el frontend manda para indicar si el precio
     # viene de la fórmula (auto, false) o lo tipeó el admin a mano (true).
     # Si no se manda y se cambia precio_jornada, el endpoint infiere
@@ -511,6 +512,7 @@ def _resolve_brand_id(conn, nombre: str | None) -> int | None:
 
 
 @router.post("/equipos", status_code=201)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def create_equipo(data: EquipoCreate, request: Request):
     require_admin(request)
     with get_db() as conn:
@@ -565,6 +567,7 @@ def _normalize_fecha_compra(value):
 
 
 @router.patch("/equipos/{id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def update_equipo(id: int, data: EquipoUpdate, request: Request):
     require_admin(request)
     with get_db() as conn:
@@ -628,6 +631,7 @@ def update_equipo(id: int, data: EquipoUpdate, request: Request):
 
 
 @router.post("/equipos/{id}/duplicate")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def duplicate_equipo(id: int, request: Request):
     """
     Duplica un equipo: copia equipo + ficha + categorías + kit. La nueva fila
@@ -693,6 +697,7 @@ def duplicate_equipo(id: int, request: Request):
 
 
 @router.post("/equipos/{id}/restore")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def restore_equipo(id: int, request: Request):
     """Restaura un equipo soft-deleted (eliminado_at = NULL). #206."""
     require_admin(request)
@@ -725,6 +730,7 @@ class BulkActionInput(BaseModel):
 
 
 @router.post("/admin/equipos/bulk")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def bulk_action(payload: BulkActionInput, request: Request):
     """Aplica una acción a varios equipos a la vez. Acciones soportadas:
     - set_visible (visible: bool)
@@ -812,6 +818,7 @@ def bulk_action(payload: BulkActionInput, request: Request):
 
 
 @router.delete("/equipos/{id}", status_code=204)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def delete_equipo(id: int, request: Request):
     """Soft delete: marca eliminado_at = NOW(). Preserva historial de
     alquileres del equipo dado de baja. Restaurable vía POST /restore (#206)."""
