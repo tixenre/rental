@@ -12,6 +12,7 @@ from fastapi import Request, HTTPException, BackgroundTasks
 from pydantic import BaseModel, field_validator
 
 from database import get_db, row_to_dict, to_datetime
+from rate_limit import limiter, CLIENTE_WRITE_LIMIT
 from routes.cliente_portal.core import (
     router,
     require_cliente,
@@ -73,6 +74,7 @@ class PedidoClienteCreate(BaseModel):
 
 
 @router.post("/api/cliente/pedidos", status_code=201)
+@limiter.limit(CLIENTE_WRITE_LIMIT)
 def cliente_crear_pedido(
     data: PedidoClienteCreate, request: Request, background: BackgroundTasks,
 ):
@@ -194,6 +196,7 @@ def cliente_crear_pedido(
 
 
 @router.patch("/api/cliente/pedidos/{id}/cancelar")
+@limiter.limit(CLIENTE_WRITE_LIMIT)
 def cliente_cancelar_pedido(id: int, request: Request):
     """La legalidad de la transición (qué estados puede cancelar un cliente)
     y el auto-cancelado de solicitudes pendientes viven en

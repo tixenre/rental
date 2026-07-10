@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from database import get_db, row_to_dict
 from auth.guards import require_admin
+from rate_limit import limiter, ADMIN_WRITE_LIMIT, ADMIN_UPLOAD_LIMIT
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -109,6 +110,7 @@ def admin_list_marcas(request: Request):
 
 
 @router.patch("/admin/marcas/{marca_id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def admin_update_marca(marca_id: int, patch: MarcaPatch, request: Request):
     """Actualiza una marca (nombre, logo_url, visible, orden)."""
     require_admin(request)
@@ -163,6 +165,7 @@ def admin_update_marca(marca_id: int, patch: MarcaPatch, request: Request):
 
 
 @router.post("/admin/marcas/merge")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def admin_merge_marcas(req: MarcaMergeRequest, request: Request):
     """Fusiona dos marcas duplicadas: reasigna todos los equipos de
     `source_id` a `target_id` (vía `brand_id` y `marca` TEXT) y borra source.
@@ -208,6 +211,7 @@ def admin_merge_marcas(req: MarcaMergeRequest, request: Request):
 
 
 @router.post("/admin/marcas/reorder")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def admin_reorder_marcas(req: MarcasReorderRequest, request: Request):
     """Actualiza el orden de múltiples marcas."""
     require_admin(request)
@@ -229,6 +233,7 @@ def admin_reorder_marcas(req: MarcasReorderRequest, request: Request):
 
 
 @router.delete("/admin/marcas/{marca_id}", status_code=204)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def admin_delete_marca(marca_id: int, request: Request):
     """Borra una marca. Rechaza si tiene equipos asociados — primero hay que
     fusionar (POST /admin/marcas/merge) o reasignar los equipos."""
@@ -290,6 +295,7 @@ def _sanitize_svg(raw: bytes) -> bytes:
 
 
 @router.post("/admin/marcas/{marca_id}/upload-logo")
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 async def admin_upload_marca_logo(marca_id: int, request: Request):
     """Sube un logo (multipart/form-data, campo `file`) a R2 y persiste
     `logo_url` en la marca.

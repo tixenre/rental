@@ -17,6 +17,7 @@ from fastapi import Request, HTTPException, Query, BackgroundTasks
 
 from database import get_db, row_to_dict
 from auth.guards import require_admin
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
 from services.email import send_email
 from reservas import validar_stock as _check_stock
 from routes.alquileres.core import (
@@ -49,6 +50,7 @@ SORT_COLS = {
 
 
 @router.post("/alquileres", status_code=201)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def create_pedido_endpoint(data: PedidoCreate, request: Request, background: BackgroundTasks):
     """Endpoint admin para crear pedido. La lógica está en `create_pedido`,
     así el portal cliente (cliente_portal.py) la reutiliza sin pasar por admin guard."""
@@ -144,6 +146,7 @@ def get_pedido(id: int, request: Request):
 
 
 @router.delete("/alquileres/{id}", status_code=204)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def delete_pedido(id: int, request: Request):
     require_admin(request)
     with get_db() as conn:
@@ -162,6 +165,7 @@ def delete_pedido(id: int, request: Request):
 
 
 @router.patch("/alquileres/{id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def update_pedido(id: int, data: PedidoEstado, request: Request, background: BackgroundTasks):
     """Transición de estado admin. La legalidad de la transición, las
     validaciones de fecha/stock, la asignación de `numero_pedido` y el
@@ -198,6 +202,7 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
 
 
 @router.patch("/alquileres/{id}/datos")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def update_pedido_datos(id: int, data: PedidoDatos, request: Request):
     require_admin(request)
     with get_db() as conn:
@@ -212,6 +217,7 @@ def update_pedido_datos(id: int, data: PedidoDatos, request: Request):
 
 
 @router.put("/alquileres/{id}/items")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def update_alquiler_items(id: int, data: PedidoItemUpdate, request: Request):
     require_admin(request)
     with get_db() as conn:
@@ -243,6 +249,7 @@ def update_alquiler_items(id: int, data: PedidoItemUpdate, request: Request):
 
 
 @router.post("/admin/recordatorios/retiro/run")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def run_recordatorios_retiro(request: Request, dry_run: bool = Query(True)):
     """Dispara on-demand el barrido de recordatorios de retiro — para probar en
     staging sin esperar al scheduler diario. `dry_run=true` (default) NO manda

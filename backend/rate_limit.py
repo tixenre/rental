@@ -33,3 +33,14 @@ limiter = Limiter(
 # anónimo) pero no infinito.
 ADMIN_WRITE_LIMIT = "60/minute"
 ADMIN_UPLOAD_LIMIT = "20/minute"  # mismo valor que routes/talleres.py para uploads
+
+# Límite para escrituras de CLIENTE autenticado (portal /api/cliente/*, no-admin):
+# mismo criterio y valor que ADMIN_WRITE_LIMIT (tráfico humano autenticado, no
+# anónimo) pero constante propia — el actor es cualquier cliente logueado, no la
+# allowlist de admin. Los endpoints de cliente ya caros/sensibles (registro/claim/
+# verificar-cuit/perfiles fiscales — hit a AFIP) mantienen sus límites bespoke más
+# ajustados (5-10/minute) en cliente_portal/cuenta.py; esta constante cubre el
+# resto (favoritos, listas, pedidos, solicitudes de modificación, reserva del
+# Estudio) — barrido de seguimiento de la auditoría #1263/#1265, que solo cubrió
+# routes/equipos/* y routes/specs/*.
+CLIENTE_WRITE_LIMIT = "60/minute"

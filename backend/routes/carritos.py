@@ -20,6 +20,7 @@ from pydantic import BaseModel
 
 from database import get_db
 from auth.session import get_session
+from rate_limit import limiter
 from services.carrito.activos import (
     heartbeat_upsert,
     listar_carritos_admin,
@@ -46,11 +47,18 @@ class CartHeartbeat(BaseModel):
 
 
 @router.post("/cart/heartbeat")
+@limiter.limit("60/minute")
 def cart_heartbeat(data: CartHeartbeat, request: Request):
     """Persiste el estado del carrito via upsert por session_id.
 
     Auth opcional: si hay sesión cliente válida asocia el cliente_id
     automáticamente. El frontend genera el session_id (UUID v4).
+
+    Límite bespoke (no CLIENTE_WRITE_LIMIT): a diferencia de los endpoints de
+    `cliente_portal`, este acepta tráfico ANÓNIMO (sin sesión) — mismo criterio
+    que busquedas.py/compartir.py/cotizacion.py. El frontend debounea 2s por
+    cambio de carrito (`useCartHeartbeat.ts`), así que 60/min da margen holgado
+    sin dejarlo sin freno.
     """
     try:
         _uuid.UUID(data.session_id)

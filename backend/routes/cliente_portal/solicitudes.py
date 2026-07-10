@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from database import get_db, row_to_dict, to_datetime
 from auth.guards import require_admin
+from rate_limit import limiter, ADMIN_WRITE_LIMIT, CLIENTE_WRITE_LIMIT
 from services.carrito.readiness import equipo_visible_catalogo
 from services.fechas import validar_rango_fechas, validar_fecha_iso
 from routes.cliente_portal.core import (
@@ -244,6 +245,7 @@ def _equipo_precio_catalogo(conn, equipo_id: int) -> int:
 
 
 @router.post("/api/cliente/pedidos/{id}/modificacion")
+@limiter.limit(CLIENTE_WRITE_LIMIT)
 def cliente_modificar_pedido(
     id: int, data: ModificacionIn, request: Request, background: BackgroundTasks,
 ):
@@ -407,6 +409,7 @@ def cliente_modificar_pedido(
 
 
 @router.delete("/api/cliente/pedidos/{id}/modificacion/{sm_id}")
+@limiter.limit(CLIENTE_WRITE_LIMIT)
 def cliente_cancelar_solicitud(
     id: int, sm_id: int, request: Request, background: BackgroundTasks,
 ):
@@ -633,6 +636,7 @@ class SolicitudRespuesta(BaseModel):
 
 
 @router.patch("/api/admin/solicitudes/{id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def admin_responder_solicitud(
     id: int, data: SolicitudRespuesta, request: Request, background: BackgroundTasks,
 ):
