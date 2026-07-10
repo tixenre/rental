@@ -17,6 +17,7 @@ from fastapi import Request, HTTPException, Query, BackgroundTasks
 
 from database import get_db, row_to_dict
 from auth.guards import require_admin
+from busqueda import construir
 from rate_limit import limiter, ADMIN_WRITE_LIMIT
 from services.email import send_email
 from reservas import validar_stock as _check_stock
@@ -83,16 +84,37 @@ def list_pedidos(
             where += " AND p.fuente = %s"
             params.append(fuente)
         if q:
-            like = f"%{q}%"
-            # Busca por la foto del pedido Y por el nombre ACTUAL del cliente
-            # (el contacto se muestra en vivo → buscar por el dato corregido
-            # también tiene que encontrar el pedido).
-            where += (
-                " AND (p.cliente_nombre LIKE %s OR CAST(p.numero_pedido AS TEXT) LIKE %s"
-                " OR EXISTS (SELECT 1 FROM clientes c WHERE c.id = p.cliente_id"
-                " AND (c.nombre LIKE %s OR c.apellido LIKE %s)))"
+            # Búsqueda por NOMBRE vía el motor único (backend/busqueda): sin
+            # importar mayúsculas/minúsculas, sin tildes ("jose"→"José"),
+            # multi-palabra y tolerante a typos. Antes era un `LIKE` crudo —
+            # case-SENSITIVE en Postgres — que no encontraba "Tincho" buscando
+            # "tinc". Se buscan dos campos de nombre: la foto congelada del
+            # pedido (`p.cliente_nombre`) y el nombre ACTUAL del cliente (en
+            # vivo → un dato corregido también tiene que encontrar el pedido).
+            # El número de pedido es un id, no texto: se matchea aparte por
+            # substring exacto (OR), no por el motor fuzzy.
+            # El nombre en vivo prefiere RENAPER (nombre_legal → nombre_validado):
+            # lo que se VE en la lista puede ser el nombre legal, no el ingresado.
+            # Buscamos la UNIÓN (base + renaper) para matchear tanto lo mostrado
+            # como lo que el admin recuerde haber cargado; el motor hace OR entre
+            # campos, así que sobra-match antes que falte-match.
+            pred = construir(
+                [
+                    "p.cliente_nombre",
+                    "(SELECT COALESCE(c.nombre, '') || ' ' || COALESCE(c.apellido, '')"
+                    "        || ' ' || COALESCE(c.nombre_renaper, '')"
+                    "        || ' ' || COALESCE(c.apellido_renaper, '')"
+                    " FROM clientes c WHERE c.id = p.cliente_id)",
+                ],
+                q,
             )
-            params += [like, like, like, like]
+            like_num = f"%{q}%"
+            if pred.activo:
+                where += f" AND (({pred.where}) OR CAST(p.numero_pedido AS TEXT) LIKE %s)"
+                params += pred.where_params + [like_num]
+            else:
+                where += " AND CAST(p.numero_pedido AS TEXT) LIKE %s"
+                params.append(like_num)
         if con_saldo:
             # Pedidos con saldo > 0 y no cancelados. Borrador y presupuesto no
             # aplican porque todavía no se cobra; cancelado tampoco.
