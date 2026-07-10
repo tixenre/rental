@@ -6,6 +6,8 @@
 """
 from unittest.mock import patch, MagicMock, AsyncMock
 
+from starlette.requests import Request
+
 
 # ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -83,7 +85,14 @@ def test_upload_raster_integra_display_sm():
             return {"file": file_mock}
 
         import routes.marcas as m
-        req = MagicMock()
+        # Request real (no un MagicMock) — admin_upload_marca_logo lleva
+        # `@limiter.limit` (barrido de seguimiento #1263/#1265): slowapi exige
+        # una instancia genuina de `starlette.requests.Request`. `.form` se
+        # sobreescribe igual que antes (Request no usa __slots__).
+        req = Request(
+            {"type": "http", "method": "POST", "path": "/admin/marcas/1/upload-logo",
+             "headers": [], "client": ("127.0.0.1", 0)}
+        )
         req.form = fake_form
 
         asyncio.run(m.admin_upload_marca_logo(1, req))
