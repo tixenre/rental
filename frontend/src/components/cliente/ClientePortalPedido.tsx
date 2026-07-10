@@ -498,7 +498,7 @@ export function PedidoCard({
       </div>
 
       {expanded && (
-        <div className="border-t border-dashed border-[var(--hairline)] px-portal pt-[18px] pb-[22px] grid gap-y-5 gap-x-7 animate-[expand-in_.22s_ease-out] [grid-template-areas:'banner''timeline''docs''main''side'] lg:[grid-template-columns:minmax(0,1fr)_clamp(20rem,26%,25rem)] lg:[grid-template-areas:'banner_banner''timeline_timeline''main_docs''main_side']">
+        <div className="border-t border-dashed border-[var(--hairline)] px-portal pt-[18px] pb-[22px] grid gap-y-5 gap-x-7 animate-[expand-in_.22s_ease-out] [grid-template-areas:'banner''timeline''docs''main''side'] lg:[grid-template-columns:minmax(0,1fr)_clamp(20rem,26%,25rem)] lg:[grid-template-rows:auto_auto_min-content_min-content_1fr] lg:[grid-template-areas:'banner_banner''timeline_timeline''main_docs''main_side''main_.']">
           {/* ── Banner: solicitud pendiente / resuelta / bienvenida (full width) ── */}
           {(pendiente || ultimaResuelta || showWelcome) && (
             <div className="[grid-area:banner] flex flex-col gap-3">
