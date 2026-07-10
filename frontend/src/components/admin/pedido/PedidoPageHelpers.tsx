@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -6,7 +7,11 @@ import {
   Check,
   ChevronDown,
   ChevronLeft,
+  Download,
+  Eye,
   GripVertical,
+  Mail,
+  Receipt,
   Tag,
   X,
 } from "lucide-react";
@@ -21,15 +26,41 @@ import { RadioGroup, RadioGroupItem } from "@/design-system/ui/radio-group";
 import { DraftNumberInput } from "@/design-system/ui/draft-number-input";
 import { QtyInput } from "@/design-system/ui/qty-input";
 import { Section } from "@/design-system/composites/Section";
+import { Chequeos } from "@/design-system/composites/Chequeos";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/design-system/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/design-system/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/design-system/ui/alert-dialog";
+import { FacturaBadge } from "@/design-system/ui/FacturaBadge";
+import { Spinner } from "@/design-system/ui/spinner";
 import { cn } from "@/lib/utils";
 import { adminApi, ESTADO_LABEL, type PedidoEstado } from "@/lib/admin/api";
 import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
+import {
+  useFacturacionArca,
+  ESTADOS_FACTURABLES,
+  LAYOUT_ASPECT,
+  type FacturacionArca,
+} from "@/components/admin/pedido/useFacturacionArca";
 import { type DraftItem, subtotalDraftItem } from "@/components/admin/pedido/usePedidoDraft";
 import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
 
@@ -457,5 +488,231 @@ export function BdRow({
         {v}
       </span>
     </div>
+  );
+}
+
+/** Modal de preview + confirmación — compartido por el detalle y el listado. */
+export function FacturaPreviewDialog({ f }: { f: FacturacionArca }) {
+  return (
+    <AlertDialog open={f.showPreview} onOpenChange={f.setShowPreview}>
+      <AlertDialogContent className="flex h-[94vh] w-fit max-w-[95vw] flex-row overflow-hidden p-0">
+        {/* Columna izquierda: info + chequeos + acciones. Columna derecha: la factura a pantalla
+            completa de alto, dimensionada a la proporción REAL del layout elegido (LAYOUT_ASPECT)
+            — así no queda el sobrante gris que el propio HTML de arca_fe deja alrededor cuando
+            el viewport no matchea el aspecto (ese HTML centra y escala manteniendo proporción). */}
+        <div className="flex w-[360px] shrink-0 flex-col overflow-y-auto border-r hairline">
+          <AlertDialogHeader className="px-5 py-4 text-left">
+            <AlertDialogTitle>Confirmar factura</AlertDialogTitle>
+            <AlertDialogDescription>
+              Revisá el documento antes de emitir — una vez que ARCA da el CAE, solo se puede
+              corregir con una Nota de Crédito.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="flex-1 px-5">
+            {f.preview.isPending && (
+              <div className="py-2 text-sm text-muted-foreground">Chequeando…</div>
+            )}
+            {f.preview.isError && (
+              <div className="py-2 text-sm text-destructive">
+                {(f.preview.error as Error).message}
+              </div>
+            )}
+            {f.preview.data && <Chequeos items={f.preview.data.chequeos} />}
+          </div>
+
+          <AlertDialogFooter className="flex-col gap-2 border-t hairline px-5 py-4 sm:flex-col">
+            <AlertDialogAction
+              disabled={!f.preview.data?.listo || f.facturar.isPending}
+              onClick={() => f.facturar.mutate()}
+              className="w-full"
+            >
+              {f.facturar.isPending ? "Emitiendo…" : "Confirmar y emitir"}
+            </AlertDialogAction>
+            <AlertDialogCancel className="w-full">Cancelar</AlertDialogCancel>
+          </AlertDialogFooter>
+        </div>
+
+        <div
+          className="relative h-full shrink-0 overflow-hidden bg-muted"
+          style={{ aspectRatio: LAYOUT_ASPECT[f.layout] ?? LAYOUT_ASPECT.simplificada }}
+        >
+          {!f.facturaHtmlError && (!f.facturaBlobUrl || !f.facturaIframeReady) && (
+            <div className="absolute inset-0 flex items-center justify-center gap-2 bg-muted text-sm text-muted-foreground">
+              <Spinner size="sm" />
+              Armando la factura…
+            </div>
+          )}
+          {f.facturaHtmlError && (
+            <div className="flex h-full items-center justify-center px-6 text-center text-sm text-destructive">
+              {f.facturaHtmlError}
+            </div>
+          )}
+          {!f.facturaHtmlError && f.facturaBlobUrl && (
+            <iframe
+              src={f.facturaBlobUrl}
+              title="Factura (borrador, sin CAE)"
+              className="h-full w-full border-0"
+              sandbox=""
+              onLoad={() => f.setFacturaIframeReady(true)}
+            />
+          )}
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+/** Vista rica de la factura ARCA para el rail del detalle de pedido (estado persistente:
+ * badge/CAE/links/anular). El listado usa `useFacturacionArca` + `FacturaPreviewDialog`
+ * directo, sin este wrapper — su barra de acciones rápidas no tiene lugar para tanto detalle. */
+export function FacturacionRailSection({
+  pedidoId,
+  estadoPedido,
+}: {
+  pedidoId: number;
+  estadoPedido: PedidoEstado;
+}) {
+  const f = useFacturacionArca(pedidoId, estadoPedido);
+
+  return (
+    <RailSection label="Factura ARCA">
+      {f.q.isLoading && <div className="text-xs text-muted-foreground">Cargando…</div>}
+
+      {f.principal && (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5">
+            <FacturaBadge estado={f.principal.estado} />
+            {f.cbteLetra && (
+              <span className="font-mono text-xs text-muted-foreground">Fact. {f.cbteLetra}</span>
+            )}
+            {f.principal.ambiente === "homologacion" && (
+              // eslint-disable-next-line no-restricted-syntax -- amber: paleta categórica homologación (Tier 3)
+              <span className="font-mono text-2xs text-amber-600 border border-amber-400/50 rounded px-1">
+                TEST
+              </span>
+            )}
+          </div>
+
+          {f.principal.cbte_nro && (
+            <div className="font-mono text-xs text-muted-foreground">
+              {String(f.principal.pto_vta).padStart(5, "0")}-
+              {String(f.principal.cbte_nro).padStart(8, "0")}
+            </div>
+          )}
+
+          {f.principal.cae && (
+            <div className="font-mono text-xs text-muted-foreground">CAE {f.principal.cae}</div>
+          )}
+
+          {f.principal.estado === "error" && f.principal.errores && (
+            <div className="text-xs text-destructive rounded border border-destructive/20 bg-destructive/5 px-2 py-1.5">
+              {Array.isArray(f.principal.errores)
+                ? f.principal.errores.join(" / ")
+                : String(f.principal.errores)}
+            </div>
+          )}
+
+          {f.principal.estado === "emitida" && (
+            <div className="space-y-1.5">
+              <Select value={f.layout} onValueChange={f.setLayout}>
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue placeholder="Formato" />
+                </SelectTrigger>
+                <SelectContent>
+                  {f.layouts.map((l) => (
+                    <SelectItem key={l.id} value={l.id} title={l.descripcion}>
+                      {l.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {f.layoutInfo?.descripcion && (
+                <p className="text-2xs text-muted-foreground leading-snug">
+                  {f.layoutInfo.descripcion}
+                </p>
+              )}
+              {f.layoutInfo?.advertencia && (
+                // eslint-disable-next-line no-restricted-syntax -- amber: paleta categórica de advertencia (Tier 3)
+                <p className="text-2xs text-amber-700 leading-snug flex items-start gap-1">
+                  <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
+                  {f.layoutInfo.advertencia}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-1.5">
+                <a
+                  href={`/api/facturas/${f.principal.id}/pdf?format=html&layout=${f.layout}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
+                >
+                  <Eye className="h-3 w-3" /> Ver
+                </a>
+                <a
+                  href={`/api/facturas/${f.principal.id}/pdf?layout=${f.layout}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
+                >
+                  <Download className="h-3 w-3" /> Descargar PDF
+                </a>
+                <button
+                  type="button"
+                  onClick={() => f.enviarMail.mutate(f.principal!.id)}
+                  disabled={f.enviarMail.isPending}
+                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30 disabled:opacity-50"
+                >
+                  <Mail className="h-3 w-3" />
+                  {f.enviarMail.isPending ? "Enviando…" : "Enviar por mail"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {f.nc && (
+            <div className="mt-1 flex items-center gap-1.5">
+              <FacturaBadge estado={f.nc.estado} />
+              <span className="font-mono text-2xs text-muted-foreground">NC emitida</span>
+            </div>
+          )}
+
+          {f.puedeAnular && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              disabled={f.notaCredito.isPending}
+              onClick={() => f.notaCredito.mutate(f.principal!.id)}
+            >
+              <X className="h-3.5 w-3.5 mr-1" />
+              {f.notaCredito.isPending ? "Emitiendo NC…" : "Anular con NC"}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {(!f.principal || f.principal.estado === "error") && !f.q.isLoading && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          disabled={!f.puedeFacturar || f.preview.isPending}
+          title={
+            !ESTADOS_FACTURABLES.includes(estadoPedido)
+              ? "El pedido debe estar confirmado para facturar"
+              : undefined
+          }
+          onClick={() => {
+            f.setShowPreview(true);
+            f.preview.mutate();
+          }}
+        >
+          <Receipt className="h-3.5 w-3.5 mr-1" />
+          {f.preview.isPending ? "Calculando…" : f.principal ? "Reintentar" : "Facturar"}
+        </Button>
+      )}
+
+      <FacturaPreviewDialog f={f} />
+    </RailSection>
   );
 }

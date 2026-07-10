@@ -21,7 +21,6 @@ import {
   Trash2,
   GripVertical,
   Tag,
-  Receipt,
   ShieldAlert,
   ShieldCheck,
   Copy,
@@ -46,20 +45,11 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 
-import { Chequeos } from "@/design-system/composites/Chequeos";
-import { Spinner } from "@/design-system/ui/spinner";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 import { MoneyInput } from "@/design-system/ui/money-input";
 import { Textarea } from "@/design-system/ui/textarea";
 import { Skeleton } from "@/design-system/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/design-system/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -74,15 +64,12 @@ import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import {
   adminApi,
-  facturacionApi,
   ESTADO_LABEL,
   pedidoPdfUrl,
   type Pedido,
   type PedidoEstado,
   type Equipo,
-  type Factura,
 } from "@/lib/admin/api";
-import { FacturaBadge } from "@/design-system/ui/FacturaBadge";
 import {
   usePedidoDraft,
   nuevoUidLinea,
@@ -114,6 +101,7 @@ import {
   EstadoSplitButton,
   BdRow,
   FacturacionTargetSection,
+  FacturacionRailSection,
 } from "@/components/admin/pedido/PedidoPageHelpers";
 import { Section } from "@/design-system/composites/Section";
 import { FieldLabel } from "@/design-system/ui/Field";
@@ -1052,343 +1040,6 @@ function PedidoEditorPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-// ── FacturacionRailSection ────────────────────────────────────────────────────
-
-const ESTADOS_FACTURABLES: PedidoEstado[] = [
-  "confirmado",
-  "retirado",
-  "entregado",
-  "devuelto",
-  "finalizado",
-];
-
-// Proporción ancho/alto de cada layout (ver arca_fe/render.py: "simplificada" = 4:5 fijo,
-// "oficial"/"detallada" = A4). El preview del modal usa esto para dimensionar el panel de la
-// factura SIN el sobrante gris que el propio HTML deja alrededor cuando el viewport no matchea
-// la proporción exacta (el `.page`/`body` de arca_fe centra y escala manteniendo aspecto — si le
-// damos el mismo aspecto de entrada, el sobrante desaparece solo, no hay que "recortar" nada).
-const LAYOUT_ASPECT: Record<string, number> = {
-  simplificada: 1080 / 1350,
-  oficial: 210 / 297,
-  detallada: 210 / 297,
-};
-
-function FacturacionRailSection({
-  pedidoId,
-  estadoPedido,
-}: {
-  pedidoId: number;
-  estadoPedido: PedidoEstado;
-}) {
-  const qc = useQueryClient();
-
-  const q = useQuery({
-    queryKey: ["admin", "facturas", pedidoId],
-    queryFn: () => facturacionApi.listFacturasPedido(pedidoId),
-  });
-
-  // Layouts disponibles (nombre/descripción/advertencia) — estáticos en la práctica, cache larga.
-  const layoutsQ = useQuery({
-    queryKey: ["admin", "facturacion", "layouts"],
-    queryFn: () => facturacionApi.getLayouts(),
-    staleTime: Infinity,
-  });
-  const layouts = layoutsQ.data ?? [];
-  const [layout, setLayout] = useState<string>("simplificada");
-  const layoutInfo = layouts.find((l) => l.id === layout);
-
-  const [showPreview, setShowPreview] = useState(false);
-
-  const preview = useMutation({
-    mutationFn: () => facturacionApi.previewFactura(pedidoId),
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  // Factura completa (mismo layout real, CAE/QR placeholder) embebida en el propio modal — pedido
-  // del dueño de ir directo a la vista real en vez de un resumen en texto + un link aparte. Mismo
-  // patrón que ContratoPreviewModal (blob URL + <iframe src>, no srcDoc: un documento con fuentes
-  // embebidas en base64 tarda mucho más en pintar vía srcDoc que navegado como blob real).
-  const [facturaBlobUrl, setFacturaBlobUrl] = useState<string | null>(null);
-  const [facturaHtmlError, setFacturaHtmlError] = useState<string | null>(null);
-  const [facturaIframeReady, setFacturaIframeReady] = useState(false);
-
-  useEffect(() => {
-    if (!showPreview) return;
-    let alive = true;
-    let url: string | null = null;
-    setFacturaIframeReady(false);
-    setFacturaHtmlError(null);
-    facturacionApi
-      .previewFacturaHtml(pedidoId, layout)
-      .then((html) => {
-        if (!alive) return;
-        url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
-        setFacturaBlobUrl(url);
-      })
-      .catch((err: unknown) => {
-        if (alive) {
-          setFacturaHtmlError(
-            err instanceof Error ? err.message : "No pudimos generar el preview de la factura.",
-          );
-        }
-      });
-    return () => {
-      alive = false;
-      setFacturaBlobUrl(null);
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [showPreview, pedidoId, layout]);
-
-  const facturar = useMutation({
-    mutationFn: () => facturacionApi.facturarPedido(pedidoId),
-    onSuccess: () => {
-      toast.success("Factura emitida");
-      qc.invalidateQueries({ queryKey: ["admin", "facturas", pedidoId] });
-      setShowPreview(false);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const notaCredito = useMutation({
-    mutationFn: (facturaId: number) => facturacionApi.notaCreditoFactura(facturaId),
-    onSuccess: () => {
-      toast.success("Nota de crédito emitida");
-      qc.invalidateQueries({ queryKey: ["admin", "facturas", pedidoId] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const enviarMail = useMutation({
-    mutationFn: (facturaId: number) => facturacionApi.enviarMailFactura(facturaId, layout),
-    onSuccess: (data) => toast.success(`Factura enviada a ${data.to}`),
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const facturas = q.data ?? [];
-  const principal = facturas.find(
-    (f: Factura) => f.nota_credito_de == null && f.estado !== "anulada",
-  );
-  const nc = facturas.find((f: Factura) => f.nota_credito_de != null);
-  // Un intento previo en estado 'error' es reintentable — el backend inserta
-  // un nuevo intento y vuelve a pedirle el CAE a ARCA (`get_factura_vigente`
-  // solo considera 'pendiente'/'emitida', el índice único parcial excluye
-  // 'error'). Sin este chequeo, un primer intento fallido dejaba el pedido
-  // sin forma de facturar nunca más (bug real de prod).
-  const puedeFacturar =
-    ESTADOS_FACTURABLES.includes(estadoPedido) && (!principal || principal.estado === "error");
-  const puedeAnular = principal?.estado === "emitida" && !nc;
-
-  const cbteLetra = principal
-    ? ({ 1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C" }[principal.cbte_tipo] ?? "?")
-    : null;
-
-  return (
-    <RailSection label="Factura ARCA">
-      {q.isLoading && <div className="text-xs text-muted-foreground">Cargando…</div>}
-
-      {principal && (
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5">
-            <FacturaBadge estado={principal.estado} />
-            {cbteLetra && (
-              <span className="font-mono text-xs text-muted-foreground">Fact. {cbteLetra}</span>
-            )}
-            {principal.ambiente === "homologacion" && (
-              // eslint-disable-next-line no-restricted-syntax -- amber: paleta categórica homologación (Tier 3)
-              <span className="font-mono text-2xs text-amber-600 border border-amber-400/50 rounded px-1">
-                TEST
-              </span>
-            )}
-          </div>
-
-          {principal.cbte_nro && (
-            <div className="font-mono text-xs text-muted-foreground">
-              {String(principal.pto_vta).padStart(5, "0")}-
-              {String(principal.cbte_nro).padStart(8, "0")}
-            </div>
-          )}
-
-          {principal.cae && (
-            <div className="font-mono text-xs text-muted-foreground">CAE {principal.cae}</div>
-          )}
-
-          {principal.estado === "error" && principal.errores && (
-            <div className="text-xs text-destructive rounded border border-destructive/20 bg-destructive/5 px-2 py-1.5">
-              {Array.isArray(principal.errores)
-                ? principal.errores.join(" / ")
-                : String(principal.errores)}
-            </div>
-          )}
-
-          {principal.estado === "emitida" && (
-            <div className="space-y-1.5">
-              <Select value={layout} onValueChange={setLayout}>
-                <SelectTrigger className="h-7 text-xs">
-                  <SelectValue placeholder="Formato" />
-                </SelectTrigger>
-                <SelectContent>
-                  {layouts.map((l) => (
-                    <SelectItem key={l.id} value={l.id} title={l.descripcion}>
-                      {l.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {layoutInfo?.descripcion && (
-                <p className="text-2xs text-muted-foreground leading-snug">
-                  {layoutInfo.descripcion}
-                </p>
-              )}
-              {layoutInfo?.advertencia && (
-                // eslint-disable-next-line no-restricted-syntax -- amber: paleta categórica de advertencia (Tier 3)
-                <p className="text-2xs text-amber-700 leading-snug flex items-start gap-1">
-                  <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
-                  {layoutInfo.advertencia}
-                </p>
-              )}
-              <div className="flex flex-wrap gap-1.5">
-                <a
-                  href={`/api/facturas/${principal.id}/pdf?format=html&layout=${layout}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
-                >
-                  <Eye className="h-3 w-3" /> Ver
-                </a>
-                <a
-                  href={`/api/facturas/${principal.id}/pdf?layout=${layout}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
-                >
-                  <Download className="h-3 w-3" /> Descargar PDF
-                </a>
-                <button
-                  type="button"
-                  onClick={() => enviarMail.mutate(principal.id)}
-                  disabled={enviarMail.isPending}
-                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30 disabled:opacity-50"
-                >
-                  <Mail className="h-3 w-3" />
-                  {enviarMail.isPending ? "Enviando…" : "Enviar por mail"}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {nc && (
-            <div className="mt-1 flex items-center gap-1.5">
-              <FacturaBadge estado={nc.estado} />
-              <span className="font-mono text-2xs text-muted-foreground">NC emitida</span>
-            </div>
-          )}
-
-          {puedeAnular && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
-              disabled={notaCredito.isPending}
-              onClick={() => notaCredito.mutate(principal.id)}
-            >
-              <X className="h-3.5 w-3.5 mr-1" />
-              {notaCredito.isPending ? "Emitiendo NC…" : "Anular con NC"}
-            </Button>
-          )}
-        </div>
-      )}
-
-      {(!principal || principal.estado === "error") && !q.isLoading && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full"
-          disabled={!puedeFacturar || preview.isPending}
-          title={
-            !ESTADOS_FACTURABLES.includes(estadoPedido)
-              ? "El pedido debe estar confirmado para facturar"
-              : undefined
-          }
-          onClick={() => {
-            setShowPreview(true);
-            preview.mutate();
-          }}
-        >
-          <Receipt className="h-3.5 w-3.5 mr-1" />
-          {preview.isPending ? "Calculando…" : principal ? "Reintentar" : "Facturar"}
-        </Button>
-      )}
-
-      <AlertDialog open={showPreview} onOpenChange={setShowPreview}>
-        <AlertDialogContent className="flex h-[94vh] w-fit max-w-[95vw] flex-row overflow-hidden p-0">
-          {/* Columna izquierda: info + chequeos + acciones. Columna derecha: la factura a pantalla
-              completa de alto, dimensionada a la proporción REAL del layout elegido (LAYOUT_ASPECT)
-              — así no queda el sobrante gris que el propio HTML de arca_fe deja alrededor cuando
-              el viewport no matchea el aspecto (ese HTML centra y escala manteniendo proporción). */}
-          <div className="flex w-[360px] shrink-0 flex-col overflow-y-auto border-r hairline">
-            <AlertDialogHeader className="px-5 py-4 text-left">
-              <AlertDialogTitle>Confirmar factura</AlertDialogTitle>
-              <AlertDialogDescription>
-                Revisá el documento antes de emitir — una vez que ARCA da el CAE, solo se puede
-                corregir con una Nota de Crédito.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-
-            <div className="flex-1 px-5">
-              {preview.isPending && (
-                <div className="py-2 text-sm text-muted-foreground">Chequeando…</div>
-              )}
-              {preview.isError && (
-                <div className="py-2 text-sm text-destructive">
-                  {(preview.error as Error).message}
-                </div>
-              )}
-              {preview.data && <Chequeos items={preview.data.chequeos} />}
-            </div>
-
-            <AlertDialogFooter className="flex-col gap-2 border-t hairline px-5 py-4 sm:flex-col">
-              <AlertDialogAction
-                disabled={!preview.data?.listo || facturar.isPending}
-                onClick={() => facturar.mutate()}
-                className="w-full"
-              >
-                {facturar.isPending ? "Emitiendo…" : "Confirmar y emitir"}
-              </AlertDialogAction>
-              <AlertDialogCancel className="w-full">Cancelar</AlertDialogCancel>
-            </AlertDialogFooter>
-          </div>
-
-          <div
-            className="relative h-full shrink-0 overflow-hidden bg-muted"
-            style={{ aspectRatio: LAYOUT_ASPECT[layout] ?? LAYOUT_ASPECT.simplificada }}
-          >
-            {!facturaHtmlError && (!facturaBlobUrl || !facturaIframeReady) && (
-              <div className="absolute inset-0 flex items-center justify-center gap-2 bg-muted text-sm text-muted-foreground">
-                <Spinner size="sm" />
-                Armando la factura…
-              </div>
-            )}
-            {facturaHtmlError && (
-              <div className="flex h-full items-center justify-center px-6 text-center text-sm text-destructive">
-                {facturaHtmlError}
-              </div>
-            )}
-            {!facturaHtmlError && facturaBlobUrl && (
-              <iframe
-                src={facturaBlobUrl}
-                title="Factura (borrador, sin CAE)"
-                className="h-full w-full border-0"
-                sandbox=""
-                onLoad={() => setFacturaIframeReady(true)}
-              />
-            )}
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
-    </RailSection>
   );
 }
 

@@ -8,6 +8,7 @@ import {
   Coins,
   Mail,
   ArrowRight,
+  Receipt,
   Trash2,
   ShieldAlert,
   X,
@@ -38,6 +39,8 @@ import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { RegistrarPagoModal } from "@/components/admin/pedido/RegistrarPagoModal";
 import { EnviarDocsDialog } from "@/components/admin/pedido/EnviarDocsDialog";
+import { FacturaPreviewDialog } from "@/components/admin/pedido/PedidoPageHelpers";
+import { useFacturacionArca } from "@/components/admin/pedido/useFacturacionArca";
 import { AdminCard, FAB } from "@/components/mobile";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
@@ -535,6 +538,13 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Regla de hooks: no puede esperar a que `p` cargue para llamarse — por eso el
+  // id "de respaldo" y el gate `enabled` (ver useFacturacionArca) en vez de mover
+  // esto después de los early-return de abajo.
+  const facturacion = useFacturacionArca(id ?? -1, p?.estado ?? "borrador", {
+    enabled: id != null,
+  });
+
   if (id == null) {
     return (
       <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
@@ -603,8 +613,23 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
           </div>
         </div>
 
-        {/* Quick-actions: lo que más se usa, sin scrollear ni entrar al editor */}
+        {/* Quick-actions: lo que más se usa, sin scrollear ni entrar al editor.
+            "Siguiente paso" y "Facturar" van primero/último — son las 2 acciones que
+            antes vivían fuera de esta barra (a pedido del dueño: "se sentían separadas
+            del resto"). */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
+          {ns && (
+            <Button
+              variant={ns.blocked ? "outline" : "amber"}
+              size="sm"
+              disabled={!!ns.blocked || estadoMut.isPending}
+              title={ns.blocked ?? ""}
+              onClick={() => !ns.blocked && advanceEstado(ns.target)}
+            >
+              <ArrowRight className="h-3.5 w-3.5 mr-1" />
+              {ns.blocked ? `Falta: ${ns.blocked}` : ns.label}
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => onOpen(p.id)}>
             <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
           </Button>
@@ -620,29 +645,33 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
             <Mail className="h-3.5 w-3.5 mr-1" /> Mandar mail
           </Button>
           <WhatsAppButton pedido={p} phone={p.cliente_telefono} variant="compact" />
+          {(!facturacion.principal || facturacion.principal.estado === "error") &&
+            !facturacion.q.isLoading && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!facturacion.puedeFacturar || facturacion.preview.isPending}
+                title={
+                  !facturacion.puedeFacturar ? "No se puede facturar en este estado" : undefined
+                }
+                onClick={() => {
+                  facturacion.setShowPreview(true);
+                  facturacion.preview.mutate();
+                }}
+              >
+                <Receipt className="h-3.5 w-3.5 mr-1" />
+                {facturacion.preview.isPending
+                  ? "Calculando…"
+                  : facturacion.principal
+                    ? "Reintentar"
+                    : "Facturar"}
+              </Button>
+            )}
         </div>
       </div>
 
       {/* Cuerpo */}
       <div className="px-5 md:px-6 py-5 space-y-4">
-        {/* Siguiente paso — ejecuta la transición acá mismo (compacto, sin aire muerto) */}
-        {ns && (
-          <div className="flex w-fit items-center gap-3 rounded-lg border border-amber bg-amber-soft py-2 pl-3.5 pr-2">
-            <span className="t-eyebrow">Siguiente paso</span>
-            <Button
-              variant={ns.blocked ? "outline" : "amber"}
-              size="sm"
-              className="shrink-0"
-              disabled={!!ns.blocked || estadoMut.isPending}
-              title={ns.blocked ?? ""}
-              onClick={() => !ns.blocked && advanceEstado(ns.target)}
-            >
-              <ArrowRight className="h-4 w-4 mr-1" />
-              {ns.blocked ? `Falta: ${ns.blocked}` : ns.label}
-            </Button>
-          </div>
-        )}
-
         {/* Fechas + total */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="card-elevated px-4 py-3">
@@ -717,6 +746,7 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
         open={openMail}
         onOpenChange={setOpenMail}
       />
+      <FacturaPreviewDialog f={facturacion} />
 
       <AlertDialog open={askVerif} onOpenChange={setAskVerif}>
         <AlertDialogContent>
