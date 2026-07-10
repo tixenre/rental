@@ -171,26 +171,38 @@ export function useEquipoFormSubmit({
           return;
         }
 
+        // Los guardados secundarios (foto/ficha/nombre-público/specs/categorías)
+        // van a endpoints y tablas distintas, ninguno lee el resultado de otro
+        // — corren en paralelo (Promise.allSettled) en vez de encadenados; cada
+        // uno preserva su propio try/catch, así que un fallo no aborta al resto
+        // (mismo criterio "avisos" que ya tenía el código secuencial).
+        const equipoIdOk = equipoId;
+        const tareasSecundarias: Array<() => Promise<void>> = [];
+
         // Foto pendiente o externa
         if (pendingFile) {
-          try {
-            const r2url = await uploadFileToBucket(equipoId, pendingFile);
-            await adminApi.updateEquipo(equipoId, { foto_url: r2url });
-            form.setValue("foto_url", r2url, { shouldDirty: false });
-            setPendingFile(null);
-            if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
-            setPendingFilePreview("");
-          } catch (e) {
-            fallidos.push(`foto (${e instanceof Error ? e.message : "error"})`);
-          }
+          tareasSecundarias.push(async () => {
+            try {
+              const r2url = await uploadFileToBucket(equipoIdOk, pendingFile);
+              await adminApi.updateEquipo(equipoIdOk, { foto_url: r2url });
+              form.setValue("foto_url", r2url, { shouldDirty: false });
+              setPendingFile(null);
+              if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
+              setPendingFilePreview("");
+            } catch (e) {
+              fallidos.push(`foto (${e instanceof Error ? e.message : "error"})`);
+            }
+          });
         } else if (fotoExternaPendiente) {
-          try {
-            const r2url = await uploadExternalUrlToBucket(equipoId, fotoExternaPendiente);
-            await adminApi.updateEquipo(equipoId, { foto_url: r2url });
-            form.setValue("foto_url", r2url, { shouldDirty: false });
-          } catch (e) {
-            fallidos.push(`foto a R2 (${e instanceof Error ? e.message : "error"})`);
-          }
+          tareasSecundarias.push(async () => {
+            try {
+              const r2url = await uploadExternalUrlToBucket(equipoIdOk, fotoExternaPendiente);
+              await adminApi.updateEquipo(equipoIdOk, { foto_url: r2url });
+              form.setValue("foto_url", r2url, { shouldDirty: false });
+            } catch (e) {
+              fallidos.push(`foto a R2 (${e instanceof Error ? e.message : "error"})`);
+            }
+          });
         }
 
         // Ficha legacy: descripción + notas + keywords + contenido incluido.
@@ -199,29 +211,31 @@ export function useEquipoFormSubmit({
         // y se persisten vía putEquipoSpecs (más abajo).
         const tieneFicha = isEdit || !!descripcion || !!notas || tags.length > 0;
         if (tieneFicha) {
-          try {
-            const validos = contenidoIncluido.filter((ci) => ci.nombre.trim().length > 0);
-            const fichaGuardada = await adminApi.setFicha(equipoId, {
-              descripcion: descripcion || null,
-              notas: notas || null,
-              keywords_json: tags.length ? JSON.stringify(tags) : null,
-              // B1 #635: contenido incluido — filtramos los ítems sin nombre
-              // (el usuario puede tener una fila vacía sin completar; no la
-              // enviamos para no fallar la validación del backend y perder
-              // los ítems válidos en la misma operación).
-              contenido_incluido_json: validos.length > 0 ? JSON.stringify(validos) : null,
-            });
-            // Actualizar el cache de ficha inmediatamente con la respuesta del
-            // servidor. Sin esto, al usar "Aplicar" (no cierra el form), la
-            // invalidación del equipo dispara el effect de hidratación de ficha
-            // (useEquipoFormDraft) con la ficha VIEJA (no invalidada) →
-            // setContenidoIncluido(viejos) pisa lo recién guardado. Con
-            // setQueryData el effect re-corre con la ficha fresca y el
-            // contenido queda correcto en pantalla.
-            qc.setQueryData(["admin", "equipo-ficha", equipoId], fichaGuardada);
-          } catch (e) {
-            fallidos.push(`ficha (${e instanceof Error ? e.message : "error"})`);
-          }
+          tareasSecundarias.push(async () => {
+            try {
+              const validos = contenidoIncluido.filter((ci) => ci.nombre.trim().length > 0);
+              const fichaGuardada = await adminApi.setFicha(equipoIdOk, {
+                descripcion: descripcion || null,
+                notas: notas || null,
+                keywords_json: tags.length ? JSON.stringify(tags) : null,
+                // B1 #635: contenido incluido — filtramos los ítems sin nombre
+                // (el usuario puede tener una fila vacía sin completar; no la
+                // enviamos para no fallar la validación del backend y perder
+                // los ítems válidos en la misma operación).
+                contenido_incluido_json: validos.length > 0 ? JSON.stringify(validos) : null,
+              });
+              // Actualizar el cache de ficha inmediatamente con la respuesta del
+              // servidor. Sin esto, al usar "Aplicar" (no cierra el form), la
+              // invalidación del equipo dispara el effect de hidratación de ficha
+              // (useEquipoFormDraft) con la ficha VIEJA (no invalidada) →
+              // setContenidoIncluido(viejos) pisa lo recién guardado. Con
+              // setQueryData el effect re-corre con la ficha fresca y el
+              // contenido queda correcto en pantalla.
+              qc.setQueryData(["admin", "equipo-ficha", equipoIdOk], fichaGuardada);
+            } catch (e) {
+              fallidos.push(`ficha (${e instanceof Error ? e.message : "error"})`);
+            }
+          });
         }
 
         // Nombre público: override manual vía el endpoint dedicado — gana
@@ -240,17 +254,21 @@ export function useEquipoFormSubmit({
         // override en ese caso dispara actualizar_nombres_de igual y lo
         // pisaría a vacío sin que el usuario haya tocado el nombre.
         if (texto) {
-          try {
-            await adminApi.aprobarNombre(equipoId, { override: texto, revisado: true });
-          } catch (e) {
-            fallidos.push(`nombre público (${e instanceof Error ? e.message : "error"})`);
-          }
+          tareasSecundarias.push(async () => {
+            try {
+              await adminApi.aprobarNombre(equipoIdOk, { override: texto, revisado: true });
+            } catch (e) {
+              fallidos.push(`nombre público (${e instanceof Error ? e.message : "error"})`);
+            }
+          });
         } else if (teniaOverride) {
-          try {
-            await adminApi.aprobarNombre(equipoId, { override: null, revisado: false });
-          } catch (e) {
-            fallidos.push(`nombre público (${e instanceof Error ? e.message : "error"})`);
-          }
+          tareasSecundarias.push(async () => {
+            try {
+              await adminApi.aprobarNombre(equipoIdOk, { override: null, revisado: false });
+            } catch (e) {
+              fallidos.push(`nombre público (${e instanceof Error ? e.message : "error"})`);
+            }
+          });
         }
 
         // Specs estructuradas → PUT a equipo_specs (SoT única). El id de cada
@@ -260,27 +278,33 @@ export function useEquipoFormSubmit({
         // resuelto contra el template. Los specs custom (id uuid, sin
         // spec_def_id) no van a equipo_specs: se gestionan en /admin/equipos/specs.
         if (isEdit && equipoSpecsQuery.data) {
-          try {
-            const specsDict: Record<string, string> = {};
-            for (const s of specs) {
-              const value = s.value.trim();
-              if (!value) continue;
-              const m = /^(?:spec|tmpl)-(\d+)$/.exec(s.id);
-              if (!m) continue;
-              specsDict[m[1]] = value;
+          tareasSecundarias.push(async () => {
+            try {
+              const specsDict: Record<string, string> = {};
+              for (const s of specs) {
+                const value = s.value.trim();
+                if (!value) continue;
+                const m = /^(?:spec|tmpl)-(\d+)$/.exec(s.id);
+                if (!m) continue;
+                specsDict[m[1]] = value;
+              }
+              await adminApi.putEquipoSpecs(equipoIdOk, specsDict);
+            } catch (e) {
+              fallidos.push(`specs (${e instanceof Error ? e.message : "error"})`);
             }
-            await adminApi.putEquipoSpecs(equipoId, specsDict);
-          } catch (e) {
-            fallidos.push(`specs (${e instanceof Error ? e.message : "error"})`);
-          }
+          });
         }
 
         // Categorías (en V2 las habilitamos también en CREATE)
-        try {
-          await adminApi.setCategorias(equipoId, [...selectedCats]);
-        } catch (e) {
-          fallidos.push(`categorías (${e instanceof Error ? e.message : "error"})`);
-        }
+        tareasSecundarias.push(async () => {
+          try {
+            await adminApi.setCategorias(equipoIdOk, [...selectedCats]);
+          } catch (e) {
+            fallidos.push(`categorías (${e instanceof Error ? e.message : "error"})`);
+          }
+        });
+
+        await Promise.allSettled(tareasSecundarias.map((t) => t()));
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Error al guardar");
         return;

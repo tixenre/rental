@@ -5,6 +5,7 @@
  * del skill `mantenimiento`, F2a #1263). Puramente de lectura — no dispara
  * ningún cambio, así que recibe los valores ya resueltos en vez de `form`.
  */
+import { memo } from "react";
 import { Image as ImageIcon } from "lucide-react";
 import { Monto, PrecioUnidad } from "@/components/admin/Monto";
 import type { FormValues } from "./equipo-form-schema";
@@ -13,7 +14,10 @@ function kpiFmt(n: unknown) {
   return typeof n === "number" && !Number.isNaN(n) ? n.toLocaleString("es-AR") : "—";
 }
 
-export function EquipoPreviewAside({
+// memo: props primitivas (string/number) — evita re-render cuando el padre
+// re-renderiza por un form.watch() de OTRO campo (ej. "visible en catálogo")
+// sin que nombre/precio/roi/valor_reposicion hayan cambiado de valor.
+function EquipoPreviewAsideImpl({
   fotoActual,
   nombre,
   nombrePublico,
@@ -57,7 +61,7 @@ export function EquipoPreviewAside({
         <div className="rounded-lg border hairline bg-card px-3 py-2.5">
           <div className="t-eyebrow">$ / jornada</div>
           <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
-            <PrecioUnidad value={precioJornada} />
+            <PrecioUnidad value={precioJornada} compact />
           </div>
         </div>
         <div className="rounded-lg border hairline bg-card px-3 py-2.5">
@@ -76,3 +80,5 @@ export function EquipoPreviewAside({
     </aside>
   );
 }
+
+export const EquipoPreviewAside = memo(EquipoPreviewAsideImpl);

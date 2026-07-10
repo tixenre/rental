@@ -6,6 +6,7 @@
  * lo que necesita ya vive en `draft` (issue #1263 F1); `specCatOptions` es lo
  * único externo (referencia resuelta por el padre desde `specCatsQ`).
  */
+import { memo } from "react";
 import { CollapsibleSection } from "./form-helpers";
 import { Field } from "./form-helpers";
 import {
@@ -18,7 +19,10 @@ import {
 import { SpecsDiffEditor } from "./SpecsDiffEditor";
 import type { EquipoFormDraft } from "./useEquipoFormDraft";
 
-export function FichaTecnicaSection({
+// memo: `draft` viaja entero y ahora está memoizado (useEquipoFormDraft) —
+// sin este boundary, cualquier re-render del padre (ej. tipear en otro campo)
+// re-renderiza igual a SpecsDiffEditor de abajo.
+function FichaTecnicaSectionImpl({
   draft,
   specCatOptions,
 }: {
@@ -77,3 +81,5 @@ export function FichaTecnicaSection({
     </CollapsibleSection>
   );
 }
+
+export const FichaTecnicaSection = memo(FichaTecnicaSectionImpl);

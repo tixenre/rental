@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { adminApi, type CategoriaAdmin, type Equipo } from "@/lib/admin/api";
@@ -221,10 +221,10 @@ export function useEquipoFormDraft(
    *  el auto-default de arriba deje de pelear contra una elección explícita
    *  (incluida "Sin categoría de specs") — encapsulado acá, ya no hace falta
    *  que el componente conozca el ref. */
-  const setCategoriaSpecs = (v: string) => {
+  const setCategoriaSpecs = useCallback((v: string) => {
     specsTouchedRef.current = true;
     setCategoriaSpecsRaw(v);
-  };
+  }, []);
 
   /** Nombre de la categoría de specs — drive de specs + nombre público. */
   const categoriaRoot = categoriaSpecsRaw || null;
@@ -352,102 +352,148 @@ export function useEquipoFormDraft(
   // archivo — comparten `aplicarSpecsExtraidos` (aplica al template o
   // manda a revisión), no hay 2 formas de procesar el mismo resultado.
   // ════════════════════════════════════════════════════════════════════
-  const aplicarSpecsExtraidos = (
-    specsExtraidos: { label: string; value: string; spec_key?: string }[],
-    tituloSinSpecs: string,
-  ) => {
-    const propuestos: Spec[] = withIds(specsExtraidos ?? []);
-    if (propuestos.length === 0) {
-      toast.success(tituloSinSpecs, { description: "No se extrajeron specs del archivo" });
-      return;
-    }
-    const autoAplicables = propuestos.filter((p) => !!findTemplateMatch(templateItems, p));
-    const requierenRevision = propuestos.filter((p) => !findTemplateMatch(templateItems, p));
-
-    if (autoAplicables.length > 0) {
-      setSpecs((prev) => {
-        let next = prev;
-        for (const p of autoAplicables) {
-          const tmpl = findTemplateMatch(templateItems, p)!;
-          next = upsertTemplateSpec(next, tmpl, p.value, p.spec_key);
-        }
-        return next;
-      });
-    }
-    if (requierenRevision.length > 0) setSpecsPropuestos(requierenRevision);
-
-    const parts: string[] = [];
-    if (autoAplicables.length) parts.push(`${autoAplicables.length} aplicados al template`);
-    if (requierenRevision.length) parts.push(`${requierenRevision.length} pendientes de revisar`);
-    toast.success("HTML procesado", { description: parts.join(" · ") || "specs extraídos" });
-  };
-
-  const aceptarPropuesto = (s: Spec) => {
-    setSpecs((prev) => {
-      const tmpl = findTemplateMatch(templateItems, s);
-      if (tmpl) return upsertTemplateSpec(prev, tmpl, s.value, s.spec_key);
-      // Sin template match: spec custom con UUID id.
-      const idx = prev.findIndex((x) => sameLabel(x.label, s.label));
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = { ...next[idx], value: s.value };
-        return next;
+  const aplicarSpecsExtraidos = useCallback(
+    (
+      specsExtraidos: { label: string; value: string; spec_key?: string }[],
+      tituloSinSpecs: string,
+    ) => {
+      const propuestos: Spec[] = withIds(specsExtraidos ?? []);
+      if (propuestos.length === 0) {
+        toast.success(tituloSinSpecs, { description: "No se extrajeron specs del archivo" });
+        return;
       }
-      return [...prev, newSpec(s.label, s.value, s.spec_key)];
-    });
+      const autoAplicables = propuestos.filter((p) => !!findTemplateMatch(templateItems, p));
+      const requierenRevision = propuestos.filter((p) => !findTemplateMatch(templateItems, p));
+
+      if (autoAplicables.length > 0) {
+        setSpecs((prev) => {
+          let next = prev;
+          for (const p of autoAplicables) {
+            const tmpl = findTemplateMatch(templateItems, p)!;
+            next = upsertTemplateSpec(next, tmpl, p.value, p.spec_key);
+          }
+          return next;
+        });
+      }
+      if (requierenRevision.length > 0) setSpecsPropuestos(requierenRevision);
+
+      const parts: string[] = [];
+      if (autoAplicables.length) parts.push(`${autoAplicables.length} aplicados al template`);
+      if (requierenRevision.length) parts.push(`${requierenRevision.length} pendientes de revisar`);
+      toast.success("HTML procesado", { description: parts.join(" · ") || "specs extraídos" });
+    },
+    [templateItems],
+  );
+
+  const aceptarPropuesto = useCallback(
+    (s: Spec) => {
+      setSpecs((prev) => {
+        const tmpl = findTemplateMatch(templateItems, s);
+        if (tmpl) return upsertTemplateSpec(prev, tmpl, s.value, s.spec_key);
+        // Sin template match: spec custom con UUID id.
+        const idx = prev.findIndex((x) => sameLabel(x.label, s.label));
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = { ...next[idx], value: s.value };
+          return next;
+        }
+        return [...prev, newSpec(s.label, s.value, s.spec_key)];
+      });
+      setSpecsPropuestos((prev) => prev.filter((x) => x.id !== s.id));
+    },
+    [templateItems],
+  );
+
+  const descartarPropuesto = useCallback((s: Spec) => {
     setSpecsPropuestos((prev) => prev.filter((x) => x.id !== s.id));
-  };
+  }, []);
 
-  const descartarPropuesto = (s: Spec) => {
-    setSpecsPropuestos((prev) => prev.filter((x) => x.id !== s.id));
-  };
+  // Memoizado: FichaTecnicaSection/KitComboSection reciben `draft` entero y
+  // están envueltos en React.memo — sin esto, un objeto nuevo en cada render
+  // (ej. al tipear en "Nombre interno", ajeno a este hook) invalidaría ese
+  // memo siempre, re-renderizando también SpecsDiffEditor/KitComponentEditor
+  // (con su DndContext) sin que sus datos hubieran cambiado.
+  return useMemo(
+    () => ({
+      // ficha
+      descripcion,
+      setDescripcion,
+      notas,
+      setNotas,
+      contenidoIncluido,
+      setContenidoIncluido,
+      tags,
+      fichaQuery: fichaQ,
 
-  return {
-    // ficha
-    descripcion,
-    setDescripcion,
-    notas,
-    setNotas,
-    contenidoIncluido,
-    setContenidoIncluido,
-    tags,
-    fichaQuery: fichaQ,
+      // nombre público
+      nombrePublico,
+      setNombrePublico,
+      nombrePublicoAuto,
+      setNombrePublicoAuto,
+      autoGenDisponible,
+      categoriaRoot,
+      categoriaTemplate,
 
-    // nombre público
-    nombrePublico,
-    setNombrePublico,
-    nombrePublicoAuto,
-    setNombrePublicoAuto,
-    autoGenDisponible,
-    categoriaRoot,
-    categoriaTemplate,
+      // specs
+      specs,
+      setSpecs,
+      specsPropuestos,
+      templateItems,
+      equipoSpecsQuery: equipoSpecsQ,
+      aplicarSpecsExtraidos,
+      aceptarPropuesto,
+      descartarPropuesto,
 
-    // specs
-    specs,
-    setSpecs,
-    specsPropuestos,
-    templateItems,
-    equipoSpecsQuery: equipoSpecsQ,
-    aplicarSpecsExtraidos,
-    aceptarPropuesto,
-    descartarPropuesto,
+      // categoría de specs
+      categoriaSpecs: categoriaSpecsRaw,
+      setCategoriaSpecs,
 
-    // categoría de specs
-    categoriaSpecs: categoriaSpecsRaw,
-    setCategoriaSpecs,
+      // categorías de catálogo
+      selectedCats,
+      setSelectedCats,
 
-    // categorías de catálogo
-    selectedCats,
-    setSelectedCats,
+      // html source
+      htmlSourceUrl,
+      setHtmlSourceUrl,
 
-    // html source
-    htmlSourceUrl,
-    setHtmlSourceUrl,
-
-    // precio manual (hidratación — el auto-cálculo queda en el componente)
-    precioJornadaManual,
-    setPrecioJornadaManual,
-  };
+      // precio manual (hidratación — el auto-cálculo queda en el componente)
+      precioJornadaManual,
+      setPrecioJornadaManual,
+    }),
+    [
+      descripcion,
+      setDescripcion,
+      notas,
+      setNotas,
+      contenidoIncluido,
+      setContenidoIncluido,
+      tags,
+      fichaQ,
+      nombrePublico,
+      setNombrePublico,
+      nombrePublicoAuto,
+      setNombrePublicoAuto,
+      autoGenDisponible,
+      categoriaRoot,
+      categoriaTemplate,
+      specs,
+      setSpecs,
+      specsPropuestos,
+      templateItems,
+      equipoSpecsQ,
+      aplicarSpecsExtraidos,
+      aceptarPropuesto,
+      descartarPropuesto,
+      categoriaSpecsRaw,
+      setCategoriaSpecs,
+      selectedCats,
+      setSelectedCats,
+      htmlSourceUrl,
+      setHtmlSourceUrl,
+      precioJornadaManual,
+      setPrecioJornadaManual,
+    ],
+  );
 }
 
 export type EquipoFormDraft = ReturnType<typeof useEquipoFormDraft>;
