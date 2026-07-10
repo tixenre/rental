@@ -1,0 +1,11 @@
+Fuentes vendoreadas en este directorio — tema visual DEFAULT de arca_fe, agnóstico de marca (ver
+render.py). Ambas bajo SIL Open Font License 1.1, libres de embeber/redistribuir.
+
+- Inter (inter-400/500/600/700/800.woff2) — © The Inter Project Authors.
+  https://github.com/rsms/inter — licencia: https://openfontlicense.org
+- JetBrains Mono (jetbrains-mono-400/500.woff2) — © 2020 JetBrains s.r.o.
+  https://github.com/JetBrains/JetBrainsMono — licencia: https://openfontlicense.org
+
+Ninguna de las dos es la tipografía de marca de rambla ni de ningún consumidor de arca_fe —
+son el default neutral que usa cualquiera que no pase su propio `fonts_css` a
+`renderizar_comprobante_html`.

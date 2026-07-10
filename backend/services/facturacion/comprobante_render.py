@@ -64,17 +64,24 @@ def _emisor_row(nombre: str, conn) -> dict:
 # Fuentes propias (TT Commons + JetBrains Mono, vendoreadas — mismas que usa la web), inyectadas a
 # `arca_fe.render.renderizar_comprobante_html(..., fonts_css=...)`. Playwright renderiza con base
 # `about:blank`: todo va embebido, nada de `<img src="archivo-relativo">`.
+#
+# El nombre de familia CSS declarado acá es 'ComprobanteSans' — el nombre LÓGICO que
+# `arca_fe.render` usa en sus templates (nunca 'TT Commons' hardcodeado ahí, que sería la marca
+# de Rambla filtrándose a una librería agnóstica de marca). Esto es puro re-etiquetado de los
+# mismos bytes de TT Commons — cero cambio visual en las facturas reales de Rambla; simplemente
+# arca_fe ahora también tiene su propio default (Inter) bajo ese mismo nombre lógico para quien no
+# pase su propio `fonts_css` (ver docs/DECISIONES.md → "Tema tipográfico compartido de arca_fe").
 # ---------------------------------------------------------------------------
 
 _FONTS_DIR = os.path.join(
     os.path.dirname(__file__), "..", "..", "..", "frontend", "public", "fonts", "woff2"
 )
 _FONT_FILES = [
-    ("tt-commons-400.woff2", "TT Commons", 400),
-    ("tt-commons-500.woff2", "TT Commons", 500),
-    ("tt-commons-600.woff2", "TT Commons", 600),
-    ("tt-commons-700.woff2", "TT Commons", 700),
-    ("tt-commons-800.woff2", "TT Commons", 800),
+    ("tt-commons-400.woff2", "ComprobanteSans", 400),
+    ("tt-commons-500.woff2", "ComprobanteSans", 500),
+    ("tt-commons-600.woff2", "ComprobanteSans", 600),
+    ("tt-commons-700.woff2", "ComprobanteSans", 700),
+    ("tt-commons-800.woff2", "ComprobanteSans", 800),
     ("jetbrains-mono-400.woff2", "JetBrains Mono", 400),
     ("jetbrains-mono-500.woff2", "JetBrains Mono", 500),
 ]

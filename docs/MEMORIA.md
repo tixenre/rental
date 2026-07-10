@@ -1129,3 +1129,33 @@ En la práctica (iniciativa #1029, F5–F7): `import pytest` sin usar, columnas 
 URL apuntando a un archivo borrado, test con paths eliminados — todos encontrados por el supervisor.
 **No skippearlo aunque el cambio parezca mecánico**: es una segunda revisión de código, no solo un gate
 de scope. Los bugs concretos que encuentra son distintos a los que caza CI (tipos, lint, tests unitarios).
+
+### 2026-07-08 — `arca_fe` gana un tema tipográfico default, agnóstico de marca (Inter + JetBrains Mono)
+
+Preparando la integración de `arca_fe` en Freelo (otro proyecto propio) con el requisito explícito
+de "cero drift" entre plataformas, `renderizar_comprobante_html` gana un tema default embebido
+(Inter + JetBrains Mono, SIL OFL) para cuando el caller no pasa `fonts_css` — antes caía a fuentes
+de sistema. Los templates dejan de referenciar `'TT Commons'` literal (la marca de Rambla filtrada
+en una librería agnóstica) y pasan a un nombre lógico `'ComprobanteSans'`; `comprobante_render.py`
+de Rambla se actualizó para embeber sus mismos bytes de TT Commons bajo ese nombre — cero cambio
+visual en las facturas reales de Rambla (decisión explícita: no adoptar el default nuevo todavía,
+cambiar la tipografía de un documento fiscal en producción es una decisión de producto aparte). 294
+tests de `arca_fe` en verde, `__version__` 0.1.0→0.2.0. Detalle completo en `docs/DECISIONES.md`
+esta fecha.
+
+### 2026-07-08 — `arca_fe` gana conversión HTML→PDF/imagen (Chromium vía Playwright)
+
+Nuevo módulo `arca_fe.pdf` (extra opcional `pdf`, import lazy): `renderizar_pdf`/`renderizar_imagen`,
+un solo motor fijo (Chromium headless/Playwright, browser compartido) por el mismo criterio de
+cero-drift que el tema tipográfico — un motor configurable por consumidor podía volver a divergir el
+output. Ambas funciones son intercambiables sobre cualquiera de los 3 layouts (oficial/detallada/
+simplificada), no solo la pareja "natural" (imagen para simplificada) — pedido explícito para
+Freelo, que no sabe de antemano qué van a preferir sus usuarios. API async-nativa (a diferencia del
+resto de `arca_fe`, sync-first) porque Playwright rinde mejor así en un proceso de server de larga
+vida. Nuevo parámetro `executable_path` (útil para despliegues con Chromium propio, no solo para
+este sandbox). 6 tests nuevos (`integration`, Chromium real) + suite completa (300) en verde,
+`__version__` 0.2.0→0.3.0. CI ajustado tras un fallo real: el job `python-tests` nunca instaló
+Chromium (ningún test de Rambla lo hace, siempre mockean `pdf._render_pdf`) — `test_pdf.py` pasa a
+saltearse por opt-in (`ARCA_FE_PDF_TEST=1`), mismo patrón ya usado por `test_alembic_upgrade_db.py`
+para integration tests que necesitan infra que el job default no provee. Detalle completo en
+`docs/DECISIONES.md` esta fecha.
