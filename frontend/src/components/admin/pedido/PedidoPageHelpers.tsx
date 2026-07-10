@@ -321,7 +321,7 @@ export function FacturacionTargetSection({
 
 export function RailSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
+    <div className="border-t hairline pt-4 first:border-t-0 first:pt-0">
       <div className="t-eyebrow mb-2">{label}</div>
       <div className="space-y-2">{children}</div>
     </div>
