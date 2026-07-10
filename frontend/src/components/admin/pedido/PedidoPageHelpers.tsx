@@ -57,7 +57,6 @@ import { adminApi, ESTADO_LABEL, type PedidoEstado } from "@/lib/admin/api";
 import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
 import {
   useFacturacionArca,
-  ESTADOS_FACTURABLES,
   LAYOUT_ASPECT,
   type FacturacionArca,
 } from "@/components/admin/pedido/useFacturacionArca";
@@ -563,9 +562,38 @@ export function FacturaPreviewDialog({ f }: { f: FacturacionArca }) {
   );
 }
 
+/**
+ * El botón "Facturar"/"Reintentar" en sí — mismo componente en el rail del
+ * detalle (`FacturacionRailSection`, abajo) y en la barra de acciones rápidas
+ * del listado (`pedidos.index.lazy.tsx`). Antes estaba escrito dos veces con
+ * el mismo `disabled`/`onClick`/label pero un `title` ligeramente distinto
+ * entre copias — exactamente el tipo de drift silencioso que el dueño no
+ * quiere: un cambio futuro (label, gate, ícono) ahora se hace una sola vez.
+ */
+export function FacturarButton({ f, className }: { f: FacturacionArca; className?: string }) {
+  if (!((!f.principal || f.principal.estado === "error") && !f.q.isLoading)) return null;
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className={className}
+      disabled={!f.puedeFacturar || f.preview.isPending}
+      title={!f.puedeFacturar ? "No se puede facturar en este estado" : undefined}
+      onClick={() => {
+        f.setShowPreview(true);
+        f.preview.mutate();
+      }}
+    >
+      <Receipt className="h-3.5 w-3.5 mr-1" />
+      {f.preview.isPending ? "Calculando…" : f.principal ? "Reintentar" : "Facturar"}
+    </Button>
+  );
+}
+
 /** Vista rica de la factura ARCA para el rail del detalle de pedido (estado persistente:
- * badge/CAE/links/anular). El listado usa `useFacturacionArca` + `FacturaPreviewDialog`
- * directo, sin este wrapper — su barra de acciones rápidas no tiene lugar para tanto detalle. */
+ * badge/CAE/links/anular). El listado usa `useFacturacionArca` + `FacturaPreviewDialog` +
+ * `FacturarButton` directo, sin este wrapper — su barra de acciones rápidas no tiene lugar
+ * para tanto detalle. */
 export function FacturacionRailSection({
   pedidoId,
   estadoPedido,
@@ -691,27 +719,7 @@ export function FacturacionRailSection({
         </div>
       )}
 
-      {(!f.principal || f.principal.estado === "error") && !f.q.isLoading && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full"
-          disabled={!f.puedeFacturar || f.preview.isPending}
-          title={
-            !ESTADOS_FACTURABLES.includes(estadoPedido)
-              ? "El pedido debe estar confirmado para facturar"
-              : undefined
-          }
-          onClick={() => {
-            f.setShowPreview(true);
-            f.preview.mutate();
-          }}
-        >
-          <Receipt className="h-3.5 w-3.5 mr-1" />
-          {f.preview.isPending ? "Calculando…" : f.principal ? "Reintentar" : "Facturar"}
-        </Button>
-      )}
-
+      <FacturarButton f={f} className="w-full" />
       <FacturaPreviewDialog f={f} />
     </RailSection>
   );

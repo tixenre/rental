@@ -8,7 +8,6 @@ import {
   Coins,
   Mail,
   ArrowRight,
-  Receipt,
   Trash2,
   ShieldAlert,
   X,
@@ -39,7 +38,7 @@ import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { RegistrarPagoModal } from "@/components/admin/pedido/RegistrarPagoModal";
 import { EnviarDocsDialog } from "@/components/admin/pedido/EnviarDocsDialog";
-import { FacturaPreviewDialog } from "@/components/admin/pedido/PedidoPageHelpers";
+import { FacturaPreviewDialog, FacturarButton } from "@/components/admin/pedido/PedidoPageHelpers";
 import { useFacturacionArca } from "@/components/admin/pedido/useFacturacionArca";
 import { AdminCard, FAB } from "@/components/mobile";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -645,28 +644,7 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
             <Mail className="h-3.5 w-3.5 mr-1" /> Mandar mail
           </Button>
           <WhatsAppButton pedido={p} phone={p.cliente_telefono} variant="compact" />
-          {(!facturacion.principal || facturacion.principal.estado === "error") &&
-            !facturacion.q.isLoading && (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!facturacion.puedeFacturar || facturacion.preview.isPending}
-                title={
-                  !facturacion.puedeFacturar ? "No se puede facturar en este estado" : undefined
-                }
-                onClick={() => {
-                  facturacion.setShowPreview(true);
-                  facturacion.preview.mutate();
-                }}
-              >
-                <Receipt className="h-3.5 w-3.5 mr-1" />
-                {facturacion.preview.isPending
-                  ? "Calculando…"
-                  : facturacion.principal
-                    ? "Reintentar"
-                    : "Facturar"}
-              </Button>
-            )}
+          <FacturarButton f={facturacion} />
         </div>
       </div>
 
