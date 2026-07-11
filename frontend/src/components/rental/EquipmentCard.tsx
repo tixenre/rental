@@ -7,6 +7,7 @@ import { useFlyToCart } from "@/lib/fly-to-cart-store";
 import { type Equipment } from "@/data/equipment";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
+import { DESCUENTO_CATALOGO_HABILITADO } from "@/lib/features";
 import { EmptyImage } from "./EmptyImage";
 import { EquipoFoto } from "./EquipoFoto";
 import { cn } from "@/lib/utils";
@@ -47,6 +48,7 @@ export function EquipmentCard({
   const triggerFly = useFlyToCart((s) => s.triggerFly);
   const jornadas = useCart((s) => s.days());
   const hasDateRange = useCart((s) => !!s.startDate && !!s.endDate);
+  const mostrarDescuento = hasDateRange && DESCUENTO_CATALOGO_HABILITADO;
 
   const { data: clienteSession } = useClienteSession();
   const conIva = aplicaIva(clienteSession?.perfil_impuestos);
@@ -174,9 +176,9 @@ export function EquipmentCard({
           qty={qty || 1}
           conIva={conIva}
           size="lg"
-          perDayFinal={hasDateRange ? item.pricePerDayFinal : undefined}
-          descuentoPct={hasDateRange ? item.discountPct : undefined}
-          descuentoOrigen={hasDateRange ? item.discountOrigin : undefined}
+          perDayFinal={mostrarDescuento ? item.pricePerDayFinal : undefined}
+          descuentoPct={mostrarDescuento ? item.discountPct : undefined}
+          descuentoOrigen={mostrarDescuento ? item.discountOrigin : undefined}
         />
 
         {qty === 0 ? (

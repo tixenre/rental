@@ -44,6 +44,7 @@ import { useCart } from "@/lib/cart-store";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { buildCategoriaSlug } from "@/lib/categoria-slug";
+import { DESCUENTO_CATALOGO_HABILITADO } from "@/lib/features";
 import { SITE_URL } from "@/lib/site";
 import { shareEquipo } from "@/lib/share";
 import { type Equipment } from "@/data/equipment";
@@ -299,6 +300,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
   const jornadas = useCart((s) => s.days());
   const hasDateRange = useCart((s) => !!s.startDate && !!s.endDate);
   const showPeriodTotal = hasDateRange && jornadas > 1;
+  const mostrarDescuento = hasDateRange && DESCUENTO_CATALOGO_HABILITADO;
   const { data: clienteSession } = useClienteSession();
   const conIva = aplicaIva(clienteSession?.perfil_impuestos);
   // Ficha técnica: abierta por default si son pocas specs, colapsada si hay muchas.
@@ -477,9 +479,9 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           jornadas={jornadas}
           conIva={conIva}
           size="md"
-          perDayFinal={hasDateRange ? item.pricePerDayFinal : undefined}
-          descuentoPct={hasDateRange ? item.discountPct : undefined}
-          descuentoOrigen={hasDateRange ? item.discountOrigin : undefined}
+          perDayFinal={mostrarDescuento ? item.pricePerDayFinal : undefined}
+          descuentoPct={mostrarDescuento ? item.discountPct : undefined}
+          descuentoOrigen={mostrarDescuento ? item.discountOrigin : undefined}
         />
         <CartButtons
           qty={qty}
@@ -577,9 +579,9 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
               jornadas={jornadas}
               conIva={conIva}
               size="lg"
-              perDayFinal={hasDateRange ? item.pricePerDayFinal : undefined}
-              descuentoPct={hasDateRange ? item.discountPct : undefined}
-              descuentoOrigen={hasDateRange ? item.discountOrigin : undefined}
+              perDayFinal={mostrarDescuento ? item.pricePerDayFinal : undefined}
+              descuentoPct={mostrarDescuento ? item.discountPct : undefined}
+              descuentoOrigen={mostrarDescuento ? item.discountOrigin : undefined}
             />
             <CartButtons
               qty={qty}
