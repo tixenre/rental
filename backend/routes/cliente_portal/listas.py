@@ -18,6 +18,7 @@ from fastapi import Request, HTTPException
 from pydantic import BaseModel
 
 from database import get_db
+from rate_limit import limiter, CLIENTE_WRITE_LIMIT
 from routes.cliente_portal.core import router, require_cliente
 from services.carrito import normalizar_seleccion, a_tuplas
 
@@ -123,6 +124,7 @@ def get_listas(request: Request):
 
 
 @router.post("/api/cliente/listas", status_code=201)
+@limiter.limit(CLIENTE_WRITE_LIMIT)
 def create_lista(data: ListaCreate, request: Request):
     """Crea una lista nueva con su composición (ej.: guardar el carrito actual)."""
     session = require_cliente(request)
@@ -153,6 +155,7 @@ def create_lista(data: ListaCreate, request: Request):
 
 
 @router.patch("/api/cliente/listas/{lista_id}")
+@limiter.limit(CLIENTE_WRITE_LIMIT)
 def rename_lista(lista_id: int, data: ListaRename, request: Request):
     """Renombra una lista del cliente."""
     session = require_cliente(request)
@@ -171,6 +174,7 @@ def rename_lista(lista_id: int, data: ListaRename, request: Request):
 
 
 @router.put("/api/cliente/listas/{lista_id}/items")
+@limiter.limit(CLIENTE_WRITE_LIMIT)
 def replace_items(lista_id: int, data: ListaItemsReplace, request: Request):
     """Reemplaza la composición completa de una lista (ej.: actualizarla con el
     carrito actual)."""
@@ -202,6 +206,7 @@ def replace_items(lista_id: int, data: ListaItemsReplace, request: Request):
 
 
 @router.delete("/api/cliente/listas/{lista_id}/items/{equipo_id}")
+@limiter.limit(CLIENTE_WRITE_LIMIT)
 def remove_item(lista_id: int, equipo_id: int, request: Request):
     """Quita un equipo de una lista (acción rápida desde la card)."""
     session = require_cliente(request)
@@ -226,6 +231,7 @@ def remove_item(lista_id: int, equipo_id: int, request: Request):
 
 
 @router.delete("/api/cliente/listas/{lista_id}")
+@limiter.limit(CLIENTE_WRITE_LIMIT)
 def delete_lista(lista_id: int, request: Request):
     """Borra una lista del cliente (sus items caen por ON DELETE CASCADE)."""
     session = require_cliente(request)

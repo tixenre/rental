@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from auth.guards import require_admin
 from database import MARCA_SUBQUERY, get_db, now_ar, to_datetime
+from rate_limit import limiter, ADMIN_WRITE_LIMIT, ADMIN_UPLOAD_LIMIT, CLIENTE_WRITE_LIMIT
 from clientes.queries.identidad import nombre_completo_cliente
 from reservas import ESTADOS_RESERVADO, validar_stock as _check_stock
 from routes.alquileres import (
@@ -524,6 +525,7 @@ class EstudioUpdate(BaseModel):
 
 
 @router.patch("/admin/estudio")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def patch_estudio(body: EstudioUpdate, request: Request):
     require_admin(request)
 
@@ -571,6 +573,7 @@ def patch_estudio(body: EstudioUpdate, request: Request):
 
 
 @router.post("/admin/estudio/upload-foto")
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 async def upload_foto(request: Request):
     """Sube un archivo (multipart, campo 'file') a R2 y lo registra en estudio_fotos."""
     require_admin(request)
@@ -634,6 +637,7 @@ class UploadFromUrlBody(BaseModel):
 
 
 @router.post("/admin/estudio/upload-foto-from-url")
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 def upload_foto_from_url(body: UploadFromUrlBody, request: Request):
     """Descarga URL externa, optimiza y sube a R2. SSRF-safe."""
     require_admin(request)
@@ -690,6 +694,7 @@ def upload_foto_from_url(body: UploadFromUrlBody, request: Request):
 
 
 @router.delete("/admin/estudio/fotos/{foto_id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def delete_foto(foto_id: int, request: Request):
     require_admin(request)
 
@@ -734,6 +739,7 @@ class ReorderBody(BaseModel):
 
 
 @router.patch("/admin/estudio/fotos/orden")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def reorder_fotos(body: ReorderBody, request: Request):
     require_admin(request)
 
@@ -768,6 +774,7 @@ def admin_list_trabajos(request: Request):
 
 
 @router.post("/admin/estudio/trabajos/fetch-meta")
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 async def fetch_trabajo_meta(request: Request):
     """Dado un link de YouTube o Instagram, retorna metadata (titulo, realizador, thumbnail).
     YouTube usa oEmbed oficial. Instagram usa og:tags (best-effort)."""
@@ -836,6 +843,7 @@ class TrabajoCreate(BaseModel):
 
 
 @router.post("/admin/estudio/trabajos")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def admin_create_trabajo(body: TrabajoCreate, request: Request):
     require_admin(request)
     # Resolver links (baja + procesa thumbnails) ANTES de abrir la conexión del
@@ -887,6 +895,7 @@ class TrabajoReorderBody(BaseModel):
 # FastAPI matchea `PATCH /trabajos/orden` contra `{trabajo_id}` con "orden" y
 # falla la conversión a int (422). Static-before-dynamic.
 @router.patch("/admin/estudio/trabajos/orden")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def admin_reorder_trabajos(body: TrabajoReorderBody, request: Request):
     require_admin(request)
     with get_db() as conn:
@@ -900,6 +909,7 @@ def admin_reorder_trabajos(body: TrabajoReorderBody, request: Request):
 
 
 @router.patch("/admin/estudio/trabajos/{trabajo_id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def admin_update_trabajo(trabajo_id: int, body: TrabajoUpdate, request: Request):
     require_admin(request)
     updates = {
@@ -951,6 +961,7 @@ def admin_update_trabajo(trabajo_id: int, body: TrabajoUpdate, request: Request)
 
 
 @router.delete("/admin/estudio/trabajos/{trabajo_id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def admin_delete_trabajo(trabajo_id: int, request: Request):
     require_admin(request)
     with get_db() as conn:
@@ -960,6 +971,7 @@ def admin_delete_trabajo(trabajo_id: int, request: Request):
 
 
 @router.post("/admin/estudio/trabajos/{trabajo_id}/upload-foto")
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 async def admin_upload_trabajo_foto(
     trabajo_id: int, request: Request, background_tasks: BackgroundTasks
 ):
@@ -1002,6 +1014,7 @@ async def admin_upload_trabajo_foto(
 
 
 @router.delete("/admin/estudio/trabajos/{trabajo_id}/fotos/{foto_idx}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def admin_delete_trabajo_foto(trabajo_id: int, foto_idx: int, request: Request):
     require_admin(request)
     with get_db() as conn:
@@ -1025,6 +1038,7 @@ def admin_delete_trabajo_foto(trabajo_id: int, foto_idx: int, request: Request):
 
 
 @router.post("/admin/estudio/trabajos/{trabajo_id}/upload-logo")
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 async def admin_upload_trabajo_logo(
     trabajo_id: int, request: Request, background_tasks: BackgroundTasks
 ):
@@ -1239,6 +1253,7 @@ class PackEquipoCreate(BaseModel):
 
 
 @router.post("/admin/estudio/pack", status_code=201)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def agregar_pack_equipo(body: PackEquipoCreate, request: Request):
     require_admin(request)
     with get_db() as conn:
@@ -1267,6 +1282,7 @@ def agregar_pack_equipo(body: PackEquipoCreate, request: Request):
 
 
 @router.delete("/admin/estudio/pack/{equipo_id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def quitar_pack_equipo(equipo_id: int, request: Request):
     require_admin(request)
     with get_db() as conn:
@@ -1594,6 +1610,7 @@ def _agregar_items_pack(conn, pedido_id: int, fecha_desde, fecha_hasta, pack_ids
 
 
 @router.post("/estudio/reservas", status_code=201)
+@limiter.limit(CLIENTE_WRITE_LIMIT)
 def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, background: BackgroundTasks):
     """Reserva real del estudio por horas. Entra como solicitud
     (estado='presupuesto'), en UNA transacción.
@@ -1781,6 +1798,7 @@ def listar_slots(request: Request):
 
 
 @router.post("/admin/estudio/slots", status_code=201)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def crear_slot(body: SlotFijoCreate, request: Request):
     require_admin(request)
     data = body.dict()
@@ -1813,6 +1831,7 @@ def crear_slot(body: SlotFijoCreate, request: Request):
 
 
 @router.patch("/admin/estudio/slots/{slot_id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def actualizar_slot(slot_id: int, body: SlotFijoUpdate, request: Request):
     require_admin(request)
     updates = {k: v for k, v in body.dict().items() if v is not None}
@@ -1847,6 +1866,7 @@ def actualizar_slot(slot_id: int, body: SlotFijoUpdate, request: Request):
 
 
 @router.delete("/admin/estudio/slots/{slot_id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def borrar_slot(slot_id: int, request: Request):
     require_admin(request)
     with get_db() as conn:

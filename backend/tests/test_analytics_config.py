@@ -10,8 +10,23 @@ Cubre:
 
 import pytest
 from fastapi import HTTPException
+from starlette.requests import Request
 
 pytestmark = pytest.mark.unit
+
+
+def _fake_request() -> Request:
+    """Request real (no `None`) — update_setting lleva `@limiter.limit`
+    (barrido de seguimiento #1263/#1265): slowapi exige una instancia genuina
+    de `starlette.requests.Request`. Sin conexión real — alcanza con el scope
+    ASGI mínimo. Pasarlo SIEMPRE posicional en el call site (no `request=`):
+    el wrapper de slowapi resuelve `args[idx] if args else None` de forma
+    ansiosa incluso cuando `request` ya está en kwargs — con args parciales
+    (call directo, no vía FastAPI) eso revienta con IndexError."""
+    return Request(
+        {"type": "http", "method": "PUT", "path": "/admin/settings/ga4_measurement_id",
+         "headers": [], "client": ("127.0.0.1", 0)}
+    )
 
 
 class _FakeRow(dict):
@@ -117,7 +132,7 @@ def test_update_ga4_valido_normaliza_mayusculas(monkeypatch):
     fake = _FakeConn()
     monkeypatch.setattr(mod, "get_db", lambda: fake)
 
-    res = mod.update_setting("ga4_measurement_id", {"value": "g-ab12cd34"}, request=None)
+    res = mod.update_setting("ga4_measurement_id", {"value": "g-ab12cd34"}, _fake_request())
     assert res["value"] == "G-AB12CD34"
     assert fake.committed is True
 
@@ -129,7 +144,7 @@ def test_update_ga4_invalido_rechaza(monkeypatch):
     monkeypatch.setattr(mod, "get_db", lambda: _FakeConn())
 
     with pytest.raises(HTTPException) as exc:
-        mod.update_setting("ga4_measurement_id", {"value": "UA-12345"}, request=None)
+        mod.update_setting("ga4_measurement_id", {"value": "UA-12345"}, _fake_request())
     assert exc.value.status_code == 400
 
 
@@ -141,5 +156,5 @@ def test_update_ga4_vacio_apaga(monkeypatch):
     fake = _FakeConn()
     monkeypatch.setattr(mod, "get_db", lambda: fake)
 
-    res = mod.update_setting("ga4_measurement_id", {"value": ""}, request=None)
+    res = mod.update_setting("ga4_measurement_id", {"value": ""}, _fake_request())
     assert res["value"] == ""

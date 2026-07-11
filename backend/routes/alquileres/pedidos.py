@@ -17,6 +17,8 @@ from fastapi import Request, HTTPException, Query, BackgroundTasks
 
 from database import get_db, row_to_dict
 from auth.guards import require_admin
+from busqueda import construir
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
 from services.email import send_email
 from reservas import validar_stock as _check_stock
 from routes.alquileres.core import (
@@ -49,6 +51,7 @@ SORT_COLS = {
 
 
 @router.post("/alquileres", status_code=201)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def create_pedido_endpoint(data: PedidoCreate, request: Request, background: BackgroundTasks):
     """Endpoint admin para crear pedido. La lógica está en `create_pedido`,
     así el portal cliente (cliente_portal.py) la reutiliza sin pasar por admin guard."""
@@ -81,16 +84,37 @@ def list_pedidos(
             where += " AND p.fuente = %s"
             params.append(fuente)
         if q:
-            like = f"%{q}%"
-            # Busca por la foto del pedido Y por el nombre ACTUAL del cliente
-            # (el contacto se muestra en vivo → buscar por el dato corregido
-            # también tiene que encontrar el pedido).
-            where += (
-                " AND (p.cliente_nombre LIKE %s OR CAST(p.numero_pedido AS TEXT) LIKE %s"
-                " OR EXISTS (SELECT 1 FROM clientes c WHERE c.id = p.cliente_id"
-                " AND (c.nombre LIKE %s OR c.apellido LIKE %s)))"
+            # Búsqueda por NOMBRE vía el motor único (backend/busqueda): sin
+            # importar mayúsculas/minúsculas, sin tildes ("jose"→"José"),
+            # multi-palabra y tolerante a typos. Antes era un `LIKE` crudo —
+            # case-SENSITIVE en Postgres — que no encontraba "Tincho" buscando
+            # "tinc". Se buscan dos campos de nombre: la foto congelada del
+            # pedido (`p.cliente_nombre`) y el nombre ACTUAL del cliente (en
+            # vivo → un dato corregido también tiene que encontrar el pedido).
+            # El número de pedido es un id, no texto: se matchea aparte por
+            # substring exacto (OR), no por el motor fuzzy.
+            # El nombre en vivo prefiere RENAPER (nombre_legal → nombre_validado):
+            # lo que se VE en la lista puede ser el nombre legal, no el ingresado.
+            # Buscamos la UNIÓN (base + renaper) para matchear tanto lo mostrado
+            # como lo que el admin recuerde haber cargado; el motor hace OR entre
+            # campos, así que sobra-match antes que falte-match.
+            pred = construir(
+                [
+                    "p.cliente_nombre",
+                    "(SELECT COALESCE(c.nombre, '') || ' ' || COALESCE(c.apellido, '')"
+                    "        || ' ' || COALESCE(c.nombre_renaper, '')"
+                    "        || ' ' || COALESCE(c.apellido_renaper, '')"
+                    " FROM clientes c WHERE c.id = p.cliente_id)",
+                ],
+                q,
             )
-            params += [like, like, like, like]
+            like_num = f"%{q}%"
+            if pred.activo:
+                where += f" AND (({pred.where}) OR CAST(p.numero_pedido AS TEXT) LIKE %s)"
+                params += pred.where_params + [like_num]
+            else:
+                where += " AND CAST(p.numero_pedido AS TEXT) LIKE %s"
+                params.append(like_num)
         if con_saldo:
             # Pedidos con saldo > 0 y no cancelados. Borrador y presupuesto no
             # aplican porque todavía no se cobra; cancelado tampoco.
@@ -144,6 +168,7 @@ def get_pedido(id: int, request: Request):
 
 
 @router.delete("/alquileres/{id}", status_code=204)
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def delete_pedido(id: int, request: Request):
     require_admin(request)
     with get_db() as conn:
@@ -162,6 +187,7 @@ def delete_pedido(id: int, request: Request):
 
 
 @router.patch("/alquileres/{id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def update_pedido(id: int, data: PedidoEstado, request: Request, background: BackgroundTasks):
     """Transición de estado admin. La legalidad de la transición, las
     validaciones de fecha/stock, la asignación de `numero_pedido` y el
@@ -198,6 +224,7 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
 
 
 @router.patch("/alquileres/{id}/datos")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def update_pedido_datos(id: int, data: PedidoDatos, request: Request):
     require_admin(request)
     with get_db() as conn:
@@ -212,6 +239,7 @@ def update_pedido_datos(id: int, data: PedidoDatos, request: Request):
 
 
 @router.put("/alquileres/{id}/items")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def update_alquiler_items(id: int, data: PedidoItemUpdate, request: Request):
     require_admin(request)
     with get_db() as conn:
@@ -243,6 +271,7 @@ def update_alquiler_items(id: int, data: PedidoItemUpdate, request: Request):
 
 
 @router.post("/admin/recordatorios/retiro/run")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def run_recordatorios_retiro(request: Request, dry_run: bool = Query(True)):
     """Dispara on-demand el barrido de recordatorios de retiro — para probar en
     staging sin esperar al scheduler diario. `dry_run=true` (default) NO manda

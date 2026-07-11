@@ -7,6 +7,7 @@ desde `equipos.precio_jornada`.
 
 import pytest
 from fastapi import BackgroundTasks
+from starlette.requests import Request
 
 from routes.cliente_portal import (
     cliente_crear_pedido,
@@ -18,9 +19,14 @@ from routes.cliente_portal import (
 pytestmark = pytest.mark.unit
 
 
-class FakeRequest:
-    def __init__(self, cookies=None):
-        self.cookies = cookies or {}
+def _fake_request() -> Request:
+    """Request real (no un stub crudo) — cliente_crear_pedido lleva
+    `@limiter.limit` (barrido de seguimiento #1263/#1265): slowapi exige una
+    instancia genuina de `starlette.requests.Request`. Sin conexión real —
+    alcanza con el scope ASGI mínimo."""
+    return Request(
+        {"type": "http", "method": "POST", "path": "/api/cliente/pedidos", "headers": [], "client": ("127.0.0.1", 0)}
+    )
 
 
 class FakeRow(dict):
@@ -122,7 +128,7 @@ def test_cliente_no_decide_precio_jornada(monkeypatch):
         fecha_hasta="2030-01-02T10:00",
         items=[CartItemIn(equipo_id=7, cantidad=3, precio_jornada=1)],
     )
-    cliente_crear_pedido(body, FakeRequest(), BackgroundTasks())
+    cliente_crear_pedido(body, _fake_request(), BackgroundTasks())
 
     # 6. El payload final debe tener el precio del CATÁLOGO, no el del body.
     payload = captured["payload"]
@@ -160,6 +166,6 @@ def test_equipo_inexistente_devuelve_404(monkeypatch):
         items=[CartItemIn(equipo_id=999, cantidad=1, precio_jornada=1000)],
     )
     with pytest.raises(HTTPException) as exc:
-        cliente_crear_pedido(body, FakeRequest(), BackgroundTasks())
+        cliente_crear_pedido(body, _fake_request(), BackgroundTasks())
     assert exc.value.status_code == 404
     assert "999" in exc.value.detail
