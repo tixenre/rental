@@ -73,6 +73,7 @@ from routes.alquileres.detalle import (
 # y varios tests (`routes.alquileres.core` directo o vía el paquete).
 from services.pedidos_notificaciones import (
     _dispatch_pedido_creado_emails,
+    _dispatch_pedido_confirmado,  # noqa: F401 — re-export, ver comentario arriba
     _ics_adjunto_pedido,  # noqa: F401 — re-export, ver comentario arriba
     _pedido_email_context,  # noqa: F401 — re-export, ver comentario arriba
 )

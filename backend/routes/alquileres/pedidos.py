@@ -19,7 +19,6 @@ from database import get_db, row_to_dict
 from auth.guards import require_admin
 from busqueda import construir
 from rate_limit import limiter, ADMIN_WRITE_LIMIT
-from services.email import send_email
 from reservas import validar_stock as _check_stock
 from routes.alquileres.core import (
     router,
@@ -31,8 +30,7 @@ from routes.alquileres.core import (
     _get_alquiler_detail,
     _batch_get_alquiler_items,
     _enriquecer_pedidos_con_cliente,
-    _pedido_email_context,
-    _ics_adjunto_pedido,
+    _dispatch_pedido_confirmado,
     _apply_pedido_datos,
     _apply_pedido_items,
 )
@@ -206,20 +204,16 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
             conn.rollback()
             raise
 
-    # Notif al cliente cuando pasamos a 'confirmado' (solo si veníamos de
-    # otro estado — no re-mandamos si ya estaba confirmado).
+    # Notif al cliente cuando pasamos a 'confirmado' (solo si veníamos de otro
+    # estado — no re-mandamos si ya estaba confirmado). Mail + WhatsApp salen por
+    # la boca única `_dispatch_pedido_confirmado` (mail gateado por cliente_email
+    # adentro; WhatsApp por opt-in/E.164).
     if (
         pedido
         and resultado["estado_nuevo"] == "confirmado"
         and resultado["estado_anterior"] != "confirmado"
-        and pedido.get("cliente_email")
     ):
-        ctx = _pedido_email_context(pedido)
-        background.add_task(
-            send_email, "pedido_confirmado_cliente",
-            pedido["cliente_email"], ctx, pedido.get("id"),
-            attachments=_ics_adjunto_pedido(pedido),
-        )
+        _dispatch_pedido_confirmado(background, pedido)
     return pedido
 
 

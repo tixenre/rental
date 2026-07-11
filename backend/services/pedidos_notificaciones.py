@@ -184,10 +184,30 @@ def _ics_adjunto_pedido(pedido: dict) -> Optional[list[Attachment]]:
         return None
 
 
+def _enqueue_whatsapp(
+    background: Optional[BackgroundTasks], plantilla_key: str, pedido: dict, ctx: dict
+) -> None:
+    """Encola (o corre síncrono) el WhatsApp del evento por la boca única
+    `services.whatsapp.enviar_evento_pedido`. Import perezoso para no acoplar el
+    módulo de mails al canal WhatsApp. `enviar_evento_pedido` NUNCA propaga y se
+    autogatea adentro (credencial/opt-in/E.164/allowlist): si el canal no está
+    configurado o el cliente no aceptó, es un no-op silencioso."""
+    from services.whatsapp import enviar_evento_pedido
+
+    if background is not None:
+        background.add_task(enviar_evento_pedido, plantilla_key, pedido, ctx)
+    else:
+        enviar_evento_pedido(plantilla_key, pedido, ctx)
+
+
 def _dispatch_pedido_creado_emails(background: Optional[BackgroundTasks], pedido: dict):
-    """Encola los mails de 'pedido creado' (cliente + admin) como
-    background tasks. Si no hay BackgroundTasks (llamada desde script),
-    los corre síncrono — el send_email() jamás propaga errores."""
+    """Encola las notificaciones de 'pedido creado': mails (cliente + admin) + el
+    WhatsApp al cliente. Si no hay BackgroundTasks (llamada desde script), corre
+    síncrono — ninguna notificación propaga errores.
+
+    (El nombre conserva el `_emails` histórico por los ~5 call sites/tests que lo
+    importan; hoy es la boca multi-canal del evento — el mail sigue igual y se le
+    sumó el canal WhatsApp, gateado adentro.)"""
     ctx = _pedido_email_context(pedido)
     pedido_id = pedido.get("id")
     cliente_email = pedido.get("cliente_email")
@@ -208,3 +228,30 @@ def _dispatch_pedido_creado_emails(background: Optional[BackgroundTasks], pedido
             )
         else:
             send_email("pedido_creado_admin", admin_to, ctx, pedido_id)
+
+    # Canal WhatsApp: solo al cliente (el admin recibe por mail). Gateado adentro.
+    _enqueue_whatsapp(background, "pedido_creado", pedido, ctx)
+
+
+def _dispatch_pedido_confirmado(background: Optional[BackgroundTasks], pedido: dict):
+    """Encola las notificaciones de 'pedido confirmado': mail al cliente (con el
+    .ics de la reserva) + WhatsApp. Extraído de
+    `routes/alquileres/pedidos.py::update_pedido` (antes inline) para que el canal
+    WhatsApp se sume en la boca única y no cableado en el route (evita drift). El
+    mail sigue gateado por `cliente_email`; el WhatsApp por opt-in/E.164 adentro."""
+    ctx = _pedido_email_context(pedido)
+    cliente_email = pedido.get("cliente_email")
+
+    if cliente_email:
+        if background is not None:
+            background.add_task(
+                send_email, "pedido_confirmado_cliente", cliente_email, ctx,
+                pedido.get("id"), attachments=_ics_adjunto_pedido(pedido),
+            )
+        else:
+            send_email(
+                "pedido_confirmado_cliente", cliente_email, ctx,
+                pedido.get("id"), attachments=_ics_adjunto_pedido(pedido),
+            )
+
+    _enqueue_whatsapp(background, "pedido_confirmado", pedido, ctx)
