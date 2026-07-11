@@ -26,6 +26,7 @@ from database import get_db, now_ar, row_to_dict
 from jobs.recordatorios_config import resolve as _resolve_config
 from routes.alquileres import _get_alquiler_items, _pedido_email_context
 from services.email import send_email
+from services.whatsapp import enviar_evento_pedido
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ def _pedidos_para_retiro(conn, hoy, dias_antes: int) -> list[dict]:
     ph = ",".join(["%s"] * len(ESTADOS_RECORDABLES))
     rows = conn.execute(
         f"""
-        SELECT a.id, a.numero_pedido, a.cliente_nombre, a.cliente_email,
+        SELECT a.id, a.cliente_id, a.numero_pedido, a.cliente_nombre, a.cliente_email,
                a.cliente_telefono, a.fecha_desde, a.fecha_hasta,
                a.monto_total, a.notas
         FROM alquileres a
@@ -129,6 +130,10 @@ def enviar_recordatorios_retiro(
                 resumen["fallidos"] += 1
                 entry["status"] = "failed"
                 entry["error"] = res.get("error")
+            # Canal WhatsApp (además del mail): mismo evento/contexto. Gateado
+            # adentro (credencial/opt-in/E.164) e idempotente por whatsapp_log —
+            # nunca propaga, así que no cambia el resultado del mail.
+            enviar_evento_pedido(TEMPLATE_KEY, p, ctx)
             resumen["pedidos"].append(entry)
         logger.info(
             "Recordatorios de retiro (%s): %d candidatos, %d enviados, %d fallidos, dry_run=%s",

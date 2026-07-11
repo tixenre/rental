@@ -104,6 +104,25 @@ def test_whatsapp(request: Request, body: dict):
     return {"ok": True, "wamid": res.message_id, "to": to, "template": plantilla.meta_name}
 
 
+@router.post("/admin/whatsapp/recordatorios-devolucion/run")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+def run_recordatorios_devolucion(request: Request, body: dict | None = None):
+    """Corre el barrido de recordatorios de devolución on-demand. `dry_run` (default
+    True) solo lista candidatos sin enviar — preview seguro. `ventanas` opcional
+    (lista de 'd1'/'d0'/'vencido'); si falta, usa las prendidas en la config."""
+    require_admin(request)
+
+    from jobs.recordatorios_devolucion import enviar_recordatorios_devolucion
+    from jobs.recordatorios_devolucion_config import resolve as resolve_dev
+
+    body = body or {}
+    dry_run = bool(body.get("dry_run", True))
+    ventanas = body.get("ventanas")
+    if ventanas is None:
+        ventanas = resolve_dev()["ventanas"]
+    return enviar_recordatorios_devolucion(ventanas=set(ventanas), dry_run=dry_run)
+
+
 def _status_for_wa_error(exc) -> int:
     """Mapea la taxonomía de whatsapp_cloud a un status HTTP (mismo criterio que
     `facturacion._status_for_arca_error`)."""
