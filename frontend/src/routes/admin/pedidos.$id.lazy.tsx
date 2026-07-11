@@ -10,7 +10,6 @@ import {
   Check,
   AlertTriangle,
   Coins,
-  ArrowRight,
   Plus,
   Minus,
   X,
@@ -558,19 +557,18 @@ function PedidoEditorPage() {
             >
               {startDate && endDate ? (
                 <>
-                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <div className="min-w-0 flex-1 flex items-center gap-x-3 gap-y-1.5 flex-wrap">
+                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0 self-start mt-0.5" />
+                  <div className="min-w-0 flex-1 flex flex-col gap-2">
                     <div className="min-w-0">
                       <div className="t-eyebrow">Retiro</div>
                       <div className="font-mono text-sm tabular-nums text-ink mt-0.5">
-                        {format(startDate, "dd MMM yyyy", { locale: es })} · {startTime}
+                        {format(startDate, "EEEE d 'de' MMMM", { locale: es })} · {startTime}
                       </div>
                     </div>
-                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 self-end mb-1" />
                     <div className="min-w-0">
                       <div className="t-eyebrow">Devolución</div>
                       <div className="font-mono text-sm tabular-nums text-ink mt-0.5">
-                        {format(endDate, "dd MMM yyyy", { locale: es })} · {endTime}
+                        {format(endDate, "EEEE d 'de' MMMM", { locale: es })} · {endTime}
                       </div>
                     </div>
                   </div>
