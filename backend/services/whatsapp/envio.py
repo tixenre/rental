@@ -94,7 +94,7 @@ def enviar_evento_pedido(plantilla_key: str, pedido: dict, ctx: dict, *, force: 
         except WhatsAppError as e:
             log_id = _insert_log(
                 conn, to=to, template_key=plantilla.key, alquiler_id=alquiler_id,
-                cliente_id=cliente_id, status="failed", wamid=None, error=str(e),
+                status="failed", wamid=None, error=str(e),
             )
             conn.commit()
             logger.warning("whatsapp envío falló tpl=%s pedido=%s: %s", plantilla.key, alquiler_id, e)
@@ -103,7 +103,7 @@ def enviar_evento_pedido(plantilla_key: str, pedido: dict, ctx: dict, *, force: 
         try:
             log_id = _insert_log(
                 conn, to=to, template_key=plantilla.key, alquiler_id=alquiler_id,
-                cliente_id=cliente_id, status="sent", wamid=res.message_id, error=None,
+                status="sent", wamid=res.message_id, error=None,
             )
             conn.commit()
         except Exception:
@@ -162,10 +162,10 @@ def _opt_in(conn, cliente_id) -> bool:
     return bool(row and row["whatsapp_opt_in"])
 
 
-def _insert_log(conn, *, to, template_key, alquiler_id, cliente_id, status, wamid, error):
+def _insert_log(conn, *, to, template_key, alquiler_id, status, wamid, error):
     return conn.insert_returning(
         "INSERT INTO whatsapp_log "
-        "(to_phone, template_key, alquiler_id, cliente_id, status, wamid, error) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s)",
-        (to, template_key, alquiler_id, cliente_id, status, wamid, error),
+        "(to_phone, template_key, alquiler_id, status, wamid, error) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        (to, template_key, alquiler_id, status, wamid, error),
     )

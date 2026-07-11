@@ -28,7 +28,6 @@ def upgrade() -> None:
             to_phone     TEXT NOT NULL,
             template_key TEXT NOT NULL,
             alquiler_id  INTEGER REFERENCES alquileres(id) ON DELETE SET NULL,
-            cliente_id   INTEGER REFERENCES clientes(id) ON DELETE SET NULL,
             status       TEXT NOT NULL,
             wamid        TEXT,
             error        TEXT,

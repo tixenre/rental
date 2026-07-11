@@ -195,7 +195,8 @@ def test_envio_happy_path(monkeypatch):
     r = env.enviar_evento_pedido("pedido_creado", {"id": 9, "cliente_id": 5}, ctx)
     assert r["ok"] and r["wamid"] == "wamid.OK"
     assert fake_conn.committed
-    assert fake_conn.inserted and fake_conn.inserted[0][1][4] == "sent"  # status col
+    # params: (to, template_key, alquiler_id, status, wamid, error) → status = idx 3
+    assert fake_conn.inserted and fake_conn.inserted[0][1][3] == "sent"
 
 
 def test_envio_falla_provider_se_loguea_failed(monkeypatch):
@@ -218,7 +219,7 @@ def test_envio_falla_provider_se_loguea_failed(monkeypatch):
     monkeypatch.setattr(whatsapp_cloud, "WhatsAppClient", _BoomClient)
     r = env.enviar_evento_pedido("pedido_creado", {"id": 9, "cliente_id": 5}, {"cliente_nombre": "A", "numero_pedido": "1"})
     assert r["ok"] is False and "inválido" in r["error"]
-    assert fake_conn.inserted[0][1][4] == "failed"
+    assert fake_conn.inserted[0][1][3] == "failed"
 
 
 # ── helpers de teléfono ─────────────────────────────────────────────────

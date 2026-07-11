@@ -1484,13 +1484,16 @@ def _init_db_schema(conn):
     # w1h2a3t4s5a6). Espeja emails_log; su índice único parcial da idempotencia
     # por pedido (un envío 'sent' por (alquiler_id, template_key)) — clave porque
     # el gate de los jobs es una var en memoria que se resetea en cada restart.
+    # Sin `cliente_id`: espeja emails_log (que tampoco lo tiene) — keyea por
+    # alquiler_id, que sobrevive un merge de cuentas con el pedido; así NO suma
+    # una FK a `clientes` que habría que clasificar en identity/merge (el cliente
+    # se deriva por join a alquileres si hace falta).
     conn.execute("""
         CREATE TABLE IF NOT EXISTS whatsapp_log (
             id           BIGSERIAL PRIMARY KEY,
             to_phone     TEXT NOT NULL,
             template_key TEXT NOT NULL,
             alquiler_id  INTEGER REFERENCES alquileres(id) ON DELETE SET NULL,
-            cliente_id   INTEGER REFERENCES clientes(id) ON DELETE SET NULL,
             status       TEXT NOT NULL,
             wamid        TEXT,
             error        TEXT,

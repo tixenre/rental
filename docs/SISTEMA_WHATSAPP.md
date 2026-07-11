@@ -61,7 +61,7 @@ la excepción por ser multi-emisor con certs subidos por UI).
 
 Mismo contrato que `services.email.send_email`:
 - **Nunca propaga**: cada gate no cumplido devuelve `{ok:True, skipped:True, reason}`; un fallo del provider se loguea `status='failed'` sin tumbar al caller.
-- **Loguea siempre** en `whatsapp_log` (`to_phone`, `template_key`, `alquiler_id`, `cliente_id`, `status`, `wamid`, `error`).
+- **Loguea siempre** en `whatsapp_log` (`to_phone`, `template_key`, `alquiler_id`, `status`, `wamid`, `error`). Sin `cliente_id` (espeja `emails_log`; keyea por `alquiler_id`, que sobrevive un merge de cuentas — así no suma una FK a `clientes` que clasificar en `identity/merge`).
 - **Idempotente por pedido**: el índice único parcial `idx_whatsapp_log_idempotente (alquiler_id, template_key) WHERE status='sent'` garantiza un solo envío 'sent' por pedido+template. Clave: el gate de los jobs del scheduler es una **variable en memoria que se resetea en cada restart** (causó el spam del mail de reconciliación) — la idempotencia real la da el índice, no la var.
 
 ## Eventos y enganche (dónde se dispara)
