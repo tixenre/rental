@@ -553,12 +553,12 @@ function PedidoEditorPage() {
             <button
               type="button"
               onClick={() => setOpenDateModal(true)}
-              className="flex w-full items-center gap-3 rounded-lg border hairline bg-surface-elevated px-3.5 py-2.5 text-left transition hover:border-ink min-h-[44px]"
+              className="@container flex w-full items-center gap-3 rounded-lg border hairline bg-surface-elevated px-3.5 py-2.5 text-left transition hover:border-ink min-h-[44px]"
             >
               {startDate && endDate ? (
                 <>
                   <Calendar className="h-4 w-4 text-muted-foreground shrink-0 self-start mt-0.5" />
-                  <div className="min-w-0 flex-1 flex flex-col gap-2">
+                  <div className="min-w-0 flex-1 grid grid-cols-1 gap-x-6 gap-y-2 @2xl:grid-cols-2">
                     <div className="min-w-0">
                       <div className="t-eyebrow">Retiro</div>
                       <div className="font-mono text-sm tabular-nums text-ink mt-0.5">
