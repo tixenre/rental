@@ -189,6 +189,10 @@ ALLOWED_SETTINGS_KEYS = {
     "recordatorios_enabled",      # Encendido del recordatorio automático. "1"/"0".
     "recordatorios_hora",         # Hora AR del barrido diario. Int 0-23.
     "recordatorios_dias_antes",   # Días de anticipación. Int 1-14.
+    # ── Canal WhatsApp (Meta Cloud API) ──────────────────────────────
+    # Toggle del canal desde el back-office (el token/número van en ENV, no acá).
+    # Override por env WHATSAPP_ENABLED — ver services/whatsapp/config.py.
+    "whatsapp_enabled",           # Encendido del canal WhatsApp. "1"/"0".
 }
 
 # Subset de ALLOWED_SETTINGS_KEYS que el catálogo ANÓNIMO (sin sesión) puede
