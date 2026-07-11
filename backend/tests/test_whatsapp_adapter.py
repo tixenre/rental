@@ -223,9 +223,11 @@ def test_envio_falla_provider_se_loguea_failed(monkeypatch):
 
 
 # ── helpers de teléfono ─────────────────────────────────────────────────
-def test_resolver_telefono_solo_e164(monkeypatch):
-    # cliente_telefono crudo no-E.164 → None; E.164 → se acepta.
-    assert env._resolver_telefono(_FakeConn(), {"cliente_telefono": "223 555-0100"}) is None
+def test_resolver_telefono_pasa_por_el_embudo():
+    # El embudo (services/telefono) valida + normaliza: inválido → None, local
+    # válido → E.164, E.164 → se mantiene.
+    assert env._resolver_telefono(_FakeConn(), {"cliente_telefono": "222-nuevo"}) is None
+    assert env._resolver_telefono(_FakeConn(), {"cliente_telefono": "223 555-0100"}) == "+542235550100"
     assert env._resolver_telefono(_FakeConn(), {"cliente_telefono": "+54 9 223 555 0100"}) == "+5492235550100"
 
 

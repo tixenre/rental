@@ -6,8 +6,7 @@
 >
 > **Estado:** describe el scaffold inicial del canal (rama
 > `claude/whatsapp-business-integration-nv589d`). Lo que quedó **fuera a propósito**
-> —normalización del teléfono crudo a E.164 (gateada por la medición de cobertura) y
-> la captura de opt-in en el front— está marcado al final como **pendiente**.
+> —la captura de opt-in en el front— está marcado al final como **pendiente**.
 
 ## Qué resuelve
 
@@ -54,7 +53,7 @@ la excepción por ser multi-emisor con certs subidos por UI).
 1. **credencial presente** (`resolver_creds()`): sin token/número → canal inerte.
 2. **canal prendido** (`canal_habilitado`): env `WHATSAPP_ENABLED` > app_settings `whatsapp_enabled` > **default OFF**.
 3. **opt-in del cliente** (`clientes.whatsapp_opt_in`): Meta exige consentimiento demostrable; default FALSE.
-4. **teléfono E.164** (`_resolver_telefono`): vía `identity.contacts.telefono_contacto` (verificado E.164 > crudo); hoy solo envía si YA está en E.164.
+4. **teléfono E.164** (`_resolver_telefono`): vía `identity.contacts.telefono_contacto` (verificado E.164 > crudo), pasado por el **embudo único** `services/telefono` (libphonenumber, región AR) que valida y normaliza a E.164; un número inválido → no se envía.
 5. **destinatario permitido** (`destinatario_permitido`): en prod cualquiera; **fuera de prod solo la allowlist** `WHATSAPP_TEST_RECIPIENTS` (red anti-spam, espeja el número de test de Meta).
 
 ## Contrato de la boca de envío (`enviar_evento_pedido`)
@@ -108,8 +107,18 @@ devuelve el registro con el copy sugerido para copiar-pegar.
 - `tests/test_recordatorios_devolucion.py` (config de ventanas + job).
 - La migración `w1h2a3t4s5a6` (whatsapp_log + opt-in) se ejercita en `test_alembic_upgrade_db.py`.
 
+## Embudo de teléfono (`services/telefono.py`)
+
+Puerta única de validación/formateo a E.164 (libphonenumber, región AR), por la que
+pasa TODO número: al **guardar** (`formatear_para_guardar`: E.164 si es válido, si no el
+crudo — no bloquea) en registro/perfil (`cliente_portal/cuenta.py`) y alta admin
+(`clientes.py`); al **re-chequear** el `full_number` que trae Didit (`services/didit/
+decision.py` — no-op si ya está bien); y al **enviar** (`normalizar_e164` estricto en
+`whatsapp/envio.py`: inválido → no se manda). Así el número se asegura una sola forma,
+no dependemos de que cada fuente lo mande formateado. (El **rechazo duro** —bloquear un
+alta con teléfono inválido— es una decisión de UX aparte; hoy el guardado es lenient.)
+
 ## Pendiente (fuera del scaffold, a propósito)
 
-- **Normalización del teléfono crudo a E.164** (`phonenumbers`, puerta única en los ~3 writers): gateada por la **medición de cobertura** — hoy el canal solo envía a números que ya están en E.164 (típicamente los verificados por Didit).
 - **Captura de opt-in en el front** (portal/checkout): la columna `clientes.whatsapp_opt_in` existe; falta el punto de captura y su UI.
 - **Recepción de mensajes / webhooks de estado de entrega**: fuera de alcance (esto es solo saliente).

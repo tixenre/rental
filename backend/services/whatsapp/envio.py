@@ -8,19 +8,17 @@ reimplementa:
   - creación/gating → `services.whatsapp.config`.
   - envío HTTP + errores tipados → `whatsapp_cloud` (librería portable).
 
-Gate de teléfono conservador: hoy solo se envía a números que YA están en E.164
-(`+` + 8-15 dígitos) — típicamente los verificados por Didit. La normalización del
-teléfono crudo autodeclarado (introducir `phonenumbers`) es un paso aparte, gateado
-por la medición de cobertura; hasta entonces un teléfono no-E.164 se saltea (no se
-manda basura a Meta).
+El teléfono pasa por el embudo único `services/telefono.normalizar_e164` (libphonenumber,
+región AR): valida y normaliza a E.164 el mejor teléfono del cliente (verificado por
+Didit > base). Si no es un número válido, se saltea (no se manda basura a Meta).
 """
 from __future__ import annotations
 
 import logging
-import re
 from typing import Optional
 
 from database import get_db
+from services.telefono import normalizar_e164
 from services.whatsapp.config import (
     canal_habilitado,
     destinatario_permitido,
@@ -29,8 +27,6 @@ from services.whatsapp.config import (
 from services.whatsapp.plantillas import REGISTRO
 
 logger = logging.getLogger(__name__)
-
-_E164 = re.compile(r"^\+\d{8,15}$")
 
 
 def enviar_evento_pedido(plantilla_key: str, pedido: dict, ctx: dict, *, force: bool = False) -> dict:
@@ -132,7 +128,8 @@ def enviar_evento_pedido(plantilla_key: str, pedido: dict, ctx: dict, *, force: 
 def _resolver_telefono(conn, pedido: dict) -> Optional[str]:
     """Mejor teléfono del cliente en E.164, o None. Prefiere el resolvedor canónico
     `identity.contacts.telefono_contacto` (verificado E.164 > crudo); cae al snapshot
-    `cliente_telefono` del pedido. Solo devuelve el número si ya está en E.164."""
+    `cliente_telefono` del pedido. Lo pasa por el embudo `services/telefono` que valida
+    y normaliza a E.164 (un número inválido → None)."""
     cid = pedido.get("cliente_id")
     tel = None
     if cid:
@@ -145,10 +142,9 @@ def _resolver_telefono(conn, pedido: dict) -> Optional[str]:
             tel = None
     if not tel:
         tel = pedido.get("cliente_telefono")
-    if not tel:
-        return None
-    t = str(tel).strip().replace(" ", "").replace("-", "")
-    return t if _E164.match(t) else None
+    # El embudo único (services/telefono) valida y normaliza a E.164; si no es un
+    # número válido, devuelve None y el envío se saltea (no se le manda basura a Meta).
+    return normalizar_e164(tel)
 
 
 def _opt_in(conn, cliente_id) -> bool:
