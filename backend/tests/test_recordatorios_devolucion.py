@@ -79,9 +79,9 @@ def _hoy():
 
 
 def test_job_solo_corre_ventanas_activas(monkeypatch):
-    monkeypatch.setattr(jd, "_pedido_email_context", lambda p: {})
+    monkeypatch.setattr(jd, "pedido_email_context", lambda p: {})
     sent = []
-    monkeypatch.setattr(jd, "enviar_evento_pedido", lambda tpl, p, ctx: sent.append((tpl, p["id"])) or {"ok": True})
+    monkeypatch.setattr(jd, "notificar_pedido", lambda tpl, p, ctx: sent.append((tpl, p["id"])) or {"whatsapp": {"ok": True}})
     conn = _FakeConnPedidos([{"id": 1, "cliente_id": 2, "numero_pedido": "A"}])
 
     r = jd.enviar_recordatorios_devolucion(conn=conn, hoy=_hoy(), ventanas={"d0"})
@@ -91,9 +91,9 @@ def test_job_solo_corre_ventanas_activas(monkeypatch):
 
 
 def test_job_usa_template_correcto_por_ventana(monkeypatch):
-    monkeypatch.setattr(jd, "_pedido_email_context", lambda p: {})
+    monkeypatch.setattr(jd, "pedido_email_context", lambda p: {})
     sent = []
-    monkeypatch.setattr(jd, "enviar_evento_pedido", lambda tpl, p, ctx: sent.append(tpl) or {"ok": True})
+    monkeypatch.setattr(jd, "notificar_pedido", lambda tpl, p, ctx: sent.append(tpl) or {"whatsapp": {"ok": True}})
     conn = _FakeConnPedidos([{"id": 1, "cliente_id": 2, "numero_pedido": "A"}])
 
     jd.enviar_recordatorios_devolucion(conn=conn, hoy=_hoy(), ventanas={"d1", "d0", "vencido"})
@@ -105,9 +105,9 @@ def test_job_usa_template_correcto_por_ventana(monkeypatch):
 
 
 def test_job_dry_run_no_envia(monkeypatch):
-    monkeypatch.setattr(jd, "_pedido_email_context", lambda p: {})
+    monkeypatch.setattr(jd, "pedido_email_context", lambda p: {})
     sent = []
-    monkeypatch.setattr(jd, "enviar_evento_pedido", lambda *a: sent.append(a) or {"ok": True})
+    monkeypatch.setattr(jd, "notificar_pedido", lambda *a: sent.append(a) or {"whatsapp": {"ok": True}})
     conn = _FakeConnPedidos([{"id": 1, "cliente_id": 2, "numero_pedido": "A"}])
 
     r = jd.enviar_recordatorios_devolucion(conn=conn, hoy=_hoy(), ventanas={"d0"}, dry_run=True)
@@ -116,8 +116,8 @@ def test_job_dry_run_no_envia(monkeypatch):
 
 
 def test_job_cuenta_skipped(monkeypatch):
-    monkeypatch.setattr(jd, "_pedido_email_context", lambda p: {})
-    monkeypatch.setattr(jd, "enviar_evento_pedido", lambda *a: {"ok": True, "skipped": True, "reason": "sin_opt_in"})
+    monkeypatch.setattr(jd, "pedido_email_context", lambda p: {})
+    monkeypatch.setattr(jd, "notificar_pedido", lambda *a: {"whatsapp": {"ok": True, "skipped": True, "reason": "sin_opt_in"}})
     conn = _FakeConnPedidos([{"id": 1, "cliente_id": 2, "numero_pedido": "A"}])
 
     r = jd.enviar_recordatorios_devolucion(conn=conn, hoy=_hoy(), ventanas={"d0"})

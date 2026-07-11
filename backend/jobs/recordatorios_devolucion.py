@@ -20,8 +20,7 @@ import logging
 from datetime import timedelta
 
 from database import get_db, now_ar, row_to_dict
-from routes.alquileres import _pedido_email_context
-from services.whatsapp import enviar_evento_pedido
+from services.comunicacion import notificar_pedido, pedido_email_context
 
 logger = logging.getLogger(__name__)
 
@@ -95,8 +94,10 @@ def enviar_recordatorios_devolucion(
                     entry["status"] = "dry_run"
                     v["pedidos"].append(entry)
                     continue
-                ctx = _pedido_email_context(p)
-                res = enviar_evento_pedido(template_key, p, ctx)
+                ctx = pedido_email_context(p)
+                # Evento solo-WhatsApp (así lo declara el registro de comunicación):
+                # el fan-out devuelve el resultado del canal WhatsApp.
+                res = notificar_pedido(template_key, p, ctx)["whatsapp"] or {}
                 if res.get("ok") and not res.get("skipped"):
                     v["enviados"] += 1
                     entry["status"] = "sent"

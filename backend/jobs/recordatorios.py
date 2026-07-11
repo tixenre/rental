@@ -12,9 +12,10 @@ reinicia después de la corrida), el segundo `send_email` choca contra el índic
 y `services.email` lo traga: no re-manda. El barrido además filtra con
 `NOT EXISTS` para no intentar siquiera los ya enviados.
 
-Reusa la boca única de envío (`send_email`, canal-agnóstica — decisión
-2026-05-27) y el mismo armador de contexto que el resto de los mails de pedido
-(`_pedido_email_context`), así el template ve exactamente las mismas variables.
+Despacha por la capa única de comunicación (`comunicacion.notificar_pedido`,
+decisión 2026-05-27): el evento `recordatorio_retiro` sale por mail Y WhatsApp
+(los canales que declara el registro), con el mismo contexto que el resto de los
+mails de pedido (`comunicacion.pedido_email_context`).
 """
 
 from __future__ import annotations
@@ -24,9 +25,8 @@ from datetime import timedelta
 
 from database import get_db, now_ar, row_to_dict
 from jobs.recordatorios_config import resolve as _resolve_config
-from routes.alquileres import _get_alquiler_items, _pedido_email_context
-from services.email import send_email
-from services.whatsapp import enviar_evento_pedido
+from routes.alquileres import _get_alquiler_items
+from services.comunicacion import notificar_pedido, pedido_email_context
 
 logger = logging.getLogger(__name__)
 
@@ -120,20 +120,21 @@ def enviar_recordatorios_retiro(
                 resumen["pedidos"].append(entry)
                 continue
             p["items"] = _get_alquiler_items(conn, p["id"])
-            ctx = _pedido_email_context(p)
+            ctx = pedido_email_context(p)
             ctx["dias_antes"] = dias_antes  # el copy del recordatorio lo usa
-            res = send_email(TEMPLATE_KEY, p["cliente_email"], ctx, p["id"])
-            if res.get("ok"):
+            # Despacho por la capa única de comunicación: manda el mail (idempotente
+            # por emails_log) Y el WhatsApp (gateado + idempotente por whatsapp_log).
+            # Síncrono (background=None) → devuelve los resultados por canal. El
+            # conteo del resumen sigue al canal mail (el histórico de este job).
+            res = notificar_pedido(TEMPLATE_KEY, p, ctx)
+            mail_res = res["mail"][0] if res["mail"] else {}
+            if mail_res.get("ok"):
                 resumen["enviados"] += 1
                 entry["status"] = "sent"
             else:
                 resumen["fallidos"] += 1
                 entry["status"] = "failed"
-                entry["error"] = res.get("error")
-            # Canal WhatsApp (además del mail): mismo evento/contexto. Gateado
-            # adentro (credencial/opt-in/E.164) e idempotente por whatsapp_log —
-            # nunca propaga, así que no cambia el resultado del mail.
-            enviar_evento_pedido(TEMPLATE_KEY, p, ctx)
+                entry["error"] = mail_res.get("error")
             resumen["pedidos"].append(entry)
         logger.info(
             "Recordatorios de retiro (%s): %d candidatos, %d enviados, %d fallidos, dry_run=%s",

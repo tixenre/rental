@@ -65,14 +65,18 @@ Mismo contrato que `services.email.send_email`:
 
 ## Eventos y enganche (dónde se dispara)
 
-Todos reusan `_pedido_email_context` (el mismo contexto que los mails) para los params.
+El WhatsApp NO se dispara directo: se dispara como **un canal más** de la capa única de
+comunicación (`services/comunicacion/` — ver [`SISTEMA_COMUNICACION.md`](SISTEMA_COMUNICACION.md)).
+El registro `comunicacion/eventos.py` declara, por evento, su template de mail + su template de
+WhatsApp + qué canales salen; `comunicacion.notificar_pedido(evento, pedido, ctx)` hace el fan-out.
+Los eventos que hoy salen por WhatsApp:
 
-| Evento | Template (`plantillas.REGISTRO`) | Enganche |
-| --- | --- | --- |
-| Pedido creado | `pedido_creado` | `services/pedidos_notificaciones.py::_dispatch_pedido_creado_emails` (boca multi-canal: mail + WhatsApp) |
-| Pedido confirmado | `pedido_confirmado` | `services/pedidos_notificaciones.py::_dispatch_pedido_confirmado` (extraído del inline de `routes/alquileres/pedidos.py`) |
-| Recordatorio de retiro (D-1) | `recordatorio_retiro` | `jobs/recordatorios.py` (además del mail) |
-| Recordatorio de devolución D-1/D-0/vencido | `recordatorio_devolucion_{d1,d0,vencido}` | `jobs/recordatorios_devolucion.py` (solo WhatsApp) — 3 ventanas prendibles por separado (`jobs/recordatorios_devolucion_config.py`) |
+| Evento | Template WhatsApp (`plantillas.REGISTRO`) | Canales | Disparador |
+| --- | --- | --- | --- |
+| Pedido creado | `pedido_creado` | mail + whatsapp | `services/pedidos_notificaciones` (shim) → `notificar_pedido` |
+| Pedido confirmado | `pedido_confirmado` | mail + whatsapp | `services/pedidos_notificaciones` (shim, extraído del inline de `routes/alquileres/pedidos.py`) |
+| Recordatorio de retiro (D-1) | `recordatorio_retiro` | mail + whatsapp | `jobs/recordatorios.py` → `notificar_pedido` |
+| Recordatorio de devolución D-1/D-0/vencido | `recordatorio_devolucion_{d1,d0,vencido}` | solo whatsapp | `jobs/recordatorios_devolucion.py` — 3 ventanas prendibles por separado (`recordatorios_devolucion_config.py`) |
 
 El scheduler in-process (`jobs/scheduler.py`) corre los dos barridos diarios (retiro + devolución),
 cada uno con su gate de hora y su var de dedup; la idempotencia final la da `whatsapp_log`.
