@@ -1,7 +1,7 @@
 /**
  * Organismos del back-office — las piezas ENSAMBLADAS del panel admin (/admin/*).
  * El listado de pedidos (tabla con fila expandible), el modal de registrar pago,
- * la paleta de comandos ⌘K y la barra lateral de navegación.
+ * la paleta de comandos ⌘F y la barra lateral de navegación.
  *
  * Algunas piezas son fixed/portaled (la paleta) o viven al borde de la página
  * (la sidebar): se muestran con el patrón honesto — un disparador que abre el
@@ -124,7 +124,7 @@ function RegistrarPagoModalDemo() {
   );
 }
 
-// ── Paleta de comandos ⌘K (dispara el evento que abre la REAL, ya montada) ─────
+// ── Paleta de comandos ⌘F (dispara el evento que abre la REAL, ya montada) ─────
 function CommandPaletteDemo() {
   return (
     <Stack>
@@ -132,7 +132,7 @@ function CommandPaletteDemo() {
         Abrir la paleta de comandos
       </Button>
       <Caption>
-        La paleta ⌘K del back-office. Se abre con ⌘K (o Ctrl+K) desde cualquier pantalla del admin —
+        La paleta ⌘F del back-office. Se abre con ⌘F (o Ctrl+K) desde cualquier pantalla del admin —
         el botón dispara el mismo evento. Saltá a una sección o buscá pedidos, clientes y equipos
         sin soltar el teclado.
       </Caption>
@@ -152,7 +152,7 @@ function AdminSidebarFicha() {
         <div className="t-eyebrow mb-2">AdminSidebar — organismo</div>
         <ul className="flex flex-col gap-1.5 text-sm text-muted-foreground">
           <li>· Cinco grupos por dominio, colapsables.</li>
-          <li>· Buscador global ⌘K arriba de todo (abre la paleta de comandos).</li>
+          <li>· Buscador global ⌘F arriba de todo (abre la paleta de comandos).</li>
           <li>· Resalta la sección activa y auto-expande su grupo al navegar.</li>
           <li>· Colapsa a un riel de iconos para ganar espacio.</li>
         </ul>
@@ -164,7 +164,7 @@ function AdminSidebarFicha() {
 export const adminOrganismosSection: CatalogSection = {
   id: "admin-organismos",
   title: "Back-office (organismos)",
-  hint: "Las piezas del panel admin: el listado de pedidos (tabla con fila expandible), el modal de registrar pago, la paleta de comandos ⌘K y la barra lateral. Datos demo: cuatro pedidos en cuatro estados (presupuesto · solicitado · confirmado con saldo · finalizado).",
+  hint: "Las piezas del panel admin: el listado de pedidos (tabla con fila expandible), el modal de registrar pago, la paleta de comandos ⌘F y la barra lateral. Datos demo: cuatro pedidos en cuatro estados (presupuesto · solicitado · confirmado con saldo · finalizado).",
   specimens: [
     {
       name: "AdminTable",
@@ -184,14 +184,14 @@ export const adminOrganismosSection: CatalogSection = {
       name: "AdminCommandPalette",
       files: ["components/admin/AdminCommandPalette.tsx"],
       blurb:
-        "La paleta de comandos ⌘K del back-office: saltar a una sección o buscar pedidos, clientes y equipos sin sacar las manos del teclado. Vive montada en el layout del admin; el botón dispara el mismo evento que abre la real.",
+        "La paleta de comandos ⌘F del back-office: saltar a una sección o buscar pedidos, clientes y equipos sin sacar las manos del teclado. Vive montada en el layout del admin; el botón dispara el mismo evento que abre la real.",
       render: () => <CommandPaletteDemo />,
     },
     {
       name: "AdminSidebar",
       files: ["components/admin/AdminSidebar.tsx"],
       blurb:
-        "La barra de navegación del back-office: grupos por dominio colapsables, buscador ⌘K, resaltado de sección activa y colapso a riel de iconos. Vive fija al borde de la pantalla — acá va su ficha.",
+        "La barra de navegación del back-office: grupos por dominio colapsables, buscador ⌘F, resaltado de sección activa y colapso a riel de iconos. Vive fija al borde de la pantalla — acá va su ficha.",
       render: () => <AdminSidebarFicha />,
     },
   ],
