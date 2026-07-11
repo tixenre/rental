@@ -3238,3 +3238,84 @@ passed).
 `backend/arca_fe/__init__.py` (imports/`__all__`/version), `backend/arca_fe/pyproject.toml` (extra
 `pdf` + version), `backend/arca_fe/README.md` (instalación, Quickstart, sección nueva "Render a
 PDF/imagen", "Qué NO cubre").
+
+### 2026-07-11 — Canal WhatsApp (Meta Cloud API): cuenta única Rambla, token en ENV, embudo de teléfono a E.164
+
+**Contexto.** El dueño pidió integrar WhatsApp Business Platform (Meta Cloud API) para notificaciones
+salientes a clientes (recordatorios/confirmaciones/avisos). El precedente más cercano era ARCA
+(`arca_fe/` lib portable + `services/facturacion/` adapter, credencial cifrada en DB, multi-emisor). Ya
+existía la decisión _2026-05-27 — Notificaciones canal-agnósticas_ ("multi-canal a un punto único, mail
+hoy, WhatsApp follow-up, se activan por config no código") y un issue de tracking diferido (#65, con
+Twilio/360dialog como opciones). Tres preguntas abiertas: (a) qué evento dispara, (b) cuenta única vs
+por-emisor, (c) qué dato de teléfono falta y quién lo carga.
+
+**Decisiones con el dueño.** (a) Los 4 eventos: pedido creado, confirmado, recordatorio de retiro y de
+devolución (este último con 3 ventanas D-1/D-0/vencido, cada una prendible desde el back-office). (b)
+**Una sola cuenta Rambla** — la app es single-tenant explícito (MANIFIESTO lista "multi-tenant" entre lo
+que NO existe), "emisor" es puramente fiscal (un pedido no tiene emisor hasta facturarse), el cliente ve
+siempre la marca Rambla. (c) Se confirmó, contra el workflow Didit **publicado** de Rambla (feature
+`PHONE_VERIFICATION`), que los clientes verificados traen el teléfono en E.164 en `verified_contacts`, y
+como el pedido exige Didit, la cobertura para clientes con pedido es alta → no hizo falta una campaña de
+medición previa.
+
+**Token en ENV, no cifrado en `app_settings` (a diferencia de ARCA) — la decisión de criterio central.**
+WhatsApp no tiene un host de "homologación" como ARCA (que en staging pega a AFIP-homo, inocuo) — es el
+mismo `graph.facebook.com` y envíos reales. Si el token viviera cifrado en `app_settings`, staging —que
+corre con una **BD clonada de prod**— heredaría el token de prod y podría **mensajear a clientes reales**.
+En ENV cada ambiente de Railway tiene el suyo (o ninguno → canal inerte) → staging seguro por
+construcción. Es además el patrón idiomático del repo para keys de terceros de una sola cuenta
+(`RESEND_API_KEY`, `DIDIT_API_KEY` en ENV); ARCA es la excepción justamente por ser multi-emisor con
+certs que el admin sube por UI. Defensa en profundidad: `destinatario_permitido` restringe los envíos
+fuera de prod a la allowlist `WHATSAPP_TEST_RECIPIENTS`.
+
+**Arquitectura.** Lib portable `backend/whatsapp_cloud/` (cero imports de `backend.*`, verificado por
+test de portabilidad; cliente HTTP + errores tipados auth/rate-limit/network/request/response + retry
+opt-in; `__version__` "0.0.0" hasta el primer envío real, política de `arca_fe`) + adapter
+`backend/services/whatsapp/` (credenciales/gating `config.py`, readiness `estado.py` con el shape de
+`diagnosticar_emisor`, registro de templates `plantillas.py`, boca de envío `envio.py`). El canal se
+acopla a `services/pedidos_notificaciones.py` (creación/confirmación — la confirmación se **extrajo** del
+inline en `routes/alquileres/pedidos.py`, move-verbatim para el mail) y a los jobs (`recordatorios.py`
+retiro + `recordatorios_devolucion.py` nuevo, ambos vía el scheduler in-process). `enviar_evento_pedido`
+respeta el contrato de `send_email` (nunca propaga, loguea, idempotente).
+
+**Idempotencia por pedido.** `whatsapp_log` con índice único parcial `(alquiler_id, template_key) WHERE
+status='sent'` — clave porque el gate de los jobs del scheduler es una var en memoria que se resetea en
+cada restart (el mismo bug que causó el spam del mail de reconciliación). Espeja `emails_log`: SIN
+`cliente_id` (lo tenía en el primer intento, pero el guard `test_identity_merge_cobertura` lo cazó como
+FK a `clientes` sin clasificar en `identity/merge`; en vez de clasificarlo se quitó porque es redundante
+—todo envío tiene `alquiler_id`— y así keyea por `alquiler_id`, que sobrevive un merge de cuentas con el
+pedido, igual que `emails_log`).
+
+**Embudo de teléfono `services/telefono.py`.** A pedido del dueño ("ese validador/formateador es el
+embudo, nos aseguramos siempre de que el número esté bien, sin depender de que cada fuente lo mande
+formateado"): puerta única de validación/formateo a E.164 sobre libphonenumber (`phonenumbers==9.0.34`,
+región AR; entiende el `0`/`15` móvil argentino). `normalizar_e164` (estricto → E.164 o None, lo usa el
+envío) + `formatear_para_guardar` (lenient → E.164 si vale, si no el crudo, no bloquea el alta; lo usan
+registro/perfil `cliente_portal/cuenta.py` y alta admin `clientes.py`) + `es_valido`. El `full_number`
+de Didit se re-chequea por el embudo en `services/didit/decision.py` (no-op si ya está bien); el fallback
+`phone_number` local NO se normaliza (sin código de país es ambiguo móvil/fijo). El **rechazo duro**
+(bloquear un alta con teléfono inválido) quedó como decisión de UX aparte — hoy el guardado es lenient.
+
+**Diferido a propósito.** La captura del opt-in en el front (portal/checkout; la columna
+`clientes.whatsapp_opt_in` ya existe) y la recepción/webhooks de estado de entrega (esto es solo
+saliente). El comprobante de pago como 5º evento queda de backlog en #65.
+
+**Enforcement (el supervisor marca).** Un token de WhatsApp guardado en `app_settings`; un canal que
+mensajee fuera de la allowlist en no-prod; una boca de WhatsApp ad-hoc fuera de `enviar_evento_pedido`;
+un teléfono guardado o enviado sin pasar por `services/telefono`; o `whatsapp_log` con una FK a
+`clientes` reintroducida.
+
+**Tests/CI.** Lib (`whatsapp_cloud/tests/`, portabilidad + mapeo de respuesta) + adapter
+(`test_whatsapp_adapter.py`) + wiring (`test_pedidos_notificaciones_whatsapp.py`) + devolución
+(`test_recordatorios_devolucion.py`) + embudo (`test_telefono.py`). CI: `whatsapp_cloud/tests/` sumado
+al paso de pytest. La migración `w1h2a3t4s5a6` (down_revision = head único `f604c6bd934c`) se ejercita en
+`test_alembic_upgrade_db.py`. Un rojo real de CI (el guard de `identity/merge`) se cazó y arregló en el
+mismo PR.
+
+**Archivos:** `backend/whatsapp_cloud/*`, `backend/services/whatsapp/*`, `backend/services/telefono.py`,
+`backend/routes/whatsapp.py`; wiring en `services/pedidos_notificaciones.py` /
+`routes/alquileres/{pedidos,core,__init__}.py` / `jobs/{recordatorios,recordatorios_devolucion,
+recordatorios_devolucion_config,scheduler}.py`; writers en `routes/cliente_portal/cuenta.py` /
+`routes/clientes.py` / `services/didit/decision.py`; esquema en `database/schema.py` + migración
+`w1h2a3t4s5a6`; `config.py` (env vars); `routes/settings.py` (toggles); `docs/SISTEMA_WHATSAPP.md` +
+MANIFIESTO §8. Historia: PR #1268 / tracking #65.

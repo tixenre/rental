@@ -1042,6 +1042,34 @@ Gotcha: `get_disponibilidad` se llama DIRECTO desde `routes/estudio.py` → el d
 plano, NUNCA `Query(None)` (truthy → rompía el Estudio con 500). El supervisor marca una resta de
 disponibilidad recalculada en el front, o un editor/buscador de pedido que no consuma el hook único.
 
+### 2026-07-11 — Canal WhatsApp (Meta Cloud API): cuenta única Rambla, token en ENV, embudo de teléfono a E.164
+
+Notificaciones salientes por WhatsApp = **canal nuevo acoplado a la boca de notificaciones que ya
+existe** (no un sistema paralelo; materializa _2026-05-27 — Notificaciones canal-agnósticas_), molde
+`arca_fe`: lib portable `backend/whatsapp_cloud/` (HTTP + errores tipados + retry) + adapter
+`backend/services/whatsapp/` (credencial/gating/estado/envío). **Una sola cuenta de plataforma (marca
+Rambla única, NO multi-emisor):** el token y el `phone_number_id` viven en **ENV**
+(`WHATSAPP_ACCESS_TOKEN`/`_PHONE_NUMBER_ID`), **NO cifrados en `app_settings`** como los certs de ARCA —
+WhatsApp no tiene host de homologación (mismo Graph, envíos reales), y si el token viviera en la BD,
+**staging (clonada de prod) heredaría el de prod y mensajearía clientes reales**; en ENV cada ambiente
+tiene el suyo → staging seguro por construcción (mismo patrón que `RESEND_API_KEY`/`DIDIT_API_KEY`; ARCA
+es la excepción por multi-emisor con certs subidos por UI). **Gating en profundidad:** credencial
+presente → `whatsapp_enabled` (default OFF) → opt-in del cliente (`clientes.whatsapp_opt_in`, Meta lo
+exige) → teléfono E.164 → destinatario permitido (prod: cualquiera; no-prod: solo allowlist
+`WHATSAPP_TEST_RECIPIENTS`). **Idempotencia por pedido** vía índice único parcial en `whatsapp_log`
+(espeja `emails_log`: SIN `cliente_id`, keyea por `alquiler_id` — sobrevive un merge de cuentas con el
+pedido y no suma una FK a `clientes` que clasificar en `identity/merge`). La boca única es
+`enviar_evento_pedido` (contrato de `send_email`: nunca propaga, loguea, idempotente); 4 eventos
+(creado/confirmado/retiro/devolución), la devolución con 3 ventanas D-1/D-0/vencido prendibles desde el
+back-office. **`backend/services/telefono.py` = embudo único** de validación/formateo a E.164
+(libphonenumber, región AR): TODO número pasa por ahí — al guardar (registro/perfil/admin, lenient), al
+re-chequear el `full_number` de Didit (no-op si ya está bien; el fallback local no se normaliza), y al
+enviar (estricto). El **rechazo duro** de un alta con teléfono inválido queda como decisión de UX aparte
+(hoy lenient). El supervisor marca: un token de WhatsApp en `app_settings`; un canal que mensajee fuera
+de la allowlist en no-prod; una boca de WhatsApp ad-hoc fuera de `enviar_evento_pedido`; un teléfono
+guardado o enviado sin pasar por `services/telefono`; o `whatsapp_log` con una FK a `clientes`
+reintroducida. Cómo → [`SISTEMA_WHATSAPP.md`](SISTEMA_WHATSAPP.md); tracking #65 / PR #1268.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
