@@ -559,14 +559,20 @@ function PedidoEditorPage() {
               {startDate && endDate ? (
                 <>
                   <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-sm tabular-nums text-ink">
-                      {format(startDate, "dd MMM yyyy", { locale: es })} · {startTime}
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <span className="font-mono text-sm tabular-nums text-ink">
-                      {format(endDate, "dd MMM yyyy", { locale: es })} · {endTime}
-                    </span>
+                  <div className="min-w-0 flex-1 flex items-center gap-x-3 gap-y-1.5 flex-wrap">
+                    <div className="min-w-0">
+                      <div className="t-eyebrow">Retiro</div>
+                      <div className="font-mono text-sm tabular-nums text-ink mt-0.5">
+                        {format(startDate, "dd MMM yyyy", { locale: es })} · {startTime}
+                      </div>
+                    </div>
+                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 self-end mb-1" />
+                    <div className="min-w-0">
+                      <div className="t-eyebrow">Devolución</div>
+                      <div className="font-mono text-sm tabular-nums text-ink mt-0.5">
+                        {format(endDate, "dd MMM yyyy", { locale: es })} · {endTime}
+                      </div>
+                    </div>
                   </div>
                   <span className="ml-auto card px-2.5 py-1 text-center shrink-0">
                     <span className="font-mono text-base font-semibold leading-none">
