@@ -182,10 +182,11 @@ def _send_mail(background, template, to, ctx, alquiler_id, attachments):
 def _despachar_mail(canal: CanalMail, pedido: dict, ctx: dict, background) -> list:
     pedido_id = pedido.get("id")
     resultados = []
-    attachments = ics_adjunto_pedido(pedido) if canal.con_adjunto_ics else None
     if canal.template_cliente:
         cliente_email = pedido.get("cliente_email")
         if cliente_email:
+            # El `.ics` se calcula solo si hay a quién mandárselo (best-effort).
+            attachments = ics_adjunto_pedido(pedido) if canal.con_adjunto_ics else None
             resultados.append(
                 _send_mail(background, canal.template_cliente, cliente_email, ctx, pedido_id, attachments)
             )
@@ -209,15 +210,17 @@ def _despachar_whatsapp(template_key: str, pedido: dict, ctx: dict, background):
 
 
 def notificar_pedido(
-    evento_key: str, pedido: dict, ctx: dict, *, background: Optional[BackgroundTasks] = None,
-    canales=None,
+    evento_key: str, pedido: dict, ctx: Optional[dict] = None, *,
+    background: Optional[BackgroundTasks] = None, canales=None,
 ) -> dict:
     """Despacha el evento de comunicación de un pedido a sus canales activos.
 
     Lee `eventos.REGISTRO[evento_key]` y hace fan-out: mail (cliente + admin + `.ics`
-    según el evento) y/o WhatsApp. `canales` (default: los del evento) permite forzar un
-    subconjunto (ej. solo mail). `background=None` corre síncrono (uso de scripts/jobs) y
-    devuelve los resultados; con `BackgroundTasks` encola. Nunca propaga.
+    según el evento) y/o WhatsApp. `ctx` opcional: si es None se arma con
+    `pedido_email_context(pedido)` (los jobs lo pasan armado con extras como
+    `dias_antes`). `canales` (default: los del evento) permite forzar un subconjunto
+    (ej. solo mail). `background=None` corre síncrono (uso de scripts/jobs) y devuelve
+    los resultados; con `BackgroundTasks` encola. Nunca propaga.
 
     Devuelve `{"mail": [resultados|None...], "whatsapp": resultado|None}`."""
     evento = REGISTRO.get(evento_key)
@@ -225,6 +228,8 @@ def notificar_pedido(
         logger.warning("comunicacion: evento desconocido %r", evento_key)
         return {"mail": [], "whatsapp": None}
 
+    if ctx is None:
+        ctx = pedido_email_context(pedido)
     activos = set(canales) if canales is not None else set(evento.canales)
     out: dict = {"mail": [], "whatsapp": None}
     if evento.mail and "mail" in activos:

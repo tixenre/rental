@@ -11,7 +11,7 @@ se dan de alta y se aprueban en el WhatsApp Manager); acá vive:
                    (mapean a los `{{1}}`, `{{2}}`, ... del template).
   - `copy_ejemplo` → el texto sugerido para dar de alta en Meta (categoría *utility*).
 
-El contexto del pedido lo arma `services/pedidos_notificaciones._pedido_email_context`
+El contexto del pedido lo arma `services/comunicacion.pedido_email_context`
 (la misma fuente que los mails), así el WhatsApp ve exactamente las mismas variables
 ya formateadas (fechas amables, número de pedido, nombre).
 """

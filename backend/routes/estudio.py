@@ -17,11 +17,11 @@ from rate_limit import limiter, ADMIN_WRITE_LIMIT, ADMIN_UPLOAD_LIMIT, CLIENTE_W
 from clientes.queries.identidad import nombre_completo_cliente
 from reservas import ESTADOS_RESERVADO, validar_stock as _check_stock
 from routes.alquileres import (
-    _dispatch_pedido_creado_emails,
     _get_alquiler_detail,
     _next_numero_pedido,
     get_disponibilidad,
 )
+from services.comunicacion import notificar_pedido
 from services.media.security import _download_image_bytes, _validate_ssrf_only
 from services.media.storage import delete_object as _delete_from_r2
 from services.media import (
@@ -1733,7 +1733,7 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
             conn.rollback()
             raise
 
-    _dispatch_pedido_creado_emails(background, pedido)
+    notificar_pedido("pedido_creado", pedido, background=background)
     return pedido
 
 

@@ -67,16 +67,10 @@ from routes.alquileres.detalle import (
     _next_numero_pedido,
     _enriquecer_pedido_con_total,  # noqa: F401 — re-export, ver comentario arriba
 )
-# Armado de mails/ICS del pedido: vive en `services/pedidos_notificaciones.py`
-# (split #1254, Corte B — espeja `services/pedidos_enriquecimiento`). Re-exportado
-# acá TAL CUAL — lo consumen `create_pedido` (este módulo), `jobs/recordatorios.py`
-# y varios tests (`routes.alquileres.core` directo o vía el paquete).
-from services.pedidos_notificaciones import (
-    _dispatch_pedido_creado_emails,
-    _dispatch_pedido_confirmado,  # noqa: F401 — re-export, ver comentario arriba
-    _ics_adjunto_pedido,  # noqa: F401 — re-export, ver comentario arriba
-    _pedido_email_context,  # noqa: F401 — re-export, ver comentario arriba
-)
+# Despacho de notificaciones al cliente: la capa única de comunicación (registro de
+# eventos + despachador) vive en `services/comunicacion`. `create_pedido` dispara el
+# evento 'pedido creado' por ahí (mail + WhatsApp según el registro).
+from services.comunicacion import notificar_pedido
 
 # Motor de reservas: la fuente única vive en el paquete `reservas`. Acá se
 # importan solo los nombres que este módulo usa internamente (las transiciones
@@ -239,7 +233,7 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
     # (igual send_email no propaga, pero por las dudas). Solo se mandan si
     # el pedido salió de borrador — drafts no notifican.
     if pedido and pedido.get("estado") != "borrador":
-        _dispatch_pedido_creado_emails(background, pedido)
+        notificar_pedido("pedido_creado", pedido, background=background)
     return pedido
 
 

@@ -204,7 +204,7 @@ def test_create_pedido_arma_la_linea_personalizada(setup, monkeypatch):
     from database import get_db
     from routes.alquileres import PedidoCreate, PedidoItem, create_pedido, _get_alquiler_items
 
-    monkeypatch.setattr(ac, "_dispatch_pedido_creado_emails", lambda *a, **k: None)
+    monkeypatch.setattr(ac, "notificar_pedido", lambda *a, **k: None)
 
     pedido = create_pedido(
         PedidoCreate(

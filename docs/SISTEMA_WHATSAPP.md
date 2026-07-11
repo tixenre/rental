@@ -76,7 +76,7 @@ Los eventos que hoy salen por WhatsApp:
 | Pedido creado | `pedido_creado` | mail + whatsapp | `services/pedidos_notificaciones` (shim) → `notificar_pedido` |
 | Pedido confirmado | `pedido_confirmado` | mail + whatsapp | `services/pedidos_notificaciones` (shim, extraído del inline de `routes/alquileres/pedidos.py`) |
 | Recordatorio de retiro (D-1) | `recordatorio_retiro` | mail + whatsapp | `jobs/recordatorios.py` → `notificar_pedido` |
-| Recordatorio de devolución D-1/D-0/vencido | `recordatorio_devolucion_{d1,d0,vencido}` | solo whatsapp | `jobs/recordatorios_devolucion.py` — 3 ventanas prendibles por separado (`recordatorios_devolucion_config.py`) |
+| Recordatorio de devolución D-1/D-0/vencido | `recordatorio_devolucion_{d1,d0,vencido}` | solo whatsapp | `jobs/recordatorios_devolucion.py` — 3 ventanas prendibles por separado (`jobs/recordatorios_devolucion_config.py`) |
 
 El scheduler in-process (`jobs/scheduler.py`) corre los dos barridos diarios (retiro + devolución),
 cada uno con su gate de hora y su var de dedup; la idempotencia final la da `whatsapp_log`.

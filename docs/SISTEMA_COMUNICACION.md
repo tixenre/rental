@@ -26,8 +26,11 @@ antes (empirismo proporcional, _2026-06-27_).
 | Módulo | Rol |
 | --- | --- |
 | `services/comunicacion/eventos.py` | **Registro fuente única**: `REGISTRO[evento]` = `EventoComunicacion(mail=CanalMail(...), whatsapp="<template>", canales=(...))`. Un evento declara su template **por canal** + qué canales dispara. |
-| `services/comunicacion/despacho.py` | `notificar_pedido(evento, pedido, ctx, *, background, canales)`: lee el registro y hace fan-out. Arma el contexto (`pedido_email_context`) y el `.ics` (`ics_adjunto_pedido`). Reusa los senders de cada canal — no reimplementa el envío. Devuelve `{"mail": [...], "whatsapp": ...}`. |
-| `services/pedidos_notificaciones.py` | **Shim de compat**: `_dispatch_pedido_creado_emails`/`_dispatch_pedido_confirmado` + los helpers `_pedido_email_context`/`_ics_adjunto_pedido` siguen existiendo, delegando en `comunicacion`. Código nuevo usa `notificar_pedido` directo. |
+| `services/comunicacion/despacho.py` | `notificar_pedido(evento, pedido, ctx=None, *, background, canales)`: lee el registro y hace fan-out. Arma el contexto (`pedido_email_context`, si no se pasa `ctx`) y el `.ics` (`ics_adjunto_pedido`). Reusa los senders de cada canal — no reimplementa el envío. Devuelve `{"mail": [...], "whatsapp": ...}`. |
+
+Todos los consumidores llaman `notificar_pedido` / importan `pedido_email_context`/
+`ics_adjunto_pedido` **directo de `comunicacion`** (routes de alquileres/estudio, documentos,
+jobs de recordatorios) — no hay capa de compatibilidad intermedia.
 
 ## Canales (senders que el despachador reusa)
 
@@ -50,5 +53,6 @@ idempotencia y fail-safe salen gratis de los senders.
 
 ## Tests
 
-`tests/test_comunicacion.py` (registro consistente + fan-out por evento/canal/override) +
-`tests/test_pedidos_notificaciones_whatsapp.py` (el shim delega bien).
+`tests/test_comunicacion.py` (registro consistente + fan-out por evento/canal/override; `ctx`
+opcional). El armado de contexto/`.ics` lo cubren `tests/test_pedido_email_context.py` y
+`tests/test_ics_adjunto.py`.

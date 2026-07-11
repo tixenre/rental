@@ -25,8 +25,8 @@ from routes.alquileres.core import (
     _enriquecer_pedido_con_cliente,
     _enriquecer_pedido_con_cliente_fiscal,
     _enriquecer_pedido_con_total,
-    _pedido_email_context,
 )
+from services.comunicacion import pedido_email_context
 
 
 # ── PDFs ─────────────────────────────────────────────────────────────────────
@@ -297,7 +297,7 @@ def _ctx_mail_pedido(conn, id: int, docs: list[str], mensaje: Optional[str],
     ped["items"] = _get_alquiler_items(conn, id)
     _enriquecer_pedido_con_cliente(conn, ped)
     _enriquecer_pedido_con_total(conn, ped)
-    ctx = _pedido_email_context(ped)
+    ctx = pedido_email_context(ped)
     ctx["docs_adjuntos"] = [DOCUMENTOS[k] for k in docs]
     if mensaje and mensaje.strip():
         ctx["mensaje_admin"] = mensaje.strip()

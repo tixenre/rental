@@ -30,11 +30,11 @@ from routes.alquileres.core import (
     _get_alquiler_detail,
     _batch_get_alquiler_items,
     _enriquecer_pedidos_con_cliente,
-    _dispatch_pedido_confirmado,
     _apply_pedido_datos,
     _apply_pedido_items,
 )
 from routes.alquileres.transiciones import ESTADOS_QUE_RESERVAN, cambiar_estado
+from services.comunicacion import notificar_pedido
 
 logger = logging.getLogger(__name__)
 
@@ -205,15 +205,15 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
             raise
 
     # Notif al cliente cuando pasamos a 'confirmado' (solo si veníamos de otro
-    # estado — no re-mandamos si ya estaba confirmado). Mail + WhatsApp salen por
-    # la boca única `_dispatch_pedido_confirmado` (mail gateado por cliente_email
-    # adentro; WhatsApp por opt-in/E.164).
+    # estado — no re-mandamos si ya estaba confirmado). El evento sale por la capa
+    # única de comunicación: mail (con el .ics, gateado por cliente_email) + WhatsApp
+    # (por opt-in/E.164), según el registro.
     if (
         pedido
         and resultado["estado_nuevo"] == "confirmado"
         and resultado["estado_anterior"] != "confirmado"
     ):
-        _dispatch_pedido_confirmado(background, pedido)
+        notificar_pedido("pedido_confirmado", pedido, background=background)
     return pedido
 
 

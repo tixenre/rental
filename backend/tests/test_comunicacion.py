@@ -95,5 +95,15 @@ def test_sin_email_cliente_manda_admin_y_whatsapp(monkeypatch):
     assert res["whatsapp"]["ok"] is True
 
 
+def test_ctx_none_se_arma_solo_con_pedido_email_context(monkeypatch):
+    llamado = []
+    monkeypatch.setattr(d, "pedido_email_context", lambda p: llamado.append(p.get("id")) or {"built": True})
+    monkeypatch.setattr(d, "send_email", lambda *a, **k: None)
+    monkeypatch.setattr(d, "get_admin_to", lambda: "")
+    monkeypatch.setattr(wa, "enviar_evento_pedido", lambda *a, **k: None)
+    d.notificar_pedido("pedido_creado", {"id": 7, "cliente_id": 2, "cliente_email": "c@x.com"})  # ctx omitido
+    assert llamado == [7]
+
+
 def test_evento_desconocido_no_rompe():
     assert d.notificar_pedido("no_existe", {"id": 1}, {}) == {"mail": [], "whatsapp": None}

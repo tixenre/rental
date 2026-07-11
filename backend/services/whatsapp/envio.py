@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 def enviar_evento_pedido(plantilla_key: str, pedido: dict, ctx: dict, *, force: bool = False) -> dict:
     """Manda el WhatsApp del evento `plantilla_key` para `pedido`, usando `ctx`
-    (el mismo contexto que arman los mails, `_pedido_email_context`) para los
+    (el mismo contexto que arman los mails, `comunicacion.pedido_email_context`) para los
     parámetros del template. Devuelve `{ok, skipped?, reason?, wamid?, log_id?, error?}`.
 
     NUNCA propaga: cada rama que no envía devuelve `{ok: True, skipped: True, reason}`
