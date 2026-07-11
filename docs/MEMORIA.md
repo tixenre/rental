@@ -1070,6 +1070,25 @@ de la allowlist en no-prod; una boca de WhatsApp ad-hoc fuera de `enviar_evento_
 guardado o enviado sin pasar por `services/telefono`; o `whatsapp_log` con una FK a `clientes`
 reintroducida. Cómo → [`SISTEMA_WHATSAPP.md`](SISTEMA_WHATSAPP.md); tracking #65 / PR #1268.
 
+### 2026-07-11 — `services/comunicacion/` = capa única de comunicación multi-canal (facade + registro, no CQRS-lite)
+
+Toda notificación al cliente (mail + WhatsApp) pasa por la **capa única** `backend/services/comunicacion/`
+(materializa _2026-05-27 — Notificaciones canal-agnósticas a un punto único_): un **registro fuente única**
+de eventos (`eventos.REGISTRO`: cada evento → su template por canal + qué canales dispara) + un
+**despachador** `notificar_pedido(evento, pedido, ctx=None)` que hace fan-out **reusando** los senders de
+cada canal (mail `services/email.send_email`; WhatsApp `services/whatsapp.enviar_evento_pedido`) — no
+reimplementa el envío ni nombra plantillas a mano en routes/jobs. **Facade + registro, NO CQRS-lite** (molde
+`services/finanzas_flujo`, no `contabilidad`): comunicación es orquestación + logs append-only (que viven en
+cada sender), no una superficie de mutación de dominio con invariantes que justifique `queries/`+`commands/`;
+el split entraría solo si suma **preferencias por cliente** (CRUD opt-in/out por canal) **+ cola de mensajes
+con estados** — no antes (empirismo proporcional _2026-06-27_ + medir-y-rechazar sobre-consolidación
+_2026-06-23_). **No es "un template para los dos canales":** cada medio tiene el suyo (mail HTML nuestro
+editable; WhatsApp pre-aprobado por Meta); lo que se unifica es el **evento**. `pedido_email_context`/
+`ics_adjunto_pedido` (armado del contexto/`.ics`) viven acá (move-verbatim del ex-`pedidos_notificaciones`,
+que se **eliminó** — los consumidores importan directo, sin shim). El supervisor marca un aviso al cliente
+que nombre plantillas a mano o dispare un canal por fuera de `notificar_pedido`/el registro, o un `commands/`
+agregado sin mutación de dominio real. Cómo → [`SISTEMA_COMUNICACION.md`](SISTEMA_COMUNICACION.md); PR #1268.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

@@ -3319,3 +3319,54 @@ recordatorios_devolucion_config,scheduler}.py`; writers en `routes/cliente_porta
 `routes/clientes.py` / `services/didit/decision.py`; esquema en `database/schema.py` + migración
 `w1h2a3t4s5a6`; `config.py` (env vars); `routes/settings.py` (toggles); `docs/SISTEMA_WHATSAPP.md` +
 MANIFIESTO §8. Historia: PR #1268 / tracking #65.
+
+### 2026-07-11 — `services/comunicacion/` = capa única de comunicación multi-canal (facade + registro, no CQRS-lite)
+
+**Contexto.** Con el canal WhatsApp sumado (misma fecha), el despacho de notificaciones quedaba disperso:
+cada evento nombraba a mano su template de mail y su template de WhatsApp en routes (`pedidos.py`,
+`estudio.py`) y jobs. El dueño pidió "hacer el sistema full completo bien, ordenado y en sync con la
+comunicación" y preguntó explícitamente si convenía un módulo `comunicacion` **con CQRS-lite** (el patrón de
+`contabilidad/`/`services/specs/`).
+
+**Decisión de forma: facade + registro, NO CQRS-lite.** Recomendado por la sesión y elegido por el dueño.
+CQRS-lite (`queries/`+`commands/`) rinde donde hay una superficie de **mutación de dominio con invariantes**
+que debe pasar por una sola puerta (`contabilidad/`: cajas/movimientos, locking, soft-delete, plata que no se
+mezcla). Comunicación no es eso: es **orquestación** (leo config + opt-in → fan-out) + **logs append-only**
+(`emails_log`/`whatsapp_log`, que ya viven dentro de cada sender). No hay estado de dominio con invariantes
+que proteger detrás de un `commands/`. Meterle CQRS sería ceremonia sin pago (empirismo proporcional
+_2026-06-27_ + el precedente de medir-y-rechazar sobre-consolidación _2026-06-23_). El molde es
+`services/finanzas_flujo/` (facade orquestador) / `services/carrito/` (puerta única de lógica). **Cuándo SÍ
+entraría CQRS:** si el módulo pasa a poseer preferencias por cliente (CRUD de opt-in/out por canal) + una cola
+de mensajes con estados (encolado→enviado→entregado→falló, reintentos) — ahí aparece un `commands/` real; se
+agrega entonces, incremental, no preventivo.
+
+**Estructura.** `comunicacion/eventos.py`: `REGISTRO[evento] = EventoComunicacion(mail=CanalMail(...),
+whatsapp="<template>", canales=(...))` — fuente única de qué se comunica y por qué medio. `comunicacion/
+despacho.py`: `notificar_pedido(evento, pedido, ctx=None, *, background, canales)` lee el registro y hace
+fan-out reusando los senders; `ctx` opcional (se arma con `pedido_email_context` si no se pasa — los jobs lo
+pasan con extras como `dias_antes`); devuelve `{"mail": [...], "whatsapp": ...}`; nunca propaga. Arma el
+contexto (`pedido_email_context`) y el `.ics` (`ics_adjunto_pedido`) — move-verbatim del ex-
+`services/pedidos_notificaciones.py`, que se **eliminó** (era un shim de compat; los consumidores importan
+directo de `comunicacion` — "una sola forma", sin capa intermedia).
+
+**No es "un template para los dos canales".** Cada medio tiene el suyo por diseño: el mail es HTML nuestro
+(editable en `/admin/email-templates`, tabla `email_templates`), el WhatsApp es un template pre-aprobado por
+Meta (rígido, `{{n}}`). Lo que el registro unifica es el **evento**: el mismo disparador y contexto eligen,
+por canal, su template, y qué medios salen. Un test (`test_registro_referencia_templates_whatsapp_reales`)
+valida que cada key de WhatsApp del registro exista en `whatsapp/plantillas.REGISTRO` (CI protege contra un
+rename futuro).
+
+**Comportamiento por evento (idéntico al de antes del refactor, verificado por el supervisor):**
+pedido_creado → mail cliente + mail admin + WhatsApp (sin `.ics`); pedido_confirmado → mail cliente con `.ics`
++ WhatsApp (sin admin); recordatorio_retiro → mail + WhatsApp; recordatorio_devolucion_{d1,d0,vencido} → solo
+WhatsApp. Los jobs conservan su idempotencia (`emails_log`/`whatsapp_log`), su conteo de resumen y su dry_run.
+
+**Enforcement (el supervisor marca).** Un aviso al cliente que nombre plantillas a mano o dispare un canal por
+fuera de `notificar_pedido`/el registro; un módulo de comunicación que reimplemente un sender en vez de
+reusarlo; o un `commands/`/`queries/` agregado sin que haya mutación de dominio real con invariantes.
+
+**Archivos.** `backend/services/comunicacion/{__init__,eventos,despacho}.py`; consumidores migrados
+(`routes/alquileres/{core,pedidos,documentos,__init__}.py`, `routes/estudio.py`, `jobs/recordatorios*.py`);
+`services/pedidos_notificaciones.py` eliminado; tests `test_comunicacion.py` (+ los de contexto/`.ics`
+repunteados a `comunicacion`); manual `docs/SISTEMA_COMUNICACION.md` + índice MANIFIESTO §8. Historia: PR
+#1268 (parte de #65).
