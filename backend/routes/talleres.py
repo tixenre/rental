@@ -351,7 +351,7 @@ def crear_inscripcion(slug: str, body: InscripcionBody, request: Request):
     # Teléfono normalizado a E.164 (puerta única services.telefono → listo para
     # WhatsApp). Si no parsea, conservamos lo que cargó la persona: no bloqueamos
     # la inscripción por un formato raro.
-    telefono = telefono_svc.normalizar(telefono_raw) or telefono_raw
+    telefono = telefono_svc.formatear_para_guardar(telefono_raw) or telefono_raw
 
     with get_db() as conn:
         try:
@@ -472,7 +472,7 @@ def crear_interesado(slug: str, body: InteresadoBody, request: Request):
     if not nombre or not email:
         raise HTTPException(400, "Nombre y email son obligatorios")
     # Teléfono (opcional) normalizado a E.164 por la misma puerta única; vacío queda "".
-    telefono = telefono_svc.normalizar(body.telefono) or body.telefono.strip()
+    telefono = telefono_svc.formatear_para_guardar(body.telefono) or body.telefono.strip()
 
     with get_db() as conn:
         edicion_row = _get_edicion_row(conn, slug)

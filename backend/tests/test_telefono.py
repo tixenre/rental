@@ -11,32 +11,47 @@ from services import telefono
 class TestNormalizar:
     def test_numeros_reales_del_listado_a_e164(self):
         # Los que se vieron sin normalizar en la tabla de inscripciones.
-        assert telefono.normalizar("1131661693") == "+541131661693"
-        assert telefono.normalizar("2236898641") == "+542236898641"
-        assert telefono.normalizar("+542235766569") == "+542235766569"
-        assert telefono.normalizar("2235444704") == "+542235444704"
-        assert telefono.normalizar("2236329659") == "+542236329659"
+        assert telefono.normalizar_e164("1131661693") == "+541131661693"
+        assert telefono.normalizar_e164("2236898641") == "+542236898641"
+        assert telefono.normalizar_e164("+542235766569") == "+542235766569"
+        assert telefono.normalizar_e164("2235444704") == "+542235444704"
+        assert telefono.normalizar_e164("2236329659") == "+542236329659"
 
     def test_tolera_separadores_y_espacios(self):
-        assert telefono.normalizar("223 689 8641") == "+542236898641"
-        assert telefono.normalizar("  2236898641  ") == "+542236898641"
-        assert telefono.normalizar("223-689-8641") == "+542236898641"
+        assert telefono.normalizar_e164("223 689 8641") == "+542236898641"
+        assert telefono.normalizar_e164("  2236898641  ") == "+542236898641"
+        assert telefono.normalizar_e164("223-689-8641") == "+542236898641"
 
     def test_celular_con_15_lleva_el_9_de_movil(self):
         # El `15` legacy → móvil → E.164 con el `9` que WhatsApp necesita.
-        assert telefono.normalizar("011 15 3166-1693") == "+5491131661693"
+        assert telefono.normalizar_e164("011 15 3166-1693") == "+5491131661693"
 
     def test_ya_en_e164_es_idempotente(self):
-        assert telefono.normalizar("+542236898641") == "+542236898641"
+        assert telefono.normalizar_e164("+542236898641") == "+542236898641"
 
     def test_vacio_o_none_es_none(self):
-        assert telefono.normalizar(None) is None
-        assert telefono.normalizar("") is None
-        assert telefono.normalizar("   ") is None
+        assert telefono.normalizar_e164(None) is None
+        assert telefono.normalizar_e164("") is None
+        assert telefono.normalizar_e164("   ") is None
 
     def test_basura_es_none(self):
-        assert telefono.normalizar("no soy un tel") is None
-        assert telefono.normalizar("123") is None  # muy corto → inválido
+        assert telefono.normalizar_e164("no soy un tel") is None
+        assert telefono.normalizar_e164("123") is None  # muy corto → inválido
+
+
+class TestFormatearParaGuardar:
+    def test_valido_da_e164(self):
+        assert telefono.formatear_para_guardar("2236898641") == "+542236898641"
+
+    def test_invalido_conserva_el_crudo(self):
+        # Nunca se pierde el dato ni se bloquea el guardado por un formato raro.
+        assert telefono.formatear_para_guardar("no soy un tel") == "no soy un tel"
+        assert telefono.formatear_para_guardar("  123  ") == "123"
+
+    def test_vacio_o_none_es_none(self):
+        assert telefono.formatear_para_guardar(None) is None
+        assert telefono.formatear_para_guardar("") is None
+        assert telefono.formatear_para_guardar("   ") is None
 
 
 class TestEsValido:
