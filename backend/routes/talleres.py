@@ -29,6 +29,7 @@ from services.email.service import get_admin_to
 from services.media.models import DeriveSpec
 from services.media.errors import MediaError
 from services.media.service import store_upload, store_raw_document
+from services import telefono as telefono_svc
 
 logger = logging.getLogger(__name__)
 
@@ -344,9 +345,13 @@ def crear_inscripcion(slug: str, body: InscripcionBody, request: Request):
     """Crea una inscripción a una edición de taller. Cupos llenos → lista de espera."""
     nombre = body.nombre.strip()
     email = body.email.strip().lower()
-    telefono = body.telefono.strip()
-    if not nombre or not email or not telefono:
+    telefono_raw = body.telefono.strip()
+    if not nombre or not email or not telefono_raw:
         raise HTTPException(400, "Nombre, email y teléfono son obligatorios")
+    # Teléfono normalizado a E.164 (puerta única services.telefono → listo para
+    # WhatsApp). Si no parsea, conservamos lo que cargó la persona: no bloqueamos
+    # la inscripción por un formato raro.
+    telefono = telefono_svc.normalizar(telefono_raw) or telefono_raw
 
     with get_db() as conn:
         try:
@@ -362,6 +367,21 @@ def crear_inscripcion(slug: str, body: InscripcionBody, request: Request):
             ).fetchone()
             en_lista = locked["cupos_confirmados"] >= locked["cupos_total"]
             estado = "en_espera" if en_lista else "pendiente_sena"
+
+            # Dedup: una persona no se inscribe dos veces a la MISMA edición. La
+            # clave es el email (ya normalizado a lowercase). Corre bajo el
+            # FOR UPDATE de la edición → race-safe (dos envíos concurrentes del
+            # mismo email quedan serializados, el segundo ve al primero).
+            ya_inscripto = conn.execute(
+                "SELECT 1 FROM taller_inscripciones "
+                "WHERE edicion_id = %s AND LOWER(email) = %s LIMIT 1",
+                (edicion_id, email),
+            ).fetchone()
+            if ya_inscripto:
+                raise HTTPException(
+                    409,
+                    "Ya hay una inscripción con ese email para esta edición del taller.",
+                )
 
             cur = conn.execute(
                 """
@@ -451,6 +471,8 @@ def crear_interesado(slug: str, body: InteresadoBody, request: Request):
     email = body.email.strip().lower()
     if not nombre or not email:
         raise HTTPException(400, "Nombre y email son obligatorios")
+    # Teléfono (opcional) normalizado a E.164 por la misma puerta única; vacío queda "".
+    telefono = telefono_svc.normalizar(body.telefono) or body.telefono.strip()
 
     with get_db() as conn:
         edicion_row = _get_edicion_row(conn, slug)
@@ -461,7 +483,7 @@ def crear_interesado(slug: str, body: InteresadoBody, request: Request):
                 INSERT INTO interesados_taller (taller_id, nombre, email, telefono)
                 VALUES (%s, %s, %s, %s)
                 """,
-                (taller_id, nombre, email, body.telefono.strip()),
+                (taller_id, nombre, email, telefono),
             )
             conn.commit()
         except Exception:
