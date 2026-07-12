@@ -65,17 +65,17 @@ Mismo contrato que `services.email.send_email`:
 
 ## Eventos y enganche (dónde se dispara)
 
-El WhatsApp NO se dispara directo: se dispara como **un canal más** de la capa única de
+El WhatsApp NO se dispara directo: se dispara como **plan A** de la capa única de
 comunicación (`services/comunicacion/` — ver [`SISTEMA_COMUNICACION.md`](SISTEMA_COMUNICACION.md)).
 El registro `comunicacion/eventos.py` declara, por evento, su template de mail + su template de
-WhatsApp + qué canales salen; `comunicacion.notificar_pedido(evento, pedido, ctx)` hace el fan-out.
-Los eventos que hoy salen por WhatsApp:
+WhatsApp + la **estrategia** (plan A/B); `comunicacion.notificar_pedido(evento, pedido, ctx)` la
+resuelve. Los eventos que hoy salen por WhatsApp:
 
-| Evento | Template WhatsApp (`plantillas.REGISTRO`) | Canales | Disparador |
+| Evento | Template WhatsApp (`plantillas.REGISTRO`) | Estrategia | Disparador |
 | --- | --- | --- | --- |
-| Pedido creado | `pedido_creado` | mail + whatsapp | `services/pedidos_notificaciones` (shim) → `notificar_pedido` |
-| Pedido confirmado | `pedido_confirmado` | mail + whatsapp | `services/pedidos_notificaciones` (shim, extraído del inline de `routes/alquileres/pedidos.py`) |
-| Recordatorio de retiro (D-1) | `recordatorio_retiro` | mail + whatsapp | `jobs/recordatorios.py` → `notificar_pedido` |
+| Pedido creado | `pedido_creado` | WhatsApp plan A / mail plan B (+ mail al admin siempre) | `routes/alquileres/core.py` + `routes/estudio.py` → `notificar_pedido` |
+| Pedido confirmado | `pedido_confirmado` | WhatsApp + mail con `.ics` (ambos) | `routes/alquileres/pedidos.py` → `notificar_pedido` |
+| Recordatorio de retiro (D-1) | `recordatorio_retiro` | WhatsApp plan A / mail plan B | `jobs/recordatorios.py` → `notificar_pedido` |
 | Recordatorio de devolución D-1/D-0/vencido | `recordatorio_devolucion_{d1,d0,vencido}` | solo whatsapp | `jobs/recordatorios_devolucion.py` — 3 ventanas prendibles por separado (`jobs/recordatorios_devolucion_config.py`) |
 
 El scheduler in-process (`jobs/scheduler.py`) corre los dos barridos diarios (retiro + devolución),
@@ -107,7 +107,7 @@ devuelve el registro con el copy sugerido para copiar-pegar.
 
 - `whatsapp_cloud/tests/` (portabilidad + mapeo de respuesta, sin red).
 - `tests/test_whatsapp_adapter.py` (gating, skips, happy path, mapeo de templates).
-- `tests/test_pedidos_notificaciones_whatsapp.py` (wiring mail+WhatsApp en la boca de pedido).
+- `tests/test_comunicacion.py` (plan A/B: fallback, ambos, solo_mail, solo_whatsapp; mail al admin siempre; una sola tarea en background).
 - `tests/test_recordatorios_devolucion.py` (config de ventanas + job).
 - La migración `w1h2a3t4s5a6` (whatsapp_log + opt-in) se ejercita en `test_alembic_upgrade_db.py`.
 

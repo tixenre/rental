@@ -20,7 +20,14 @@ from fastapi import BackgroundTasks
 
 from config import SITE_URL
 from database import to_datetime, to_iso
-from services.comunicacion.eventos import REGISTRO, CanalMail
+from services.comunicacion.eventos import (
+    AMBOS,
+    REGISTRO,
+    SOLO_MAIL,
+    SOLO_WHATSAPP,
+    CanalMail,
+    EventoComunicacion,
+)
 from services.email import Attachment, send_email
 from services.email.service import get_admin_to
 from services.ical import build_vcalendar, google_calendar_url, reserva_to_vevent
@@ -167,62 +174,95 @@ def ics_adjunto_pedido(pedido: dict) -> Optional[list[Attachment]]:
         return None
 
 
-# ── fan-out ─────────────────────────────────────────────────────────────
-def _send_mail(background, template, to, ctx, alquiler_id, attachments):
-    """Encola (o corre síncrono si `background is None`) un mail. Devuelve el
-    resultado en modo síncrono, o None si se encoló."""
+# ── senders (síncronos; el despacho reusa cada canal, no reimplementa) ────
+def _mail_cliente(canal: Optional[CanalMail], pedido: dict, ctx: dict):
+    """Manda el mail al cliente (síncrono). None si no hay template o destinatario."""
+    if not (canal and canal.template_cliente):
+        return None
+    to = pedido.get("cliente_email")
     if not to:
         return None
-    if background is not None:
-        background.add_task(send_email, template, to, ctx, alquiler_id, attachments=attachments)
+    # El `.ics` se calcula solo si hay a quién mandárselo (best-effort).
+    attachments = ics_adjunto_pedido(pedido) if canal.con_adjunto_ics else None
+    return send_email(canal.template_cliente, to, ctx, pedido.get("id"), attachments=attachments)
+
+
+def _mail_admin(canal: Optional[CanalMail], pedido: dict, ctx: dict):
+    """Manda la copia al admin (síncrono). Independiente del plan A/B del cliente."""
+    if not (canal and canal.template_admin):
         return None
-    return send_email(template, to, ctx, alquiler_id, attachments=attachments)
+    to = get_admin_to()
+    if not to:
+        return None
+    return send_email(canal.template_admin, to, ctx, pedido.get("id"))
 
 
-def _despachar_mail(canal: CanalMail, pedido: dict, ctx: dict, background) -> list:
-    pedido_id = pedido.get("id")
-    resultados = []
-    if canal.template_cliente:
-        cliente_email = pedido.get("cliente_email")
-        if cliente_email:
-            # El `.ics` se calcula solo si hay a quién mandárselo (best-effort).
-            attachments = ics_adjunto_pedido(pedido) if canal.con_adjunto_ics else None
-            resultados.append(
-                _send_mail(background, canal.template_cliente, cliente_email, ctx, pedido_id, attachments)
-            )
-    if canal.template_admin:
-        admin_to = get_admin_to()
-        if admin_to:
-            resultados.append(
-                _send_mail(background, canal.template_admin, admin_to, ctx, pedido_id, None)
-            )
-    return resultados
-
-
-def _despachar_whatsapp(template_key: str, pedido: dict, ctx: dict, background):
+def _whatsapp(template_key: str, pedido: dict, ctx: dict):
     # Import perezoso: no acopla el despacho al canal WhatsApp al importar.
     from services.whatsapp import enviar_evento_pedido
 
-    if background is not None:
-        background.add_task(enviar_evento_pedido, template_key, pedido, ctx)
-        return None
     return enviar_evento_pedido(template_key, pedido, ctx)
+
+
+def _whatsapp_entregado(res) -> bool:
+    """True si el WhatsApp llegó al cliente (ahora o ya antes). `wamid` = enviado
+    recién; `skipped/duplicado` = ya se había enviado ese WhatsApp para este pedido
+    (también llegó). Cualquier otro skip por gate (sin credencial/opt-in/E.164/canal
+    apagado) o un fallo del provider → False → cae al mail (plan B)."""
+    if not res:
+        return False
+    if res.get("wamid"):
+        return True
+    return bool(res.get("skipped") and res.get("reason") == "duplicado")
+
+
+# ── despacho al cliente según la estrategia (plan A/B) ────────────────────
+def _despachar_cliente(evento: EventoComunicacion, pedido: dict, ctx: dict) -> dict:
+    """Resuelve el/los canal(es) del CLIENTE según `evento.estrategia`. SÍNCRONO —
+    en modo background se corre dentro de UNA sola tarea, para que el fallback decida
+    con el resultado real del WhatsApp (plan A) y no encolando dos envíos a ciegas.
+
+    Devuelve `{"whatsapp": <res|None>, "mail": <res|None>}` (canal del cliente)."""
+    est = evento.estrategia
+    wa = None
+    mail = None
+
+    if est == SOLO_MAIL:
+        mail = _mail_cliente(evento.mail, pedido, ctx)
+    elif est == SOLO_WHATSAPP:
+        if evento.whatsapp:
+            wa = _whatsapp(evento.whatsapp, pedido, ctx)
+    elif est == AMBOS:
+        # Confirmación: los dos. El WhatsApp confirma; el mail lleva el `.ics`.
+        if evento.whatsapp:
+            wa = _whatsapp(evento.whatsapp, pedido, ctx)
+        mail = _mail_cliente(evento.mail, pedido, ctx)
+    else:  # FALLBACK: WhatsApp plan A → mail plan B (uno u otro)
+        if evento.whatsapp:
+            wa = _whatsapp(evento.whatsapp, pedido, ctx)
+        if not _whatsapp_entregado(wa):
+            mail = _mail_cliente(evento.mail, pedido, ctx)
+
+    return {"whatsapp": wa, "mail": mail}
 
 
 def notificar_pedido(
     evento_key: str, pedido: dict, ctx: Optional[dict] = None, *,
-    background: Optional[BackgroundTasks] = None, canales=None,
+    background: Optional[BackgroundTasks] = None,
 ) -> dict:
-    """Despacha el evento de comunicación de un pedido a sus canales activos.
+    """Despacha el evento de comunicación de un pedido según su estrategia (plan A/B).
 
-    Lee `eventos.REGISTRO[evento_key]` y hace fan-out: mail (cliente + admin + `.ics`
-    según el evento) y/o WhatsApp. `ctx` opcional: si es None se arma con
-    `pedido_email_context(pedido)` (los jobs lo pasan armado con extras como
-    `dias_antes`). `canales` (default: los del evento) permite forzar un subconjunto
-    (ej. solo mail). `background=None` corre síncrono (uso de scripts/jobs) y devuelve
-    los resultados; con `BackgroundTasks` encola. Nunca propaga.
+    Lee `eventos.REGISTRO[evento_key]`: alcanza al **cliente** por WhatsApp/mail según
+    `evento.estrategia` (fallback / ambos / solo_mail / solo_whatsapp) y —si el evento lo
+    declara— manda **siempre** la copia al **admin** por mail (fuera del plan A/B).
 
-    Devuelve `{"mail": [resultados|None...], "whatsapp": resultado|None}`."""
+    `ctx` opcional: si es None se arma con `pedido_email_context(pedido)` (los jobs lo
+    pasan armado con extras como `dias_antes`). `background=None` corre síncrono (scripts/
+    jobs) y devuelve los resultados; con `BackgroundTasks` encola **una sola tarea** (para
+    que el fallback vea el resultado del WhatsApp). Nunca propaga.
+
+    Devuelve `{"mail": [resultados...], "whatsapp": resultado|None}`. El canal del
+    cliente y la copia al admin (si hubo) se acumulan en la lista `mail`."""
     evento = REGISTRO.get(evento_key)
     if evento is None:
         logger.warning("comunicacion: evento desconocido %r", evento_key)
@@ -230,10 +270,14 @@ def notificar_pedido(
 
     if ctx is None:
         ctx = pedido_email_context(pedido)
-    activos = set(canales) if canales is not None else set(evento.canales)
-    out: dict = {"mail": [], "whatsapp": None}
-    if evento.mail and "mail" in activos:
-        out["mail"] = _despachar_mail(evento.mail, pedido, ctx, background)
-    if evento.whatsapp and "whatsapp" in activos:
-        out["whatsapp"] = _despachar_whatsapp(evento.whatsapp, pedido, ctx, background)
-    return out
+
+    def _run() -> dict:
+        cliente = _despachar_cliente(evento, pedido, ctx)
+        admin = _mail_admin(evento.mail, pedido, ctx) if evento.mail else None
+        mails = [m for m in (cliente["mail"], admin) if m is not None]
+        return {"whatsapp": cliente["whatsapp"], "mail": mails}
+
+    if background is not None:
+        background.add_task(_run)
+        return {"mail": [], "whatsapp": None}  # encolado; resultados no disponibles aún
+    return _run()

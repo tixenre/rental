@@ -3370,3 +3370,57 @@ reusarlo; o un `commands/`/`queries/` agregado sin que haya mutación de dominio
 `services/pedidos_notificaciones.py` eliminado; tests `test_comunicacion.py` (+ los de contexto/`.ics`
 repunteados a `comunicacion`); manual `docs/SISTEMA_COMUNICACION.md` + índice MANIFIESTO §8. Historia: PR
 #1268 (parte de #65).
+
+### 2026-07-12 — Comunicación plan A/B: WhatsApp primero, mail de respaldo (no los dos); estrategia por evento
+
+**Contexto.** El refactor del 2026-07-11 dejó el despacho como **fan-out**: cada evento salía por mail **y**
+WhatsApp a la vez. El dueño lo cerró distinto para la etapa de producto: _"que WhatsApp sea plan A, y mails
+plan B para la comunicación. Igualmente, algunas cosas las quiero mandar por mail, como el contrato"_, y sobre
+la confirmación: _"WhatsApp + un mail con el `.ics`"_. O sea: al cliente NO le llegan los dos avisos del mismo
+evento — se prefiere WhatsApp y el mail es el respaldo; con dos excepciones nombradas (la confirmación manda
+los dos porque el mail carga el calendario, y lo formal va siempre por mail).
+
+**Decisión: una `estrategia` por evento.** `EventoComunicacion` gana un campo `estrategia` (se retira el
+`canales` de tupla, que no expresaba la relación entre canales):
+
+- **`FALLBACK`** — plan A/B real: corre el sender de WhatsApp y, **solo si no llegó**, manda el mail. Eventos:
+  `pedido_creado`, `recordatorio_retiro`.
+- **`AMBOS`** — WhatsApp **y** mail. Única razón de mandar los dos: el mail **lleva el `.ics`** de la reserva
+  (WhatsApp no adjunta calendario). Evento: `pedido_confirmado`. Si WhatsApp no está disponible, el mail sigue
+  siendo la confirmación completa (con su `.ics`); si está, el cliente recibe el WhatsApp + el mail-calendario.
+- **`SOLO_MAIL`** — comunicaciones **formales** (contrato / documentos): siempre por mail, nunca WhatsApp.
+  Está en el modelo y testeado (`_despachar_cliente` con un evento sintético), pero **sin evento cableado
+  todavía** — no se fabricó un disparador que no exista; el contrato hoy no pasa por `notificar_pedido`.
+- **`SOLO_WHATSAPP`** — devolución (nació canal-only): `recordatorio_devolucion_{d1,d0,vencido}`.
+
+**El mail al admin es independiente del plan A/B del cliente.** `CanalMail.template_admin` sale **siempre**
+por mail cuando el evento lo declara (hoy `pedido_creado`), gane o pierda el WhatsApp del cliente — el admin
+necesita enterarse del pedido pase lo que pase. Por eso el admin no entra en el fallback: se despacha aparte.
+
+**Por qué el fallback vive adentro de una sola tarea de background.** La decisión "¿mando el mail?" depende
+del **resultado real** del WhatsApp (`wamid` = salió; `skipped/duplicado` = ya había salido antes → también
+llegó; cualquier otro skip por gate o un fallo del provider → cae a mail). Si en producción encoláramos
+WhatsApp y mail como **dos** background tasks a ciegas (como hacía el fan-out), el mail saldría siempre,
+rompiendo el plan A/B. La solución: `notificar_pedido(..., background=bg)` encola **una sola** tarea (`_run`)
+que corre `_despachar_cliente` (WhatsApp síncrono → mira el resultado → quizás mail) + el mail al admin. Así
+el fallback usa el resultado real sin bloquear el request. En modo síncrono (`background=None`, jobs/scripts)
+devuelve `{"mail": [...], "whatsapp": ...}`.
+
+**Ajuste en el job de retiro.** Antes contaba "enviado" solo por el canal mail y filtraba candidatos solo
+contra `emails_log`. Con plan A/B un pedido puede quedar cubierto por WhatsApp (sin fila en `emails_log`), así
+que: (1) el `NOT EXISTS` del barrido ahora excluye a los ya alcanzados por **`emails_log` O `whatsapp_log`**
+(no se re-lista ni se re-golpea el gate cada corrida), y (2) el resumen cuenta "enviado" si el cliente fue
+alcanzado por **cualquiera** de los dos canales (`canal: "whatsapp"|"mail"` en el detalle). El requisito de
+`cliente_email` en la query de candidatos se mantiene (el email es el ancla de identidad — Google/Didit —, así
+que un cliente WhatsApp-only sin email es inexistente en la práctica; ampliar el SQL a "alcanzable por algún
+canal" queda fuera de alcance por eso).
+
+**Enforcement (el supervisor marca).** Un evento al cliente que salga por los dos canales cuando su estrategia
+es `FALLBACK`; un fallback que decida el plan B sin ver el resultado del WhatsApp (dos envíos encolados a
+ciegas); una comunicación formal (contrato/documento) despachada por WhatsApp en vez de `SOLO_MAIL`.
+
+**Archivos.** `services/comunicacion/{eventos,despacho}.py` (estrategia + `_despachar_cliente`/
+`_whatsapp_entregado`; se retiran `_despachar_mail`/`_despachar_whatsapp`/`canales`); `jobs/recordatorios.py`
+(conteo por canal + doble `NOT EXISTS`); tests `test_comunicacion.py` reescritos (fallback/ambos/solo_mail/
+solo_whatsapp, admin siempre, una sola tarea en background); manuales `SISTEMA_COMUNICACION.md` +
+`SISTEMA_WHATSAPP.md`. Refina —no reemplaza— _2026-07-11 (facade + registro)_. Historia: PR #1268 (parte de #65).

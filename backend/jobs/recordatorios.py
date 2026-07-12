@@ -13,9 +13,11 @@ y `services.email` lo traga: no re-manda. El barrido además filtra con
 `NOT EXISTS` para no intentar siquiera los ya enviados.
 
 Despacha por la capa única de comunicación (`comunicacion.notificar_pedido`,
-decisión 2026-05-27): el evento `recordatorio_retiro` sale por mail Y WhatsApp
-(los canales que declara el registro), con el mismo contexto que el resto de los
-mails de pedido (`comunicacion.pedido_email_context`).
+decisión 2026-05-27): el evento `recordatorio_retiro` es **plan A/B** (WhatsApp
+primero; si no llegó, mail), con el mismo contexto que el resto de los mails de
+pedido (`comunicacion.pedido_email_context`). El barrido no re-lista un pedido ya
+alcanzado por CUALQUIER canal (`emails_log` **o** `whatsapp_log`), y cuenta como
+"enviado" al cliente sin importar por cuál salió.
 """
 
 from __future__ import annotations
@@ -69,9 +71,15 @@ def _pedidos_para_retiro(conn, hoy, dias_antes: int) -> list[dict]:
                 AND el.template_key = %s
                 AND el.status = 'sent'
           )
+          AND NOT EXISTS (
+              SELECT 1 FROM whatsapp_log wl
+              WHERE wl.alquiler_id = a.id
+                AND wl.template_key = %s
+                AND wl.status = 'sent'
+          )
         ORDER BY a.id
     """,
-        (*ESTADOS_RECORDABLES, dia_ini, dia_fin, TEMPLATE_KEY),
+        (*ESTADOS_RECORDABLES, dia_ini, dia_fin, TEMPLATE_KEY, TEMPLATE_KEY),
     ).fetchall()
     return [row_to_dict(r) for r in rows]
 
@@ -122,19 +130,29 @@ def enviar_recordatorios_retiro(
             p["items"] = _get_alquiler_items(conn, p["id"])
             ctx = pedido_email_context(p)
             ctx["dias_antes"] = dias_antes  # el copy del recordatorio lo usa
-            # Despacho por la capa única de comunicación: manda el mail (idempotente
-            # por emails_log) Y el WhatsApp (gateado + idempotente por whatsapp_log).
-            # Síncrono (background=None) → devuelve los resultados por canal. El
-            # conteo del resumen sigue al canal mail (el histórico de este job).
+            # Despacho plan A/B por la capa única de comunicación: intenta WhatsApp
+            # (gateado + idempotente por whatsapp_log) y, si no llegó, cae al mail
+            # (idempotente por emails_log). Síncrono (background=None) → devuelve los
+            # resultados por canal. Se cuenta "enviado" si el cliente fue alcanzado
+            # por CUALQUIERA de los dos canales.
             res = notificar_pedido(TEMPLATE_KEY, p, ctx)
-            mail_res = res["mail"][0] if res["mail"] else {}
-            if mail_res.get("ok"):
+            wa = res.get("whatsapp") or {}
+            mail_res = (res.get("mail") or [None])[0] or {}
+            wa_ok = bool(
+                wa.get("wamid") or (wa.get("skipped") and wa.get("reason") == "duplicado")
+            )
+            if wa_ok:
                 resumen["enviados"] += 1
                 entry["status"] = "sent"
+                entry["canal"] = "whatsapp"
+            elif mail_res.get("ok"):
+                resumen["enviados"] += 1
+                entry["status"] = "sent"
+                entry["canal"] = "mail"
             else:
                 resumen["fallidos"] += 1
                 entry["status"] = "failed"
-                entry["error"] = mail_res.get("error")
+                entry["error"] = mail_res.get("error") or wa.get("error")
             resumen["pedidos"].append(entry)
         logger.info(
             "Recordatorios de retiro (%s): %d candidatos, %d enviados, %d fallidos, dry_run=%s",

@@ -9,7 +9,32 @@
 Un **único lugar** para "qué le comunicamos al cliente y por qué medio". Materializa
 _2026-05-27 — Notificaciones canal-agnósticas a un punto único_. Antes cada evento nombraba a
 mano su template de mail y su template de WhatsApp, desparramado por routes y jobs; ahora hay
-**un registro** de eventos de comunicación + **un despachador** que hace el fan-out a los canales.
+**un registro** de eventos de comunicación + **un despachador** que resuelve el envío por canal.
+
+## Plan A/B: WhatsApp primero, mail de respaldo (no los dos)
+
+Decisión del dueño (_2026-07-12_): **WhatsApp es plan A, el mail es plan B**. Para un evento
+al cliente NO se manda por los dos canales a la vez — se prefiere WhatsApp y, si no llegó
+(sin opt-in / sin E.164 / canal apagado / falló), recién ahí se cae al mail. Cada evento
+declara su **estrategia** de cómo alcanzar al cliente:
+
+| Estrategia | Qué hace | Eventos hoy |
+| --- | --- | --- |
+| `FALLBACK` | WhatsApp plan A → mail plan B (uno u otro). | `pedido_creado`, `recordatorio_retiro` |
+| `AMBOS` | WhatsApp **y** mail. La confirmación: el WhatsApp confirma y el **mail lleva el `.ics`** (WhatsApp no adjunta calendario). | `pedido_confirmado` |
+| `SOLO_MAIL` | Solo mail. Comunicaciones **formales** (contrato / documentos) van siempre por mail. | _(disponible; sin evento cableado aún)_ |
+| `SOLO_WHATSAPP` | Solo WhatsApp. | `recordatorio_devolucion_{d1,d0,vencido}` |
+
+El **mail al admin** (`CanalMail.template_admin`) es **independiente** del plan A/B del
+cliente: si el evento lo declara, sale **siempre** por mail (el admin se entera del pedido
+pase lo que pase con el canal del cliente).
+
+**Cómo se decide el fallback (y por qué en background):** el despacho corre el sender de
+WhatsApp **síncrono** y mira su resultado (`wamid` = enviado; `skipped/duplicado` = ya había
+salido antes → también cuenta como llegado; cualquier otro skip/fallo → cae a mail). Para no
+bloquear el request, en modo `background` se encola **una sola tarea** que corre todo el plan
+A/B adentro — así la decisión usa el resultado real del WhatsApp en vez de encolar dos envíos
+a ciegas.
 
 ## Forma: facade + registro (NO CQRS-lite)
 
@@ -25,8 +50,8 @@ antes (empirismo proporcional, _2026-06-27_).
 
 | Módulo | Rol |
 | --- | --- |
-| `services/comunicacion/eventos.py` | **Registro fuente única**: `REGISTRO[evento]` = `EventoComunicacion(mail=CanalMail(...), whatsapp="<template>", canales=(...))`. Un evento declara su template **por canal** + qué canales dispara. |
-| `services/comunicacion/despacho.py` | `notificar_pedido(evento, pedido, ctx=None, *, background, canales)`: lee el registro y hace fan-out. Arma el contexto (`pedido_email_context`, si no se pasa `ctx`) y el `.ics` (`ics_adjunto_pedido`). Reusa los senders de cada canal — no reimplementa el envío. Devuelve `{"mail": [...], "whatsapp": ...}`. |
+| `services/comunicacion/eventos.py` | **Registro fuente única**: `REGISTRO[evento]` = `EventoComunicacion(estrategia=..., mail=CanalMail(...), whatsapp="<template>")`. Un evento declara su template **por canal** + la **estrategia** (plan A/B) con la que se alcanza al cliente. |
+| `services/comunicacion/despacho.py` | `notificar_pedido(evento, pedido, ctx=None, *, background)`: lee el registro y resuelve el envío según la estrategia (`_despachar_cliente` = plan A/B; el admin siempre por mail). Arma el contexto (`pedido_email_context`, si no se pasa `ctx`) y el `.ics` (`ics_adjunto_pedido`). Reusa los senders de cada canal — no reimplementa el envío. Devuelve `{"mail": [...], "whatsapp": ...}`. |
 
 Todos los consumidores llaman `notificar_pedido` / importan `pedido_email_context`/
 `ics_adjunto_pedido` **directo de `comunicacion`** (routes de alquileres/estudio, documentos,
@@ -45,11 +70,11 @@ nuestro; el WhatsApp es un template rígido pre-aprobado por Meta). Lo que el re
 
 1. Dar de alta el/los template(s): mail en `email_templates` (o migración), WhatsApp en Meta +
    `services/whatsapp/plantillas.py`.
-2. Sumar la entrada al `REGISTRO` de `comunicacion/eventos.py` (templates por canal + `canales`).
+2. Sumar la entrada al `REGISTRO` de `comunicacion/eventos.py` (templates por canal + `estrategia`).
 3. Disparar con `comunicacion.notificar_pedido("<evento>", pedido, ctx, background=...)`.
 
-Fan-out, gating por canal (mail siempre; WhatsApp gateado por credencial/opt-in/E.164),
-idempotencia y fail-safe salen gratis de los senders.
+El plan A/B, el gating por canal (WhatsApp gateado por credencial/opt-in/E.164), la
+idempotencia y el fail-safe salen gratis de los senders y de la estrategia declarada.
 
 ## Tests
 
