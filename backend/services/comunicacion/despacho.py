@@ -1,10 +1,11 @@
-"""services.comunicacion.despacho — armado de contexto/adjunto + fan-out multi-canal.
+"""services.comunicacion.despacho — armado de contexto/adjunto + despacho plan A/B.
 
 `notificar_pedido(evento, pedido, ctx)` lee el registro (`eventos.REGISTRO`) y despacha
-el evento a los canales activos, **reusando** los senders de cada canal (mail:
-`services.email.send_email`; WhatsApp: `services.whatsapp.enviar_evento_pedido`) — no
-reimplementa el envío. Cada sender ya es fail-safe (nunca propaga, loguea, idempotente),
-así que el despacho tampoco propaga.
+el evento según su **estrategia** (plan A/B: WhatsApp primero, mail de respaldo; ver
+`eventos.py`), **reusando** los senders de cada canal (mail: `services.email.send_email`;
+WhatsApp: `services.whatsapp.enviar_evento_pedido`) — no reimplementa el envío. Cada
+sender ya es fail-safe (nunca propaga, loguea, idempotente), así que el despacho tampoco
+propaga.
 
 El armado del contexto (`pedido_email_context`) y del `.ics` (`ics_adjunto_pedido`) vivía
 en `services/pedidos_notificaciones.py` (move-verbatim); es presentación específica del

@@ -95,8 +95,8 @@ def enviar_recordatorios_devolucion(
                     v["pedidos"].append(entry)
                     continue
                 ctx = pedido_email_context(p)
-                # Evento solo-WhatsApp (así lo declara el registro de comunicación):
-                # el fan-out devuelve el resultado del canal WhatsApp.
+                # Evento SOLO_WHATSAPP (así lo declara el registro de comunicación):
+                # el despacho devuelve el resultado del canal WhatsApp.
                 res = notificar_pedido(template_key, p, ctx)["whatsapp"] or {}
                 if res.get("ok") and not res.get("skipped"):
                     v["enviados"] += 1

@@ -69,9 +69,6 @@ class EventoComunicacion:
     whatsapp: Optional[str] = None
 
 
-CANALES = ("mail", "whatsapp")
-
-
 REGISTRO: dict[str, EventoComunicacion] = {
     "pedido_creado": EventoComunicacion(
         key="pedido_creado",
