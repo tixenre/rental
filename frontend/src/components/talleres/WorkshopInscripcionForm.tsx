@@ -31,6 +31,7 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
   const [experiencia, setExperiencia] = useState("");
   const [upload, setUpload] = useState<UploadState>({ status: "idle" });
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
+  const [errorMsg, setErrorMsg] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const cuposDisponibles = Math.max(0, taller.cupos_total - taller.cupos_confirmados);
@@ -95,7 +96,9 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
       setSubmitState(result.en_lista_espera ? "success_espera" : "success_normal");
       onSuccess?.(result.en_lista_espera);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Algo salió mal. Intentá de nuevo.");
+      const msg = err instanceof Error ? err.message : "Algo salió mal. Intentá de nuevo.";
+      setErrorMsg(msg);
+      toast.error(msg);
       setSubmitState("error");
     }
   };
@@ -292,7 +295,7 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
       {submitState === "error" && (
         <div className="flex items-center gap-2 rounded-lg bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive">
           <AlertCircle className="h-4 w-4 shrink-0" />
-          Algo salió mal. Revisá los datos e intentá de nuevo.
+          {errorMsg || "Algo salió mal. Revisá los datos e intentá de nuevo."}
         </div>
       )}
 

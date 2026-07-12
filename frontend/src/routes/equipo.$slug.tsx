@@ -12,6 +12,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { format } from "date-fns";
 import {
   ArrowLeft,
   Plus,
@@ -43,13 +44,15 @@ import { useCart } from "@/lib/cart-store";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { buildCategoriaSlug } from "@/lib/categoria-slug";
+import { DESCUENTO_CATALOGO_HABILITADO } from "@/lib/features";
 import { SITE_URL } from "@/lib/site";
 import { shareEquipo } from "@/lib/share";
 import { type Equipment } from "@/data/equipment";
 import { EquipoFoto } from "@/components/rental/EquipoFoto";
 
-async function fetchEquipo(id: string): Promise<Equipment | null> {
-  const res = await fetch(`/api/equipos/${id}`);
+async function fetchEquipo(id: string, desde?: string, hasta?: string): Promise<Equipment | null> {
+  const qs = desde && hasta ? `?desde=${desde}&hasta=${hasta}` : "";
+  const res = await fetch(`/api/equipos/${id}${qs}`);
   if (!res.ok) return null;
   const raw = await res.json();
   return backendToEquipment(raw);
@@ -196,13 +199,22 @@ export const Route = createFileRoute("/equipo/$slug")({
 function EquipoPage() {
   const { slug } = Route.useParams();
   const navigate = useNavigate();
+  const cartStartDate = useCart((s) => s.startDate);
+  const cartEndDate = useCart((s) => s.endDate);
+  const desde = cartStartDate ? format(cartStartDate, "yyyy-MM-dd") : undefined;
+  const hasta = cartEndDate ? format(cartEndDate, "yyyy-MM-dd") : undefined;
+  // Mismo queryKey que el loader (["equipo", slug]) cuando no hay fechas —
+  // reusa el pre-fetch sin refetch extra. Con fechas del carrito global, el
+  // key cambia a propósito: el descuento por jornadas/cliente depende de
+  // ellas (`descuento_pct`/`precio_jornada_final`), así que SÍ hay que
+  // refetchear cuando el visitante ya eligió fechas antes de entrar a la ficha.
   const {
     data: equipo,
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["equipo", slug],
-    queryFn: () => fetchEquipo(slug),
+    queryKey: desde && hasta ? ["equipo", slug, desde, hasta] : ["equipo", slug],
+    queryFn: () => fetchEquipo(slug, desde, hasta),
     staleTime: 60_000,
   });
 
@@ -288,6 +300,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
   const jornadas = useCart((s) => s.days());
   const hasDateRange = useCart((s) => !!s.startDate && !!s.endDate);
   const showPeriodTotal = hasDateRange && jornadas > 1;
+  const mostrarDescuento = hasDateRange && DESCUENTO_CATALOGO_HABILITADO;
   const { data: clienteSession } = useClienteSession();
   const conIva = aplicaIva(clienteSession?.perfil_impuestos);
   // Ficha técnica: abierta por default si son pocas specs, colapsada si hay muchas.
@@ -461,7 +474,15 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
       {/* Precio + agregar (sticky en mobile bottom bar). En desktop el precio
        *  vive en la columna derecha sticky. */}
       <div className="md:hidden sticky bottom-0 -mx-4 z-10 bg-background border-t hairline px-4 py-3 flex items-center justify-between gap-3">
-        <PriceBlock perDay={item.pricePerDay} jornadas={jornadas} conIva={conIva} size="md" />
+        <PriceBlock
+          perDay={item.pricePerDay}
+          jornadas={jornadas}
+          conIva={conIva}
+          size="md"
+          perDayFinal={mostrarDescuento ? item.pricePerDayFinal : undefined}
+          descuentoPct={mostrarDescuento ? item.discountPct : undefined}
+          descuentoOrigen={mostrarDescuento ? item.discountOrigin : undefined}
+        />
         <CartButtons
           qty={qty}
           sinStock={sinStock}
@@ -552,8 +573,16 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           )}
 
           {/* Precio + agregar (desktop — en la col visual) */}
-          <div className="hidden md:flex items-center justify-between gap-3 card px-4 py-3">
-            <PriceBlock perDay={item.pricePerDay} jornadas={jornadas} conIva={conIva} size="lg" />
+          <div className="hidden md:flex items-center justify-between gap-3 rounded-xl border hairline bg-surface px-4 py-3">
+            <PriceBlock
+              perDay={item.pricePerDay}
+              jornadas={jornadas}
+              conIva={conIva}
+              size="lg"
+              perDayFinal={mostrarDescuento ? item.pricePerDayFinal : undefined}
+              descuentoPct={mostrarDescuento ? item.discountPct : undefined}
+              descuentoOrigen={mostrarDescuento ? item.discountOrigin : undefined}
+            />
             <CartButtons
               qty={qty}
               sinStock={sinStock}

@@ -461,6 +461,9 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     precioBhUsd: ficha?.precio_bh_usd ?? null,
     disponible: e.disponible,
     tipo: e.tipo,
+    discountPct: e.descuento_pct,
+    discountOrigin: e.descuento_origen ?? null,
+    pricePerDayFinal: e.precio_jornada_final,
     // Dict raw de specs estructuradas (Fase H: filtros públicos).
     // Cada entry tiene {value, label, tipo, prioridad, en_filtros, ...}
     // para que el catálogo arme filtros dinámicos.

@@ -115,8 +115,6 @@ export function EquipmentRowMobile({
           </div>
         </div>
 
-        {/* Price — compacto en la fila densa: total + jornadas, sin la 3ª línea
-            (el desglose por jornada queda en el panel expandido). */}
         <PriceBlock
           perDay={eq.pricePerDay}
           jornadas={fechaDesde ? jornadas : 0}
@@ -124,7 +122,6 @@ export function EquipmentRowMobile({
           conIva={conIva}
           size="sm"
           align="right"
-          compact
           className="shrink-0"
         />
 

@@ -306,7 +306,17 @@ def list_equipos(
     # catálogo: se excluye SIEMPRE (público y admin), filtros incluidos.
     base_sql += " AND e.es_recurso_interno = FALSE"
 
-    is_admin = bool(get_session(request))
+    session = get_session(request)
+    is_admin = bool(session)
+    # Descuento de catálogo (jornadas vs. cliente, no acumulable): solo aplica
+    # para una sesión CLIENTE puntual (no admin) — mismo criterio de precedencia
+    # que `routes/alquileres/cotizacion.py` (un admin navegando el catálogo no
+    # tiene "su propio" descuento de cliente que mostrar).
+    cliente_id = (
+        session["cliente_id"]
+        if session and session.get("role") == "cliente" and session.get("cliente_id")
+        else None
+    )
     if solo_visibles or not is_admin:
         base_sql += " AND e.visible_catalogo = 1 AND e.estado != 'fuera_servicio'"
 
@@ -412,6 +422,7 @@ def list_equipos(
             hasta=hasta,
             is_admin=is_admin,
             incluir_detalle=incluir_detalle_val,
+            cliente_id=cliente_id,
         )
     # Cache: respuesta pública estable para un set dado de params;
     # admin recibe no-store (ve equipos no-visibles y filtros extra).
@@ -423,7 +434,12 @@ def list_equipos(
 
 
 @router.get("/equipos/{id_or_slug}")
-def get_equipo(id_or_slug: str):
+def get_equipo(
+    id_or_slug: str,
+    request: Request,
+    desde: Optional[str] = Query(None, description="Fecha inicio (YYYY-MM-DD) para descuento por jornadas"),
+    hasta: Optional[str] = Query(None, description="Fecha fin (YYYY-MM-DD) para descuento por jornadas"),
+):
     """Devuelve el detalle de un equipo.
 
     Acepta tanto ID numérico puro (`47`) como slug-id mixto al estilo
@@ -433,6 +449,11 @@ def get_equipo(id_or_slug: str):
 
     Si el cliente manda solo el slug sin ID (`sony-fx3-cuerpo`), devuelve
     400 — preferimos ser explícitos y no adivinar.
+
+    `desde`/`hasta` (opcionales, ambas o ninguna): con las fechas del carrito
+    global, la ficha trae el descuento por jornadas/cliente ya resuelto
+    (`descuento_pct`/`descuento_origen`/`precio_jornada_final`) — mismo
+    criterio que `GET /equipos`.
     """
     # Caso 1: ID puro (compat con URLs viejas)
     if id_or_slug.isdigit():
@@ -444,8 +465,15 @@ def get_equipo(id_or_slug: str):
             raise HTTPException(400, "URL inválida — falta el id del equipo")
         actual_id = int(m.group(1))
 
+    session = get_session(request)
+    cliente_id = (
+        session["cliente_id"]
+        if session and session.get("role") == "cliente" and session.get("cliente_id")
+        else None
+    )
+
     with get_db() as conn:
-        equipo = proyectar_uno(conn, actual_id)
+        equipo = proyectar_uno(conn, actual_id, desde=desde, hasta=hasta, cliente_id=cliente_id)
     if not equipo:
         raise HTTPException(404, "Equipo no encontrado")
     return equipo

@@ -97,6 +97,13 @@ export type Equipment = {
   disponible?: number;
   /** A1 #635: tipo de producto. */
   tipo?: "simple" | "kit" | "combo";
+  /** Descuento ganador (cliente vs. jornadas) ya resuelto por el backend —
+   *  solo presente cuando se consulta con fechas. Ver `PriceBlock`. */
+  discountPct?: number;
+  discountOrigin?: "cliente" | "jornadas" | null;
+  /** Precio por jornada con el descuento ya aplicado (backend). Igual a
+   *  `pricePerDay` sin descuento o en un combo. */
+  pricePerDayFinal?: number;
   /** Dict raw de specs estructuradas keyed por spec_key (Fase H: filtros
    *  públicos dinámicos). Cada entry tiene la metadata del template
    *  necesaria para construir UI de filtros: {value, label, tipo,

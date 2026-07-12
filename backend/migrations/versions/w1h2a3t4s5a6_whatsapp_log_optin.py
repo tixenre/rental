@@ -7,7 +7,7 @@ parcial de `whatsapp_log` da idempotencia por pedido (un envío 'sent' por
 demostrable que exige Meta (default FALSE).
 
 Revision ID: w1h2a3t4s5a6
-Revises: f604c6bd934c
+Revises: t3l3f0n0bkfl
 Create Date: 2026-07-11
 """
 
@@ -16,7 +16,7 @@ from typing import Sequence, Union
 from alembic import op
 
 revision: str = "w1h2a3t4s5a6"
-down_revision: Union[str, Sequence[str], None] = "f604c6bd934c"
+down_revision: Union[str, Sequence[str], None] = "t3l3f0n0bkfl"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

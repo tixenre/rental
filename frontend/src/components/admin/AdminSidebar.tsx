@@ -121,21 +121,21 @@ export function AdminSidebar({ email }: { email: string }) {
       </SidebarHeader>
 
       <SidebarContent>
-        {/* Buscador global ⌘K — despacha el evento que abre el command palette. */}
+        {/* Buscador global ⌘F — despacha el evento que abre el command palette. */}
         <SidebarGroup className="pb-0">
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   onClick={() => window.dispatchEvent(new Event("admin:cmdk"))}
-                  tooltip={collapsed ? "Buscar (⌘K)" : undefined}
+                  tooltip={collapsed ? "Buscar (⌘F)" : undefined}
                 >
                   <Search className="h-4 w-4 shrink-0" />
                   {!collapsed && (
                     <>
                       <span className="text-muted-foreground">Buscar…</span>
                       <kbd className="ml-auto rounded border hairline px-1.5 py-0.5 font-mono text-2xs text-muted-foreground">
-                        ⌘K
+                        ⌘F
                       </kbd>
                     </>
                   )}

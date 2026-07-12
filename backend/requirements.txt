@@ -9,6 +9,9 @@ itsdangerous==2.2.0
 pydantic==2.13.4
 pydantic-settings==2.14.2
 email-validator==2.2.0
+# Normalización/validación de teléfonos → E.164 (services/telefono.py, puerta
+# única: inscripciones a talleres + contacto + WhatsApp). libphonenumber de Google.
+phonenumbers==9.0.34
 # psycopg3 — driver moderno (sync). Runtime usa este; psycopg2 queda solo para Alembic/SQLAlchemy.
 psycopg[binary]==3.3.4
 psycopg_pool==3.3.1
