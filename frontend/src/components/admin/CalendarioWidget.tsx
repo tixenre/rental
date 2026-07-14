@@ -4,8 +4,15 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { fmtArs, formatFechaCorta } from "@/lib/format";
 import { Button } from "@/design-system/ui/button";
 import { SegmentedControl } from "@/design-system/ui/segmented-control";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/design-system/ui/tooltip";
 import { adminApi, type CalendarioPedido } from "@/lib/admin/api";
 import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
 import { estadoClase } from "@/design-system/ui/estado-color";
@@ -248,100 +255,119 @@ export function CalendarioWidget({
         </div>
       )}
 
-      <div className="rounded-lg border hairline overflow-hidden bg-background">
-        <div className="grid grid-cols-7 border-b hairline">
-          {DIAS.map((d) => (
-            <div key={d} className="px-2 py-1.5 t-eyebrow text-center">
-              {d}
-            </div>
-          ))}
-        </div>
-        {semanas.map((semana, wi) => {
-          const segmentos = segmentosDeSemana(semana, byDay);
-          const { ubicados } = asignarCarriles(segmentos, maxCarriles);
-          // "+N más" por día = lo que ese día tiene en byDay menos lo que
-          // efectivamente quedó cubierto por una barra ubicada — así el
-          // conteo sigue siendo verdad aunque un pedido largo ocupe varios
-          // carriles-semana distintos a lo largo del mes.
-          const overflowPorDia = semana.map((d, i) => {
-            const total = (byDay.get(ymd(d)) ?? []).length;
-            const cubiertos = ubicados.filter((u) => u.colStart <= i && i <= u.colEnd).length;
-            return Math.max(0, total - cubiertos);
-          });
-          return (
-            <div
-              key={wi}
-              className="grid"
-              style={{
-                gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-                gridTemplateRows: `auto repeat(${maxCarriles}, ${altoCarril}px) auto`,
-              }}
-            >
-              {semana.map((d, i) => {
-                const k = ymd(d);
-                const inMonth = view === "semana" ? true : d.getMonth() === cursorMonth;
-                const isToday = ymd(today) === k;
-                return (
-                  <div
-                    key={k}
-                    style={{ gridColumn: i + 1, gridRow: "1 / -1" }}
-                    className={cn(
-                      minCellHeight,
-                      "border-r border-b hairline p-1.5",
-                      inMonth ? "bg-background" : "bg-muted/30",
-                    )}
-                  >
+      <TooltipProvider delayDuration={200}>
+        <div className="rounded-lg border hairline overflow-hidden bg-background">
+          <div className="grid grid-cols-7 border-b hairline">
+            {DIAS.map((d) => (
+              <div key={d} className="px-2 py-1.5 t-eyebrow text-center">
+                {d}
+              </div>
+            ))}
+          </div>
+          {semanas.map((semana, wi) => {
+            const segmentos = segmentosDeSemana(semana, byDay);
+            const { ubicados } = asignarCarriles(segmentos, maxCarriles);
+            // "+N más" por día = lo que ese día tiene en byDay menos lo que
+            // efectivamente quedó cubierto por una barra ubicada — así el
+            // conteo sigue siendo verdad aunque un pedido largo ocupe varios
+            // carriles-semana distintos a lo largo del mes.
+            const overflowPorDia = semana.map((d, i) => {
+              const total = (byDay.get(ymd(d)) ?? []).length;
+              const cubiertos = ubicados.filter((u) => u.colStart <= i && i <= u.colEnd).length;
+              return Math.max(0, total - cubiertos);
+            });
+            return (
+              <div
+                key={wi}
+                className="grid"
+                style={{
+                  gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                  gridTemplateRows: `auto repeat(${maxCarriles}, ${altoCarril}px) auto`,
+                }}
+              >
+                {semana.map((d, i) => {
+                  const k = ymd(d);
+                  const inMonth = view === "semana" ? true : d.getMonth() === cursorMonth;
+                  const isToday = ymd(today) === k;
+                  return (
                     <div
+                      key={k}
+                      style={{ gridColumn: i + 1, gridRow: "1 / -1" }}
                       className={cn(
-                        "text-xs font-mono",
-                        isToday
-                          ? "inline-flex items-center justify-center h-5 min-w-5 rounded-full bg-ink text-background px-1"
-                          : inMonth
-                            ? "text-ink"
-                            : "text-muted-foreground/60",
+                        minCellHeight,
+                        "border-r border-b hairline p-1.5",
+                        inMonth ? "bg-background" : "bg-muted/30",
                       )}
                     >
-                      {d.getDate()}
+                      <div
+                        className={cn(
+                          "text-xs font-mono",
+                          isToday
+                            ? "inline-flex items-center justify-center h-5 min-w-5 rounded-full bg-ink text-background px-1"
+                            : inMonth
+                              ? "text-ink"
+                              : "text-muted-foreground/60",
+                        )}
+                      >
+                        {d.getDate()}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-              {ubicados.map(({ pedido: p, colStart, colEnd, carril, continuaIzq, continuaDer }) => (
-                <button
-                  key={p.id}
-                  onClick={() =>
-                    navigate({ to: "/admin/pedidos/$id", params: { id: String(p.id) } })
-                  }
-                  style={{ gridColumn: `${colStart + 1} / ${colEnd + 2}`, gridRow: carril + 2 }}
-                  className={cn(
-                    "block w-full overflow-hidden truncate text-left px-1 py-0.5 text-2xs leading-tight transition hover:opacity-80",
-                    estadoClase(p.estado),
-                    continuaIzq ? "rounded-l-none" : "rounded-l-sm",
-                    continuaDer ? "rounded-r-none" : "rounded-r-sm",
-                  )}
-                  title={`#${p.numero_pedido ?? p.id} · ${p.cliente_nombre ?? ""} · ${p.equipos ?? ""}`}
-                >
-                  {continuaIzq && "◂ "}
-                  {p.cliente_nombre || `Pedido #${p.numero_pedido ?? p.id}`}
-                  {continuaDer && " ▸"}
-                </button>
-              ))}
-              {overflowPorDia.map(
-                (n, i) =>
-                  n > 0 && (
-                    <div
-                      key={`ov-${i}`}
-                      style={{ gridColumn: i + 1, gridRow: maxCarriles + 2 }}
-                      className="pl-1 text-2xs text-muted-foreground"
-                    >
-                      +{n} más
-                    </div>
+                  );
+                })}
+                {ubicados.map(
+                  ({ pedido: p, colStart, colEnd, carril, continuaIzq, continuaDer }) => (
+                    <Tooltip key={p.id}>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() =>
+                            navigate({ to: "/admin/pedidos/$id", params: { id: String(p.id) } })
+                          }
+                          style={{
+                            gridColumn: `${colStart + 1} / ${colEnd + 2}`,
+                            gridRow: carril + 2,
+                          }}
+                          className={cn(
+                            "block w-full overflow-hidden truncate text-left px-1 py-0.5 text-2xs leading-tight transition hover:opacity-80",
+                            estadoClase(p.estado),
+                            continuaIzq ? "rounded-l-none" : "rounded-l-sm",
+                            continuaDer ? "rounded-r-none" : "rounded-r-sm",
+                          )}
+                        >
+                          {continuaIzq && "◂ "}#{p.numero_pedido ?? p.id} ·{" "}
+                          {p.cliente_nombre || "Sin cliente"}
+                          {continuaDer && " ▸"}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-64 whitespace-normal">
+                        <div className="font-semibold">
+                          #{p.numero_pedido ?? p.id} · {p.cliente_nombre || "Sin cliente"}
+                        </div>
+                        <div className="mt-0.5 opacity-80">
+                          {formatFechaCorta(p.fecha_desde)} → {formatFechaCorta(p.fecha_hasta)}
+                        </div>
+                        {p.equipos && <div className="mt-0.5 opacity-80">{p.equipos}</div>}
+                        <div className="mt-0.5 opacity-80">{fmtArs(p.monto_total)}</div>
+                      </TooltipContent>
+                    </Tooltip>
                   ),
-              )}
-            </div>
-          );
-        })}
-      </div>
+                )}
+                {overflowPorDia.map(
+                  (n, i) =>
+                    n > 0 && (
+                      <div
+                        key={`ov-${i}`}
+                        style={{ gridColumn: i + 1, gridRow: maxCarriles + 2 }}
+                        className="pl-1 text-2xs text-muted-foreground"
+                      >
+                        +{n} más
+                      </div>
+                    ),
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </TooltipProvider>
 
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="text-xs text-muted-foreground">
