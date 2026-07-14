@@ -29,8 +29,12 @@ from database import (
     attach_specs_estructuradas,
     query_ficha_batch,
     shape_ficha_rows,
+    to_datetime,
     MARCA_SUBQUERY,
 )
+from descuentos.queries.cliente import obtener_descuento_cliente
+from descuentos.queries.decision import calcular_descuento_aplicable, calcular_descuento_origen
+from descuentos.queries.jornadas import obtener_descuento_jornadas
 from reservas import calcular_disponibilidad
 from reservas.disponibilidad import _derivar_compuestos
 from reservas.semantics import componentes_de
@@ -40,6 +44,7 @@ from services.categorias import (
     query_categorias_de_equipos,
     shape_categorias_de_equipos_rows,
 )
+from services.precios import jornadas_periodo
 from services.specs import query_equipo_specs_rows, shape_equipo_specs_rows
 
 
@@ -95,6 +100,48 @@ def _attach_disponibilidad(conn, equipos: list, desde: str, hasta: str) -> list:
     return equipos
 
 
+def _resolver_descuento_catalogo(conn, jornadas: int, cliente_id: int | None) -> tuple[float, str | None]:
+    """Descuento GANADOR (cliente vs. jornadas, NO acumulable — `descuentos/`) para
+    mostrar en el catálogo, ANTES del carrito. Costo fijo — 2 queries totales sin
+    importar cuántos equipos tenga la página (mismo criterio GLOBAL FIXED COST que
+    `calcular_disponibilidad`): el % no depende del equipo (solo de jornadas +
+    cliente), así que se resuelve UNA vez acá y se aplica a toda la lista.
+
+    No incluye el override MANUAL (es por-pedido, no existe todavía en el
+    catálogo). Devuelve `(pct, origen)` — `origen` es `None` si `pct == 0`
+    (nadie gana, no hay nada que mostrar)."""
+    descuento_jornadas_pct = obtener_descuento_jornadas(conn, jornadas)
+    descuento_cliente_pct = obtener_descuento_cliente(conn, cliente_id)
+    fuentes = {"cliente": descuento_cliente_pct, "jornadas": descuento_jornadas_pct}
+    pct = calcular_descuento_aplicable(fuentes)
+    origen = calcular_descuento_origen(fuentes) if pct > 0 else None
+    return pct, origen
+
+
+def _aplicar_descuento_a_equipos(equipos: list, pct: float, origen: str | None) -> list:
+    """Adjunta `descuento_pct`/`descuento_origen`/`precio_jornada_final` a cada
+    equipo — PURA (sin DB), sobre la lista ya resuelta por `proyectar_lista`/
+    `proyectar_uno`. Los COMBOS quedan afuera a propósito (Fase C-3, #1219: no
+    acumulan el descuento GLOBAL de cliente/jornadas encima de su propio
+    descuento por componente — `descuentos/CLAUDE.md`) — su `precio_jornada`
+    (ya derivado de `precio_combo`) queda intacto, sin descuento adicional.
+
+    El front NO calcula descuento (MEMORIA 2026-06-29): `precio_jornada_final`
+    ya sale resuelto de acá — el front solo multiplica por jornadas/cantidad,
+    la misma operación que ya hacía sin descuento."""
+    for e in equipos:
+        base = int(e.get("precio_jornada") or 0)
+        if e.get("tipo") == "combo" or pct <= 0:
+            e["descuento_pct"] = 0.0
+            e["descuento_origen"] = None
+            e["precio_jornada_final"] = base
+            continue
+        e["descuento_pct"] = pct
+        e["descuento_origen"] = origen
+        e["precio_jornada_final"] = int(round(base * (1 - pct / 100)))
+    return equipos
+
+
 def _build_order_clause(sort: str | None, pred) -> str:
     """Construye la cláusula ORDER BY según el sort y el predicado de búsqueda."""
     use_score = bool(pred and pred.activo) and sort in (None, "ranking")
@@ -126,6 +173,7 @@ def proyectar_lista(
     hasta: str | None = None,
     is_admin: bool = False,
     incluir_detalle: bool = True,
+    cliente_id: int | None = None,
 ) -> dict:
     """Ensambla la lista paginada de equipos para el catálogo.
 
@@ -141,9 +189,17 @@ def proyectar_lista(
         pred:           Predicado de búsqueda fuzzy (busqueda.construir) o None.
         page:           Número de página (1-based).
         per_page:       Items por página.
-        desde, hasta:   Fechas YYYY-MM-DD para disponibilidad (ambas o ninguna).
+        desde, hasta:   Fechas YYYY-MM-DD para disponibilidad Y descuento (ambas o
+                        ninguna) — con las dos presentes, cada equipo trae
+                        `descuento_pct`/`descuento_origen`/`precio_jornada_final`
+                        (el descuento ganador cliente-vs-jornadas, ver
+                        `_resolver_descuento_catalogo`).
         is_admin:       Si True, incluye equipos no visibles y salta el filtro
                         de stock teórico.
+        cliente_id:     Sesión cliente (opcional) resuelta por el route — si tiene
+                        un descuento mayor al de jornadas, gana y se muestra acá
+                        (no solo en el carrito). `None` → solo compite el de
+                        jornadas (anónimo o admin navegando el catálogo).
         incluir_detalle: Si False, saltea attach_kit/attach_ficha/specs — para
                         vistas de LISTADO que no los muestran (la tabla del
                         admin solo lee nombre/marca/categoría/precio/stock; el
@@ -250,12 +306,23 @@ def proyectar_lista(
 
     if desde and hasta:
         equipos = _attach_disponibilidad(conn, equipos, desde, hasta)
+        jornadas = jornadas_periodo(to_datetime(desde), to_datetime(hasta))
+        pct, origen = _resolver_descuento_catalogo(conn, jornadas, cliente_id)
+        equipos = _aplicar_descuento_a_equipos(equipos, pct, origen)
 
     return {"total": total, "page": page, "per_page": per_page, "items": equipos}
 
 
-def proyectar_uno(conn, equipo_id: int) -> dict | None:
+def proyectar_uno(
+    conn, equipo_id: int, *, desde: str | None = None, hasta: str | None = None,
+    cliente_id: int | None = None,
+) -> dict | None:
     """Ensambla el detalle de un equipo para /api/equipos/{id}.
+
+    `desde`/`hasta`/`cliente_id`: mismo tratamiento de descuento que
+    `proyectar_lista` (ver su docstring) — opcional, un solo equipo no necesita
+    el "GLOBAL FIXED COST" pero comparte la misma función de resolución para
+    no duplicar el criterio.
 
     Retorna None si el equipo no existe. El route se encarga del 404.
 
@@ -318,6 +385,11 @@ def proyectar_uno(conn, equipo_id: int) -> dict | None:
     if equipo.get("tipo") == "combo":
         from services.precios import precio_combo
         equipo["precio_jornada"] = precio_combo(conn, equipo_id)
+
+    if desde and hasta:
+        jornadas = jornadas_periodo(to_datetime(desde), to_datetime(hasta))
+        pct, origen = _resolver_descuento_catalogo(conn, jornadas, cliente_id)
+        [equipo] = _aplicar_descuento_a_equipos([equipo], pct, origen)
 
     return equipo
 

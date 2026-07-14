@@ -87,3 +87,17 @@ y la ruta `/admin/diseño` es admin-gated → no se renderiza local). Fix `f465a
 `categoria.$slug.tsx` (`grid-cols-2→md:4` + cap de ancho). Repetible para cualquier futuro specimen de
 un componente container-coupled.
 ✅ aplicada — cierre de gobernanza 2026-06-30 (caso testigo 3d en `design-system/SKILL.md`)
+
+2026-07-14 · pulido-frontend · Al verificar un cambio de LAYOUT (grid-column spanning, posicionamiento
+absoluto/relativo, algo que no es solo color/texto), preferir medición estructural por JS
+(`getComputedStyle`, `getBoundingClientRect`, leer `gridColumn`/`gridRow` computados) por sobre
+scrollear + comparar screenshots — sumar el screenshot solo al final, con el viewport agrandado
+(`resize_window` a una altura que contenga todo el contenido) en vez de scrollear un viewport chico. ·
+Por qué: verificando el calendario admin (barras multi-día + color por estado), `computer scroll`
+tiró timeouts falsos repetidos (el scroll SÍ se aplicaba pero la tool reportaba error) y hubo un
+desfasaje real entre las coordenadas de `getBoundingClientRect()`/clicks y el recorte del screenshot
+(un elemento medido en `top:180` aparecía en la mitad inferior de la imagen) — varios intentos
+perdidos antes de confirmar el fix por JS (`gridColumn` computado + `backgroundColor` variando por
+estado real, cambiando un estado de prueba y viendo el color reaccionar) y recién después un
+screenshot limpio agrandando la ventana a 1280×1400. La medición por JS hubiera confirmado el fix en
+el primer intento.

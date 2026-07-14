@@ -10,7 +10,6 @@ import {
   Check,
   AlertTriangle,
   Coins,
-  ArrowRight,
   Plus,
   Minus,
   X,
@@ -554,19 +553,24 @@ function PedidoEditorPage() {
             <button
               type="button"
               onClick={() => setOpenDateModal(true)}
-              className="flex w-full items-center gap-3 rounded-lg border hairline bg-surface-elevated px-3.5 py-2.5 text-left transition hover:border-ink min-h-[44px]"
+              className="@container flex w-full items-center gap-3 rounded-lg border hairline bg-surface-elevated px-3.5 py-2.5 text-left transition hover:border-ink min-h-[44px]"
             >
               {startDate && endDate ? (
                 <>
-                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-sm tabular-nums text-ink">
-                      {format(startDate, "dd MMM yyyy", { locale: es })} · {startTime}
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <span className="font-mono text-sm tabular-nums text-ink">
-                      {format(endDate, "dd MMM yyyy", { locale: es })} · {endTime}
-                    </span>
+                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0 self-start mt-0.5" />
+                  <div className="min-w-0 flex-1 grid grid-cols-1 gap-x-6 gap-y-2 @2xl:grid-cols-2">
+                    <div className="min-w-0">
+                      <div className="t-eyebrow">Retiro</div>
+                      <div className="font-mono text-sm tabular-nums text-ink mt-0.5">
+                        {format(startDate, "EEEE d 'de' MMMM", { locale: es })} · {startTime}
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="t-eyebrow">Devolución</div>
+                      <div className="font-mono text-sm tabular-nums text-ink mt-0.5">
+                        {format(endDate, "EEEE d 'de' MMMM", { locale: es })} · {endTime}
+                      </div>
+                    </div>
                   </div>
                   <span className="ml-auto card px-2.5 py-1 text-center shrink-0">
                     <span className="font-mono text-base font-semibold leading-none">
