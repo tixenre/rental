@@ -13,7 +13,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/design-system/ui/tooltip";
-import { adminApi, type CalendarioPedido } from "@/lib/admin/api";
+import { Popover, PopoverContent, PopoverTrigger } from "@/design-system/ui/popover";
+import { adminApi, type CalendarioPedido, type PedidoEstado } from "@/lib/admin/api";
 import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
 import { estadoClase } from "@/design-system/ui/estado-color";
 
@@ -32,6 +33,16 @@ const MESES = [
   "Diciembre",
 ];
 const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+/** Estados que se muestran en la leyenda y sirven de filtro clickeable —
+ * los mismos que el backend devuelve en `get_calendario`. */
+const LEGEND_ESTADOS: PedidoEstado[] = [
+  "presupuesto",
+  "confirmado",
+  "retirado",
+  "devuelto",
+  "finalizado",
+];
 
 const ymd = (d: Date) => {
   const y = d.getFullYear();
@@ -130,6 +141,8 @@ export function CalendarioWidget({
   const [cursor, setCursor] = useState(
     new Date(today.getFullYear(), today.getMonth(), today.getDate()),
   );
+  // Filtro por estado (clic en la leyenda). null = todos.
+  const [filtroEstado, setFiltroEstado] = useState<PedidoEstado | null>(null);
 
   const { cells, rangeStart, rangeEnd, headerLabel } = useMemo(() => {
     if (view === "semana") {
@@ -173,12 +186,20 @@ export function CalendarioWidget({
   const calQ = useQuery({
     queryKey: ["admin", "calendario", rangeStart, rangeEnd],
     queryFn: () => adminApi.getCalendario(rangeStart, rangeEnd),
-    staleTime: 0,
+    staleTime: 30_000,
   });
+
+  // Pedidos que efectivamente se pintan: todos, o solo el estado filtrado.
+  // byDay/segmentos/overflow/conteo derivan de acá → el filtro se respeta en
+  // todo el widget con una sola fuente.
+  const pedidosVisibles = useMemo(() => {
+    const data = calQ.data ?? [];
+    return filtroEstado ? data.filter((p) => p.estado === filtroEstado) : data;
+  }, [calQ.data, filtroEstado]);
 
   const byDay = useMemo(() => {
     const map = new Map<string, CalendarioPedido[]>();
-    for (const p of calQ.data ?? []) {
+    for (const p of pedidosVisibles) {
       const start = new Date(p.fecha_desde);
       const end = new Date(p.fecha_hasta);
       const cur = new Date(start);
@@ -190,11 +211,14 @@ export function CalendarioWidget({
       }
     }
     return map;
-  }, [calQ.data]);
+  }, [pedidosVisibles]);
 
   const cursorMonth = cursor.getMonth();
   const compact = variant === "compact";
-  const maxCarriles = compact ? 2 : 3;
+  // La vista Semana tiene una sola fila y todo el alto libre → muchos más
+  // carriles antes de caer en overflow. La vista Mes se queda compacta (si no,
+  // 5-6 filas de semana × 8 carriles = un scroll enorme).
+  const maxCarriles = view === "semana" ? 8 : compact ? 2 : 3;
   const minCellHeight = compact ? "min-h-[78px]" : "min-h-[110px]";
   // Alto de fila fijo por carril — la altura de celda de arriba ya reserva
   // aire suficiente para maxCarriles filas de este alto + la fila del número.
@@ -351,18 +375,51 @@ export function CalendarioWidget({
                     </Tooltip>
                   ),
                 )}
-                {overflowPorDia.map(
-                  (n, i) =>
-                    n > 0 && (
-                      <div
-                        key={`ov-${i}`}
-                        style={{ gridColumn: i + 1, gridRow: maxCarriles + 2 }}
-                        className="pl-1 text-2xs text-muted-foreground"
-                      >
-                        +{n} más
-                      </div>
-                    ),
-                )}
+                {overflowPorDia.map((n, i) => {
+                  if (n <= 0) return null;
+                  const d = semana[i];
+                  const delDia = byDay.get(ymd(d)) ?? [];
+                  // El popover lista TODOS los pedidos del día (visibles +
+                  // ocultos) — así los que caían en overflow dejan de ser
+                  // inalcanzables y hay contexto completo del día.
+                  return (
+                    <Popover key={`ov-${i}`}>
+                      <PopoverTrigger asChild>
+                        <button
+                          style={{ gridColumn: i + 1, gridRow: maxCarriles + 2 }}
+                          className="pl-1 text-left text-2xs text-muted-foreground transition hover:text-ink"
+                        >
+                          +{n} más
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-72 p-2">
+                        <div className="mb-1.5 px-1 text-xs font-semibold text-ink">
+                          {d.getDate()} {MESES[d.getMonth()].slice(0, 3)} · {delDia.length}{" "}
+                          {delDia.length === 1 ? "pedido" : "pedidos"}
+                        </div>
+                        <div className="flex max-h-72 flex-col gap-0.5 overflow-auto">
+                          {delDia.map((p) => (
+                            <button
+                              key={p.id}
+                              onClick={() =>
+                                navigate({ to: "/admin/pedidos/$id", params: { id: String(p.id) } })
+                              }
+                              className="flex items-center gap-2 rounded-sm px-1.5 py-1 text-left text-xs transition hover:bg-muted"
+                            >
+                              <span className="shrink-0 font-mono text-2xs text-muted-foreground">
+                                #{p.numero_pedido ?? p.id}
+                              </span>
+                              <span className="flex-1 truncate">
+                                {p.cliente_nombre || "Sin cliente"}
+                              </span>
+                              <EstadoBadge estado={p.estado} className="shrink-0" />
+                            </button>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  );
+                })}
               </div>
             );
           })}
@@ -371,14 +428,39 @@ export function CalendarioWidget({
 
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="text-xs text-muted-foreground">
-          {calQ.isLoading ? "Cargando…" : `${calQ.data?.length ?? 0} pedidos en pantalla`}
+          {calQ.isLoading
+            ? "Cargando…"
+            : `${pedidosVisibles.length} ${pedidosVisibles.length === 1 ? "pedido" : "pedidos"} en pantalla`}
         </div>
         {showLegend && (
-          <div className="flex flex-wrap gap-1.5 text-xs">
-            {(["presupuesto", "confirmado", "retirado", "devuelto", "finalizado"] as const).map(
-              (e) => (
-                <EstadoBadge key={e} estado={e} />
-              ),
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            {LEGEND_ESTADOS.map((e) => {
+              const activo = filtroEstado === e;
+              return (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => setFiltroEstado(activo ? null : e)}
+                  aria-pressed={activo}
+                  title={activo ? `Quitar filtro: ${e}` : `Filtrar por ${e}`}
+                  className={cn(
+                    "rounded-full transition",
+                    filtroEstado !== null && !activo && "opacity-40 hover:opacity-100",
+                    activo && "ring-2 ring-ink/30 ring-offset-1 ring-offset-background",
+                  )}
+                >
+                  <EstadoBadge estado={e} />
+                </button>
+              );
+            })}
+            {filtroEstado && (
+              <button
+                type="button"
+                onClick={() => setFiltroEstado(null)}
+                className="text-muted-foreground underline underline-offset-2 hover:text-ink"
+              >
+                Ver todos
+              </button>
             )}
           </div>
         )}
