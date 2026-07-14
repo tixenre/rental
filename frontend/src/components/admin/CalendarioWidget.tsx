@@ -3,10 +3,12 @@ import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import { Button } from "@/design-system/ui/button";
 import { SegmentedControl } from "@/design-system/ui/segmented-control";
 import { adminApi, type CalendarioPedido } from "@/lib/admin/api";
 import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
+import { estadoClase } from "@/design-system/ui/estado-color";
 
 const MESES = [
   "Enero",
@@ -32,6 +34,71 @@ const ymd = (d: Date) => {
 };
 
 type View = "mes" | "semana";
+
+/** Un pedido dentro de UNA semana del grid: en qué columna (0-6, lun-dom)
+ * arranca/termina EN ESA FILA, y si continúa más allá de sus bordes (la
+ * misma reserva puede cruzar varias filas-semana). */
+type Segmento = {
+  pedido: CalendarioPedido;
+  colStart: number;
+  colEnd: number;
+  continuaIzq: boolean;
+  continuaDer: boolean;
+};
+
+/** Para una semana (7 días consecutivos), calcula qué pedidos la atraviesan y
+ * en qué rango de columnas. Reusa `byDay` (no recalcula fechas a mano) para
+ * que la inclusión de días sea IDÉNTICA a la que ya usa el resto del widget —
+ * sin esto, un desajuste de horas en fecha_desde/hasta correría el segmento
+ * un día de más o de menos respecto de los chips que antes se veían por día. */
+function segmentosDeSemana(semana: Date[], byDay: Map<string, CalendarioPedido[]>): Segmento[] {
+  const rango = new Map<number, { colStart: number; colEnd: number }>();
+  const porId = new Map<number, CalendarioPedido>();
+  semana.forEach((d, col) => {
+    for (const p of byDay.get(ymd(d)) ?? []) {
+      porId.set(p.id, p);
+      const r = rango.get(p.id);
+      if (r) r.colEnd = col;
+      else rango.set(p.id, { colStart: col, colEnd: col });
+    }
+  });
+  return [...rango.entries()].map(([id, { colStart, colEnd }]) => {
+    const pedido = porId.get(id)!;
+    return {
+      pedido,
+      colStart,
+      colEnd,
+      // Si el propio fecha_desde/hasta cae ANTES/DESPUÉS de esta semana, el
+      // segmento está recortado (clamped) → borde plano, sigue en la fila vecina.
+      continuaIzq: new Date(pedido.fecha_desde) < semana[0],
+      continuaDer: new Date(pedido.fecha_hasta) > semana[6],
+    };
+  });
+}
+
+/** Empaquetado greedy en "carriles" (mismo algoritmo que un calendario tipo
+ * Google/FullCalendar): ordena por inicio y asigna cada segmento al primer
+ * carril libre para su rango de columnas. Lo que no entra en `maxCarriles`
+ * queda en `overflow` (se resume como "+N más" por día). */
+function asignarCarriles(segmentos: Segmento[], maxCarriles: number) {
+  const ordenados = [...segmentos].sort(
+    (a, b) => a.colStart - b.colStart || b.colEnd - b.colStart - (a.colEnd - a.colStart),
+  );
+  const finDeCarril: number[] = [];
+  const ubicados: (Segmento & { carril: number })[] = [];
+  const overflow: Segmento[] = [];
+  for (const seg of ordenados) {
+    let carril = finDeCarril.findIndex((fin) => fin < seg.colStart);
+    if (carril === -1) carril = finDeCarril.length;
+    if (carril >= maxCarriles) {
+      overflow.push(seg);
+      continue;
+    }
+    finDeCarril[carril] = seg.colEnd;
+    ubicados.push({ ...seg, carril });
+  }
+  return { ubicados, overflow };
+}
 
 export type CalendarioWidgetProps = {
   /** "compact" baja la altura de cada celda y muestra menos pedidos por día. */
@@ -120,8 +187,18 @@ export function CalendarioWidget({
 
   const cursorMonth = cursor.getMonth();
   const compact = variant === "compact";
-  const maxPedidosPorDia = compact ? 2 : 3;
+  const maxCarriles = compact ? 2 : 3;
   const minCellHeight = compact ? "min-h-[78px]" : "min-h-[110px]";
+  // Alto de fila fijo por carril — la altura de celda de arriba ya reserva
+  // aire suficiente para maxCarriles filas de este alto + la fila del número.
+  const altoCarril = compact ? 20 : 22;
+
+  // Filas-semana de 7 días — la vista "semana" ya es una sola.
+  const semanas = useMemo(() => {
+    const out: Date[][] = [];
+    for (let i = 0; i < cells.length; i += 7) out.push(cells.slice(i, i + 7));
+    return out;
+  }, [cells]);
 
   const goPrev = () => {
     const d = new Date(cursor);
@@ -179,55 +256,91 @@ export function CalendarioWidget({
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7">
-          {cells.map((d, i) => {
-            const k = ymd(d);
-            const inMonth = view === "semana" ? true : d.getMonth() === cursorMonth;
-            const isToday = ymd(today) === k;
-            const pedidos = byDay.get(k) ?? [];
-            return (
-              <div
-                key={i}
-                className={`${minCellHeight} border-r border-b hairline p-1.5 ${
-                  inMonth ? "bg-background" : "bg-muted/30"
-                }`}
-              >
-                <div
-                  className={`text-xs font-mono mb-1 ${
-                    isToday
-                      ? "inline-flex items-center justify-center h-5 min-w-5 rounded-full bg-ink text-background px-1"
-                      : inMonth
-                        ? "text-ink"
-                        : "text-muted-foreground/60"
-                  }`}
-                >
-                  {d.getDate()}
-                </div>
-                <div className="space-y-1">
-                  {pedidos.slice(0, maxPedidosPorDia).map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() =>
-                        navigate({ to: "/admin/pedidos/$id", params: { id: String(p.id) } })
-                      }
-                      className="block w-full text-left rounded-sm bg-accent/40 hover:bg-accent/70 px-1 py-0.5 text-2xs leading-tight"
-                      title={`#${p.numero_pedido ?? p.id} · ${p.cliente_nombre ?? ""} · ${p.equipos ?? ""}`}
+        {semanas.map((semana, wi) => {
+          const segmentos = segmentosDeSemana(semana, byDay);
+          const { ubicados } = asignarCarriles(segmentos, maxCarriles);
+          // "+N más" por día = lo que ese día tiene en byDay menos lo que
+          // efectivamente quedó cubierto por una barra ubicada — así el
+          // conteo sigue siendo verdad aunque un pedido largo ocupe varios
+          // carriles-semana distintos a lo largo del mes.
+          const overflowPorDia = semana.map((d, i) => {
+            const total = (byDay.get(ymd(d)) ?? []).length;
+            const cubiertos = ubicados.filter((u) => u.colStart <= i && i <= u.colEnd).length;
+            return Math.max(0, total - cubiertos);
+          });
+          return (
+            <div
+              key={wi}
+              className="grid"
+              style={{
+                gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                gridTemplateRows: `auto repeat(${maxCarriles}, ${altoCarril}px) auto`,
+              }}
+            >
+              {semana.map((d, i) => {
+                const k = ymd(d);
+                const inMonth = view === "semana" ? true : d.getMonth() === cursorMonth;
+                const isToday = ymd(today) === k;
+                return (
+                  <div
+                    key={k}
+                    style={{ gridColumn: i + 1, gridRow: "1 / -1" }}
+                    className={cn(
+                      minCellHeight,
+                      "border-r border-b hairline p-1.5",
+                      inMonth ? "bg-background" : "bg-muted/30",
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "text-xs font-mono",
+                        isToday
+                          ? "inline-flex items-center justify-center h-5 min-w-5 rounded-full bg-ink text-background px-1"
+                          : inMonth
+                            ? "text-ink"
+                            : "text-muted-foreground/60",
+                      )}
                     >
-                      <div className="truncate text-ink">
-                        {p.cliente_nombre || `Pedido #${p.numero_pedido ?? p.id}`}
-                      </div>
-                    </button>
-                  ))}
-                  {pedidos.length > maxPedidosPorDia && (
-                    <div className="text-2xs text-muted-foreground pl-1">
-                      +{pedidos.length - maxPedidosPorDia} más
+                      {d.getDate()}
                     </div>
+                  </div>
+                );
+              })}
+              {ubicados.map(({ pedido: p, colStart, colEnd, carril, continuaIzq, continuaDer }) => (
+                <button
+                  key={p.id}
+                  onClick={() =>
+                    navigate({ to: "/admin/pedidos/$id", params: { id: String(p.id) } })
+                  }
+                  style={{ gridColumn: `${colStart + 1} / ${colEnd + 2}`, gridRow: carril + 2 }}
+                  className={cn(
+                    "block w-full overflow-hidden truncate text-left px-1 py-0.5 text-2xs leading-tight transition hover:opacity-80",
+                    estadoClase(p.estado),
+                    continuaIzq ? "rounded-l-none" : "rounded-l-sm",
+                    continuaDer ? "rounded-r-none" : "rounded-r-sm",
                   )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                  title={`#${p.numero_pedido ?? p.id} · ${p.cliente_nombre ?? ""} · ${p.equipos ?? ""}`}
+                >
+                  {continuaIzq && "◂ "}
+                  {p.cliente_nombre || `Pedido #${p.numero_pedido ?? p.id}`}
+                  {continuaDer && " ▸"}
+                </button>
+              ))}
+              {overflowPorDia.map(
+                (n, i) =>
+                  n > 0 && (
+                    <div
+                      key={`ov-${i}`}
+                      style={{ gridColumn: i + 1, gridRow: maxCarriles + 2 }}
+                      className="pl-1 text-2xs text-muted-foreground"
+                    >
+                      +{n} más
+                    </div>
+                  ),
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className="flex items-center justify-between gap-2 flex-wrap">
