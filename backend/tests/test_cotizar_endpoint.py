@@ -560,3 +560,147 @@ class TestTargetFiscalProductora:
 
         # Sin membership, la productora se ignora — sigue en consumidor_final (sin IVA).
         assert out["con_iva"] is False
+
+
+class FakeConnConPedido(FakeConn):
+    """FakeConn + una fila de `alquileres` (para `pedido_id`): así se prueba que
+    el preview del editor use el snapshot congelado del pedido, no el descuento
+    del cliente en vivo."""
+
+    def __init__(self, *args, pedido=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pedido = pedido  # {estado, cliente_id, descuento_jornadas_pct, descuento_cliente_pct}
+
+    def fetchone(self):
+        if "FROM alquileres" in self._sql:
+            return self.pedido
+        return super().fetchone()
+
+
+class TestPedidoCongeladoRespetaSnapshot:
+    """Editor de un pedido NO-presupuesto (`pedido_id`): el descuento sale del
+    SNAPSHOT del pedido (plata congelada), no del descuento del cliente EN VIVO.
+    Sin esto, el total del editor divergía de `monto_total` / la lista de pedidos
+    cuando al cliente se le cambiaba el descuento DESPUÉS de confirmar el pedido
+    (MEMORIA 2026-06-06 "plata congelada")."""
+
+    def _data(self, pedido_id=5):
+        return CotizarRequest(
+            items=[CotizarItem(equipo_id=7, cantidad=1)],
+            fecha_desde="2026-06-01T10:00:00",
+            fecha_hasta="2026-06-02T10:00:00",  # 1 jornada
+            cliente_id=99,
+            pedido_id=pedido_id,
+        )
+
+    def test_confirmado_usa_snapshot_cero_no_el_vivo(self, patch_db, monkeypatch):
+        # Cliente HOY tiene 30% en vivo; el pedido se confirmó con 0% congelado.
+        monkeypatch.setattr(alq, "is_admin_email", lambda email: True)
+        patch_db(
+            FakeConnConPedido(
+                precios={7: 10000}, perfil="consumidor_final", descuento=30,
+                pedido={"estado": "confirmado", "cliente_id": 99,
+                        "descuento_jornadas_pct": 0, "descuento_cliente_pct": 0},
+            ),
+            session={"email": "admin@test.com"},
+        )
+        out = cotizar(self._data(), FakeReq())
+        # Ganó el snapshot (0%), NO el 30% en vivo → sin descuento.
+        assert out["descuento_monto"] == 0
+        assert out["neto"] == 10000
+        assert out["descuento_origen"] == "ninguno"
+
+    def test_confirmado_con_snapshot_positivo_lo_respeta(self, patch_db, monkeypatch):
+        # El pedido se congeló con 10%; el cliente hoy tiene 30%. Gana el 10% del snapshot.
+        monkeypatch.setattr(alq, "is_admin_email", lambda email: True)
+        patch_db(
+            FakeConnConPedido(
+                precios={7: 10000}, perfil="consumidor_final", descuento=30,
+                pedido={"estado": "confirmado", "cliente_id": 99,
+                        "descuento_jornadas_pct": 0, "descuento_cliente_pct": 10},
+            ),
+            session={"email": "admin@test.com"},
+        )
+        out = cotizar(self._data(), FakeReq())
+        assert out["descuento_pct"] == 10
+        assert out["descuento_monto"] == 1000
+        assert out["neto"] == 9000
+        assert out["descuento_origen"] == "cliente"
+
+    def test_presupuesto_sigue_el_descuento_en_vivo(self, patch_db, monkeypatch):
+        # Un presupuesto SÍ debe seguir el descuento del cliente en vivo aunque se
+        # pase pedido_id (el builder sigue al cliente que el admin elija).
+        monkeypatch.setattr(alq, "is_admin_email", lambda email: True)
+        patch_db(
+            FakeConnConPedido(
+                precios={7: 10000}, perfil="consumidor_final", descuento=30,
+                pedido={"estado": "presupuesto", "cliente_id": 99,
+                        "descuento_jornadas_pct": 0, "descuento_cliente_pct": 0},
+            ),
+            session={"email": "admin@test.com"},
+        )
+        out = cotizar(self._data(), FakeReq())
+        # Presupuesto → el 30% en vivo SÍ aplica (bruto 10000 − 30% = 7000).
+        assert out["descuento_pct"] == 30
+        assert out["neto"] == 7000
+        assert out["descuento_origen"] == "cliente"
+
+    def test_no_admin_ignora_pedido_id(self, patch_db, monkeypatch):
+        # Sesión no-admin no puede forzar el snapshot de un pedido ajeno vía pedido_id.
+        monkeypatch.setattr(alq, "is_admin_email", lambda email: False)
+        patch_db(
+            FakeConnConPedido(
+                precios={7: 10000}, descuento=0,
+                pedido={"estado": "confirmado", "cliente_id": 99,
+                        "descuento_jornadas_pct": 0, "descuento_cliente_pct": 50},
+            ),
+            session={"role": "cliente", "cliente_id": 42},
+        )
+        out = cotizar(self._data(), FakeReq())
+        # El pedido_id se ignora (no admin) → sin descuento fantasma del snapshot ajeno.
+        assert out["descuento_monto"] == 0
+        assert out["neto"] == 10000
+
+    def test_snapshot_congela_el_descuento_pero_el_iva_sigue_en_vivo(self, patch_db, monkeypatch):
+        # El descuento sale del snapshot (10%), pero el IVA del perfil RI del
+        # cliente se resuelve EN VIVO — el fix congela SOLO el descuento.
+        monkeypatch.setattr(alq, "is_admin_email", lambda email: True)
+        patch_db(
+            FakeConnConPedido(
+                precios={7: 10000}, perfil="responsable_inscripto", descuento=30,
+                pedido={"estado": "confirmado", "cliente_id": 99,
+                        "descuento_jornadas_pct": 0, "descuento_cliente_pct": 10},
+            ),
+            session={"email": "admin@test.com"},
+        )
+        out = cotizar(self._data(), FakeReq())
+        # Descuento 10% (snapshot, NO el 30% vivo) → neto 9000; IVA 21% en vivo → 1890.
+        assert out["descuento_pct"] == 10
+        assert out["neto"] == 9000
+        assert out["con_iva"] is True
+        assert out["iva_monto"] == 1890
+        assert out["total_final"] == 10890
+
+    def test_override_manual_del_admin_gana_sobre_el_snapshot(self, patch_db, monkeypatch):
+        # El override manual del admin (en vivo) gana OUTRIGHT sobre el snapshot
+        # de cliente/jornadas (jerarquía #1219) — el fix no lo congela.
+        monkeypatch.setattr(alq, "is_admin_email", lambda email: True)
+        patch_db(
+            FakeConnConPedido(
+                precios={7: 10000}, perfil="consumidor_final", descuento=30,
+                pedido={"estado": "confirmado", "cliente_id": 99,
+                        "descuento_jornadas_pct": 0, "descuento_cliente_pct": 10},
+            ),
+            session={"email": "admin@test.com"},
+        )
+        data = CotizarRequest(
+            items=[CotizarItem(equipo_id=7, cantidad=1)],
+            fecha_desde="2026-06-01T10:00:00",
+            fecha_hasta="2026-06-02T10:00:00",
+            cliente_id=99, pedido_id=5, descuento_pct=25,
+        )
+        out = cotizar(data, FakeReq())
+        # El manual 25% gana sobre el snapshot 10% del cliente → neto 7500.
+        assert out["descuento_pct"] == 25
+        assert out["neto"] == 7500
+        assert out["descuento_origen"] == "manual"

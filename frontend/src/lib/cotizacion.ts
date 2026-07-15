@@ -183,6 +183,14 @@ export function useCotizacion(args: {
    */
   respetarPrecioItem?: boolean;
   /**
+   * Solo admin, editor de un pedido existente: id del pedido para respetar el
+   * descuento CONGELADO (cliente + jornadas) cuando el pedido ya no es
+   * `presupuesto`. Sin esto, el editor recotiza el descuento del cliente en vivo
+   * y muestra un total distinto al persistido / a la lista. Ver
+   * `CotizarRequest.pedido_id` (backend). En presupuesto no se pasa (vivo).
+   */
+  pedidoId?: number | null;
+  /**
    * Identidad de la entidad DUEÑA de esta cotización (ej. el id del pedido).
    * Sin esto, el hook asume una identidad estable (ej. "el carrito"), donde
    * mostrar el valor anterior mientras se recalcula es lo deseado (sin
@@ -206,6 +214,7 @@ export function useCotizacion(args: {
     descuentoTipo,
     descuentoMonto,
     respetarPrecioItem = false,
+    pedidoId = null,
     resetKey = null,
     enabled = true,
   } = args;
@@ -231,6 +240,7 @@ export function useCotizacion(args: {
     descuento_manual_tipo: descuentoTipo ?? null,
     descuento_manual_monto: descuentoMonto ?? null,
     respetar_precio_item: respetarPrecioItem,
+    pedido_id: pedidoId ?? null,
   };
 
   // Debounce: la query usa el body DEBOUNCEADO. Al tipear rápido, `bodyKey`
