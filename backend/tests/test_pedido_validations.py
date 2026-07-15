@@ -73,7 +73,7 @@ class TestItemsRequired:
     """Validación: items vacíos solo permitido en estado='borrador'."""
 
     def test_items_vacios_estado_presupuesto_400(self):
-        data = PedidoCreate(items=[], estado="presupuesto")
+        data = PedidoCreate(items=[], estado="solicitado")
         with pytest.raises(HTTPException) as exc:
             create_pedido(data)
         assert exc.value.status_code == 400
@@ -106,7 +106,7 @@ class TestValidacionFechas:
 
         data = PedidoCreate(
             items=[PedidoItem(equipo_id=1, cantidad=1, precio_jornada=1000)],
-            estado="presupuesto",
+            estado="solicitado",
             fecha_desde=manana,
             fecha_hasta=ayer_logico,  # más temprano que desde
         )
@@ -120,7 +120,7 @@ class TestValidacionFechas:
 
         data = PedidoCreate(
             items=[PedidoItem(equipo_id=1, cantidad=1, precio_jornada=1000)],
-            estado="presupuesto",
+            estado="solicitado",
             fecha_desde=manana,
             fecha_hasta=manana,  # mismo día → d0 >= d1 → rechaza
         )
@@ -139,7 +139,7 @@ class TestValidacionFechas:
 
         data = PedidoCreate(
             items=[PedidoItem(equipo_id=1, cantidad=1, precio_jornada=1000)],
-            estado="presupuesto",
+            estado="solicitado",
             fecha_desde=ayer,
             fecha_hasta=manana,
         )
@@ -193,7 +193,7 @@ class TestPedidoCreateSchema:
 
     def test_estado_default_presupuesto(self):
         data = PedidoCreate(items=[])
-        assert data.estado == "presupuesto"
+        assert data.estado == "solicitado"
 
     def test_items_default_lista_vacia(self):
         data = PedidoCreate(estado="borrador")

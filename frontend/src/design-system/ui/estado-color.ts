@@ -11,17 +11,21 @@ import type { EstadoPedido } from "./types";
  * Fast Refresh) — mismo patrón que separar un hook de sus componentes.
  */
 export const ESTADO_MAP: Record<EstadoPedido, { label: string; cls: string }> = {
+  // Ciclo de vida por color (2026-07-14): cada etapa activa tiene su propio color
+  // de marca, la progresión "avanza" con el pedido. Borrador (provisorio) y
+  // Finalizado (definitivo) se distinguen por PESO — borrador punteado sin fondo,
+  // finalizado gris sólido con texto oscuro — antes ambos eran el mismo gris.
   borrador: {
     label: "Borrador",
-    cls: "bg-muted text-muted-foreground border-transparent",
+    cls: "bg-transparent text-muted-foreground border-dashed border-muted-foreground/45",
   },
-  presupuesto: {
-    label: "Presupuesto",
-    cls: "bg-azul/10 text-azul-ink border-azul/30",
-  },
+  // `solicitado` (ex-`presupuesto`, renombrado 2026-07-14): el estado inicial. Se
+  // MUESTRA "Solicitud" — el cliente lo solicitó, todavía no es un rental
+  // confirmado. El documento PDF sigue llamándose "Presupuesto" (es el papel, no
+  // el estado). `entregado` es display del portal (hereda el naranja de retirado).
   solicitado: {
-    label: "Solicitado",
-    cls: "bg-amber/15 text-ink border-amber/50",
+    label: "Solicitud",
+    cls: "bg-azul/10 text-azul-ink border-azul/30",
   },
   confirmado: {
     label: "Confirmado",
@@ -29,19 +33,19 @@ export const ESTADO_MAP: Record<EstadoPedido, { label: string; cls: string }> = 
   },
   retirado: {
     label: "Retirado",
-    cls: "bg-verde/20 text-verde-ink border-verde/40",
+    cls: "bg-naranja/15 text-naranja-ink border-naranja/45",
   },
   entregado: {
     label: "Entregado",
-    cls: "bg-verde/20 text-verde-ink border-verde/40",
+    cls: "bg-naranja/15 text-naranja-ink border-naranja/45",
   },
   devuelto: {
     label: "Devuelto",
-    cls: "bg-muted text-muted-foreground border-hairline",
+    cls: "bg-rosa/15 text-rosa-ink border-rosa/45",
   },
   finalizado: {
     label: "Finalizado",
-    cls: "bg-muted text-muted-foreground border-hairline",
+    cls: "bg-muted text-ink border-muted-foreground/45",
   },
   cancelado: {
     label: "Cancelado",

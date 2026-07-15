@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 TEMPLATE_KEY = "recordatorio_retiro"
 
 # Solo se le recuerda a pedidos ya **confirmados**: el cliente sabe que la
-# reserva va en serio y hay una fecha de retiro firme. Un 'presupuesto' todavía
+# reserva va en serio y hay una fecha de retiro firme. Un 'solicitado' todavía
 # no es un compromiso → recordarle "mañana retirás" sería incorrecto.
 ESTADOS_RECORDABLES = ("confirmado",)
 

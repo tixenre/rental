@@ -29,7 +29,7 @@ import { TerminosModal } from "@/components/rental/account/TerminosModal";
 import { ContratoPreviewModal } from "@/components/rental/ContratoPreviewModal";
 import { DOC_DESCRIPTION, DOC_LABEL } from "@/components/cliente/ClientePortalTypes";
 
-/** Los 4 docs disponibles desde "presupuesto" (ver `_documentos_disponibles`
+/** Los 4 docs disponibles desde "solicitado" (ver `_documentos_disponibles`
  *  en el backend) — "factura" queda afuera, no existe hasta que se facture. */
 const DOCS_CHECKOUT = ["remito", "contrato", "albaran", "packing-list"] as const;
 

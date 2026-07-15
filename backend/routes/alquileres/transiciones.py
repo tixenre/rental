@@ -7,10 +7,11 @@ en `detalle.py`/`pagos.py`) — cada uno con su propia validación parcial, sin
 una tabla explícita de qué transiciones son legales. `cambiar_estado()` es
 ahora la ÚNICA puerta: admin y cliente (portal) pasan por acá.
 
-Diseño (a pedido del dueño, sesión 2026-07-06): SIN renombrar estados —
-`ESTADOS_VALIDOS` sigue siendo borrador/presupuesto/confirmado/retirado/
-devuelto/finalizado/cancelado. El admin puede moverse LIBREMENTE hacia
-adelante y hacia atrás entre los estados operativos (necesita poder volver
+Diseño (a pedido del dueño, sesión 2026-07-06): `ESTADOS_VALIDOS` =
+borrador/solicitado/confirmado/retirado/devuelto/finalizado/cancelado (el
+estado inicial se renombró presupuesto→solicitado el 2026-07-15). El admin
+puede moverse LIBREMENTE hacia adelante y hacia atrás entre los estados
+operativos (necesita poder volver
 a corregir un pedido — pasa seguido), con dos excepciones:
 
 1. `finalizado` es "estilo Magento": normalmente se prende SOLO (devuelto +
@@ -41,7 +42,7 @@ from reservas import validar_stock as _check_stock
 
 # Estados que reservan stock activamente — entrar a uno de estos desde uno que
 # NO reserva exige re-validar stock (ver `_requiere_revalidar_stock`).
-ESTADOS_QUE_RESERVAN = {"presupuesto", "confirmado", "retirado"}
+ESTADOS_QUE_RESERVAN = {"solicitado", "confirmado", "retirado"}
 
 # Estados que exigen fechas + ítems + stock ya cargados para poder entrar.
 # `finalizado` incluido por paridad con el comportamiento de siempre — llega
@@ -54,11 +55,11 @@ ESTADOS_REQUIEREN_FECHAS = {"confirmado", "retirado", "devuelto", "finalizado"}
 # `devuelto` (un paso, en cualquier dirección) — ver punto 1 del docstring.
 # `cancelado` no tiene salida — terminal.
 TRANSICIONES: dict[str, set[str]] = {
-    "borrador":    {"presupuesto", "confirmado", "retirado", "devuelto", "cancelado"},
-    "presupuesto": {"borrador", "confirmado", "retirado", "devuelto", "cancelado"},
-    "confirmado":  {"borrador", "presupuesto", "retirado", "devuelto", "cancelado"},
-    "retirado":    {"borrador", "presupuesto", "confirmado", "devuelto"},
-    "devuelto":    {"borrador", "presupuesto", "confirmado", "retirado", "finalizado"},
+    "borrador":    {"solicitado", "confirmado", "retirado", "devuelto", "cancelado"},
+    "solicitado": {"borrador", "confirmado", "retirado", "devuelto", "cancelado"},
+    "confirmado":  {"borrador", "solicitado", "retirado", "devuelto", "cancelado"},
+    "retirado":    {"borrador", "solicitado", "confirmado", "devuelto"},
+    "devuelto":    {"borrador", "solicitado", "confirmado", "retirado", "finalizado"},
     "finalizado":  {"devuelto"},
     "cancelado":   set(),
 }

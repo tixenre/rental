@@ -103,13 +103,13 @@ def test_transicion_hacia_adelante_ok(db_setup):
     conn = get_db()
     try:
         _crear_pedido(conn, _PEDIDO_IDS[0], "borrador")
-        resultado = cambiar_estado(conn, _PEDIDO_IDS[0], "presupuesto", es_admin=True, actor="system")
+        resultado = cambiar_estado(conn, _PEDIDO_IDS[0], "solicitado", es_admin=True, actor="system")
         conn.commit()
         assert resultado == {
-            "estado_anterior": "borrador", "estado_nuevo": "presupuesto", "numero_pedido_asignado": False,
+            "estado_anterior": "borrador", "estado_nuevo": "solicitado", "numero_pedido_asignado": False,
         }
         p = conn.execute("SELECT estado FROM alquileres WHERE id=%s", (_PEDIDO_IDS[0],)).fetchone()
-        assert p["estado"] == "presupuesto"
+        assert p["estado"] == "solicitado"
     finally:
         conn.close()
 
@@ -123,11 +123,11 @@ def test_transicion_hacia_atras_ok(db_setup):
     conn = get_db()
     try:
         _crear_pedido(conn, _PEDIDO_IDS[1], "confirmado")
-        resultado = cambiar_estado(conn, _PEDIDO_IDS[1], "presupuesto", es_admin=True, actor="system")
+        resultado = cambiar_estado(conn, _PEDIDO_IDS[1], "solicitado", es_admin=True, actor="system")
         conn.commit()
-        assert resultado["estado_nuevo"] == "presupuesto"
+        assert resultado["estado_nuevo"] == "solicitado"
         p = conn.execute("SELECT estado FROM alquileres WHERE id=%s", (_PEDIDO_IDS[1],)).fetchone()
-        assert p["estado"] == "presupuesto"
+        assert p["estado"] == "solicitado"
     finally:
         conn.close()
 
@@ -156,7 +156,7 @@ def test_bloquea_volver_a_borrador_si_ya_cobro(db_setup):
 
     conn = get_db()
     try:
-        _crear_pedido(conn, _PEDIDO_IDS[3], "presupuesto", monto_pagado=500)
+        _crear_pedido(conn, _PEDIDO_IDS[3], "solicitado", monto_pagado=500)
         with pytest.raises(HTTPException) as exc:
             cambiar_estado(conn, _PEDIDO_IDS[3], "borrador", es_admin=True, actor="system")
         assert exc.value.status_code == 400
@@ -195,7 +195,7 @@ def test_permite_volver_a_borrador_sin_plata_ni_factura(db_setup):
 
     conn = get_db()
     try:
-        _crear_pedido(conn, _PEDIDO_IDS[5], "presupuesto", monto_pagado=0)
+        _crear_pedido(conn, _PEDIDO_IDS[5], "solicitado", monto_pagado=0)
         resultado = cambiar_estado(conn, _PEDIDO_IDS[5], "borrador", es_admin=True, actor="system")
         conn.commit()
         assert resultado["estado_nuevo"] == "borrador"
@@ -209,7 +209,7 @@ def test_numero_pedido_se_asigna_una_sola_vez_al_confirmar(db_setup):
 
     conn = get_db()
     try:
-        _crear_pedido(conn, _PEDIDO_IDS[6], "presupuesto")
+        _crear_pedido(conn, _PEDIDO_IDS[6], "solicitado")
         r1 = cambiar_estado(conn, _PEDIDO_IDS[6], "confirmado", es_admin=True, actor="system")
         conn.commit()
         assert r1["numero_pedido_asignado"] is True
@@ -219,7 +219,7 @@ def test_numero_pedido_se_asigna_una_sola_vez_al_confirmar(db_setup):
         assert numero is not None
 
         # Retrocede y vuelve a confirmar — no debe reasignar un número nuevo.
-        cambiar_estado(conn, _PEDIDO_IDS[6], "presupuesto", es_admin=True, actor="system")
+        cambiar_estado(conn, _PEDIDO_IDS[6], "solicitado", es_admin=True, actor="system")
         conn.commit()
         r2 = cambiar_estado(conn, _PEDIDO_IDS[6], "confirmado", es_admin=True, actor="system")
         conn.commit()
@@ -238,7 +238,7 @@ def test_cliente_solo_puede_disparar_cancelado(db_setup):
 
     conn = get_db()
     try:
-        _crear_pedido(conn, _PEDIDO_IDS[7], "presupuesto")
+        _crear_pedido(conn, _PEDIDO_IDS[7], "solicitado")
         with pytest.raises(HTTPException) as exc:
             cambiar_estado(conn, _PEDIDO_IDS[7], "confirmado", es_admin=False, actor="cliente@test.com")
         assert exc.value.status_code == 400

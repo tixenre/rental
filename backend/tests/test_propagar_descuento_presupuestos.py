@@ -67,7 +67,7 @@ class FakeConn:
 
     def fetchall(self):
         sql = self._sql
-        if "estado='presupuesto'" in sql:
+        if "estado='solicitado'" in sql:
             return [
                 {"id": i} for i in self.presupuesto_ids_all
                 if not (self.pedido_rows.get(i, {}).get("descuento_pct") or 0)
@@ -86,7 +86,7 @@ class FakeConn:
 
 
 def _pedido(id, cliente_id=5, descuento_pct=0, descuento_manual_tipo="pct", descuento_manual_monto=0,
-            estado="presupuesto", descuento_cliente_pct=0):
+            estado="solicitado", descuento_cliente_pct=0):
     return {
         "id": id,
         "cliente_id": cliente_id,

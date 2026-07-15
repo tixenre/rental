@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-ESTADOS_MODIFICABLES = {"presupuesto", "confirmado"}
+ESTADOS_MODIFICABLES = {"solicitado", "confirmado"}
 
 # ── Items: fuente única + proyección por superficie ──────────────────────────
 # El portal lee los items de un pedido vía los helpers canónicos de
@@ -76,10 +76,10 @@ def _documentos_disponibles(estado: str) -> dict:
     """Devuelve qué PDFs puede descargar el cliente según el estado del pedido.
 
     Los cuatro (Remito, Contrato, Detalle de seguro, Checklist de retiro) están
-    disponibles desde "presupuesto" — apenas se solicita, antes de que Rambla
+    disponibles desde "solicitado" — apenas se solicita, antes de que Rambla
     lo confirme — para que el cliente tenga tiempo de leerlos o consultar a
     su aseguradora sin esperar. El pedido puede seguir modificándose hasta
-    que se confirma (`ESTADOS_MODIFICABLES` incluye "presupuesto"), así que
+    que se confirma (`ESTADOS_MODIFICABLES` incluye "solicitado"), así que
     cada PDF sigue mostrando el badge de estado real (`_membrete(..., estado=True)`
     en pdf_templates.py) como disclaimer — un pedido en "Presupuesto" queda
     visiblemente marcado como provisorio, no como confirmado. "borrador"

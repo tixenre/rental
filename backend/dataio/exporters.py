@@ -442,7 +442,7 @@ def export_alquileres(conn) -> list[dict]:
                 cliente_email=r["cliente_email"],
                 cliente_nombre=r["cliente_nombre"],
                 cliente_telefono=r["cliente_telefono"],
-                estado=r["estado"] or "presupuesto",
+                estado=r["estado"] or "solicitado",
                 fecha_desde=_to_iso(r["fecha_desde"]) or "",
                 fecha_hasta=_to_iso(r["fecha_hasta"]) or "",
                 monto_total=int(r["monto_total"] or 0),

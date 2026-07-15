@@ -79,7 +79,7 @@ export const clienteOrganismosSection: CatalogSection = {
         "El card del pedido en el portal: número, estado, fechas, total y saldo. Click expande el detalle (ítems, timeline, documentos, acciones). Las tres etapas de plata.",
       render: () => (
         <div className="mx-auto flex max-w-2xl flex-col gap-3">
-          <Sample label="sin iniciar — presupuesto, nada pagado">
+          <Sample label="sin iniciar — solicitud, nada pagado">
             <PedidoCardDemo pedido={pedidoPresupuesto} />
           </Sample>
           <Sample label="con seña — confirmado, debe saldo">
@@ -98,7 +98,7 @@ export const clienteOrganismosSection: CatalogSection = {
         "La línea de tiempo del pedido: solicitado → confirmado → retirado → devuelto. Marca el paso actual según el estado.",
       render: () => (
         <div className="mx-auto flex max-w-md flex-col gap-6">
-          <Sample label="presupuesto — paso 1">
+          <Sample label="solicitud — paso 1">
             <PedidoTimeline pedido={pedidoPresupuesto} />
           </Sample>
           <Sample label="finalizado — completo">

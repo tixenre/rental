@@ -262,7 +262,7 @@ def test_lock_serializa_propagar_descuento_vs_apply_items(db_setup):
     try:
         conn.execute(
             "INSERT INTO alquileres (id, cliente_id, cliente_nombre, estado, fecha_desde, fecha_hasta) "
-            "VALUES (%s,%s,%s,'presupuesto',%s,%s)",
+            "VALUES (%s,%s,%s,'solicitado',%s,%s)",
             (PEDIDO_ITEMS, CLIENTE_ID, "Cliente test (items concurrentes)", FD, FH),
         )
         conn.execute(

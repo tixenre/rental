@@ -131,7 +131,7 @@ def _crear_pedido_base(cliente_id=CLIENTE_ID):
         PedidoCreate(
             cliente_id=cliente_id,
             fecha_desde=FD, fecha_hasta=FH,
-            estado="presupuesto",
+            estado="solicitado",
             items=[PedidoItem(equipo_id=EQ_ID, cantidad=1, precio_jornada=1000)],
         ),
         es_admin=True,
@@ -149,7 +149,7 @@ def test_crear_ambos_campos_a_la_vez_400(datos):
             PedidoCreate(
                 cliente_id=CLIENTE_ID,
                 fecha_desde=FD, fecha_hasta=FH,
-                estado="presupuesto",
+                estado="solicitado",
                 items=[PedidoItem(equipo_id=EQ_ID, cantidad=1, precio_jornada=1000)],
                 perfil_fiscal_id=datos["perfil_id"],
                 productora_id=datos["productora_id"],
@@ -168,7 +168,7 @@ def test_crear_productora_de_otro_cliente_404(datos):
             PedidoCreate(
                 cliente_id=CLIENTE_ID,
                 fecha_desde=FD, fecha_hasta=FH,
-                estado="presupuesto",
+                estado="solicitado",
                 items=[PedidoItem(equipo_id=EQ_ID, cantidad=1, precio_jornada=1000)],
                 productora_id=datos["productora_ajena_id"],
             ),
@@ -185,7 +185,7 @@ def test_crear_con_productora_propia_se_persiste(datos):
         PedidoCreate(
             cliente_id=CLIENTE_ID,
             fecha_desde=FD, fecha_hasta=FH,
-            estado="presupuesto",
+            estado="solicitado",
             items=[PedidoItem(equipo_id=EQ_ID, cantidad=1, precio_jornada=1000)],
             productora_id=datos["productora_id"],
         ),

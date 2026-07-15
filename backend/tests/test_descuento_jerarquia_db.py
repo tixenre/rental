@@ -99,7 +99,7 @@ def test_jerarquia_completa_y_congelamiento_al_confirmar(setup):
     pedido = create_pedido(PedidoCreate(
         cliente_id=CLIENTE_ID,
         fecha_desde=FD, fecha_hasta=FH,
-        estado="presupuesto",
+        estado="solicitado",
         items=[PedidoItem(equipo_id=EQ_ID, cantidad=1, precio_jornada=1000)],
     ), es_admin=True)
     pid = pedido["id"]
@@ -187,7 +187,7 @@ def test_confirmado_sin_override_congela_el_fallback_del_cliente(setup):
     pedido = create_pedido(PedidoCreate(
         cliente_id=CLIENTE_ID,
         fecha_desde=FD, fecha_hasta=FH,
-        estado="presupuesto",
+        estado="solicitado",
         items=[PedidoItem(equipo_id=EQ_ID, cantidad=1, precio_jornada=1000)],
     ), es_admin=True)
     pid = pedido["id"]
@@ -239,7 +239,7 @@ def test_confirmado_editar_datos_no_pisa_el_descuento_congelado(setup):
     pedido = create_pedido(PedidoCreate(
         cliente_id=CLIENTE_ID,
         fecha_desde=FD, fecha_hasta=FH,
-        estado="presupuesto",
+        estado="solicitado",
         items=[PedidoItem(equipo_id=EQ_ID, cantidad=1, precio_jornada=1000)],
     ), es_admin=True)
     pid = pedido["id"]
