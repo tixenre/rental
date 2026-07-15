@@ -32,8 +32,11 @@ import type { EstadoPedido } from "@/lib/pedido-estados";
 
 export const ESTADO_LABEL: Record<EstadoPedido, string> = {
   borrador: "Borrador",
-  presupuesto: "Presupuesto",
-  solicitado: "Solicitado",
+  // `presupuesto` (estado real) se muestra "Solicitud" — el cliente lo solicitó,
+  // todavía no es un rental confirmado. Unificado con el portal (2026-07-14). El
+  // documento PDF sigue siendo "Presupuesto".
+  presupuesto: "Solicitud",
+  solicitado: "Solicitud",
   confirmado: "Confirmado",
   retirado: "Retirado",
   entregado: "Entregado",

@@ -132,7 +132,10 @@ def list_pedidos(
 
         total = conn.execute(f"SELECT COUNT(*) FROM alquileres p {where}", params).fetchone()[0]
         rows  = conn.execute(
-            f"SELECT p.* FROM alquileres p {where} ORDER BY {order} LIMIT %s OFFSET %s",
+            f"""SELECT p.*,
+                       EXISTS(SELECT 1 FROM facturas f
+                              WHERE f.pedido_id = p.id AND f.estado = 'emitida') AS facturado
+                FROM alquileres p {where} ORDER BY {order} LIMIT %s OFFSET %s""",
             params + [per_page, offset]
         ).fetchall()
 

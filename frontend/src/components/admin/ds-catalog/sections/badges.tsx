@@ -8,6 +8,7 @@ import { Pill } from "@/design-system/ui/Pill";
 import { CountBadge } from "@/design-system/ui/count-badge";
 import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
 import { PagoBadge } from "@/design-system/ui/PagoBadge";
+import { PagoFacturaBadge } from "@/design-system/ui/PagoFacturaBadge";
 import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { TipoMovimientoBadge } from "@/components/admin/badges";
 import { Badge } from "@/design-system/ui/badge";
@@ -87,6 +88,30 @@ export const badgesSection: CatalogSection = {
           </Sample>
           <Sample label="pagado">
             <PagoBadge pagado={5000} total={5000} estado="devuelto" />
+          </Sample>
+        </Row>
+      ),
+    },
+    {
+      name: "PagoFacturaBadge",
+      files: ["design-system/ui/PagoFacturaBadge.tsx"],
+      blurb:
+        "Micro-tags de Pagado ($ verde) y Facturado (recibo violeta). Juntos = un óvalo partido al medio, sin sumar ancho. Complementa PagoBadge (que muestra el 'Debe $X').",
+      render: () => (
+        <Row className="gap-4">
+          <Sample label="pagado">
+            <PagoFacturaBadge pagado facturado={false} detallePago="Pagado $296.611" />
+          </Sample>
+          <Sample label="facturado">
+            <PagoFacturaBadge pagado={false} facturado detalleFactura="Factura A #123" />
+          </Sample>
+          <Sample label="pagado + facturado">
+            <PagoFacturaBadge
+              pagado
+              facturado
+              detallePago="Pagado $296.611"
+              detalleFactura="Factura A #123"
+            />
           </Sample>
         </Row>
       ),

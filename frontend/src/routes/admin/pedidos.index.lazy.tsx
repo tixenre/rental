@@ -34,6 +34,7 @@ import { nextStep, type EstadoPedido } from "@/lib/pedido-estados";
 import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
 import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
 import { PagoBadge } from "@/design-system/ui/PagoBadge";
+import { PagoFacturaBadge } from "@/design-system/ui/PagoFacturaBadge";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { RegistrarPagoModal } from "@/components/admin/pedido/RegistrarPagoModal";
@@ -80,6 +81,8 @@ function creadoHace(iso?: string): string | null {
 }
 
 const saldoDe = (p: Pedido) => Math.max(0, (p.monto_total ?? 0) - (p.monto_pagado ?? 0));
+// Pagado completo: mismo criterio que el "Pagado" de PagoBadge (pagado ≥ total > 0).
+const estaPagado = (p: Pedido) => (p.monto_total ?? 0) > 0 && saldoDe(p) === 0;
 const tieneSaldo = (p: Pedido) => !["borrador", "cancelado"].includes(p.estado) && saldoDe(p) > 0;
 
 /** Origen del pedido → etiqueta legible (en vez del slug crudo "sistema"/"booqable-historico"/etc.). */
@@ -494,10 +497,17 @@ function MasterList({
                   )}
                 </div>
                 <div className="mt-1.5 flex items-center gap-2">
-                  <PagoBadge
-                    pagado={p.monto_pagado ?? 0}
-                    total={p.monto_total ?? 0}
-                    estado={p.estado}
+                  {!estaPagado(p) && (
+                    <PagoBadge
+                      pagado={p.monto_pagado ?? 0}
+                      total={p.monto_total ?? 0}
+                      estado={p.estado}
+                    />
+                  )}
+                  <PagoFacturaBadge
+                    pagado={estaPagado(p)}
+                    facturado={!!p.facturado}
+                    detallePago={`Pagado ${fmtArs(p.monto_pagado ?? 0)}`}
                   />
                   <span className="ml-auto font-mono text-sm font-semibold tabular-nums text-ink">
                     {fmtArs(p.monto_total)}

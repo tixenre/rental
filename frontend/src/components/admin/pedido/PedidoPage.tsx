@@ -156,8 +156,8 @@ export type PedidoPageProps = {
   onClose?: () => void;
 };
 
-// El mock muestra "Solicitado" para el estado interno 'presupuesto'.
-const estadoLabel = (e: PedidoEstado) => (e === "presupuesto" ? "Solicitado" : ESTADO_LABEL[e]);
+// `ESTADO_LABEL` ya mapea presupuesto → "Solicitud" (fuente única, 2026-07-14).
+const estadoLabel = (e: PedidoEstado) => ESTADO_LABEL[e];
 
 export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: PedidoPageProps) {
   const router = useRouter();

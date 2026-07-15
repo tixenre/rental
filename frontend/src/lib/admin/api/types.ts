@@ -1118,6 +1118,9 @@ export type Pedido = {
   fuente: string | null;
   monto_total: number;
   monto_pagado: number;
+  /** true si el pedido tiene una factura emitida (no anulada). Lo resuelve el
+   *  backend en `list_pedidos` (EXISTS sobre `facturas`); el front lo muestra. */
+  facturado?: boolean;
   descuento_pct: number | null;
   descuento_jornadas_pct: number | null;
   /** Fase C-2 (#1219): tipo del override manual — "pct" (default) o "monto". */
