@@ -181,6 +181,11 @@ function PedidoEditorPage() {
     // mismo bloque en la Fase C de descuentos (#1219) — el editor volvió a
     // mostrar el precio de catálogo en vivo en vez del congelado.
     respetarPrecioItem: true,
+    // Pedido con plata congelada (no-presupuesto): el descuento del preview sale
+    // del snapshot del pedido, no del cliente en vivo → el total del editor
+    // coincide con `monto_total` y con la lista. En presupuesto sigue en vivo
+    // (para que el descuento siga al cliente que el admin elija en el builder).
+    pedidoId: p && p.estado !== "presupuesto" ? pedidoId : null,
     // Defensa en profundidad (sumado a `key={id}` en `PedidoEditorRoute`,
     // arriba): aunque este panel ya se remonta al cambiar de pedido, el hook
     // en sí queda protegido para cualquier otro consumidor que no lo haga.
@@ -727,10 +732,10 @@ function PedidoEditorPage() {
               />
               {totales.descuentoPct > 0 && (
                 <BdRow
-                  l={
+                  l={`${
                     descuentoLabel(totales.descuentoOrigen, jornadas, datos.cliente_nombre) ||
-                    `Descuento ${totales.descuentoPct}%`
-                  }
+                    "Descuento"
+                  } · ${totales.descuentoPct}%`}
                   v={`– ${fmtArs(totales.descuentoMonto)}`}
                   neg
                 />
