@@ -660,3 +660,47 @@ class TestPedidoCongeladoRespetaSnapshot:
         # El pedido_id se ignora (no admin) → sin descuento fantasma del snapshot ajeno.
         assert out["descuento_monto"] == 0
         assert out["neto"] == 10000
+
+    def test_snapshot_congela_el_descuento_pero_el_iva_sigue_en_vivo(self, patch_db, monkeypatch):
+        # El descuento sale del snapshot (10%), pero el IVA del perfil RI del
+        # cliente se resuelve EN VIVO — el fix congela SOLO el descuento.
+        monkeypatch.setattr(alq, "is_admin_email", lambda email: True)
+        patch_db(
+            FakeConnConPedido(
+                precios={7: 10000}, perfil="responsable_inscripto", descuento=30,
+                pedido={"estado": "confirmado", "cliente_id": 99,
+                        "descuento_jornadas_pct": 0, "descuento_cliente_pct": 10},
+            ),
+            session={"email": "admin@test.com"},
+        )
+        out = cotizar(self._data(), FakeReq())
+        # Descuento 10% (snapshot, NO el 30% vivo) → neto 9000; IVA 21% en vivo → 1890.
+        assert out["descuento_pct"] == 10
+        assert out["neto"] == 9000
+        assert out["con_iva"] is True
+        assert out["iva_monto"] == 1890
+        assert out["total_final"] == 10890
+
+    def test_override_manual_del_admin_gana_sobre_el_snapshot(self, patch_db, monkeypatch):
+        # El override manual del admin (en vivo) gana OUTRIGHT sobre el snapshot
+        # de cliente/jornadas (jerarquía #1219) — el fix no lo congela.
+        monkeypatch.setattr(alq, "is_admin_email", lambda email: True)
+        patch_db(
+            FakeConnConPedido(
+                precios={7: 10000}, perfil="consumidor_final", descuento=30,
+                pedido={"estado": "confirmado", "cliente_id": 99,
+                        "descuento_jornadas_pct": 0, "descuento_cliente_pct": 10},
+            ),
+            session={"email": "admin@test.com"},
+        )
+        data = CotizarRequest(
+            items=[CotizarItem(equipo_id=7, cantidad=1)],
+            fecha_desde="2026-06-01T10:00:00",
+            fecha_hasta="2026-06-02T10:00:00",
+            cliente_id=99, pedido_id=5, descuento_pct=25,
+        )
+        out = cotizar(data, FakeReq())
+        # El manual 25% gana sobre el snapshot 10% del cliente → neto 7500.
+        assert out["descuento_pct"] == 25
+        assert out["neto"] == 7500
+        assert out["descuento_origen"] == "manual"
