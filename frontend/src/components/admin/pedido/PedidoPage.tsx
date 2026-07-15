@@ -172,7 +172,7 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
   const pedido = pedidoQ.data;
 
   // En modo cliente el submitMode depende del estado del pedido:
-  //  - presupuesto: autosave (se aplica directo)
+  //  - solicitado: autosave (se aplica directo)
   //  - confirmado:  propose   (genera solicitud pendiente de aprobación)
   const clienteSubmitMode = pedido?.estado === "confirmado" ? "propose" : "autosave";
 

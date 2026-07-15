@@ -119,7 +119,7 @@ const FLOW_STEPS: ReadonlyArray<{ tipo: string; label: string; desc: string }> =
 // Cuántos FLOW_STEPS están completados según el estado actual.
 const ESTADO_PROGRESS: Record<string, number> = {
   borrador: 0,
-  presupuesto: 1,
+  solicitado: 1,
   confirmado: 2,
   retirado: 3,
   devuelto: 4,

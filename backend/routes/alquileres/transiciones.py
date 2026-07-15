@@ -7,10 +7,11 @@ en `detalle.py`/`pagos.py`) — cada uno con su propia validación parcial, sin
 una tabla explícita de qué transiciones son legales. `cambiar_estado()` es
 ahora la ÚNICA puerta: admin y cliente (portal) pasan por acá.
 
-Diseño (a pedido del dueño, sesión 2026-07-06): SIN renombrar estados —
-`ESTADOS_VALIDOS` sigue siendo borrador/presupuesto/confirmado/retirado/
-devuelto/finalizado/cancelado. El admin puede moverse LIBREMENTE hacia
-adelante y hacia atrás entre los estados operativos (necesita poder volver
+Diseño (a pedido del dueño, sesión 2026-07-06): `ESTADOS_VALIDOS` =
+borrador/solicitado/confirmado/retirado/devuelto/finalizado/cancelado (el
+estado inicial se renombró presupuesto→solicitado el 2026-07-15). El admin
+puede moverse LIBREMENTE hacia adelante y hacia atrás entre los estados
+operativos (necesita poder volver
 a corregir un pedido — pasa seguido), con dos excepciones:
 
 1. `finalizado` es "estilo Magento": normalmente se prende SOLO (devuelto +
