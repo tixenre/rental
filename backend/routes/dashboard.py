@@ -19,7 +19,7 @@ def get_dashboard(_admin: dict = Depends(require_admin)):
     mes_ini = hoy[:7] + "-01"
     with get_db() as conn:
         pendientes = conn.execute(
-            "SELECT COUNT(*) FROM alquileres WHERE estado='presupuesto'"
+            "SELECT COUNT(*) FROM alquileres WHERE estado='solicitado'"
         ).fetchone()[0]
 
         activos = conn.execute(
@@ -96,7 +96,7 @@ def get_calendario(
             FROM alquileres p
             JOIN alquiler_items pi ON pi.pedido_id = p.id
             JOIN equipos e ON e.id = pi.equipo_id
-            WHERE p.estado IN ('presupuesto','confirmado','retirado','devuelto','finalizado')
+            WHERE p.estado IN ('solicitado','confirmado','retirado','devuelto','finalizado')
               AND p.fecha_hasta >= %s AND p.fecha_desde <= %s
             GROUP BY p.id, p.numero_pedido, p.cliente_nombre, p.estado,
                      p.fecha_desde, p.fecha_hasta, p.monto_total

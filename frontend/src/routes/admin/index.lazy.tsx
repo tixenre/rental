@@ -84,12 +84,7 @@ function AdminDashboard() {
               n={data.devuelven_hoy.length}
               dot="bg-rosa"
             />
-            <AtajoPedidos
-              f="nuevos"
-              label="Presupuestos nuevos"
-              n={data.pendientes}
-              dot="bg-azul"
-            />
+            <AtajoPedidos f="nuevos" label="Solicitudes nuevas" n={data.pendientes} dot="bg-azul" />
             <AtajoPedidos f="saldo" label="Con saldo" n={conSaldo} dot="bg-verde" />
           </div>
 

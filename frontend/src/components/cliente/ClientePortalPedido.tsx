@@ -314,7 +314,7 @@ export function PedidoCard({
   const { documentos_disponibles: docs } = pedido;
   const numero = pedido.numero_pedido ?? pedido.id;
   // Pedido recién enviado: banner de bienvenida con los próximos pasos.
-  const showWelcome = highlight && pedido.estado === "presupuesto";
+  const showWelcome = highlight && pedido.estado === "solicitado";
   const jornadas = jornadasEntre(pedido.fecha_desde, pedido.fecha_hasta);
   const tlCurrent = buildTimelineSteps(pedido).find((s) => s.state === "current");
   const cardRef = useRef<HTMLDivElement>(null);

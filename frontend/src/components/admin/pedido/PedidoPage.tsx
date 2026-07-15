@@ -156,7 +156,7 @@ export type PedidoPageProps = {
   onClose?: () => void;
 };
 
-// `ESTADO_LABEL` ya mapea presupuesto → "Solicitud" (fuente única, 2026-07-14).
+// El label visible de cada estado sale de la fuente única `ESTADO_LABEL`.
 const estadoLabel = (e: PedidoEstado) => ESTADO_LABEL[e];
 
 export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: PedidoPageProps) {
@@ -308,11 +308,11 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
     switch (pedido.estado) {
       case "borrador":
         return {
-          label: "Confirmar presupuesto",
-          estado: "presupuesto" as PedidoEstado,
+          label: "Confirmar solicitud",
+          estado: "solicitado" as PedidoEstado,
           needsItems: true,
         };
-      case "presupuesto":
+      case "solicitado":
         return {
           label: "Confirmar pedido",
           estado: "confirmado" as PedidoEstado,

@@ -185,7 +185,7 @@ function PedidoEditorPage() {
     // del snapshot del pedido, no del cliente en vivo → el total del editor
     // coincide con `monto_total` y con la lista. En presupuesto sigue en vivo
     // (para que el descuento siga al cliente que el admin elija en el builder).
-    pedidoId: p && p.estado !== "presupuesto" ? pedidoId : null,
+    pedidoId: p && p.estado !== "solicitado" ? pedidoId : null,
     // Defensa en profundidad (sumado a `key={id}` en `PedidoEditorRoute`,
     // arriba): aunque este panel ya se remonta al cambiar de pedido, el hook
     // en sí queda protegido para cualquier otro consumidor que no lo haga.

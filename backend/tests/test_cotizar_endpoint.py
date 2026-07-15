@@ -634,7 +634,7 @@ class TestPedidoCongeladoRespetaSnapshot:
         patch_db(
             FakeConnConPedido(
                 precios={7: 10000}, perfil="consumidor_final", descuento=30,
-                pedido={"estado": "presupuesto", "cliente_id": 99,
+                pedido={"estado": "solicitado", "cliente_id": 99,
                         "descuento_jornadas_pct": 0, "descuento_cliente_pct": 0},
             ),
             session={"email": "admin@test.com"},

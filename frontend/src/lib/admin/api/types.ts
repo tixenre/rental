@@ -1056,7 +1056,7 @@ export type PedidoCreateInput = {
   fecha_desde?: string | null;
   fecha_hasta?: string | null;
   items: { equipo_id: number; cantidad: number; precio_jornada: number }[];
-  estado?: "borrador" | "presupuesto";
+  estado?: "borrador" | "solicitado";
 };
 
 // ── Tipos pedidos ────────────────────────────────────────────────────────────

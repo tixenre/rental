@@ -357,7 +357,7 @@ export type EstudioReservaBody = {
   // Datos del cliente: NO van en el body, salen de la sesión (login obligatorio).
 };
 
-/** Crea una reserva real del estudio (entra como solicitud, estado='presupuesto').
+/** Crea una reserva real del estudio (entra como solicitud, estado='solicitado').
  *  Requiere cliente logueado: usa authedPostJson (manda la cookie de sesión). */
 export async function apiCrearReservaEstudio(body: EstudioReservaBody) {
   const res = await authedPostJson<{ id: number; numero_pedido: number | null }>(

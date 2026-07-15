@@ -98,10 +98,10 @@ function fuenteLabel(fuente: string | null): string | null {
   return map[fuente] ?? fuente;
 }
 
-type EstadoFilter = "activos" | "presupuesto" | "confirmado" | "cerrados" | "todos";
+type EstadoFilter = "activos" | "solicitado" | "confirmado" | "cerrados" | "todos";
 const ESTADO_FILTERS: { id: EstadoFilter; label: string }[] = [
   { id: "activos", label: "Activos" },
-  { id: "presupuesto", label: "Solicitados" },
+  { id: "solicitado", label: "Solicitados" },
   { id: "confirmado", label: "Confirmados" },
   { id: "cerrados", label: "Cerrados" },
   { id: "todos", label: "Todos" },
@@ -112,13 +112,13 @@ type DayFilter = "retiraHoy" | "devuelveHoy" | "nuevos" | "saldo";
 const DAY_FILTER_LABEL: Record<DayFilter, string> = {
   retiraHoy: "Retiran hoy",
   devuelveHoy: "Devuelven hoy",
-  nuevos: "Presupuestos nuevos",
+  nuevos: "Solicitudes nuevas",
   saldo: "Con saldo",
 };
 const matchesDayFilter = (p: Pedido, f: DayFilter): boolean => {
   if (f === "retiraHoy") return esHoy(p.fecha_desde) && p.estado === "confirmado";
   if (f === "devuelveHoy") return esHoy(p.fecha_hasta) && p.estado === "retirado";
-  if (f === "nuevos") return p.estado === "presupuesto" || p.estado === "solicitado";
+  if (f === "nuevos") return p.estado === "solicitado";
   return tieneSaldo(p);
 };
 
@@ -169,8 +169,7 @@ function PedidosPage() {
       return raw.filter((p) => p.estado !== "finalizado" && p.estado !== "cancelado");
     if (estadoF === "cerrados")
       return raw.filter((p) => p.estado === "finalizado" || p.estado === "cancelado");
-    if (estadoF === "presupuesto")
-      return raw.filter((p) => p.estado === "presupuesto" || p.estado === "solicitado");
+    if (estadoF === "solicitado") return raw.filter((p) => p.estado === "solicitado");
     if (estadoF === "confirmado") return raw.filter((p) => p.estado === "confirmado");
     return raw;
   }, [raw, dayFilter, estadoF]);

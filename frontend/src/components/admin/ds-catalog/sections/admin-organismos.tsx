@@ -164,7 +164,7 @@ function AdminSidebarFicha() {
 export const adminOrganismosSection: CatalogSection = {
   id: "admin-organismos",
   title: "Back-office (organismos)",
-  hint: "Las piezas del panel admin: el listado de pedidos (tabla con fila expandible), el modal de registrar pago, la paleta de comandos ⌘F y la barra lateral. Datos demo: cuatro pedidos en cuatro estados (presupuesto · solicitado · confirmado con saldo · finalizado).",
+  hint: "Las piezas del panel admin: el listado de pedidos (tabla con fila expandible), el modal de registrar pago, la paleta de comandos ⌘F y la barra lateral. Datos demo: cuatro pedidos en distintos estados (solicitud · confirmado con saldo · finalizado).",
   specimens: [
     {
       name: "AdminTable",

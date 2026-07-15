@@ -81,7 +81,7 @@ const PERFILES = [
   { value: "exento", label: "Exento" },
 ];
 
-// `ESTADO_LABEL` ya mapea presupuesto → "Solicitud" (fuente única, 2026-07-14).
+// El label visible sale de la fuente única `ESTADO_LABEL`.
 const estadoLabel = (e: string) => ESTADO_LABEL[e as keyof typeof ESTADO_LABEL] ?? e;
 const fmtFecha = (s: string | null) => formatFechaDisplay(s);
 

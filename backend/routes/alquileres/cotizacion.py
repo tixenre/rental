@@ -211,7 +211,7 @@ def cotizar(data: CotizarRequest, request: Request):
                     "descuento_cliente_pct FROM alquileres WHERE id=%s",
                     (data.pedido_id,),
                 ).fetchone()
-                if pedido_congelado and pedido_congelado["estado"] == "presupuesto":
+                if pedido_congelado and pedido_congelado["estado"] == "solicitado":
                     pedido_congelado = None  # presupuesto sigue el descuento en vivo
             # ¿Para qué cliente se cotiza?
             #   - Admin (back-office): SIEMPRE el cliente del pedido (`data.cliente_id`),

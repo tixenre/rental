@@ -17,7 +17,6 @@ import type { EstadoPedido } from "@/design-system/ui/types";
 
 const ESTADOS: EstadoPedido[] = [
   "borrador",
-  "presupuesto",
   "solicitado",
   "confirmado",
   "retirado",

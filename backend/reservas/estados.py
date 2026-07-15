@@ -7,4 +7,6 @@ SQL como `... p.estado IN {ESTADOS_RESERVADO}`. Antes estaba duplicada literal e
 """
 
 # Formato literal para cláusulas SQL `IN`. NO interpolar nada de fuera acá.
-ESTADOS_RESERVADO = "('presupuesto','confirmado','retirado')"
+# `solicitado` (ex-`presupuesto`, renombrado 2026-07-14) reserva stock desde que
+# el cliente lo solicita — igual que antes, solo cambió el nombre del estado.
+ESTADOS_RESERVADO = "('solicitado','confirmado','retirado')"

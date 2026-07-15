@@ -15,9 +15,8 @@ export type { EstadoPedido };
  * genéricos) fue eliminada al migrar `cliente.portal.tsx`.
  *
  * Admin (`/admin/pedidos`, `/admin/pedidos/$id`) también la consume (PR E2).
- * Usa el prop opcional `label` para preservar su alias visible
- * "presupuesto → Solicitado": el texto se overridea, el color sigue saliendo
- * del map por `estado` (presupuesto → azul, la paleta de marca documentada).
+ * El prop opcional `label` overridea el texto visible; el color sigue saliendo
+ * del map por `estado` (la paleta de marca documentada).
  *
  * El mapa de color vive en `./estado-color.ts` (Fast Refresh exige que este
  * archivo solo exporte el componente) — `estadoClase` de ese módulo es la
@@ -29,8 +28,7 @@ export function EstadoBadge({
   className,
 }: {
   estado: EstadoPedido | string;
-  /** Override del texto visible. El color sigue saliendo del map por `estado`.
-   *  Lo usa el admin para mostrar "Solicitado" sobre el estado `presupuesto`. */
+  /** Override del texto visible. El color sigue saliendo del map por `estado`. */
   label?: string;
   className?: string;
 }) {

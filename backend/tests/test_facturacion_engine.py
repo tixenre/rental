@@ -594,9 +594,9 @@ def test_preview_chequeo_importe_cero_bloquea(monkeypatch):
 
 def test_preview_pedido_no_confirmado_levanta_value_error(monkeypatch):
     monkeypatch.setattr(
-        engine, "_get_pedido", lambda conn, pedido_id: {**_fake_pedido(), "estado": "presupuesto"}
+        engine, "_get_pedido", lambda conn, pedido_id: {**_fake_pedido(), "estado": "solicitado"}
     )
-    with pytest.raises(ValueError, match="presupuesto"):
+    with pytest.raises(ValueError, match="solicitado"):
         engine.previsualizar_factura(1, conn=_FakeConn())
 
 

@@ -19,16 +19,10 @@ export const ESTADO_MAP: Record<EstadoPedido, { label: string; cls: string }> = 
     label: "Borrador",
     cls: "bg-transparent text-muted-foreground border-dashed border-muted-foreground/45",
   },
-  // `presupuesto` es el estado real; se MUESTRA "Solicitud" (el cliente lo solicitó,
-  // todavía no es un rental confirmado) — mismo nombre en admin y portal. El
-  // documento PDF sigue llamándose "Presupuesto" (es el papel, no el estado).
-  presupuesto: {
-    label: "Solicitud",
-    cls: "bg-azul/10 text-azul-ink border-azul/30",
-  },
-  // `solicitado`/`entregado` son estados de DISPLAY del portal (no valores reales de
-  // `alquileres.estado`, ver pedido-estados.ts): heredan el color de su estado real
-  // (solicitado→presupuesto/azul, entregado→retirado/naranja) para no divergir.
+  // `solicitado` (ex-`presupuesto`, renombrado 2026-07-14): el estado inicial. Se
+  // MUESTRA "Solicitud" — el cliente lo solicitó, todavía no es un rental
+  // confirmado. El documento PDF sigue llamándose "Presupuesto" (es el papel, no
+  // el estado). `entregado` es display del portal (hereda el naranja de retirado).
   solicitado: {
     label: "Solicitud",
     cls: "bg-azul/10 text-azul-ink border-azul/30",

@@ -89,7 +89,7 @@ def _validar_modificacion_estado(estado: str) -> None:
         raise HTTPException(
             400,
             f"Este pedido no se puede modificar en estado '{estado}'. "
-            "Solo se pueden modificar pedidos en presupuesto o confirmado."
+            "Solo se pueden modificar pedidos en solicitud o confirmado."
         )
 
 
@@ -312,7 +312,7 @@ def cliente_modificar_pedido(
                     precios[it.equipo_id] = _equipo_precio_catalogo(conn, it.equipo_id)
 
             # ── Caso `presupuesto`: aplicar directo ──────────────────────────
-            if pedido["estado"] == "presupuesto":
+            if pedido["estado"] == "solicitado":
                 # Sólo enviamos fechas si vinieron en el payload (evita pisar a null).
                 datos_kwargs = {}
                 if data.fecha_desde is not None:

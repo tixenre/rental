@@ -37,7 +37,7 @@ const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 /** Estados que se muestran en la leyenda y sirven de filtro clickeable —
  * los mismos que el backend devuelve en `get_calendario`. */
 const LEGEND_ESTADOS: PedidoEstado[] = [
-  "presupuesto",
+  "solicitado",
   "confirmado",
   "retirado",
   "devuelto",

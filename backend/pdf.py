@@ -300,7 +300,7 @@ from pdf_templates import (  # noqa: E402
 
 # Acentos de estado del DS (color sólido), por nombre — fuente única `_ESTADOS`.
 _REP_VERDE = _DS_ESTADOS["confirmado"][0]   # #009971
-_REP_AZUL = _DS_ESTADOS["presupuesto"][0]   # #1097DB
+_REP_AZUL = _DS_ESTADOS["solicitado"][0]   # #1097DB
 _REP_ROSA = _DS_ESTADOS["devuelto"][0]      # #ED7BAD
 _REP_DESTRUCTIVE = _DS_ESTADOS["cancelado"][0]
 

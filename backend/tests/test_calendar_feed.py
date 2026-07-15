@@ -144,7 +144,7 @@ class TestContenido:
         _patch_db(monkeypatch, conn)
         cal_mod.feed_ical(_req(), token="t")
         estados_en_query = [p for p in conn.reservas_params if isinstance(p, str)]
-        assert "presupuesto" not in estados_en_query
+        assert "solicitado" not in estados_en_query
         assert "cancelado" not in estados_en_query
         assert "confirmado" in estados_en_query
 
