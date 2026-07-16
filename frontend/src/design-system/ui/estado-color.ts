@@ -84,3 +84,29 @@ export const ESTADO_DOT: Record<EstadoPedido, string> = {
   finalizado: "bg-muted-foreground",
   cancelado: "bg-destructive",
 };
+
+/** Fondo + borde SÓLIDOS (color pleno) del estado — para marcadores RELLENOS
+ *  (ej. el dot de un paso completado/actual en un timeline). El ícono/texto de
+ *  adentro va en blanco. Misma fuente de color que `ESTADO_MAP`/`ESTADO_DOT`. */
+export const ESTADO_SOLID: Record<EstadoPedido, string> = {
+  borrador: "bg-muted-foreground border-muted-foreground",
+  solicitado: "bg-azul border-azul",
+  confirmado: "bg-verde border-verde",
+  retirado: "bg-naranja border-naranja",
+  entregado: "bg-naranja border-naranja",
+  devuelto: "bg-rosa border-rosa",
+  finalizado: "bg-muted-foreground border-muted-foreground",
+  cancelado: "bg-destructive border-destructive",
+};
+
+/** Ring del color del estado — para resaltar el marcador ACTUAL de un timeline. */
+export const ESTADO_RING: Record<EstadoPedido, string> = {
+  borrador: "ring-muted-foreground/25",
+  solicitado: "ring-azul/25",
+  confirmado: "ring-verde/25",
+  retirado: "ring-naranja/25",
+  entregado: "ring-naranja/25",
+  devuelto: "ring-rosa/25",
+  finalizado: "ring-muted-foreground/25",
+  cancelado: "ring-destructive/25",
+};
