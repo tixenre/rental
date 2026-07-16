@@ -37,7 +37,7 @@ const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 /** Estados que se muestran en la leyenda y sirven de filtro clickeable —
  * los mismos que el backend devuelve en `get_calendario`. */
 const LEGEND_ESTADOS: PedidoEstado[] = [
-  "presupuesto",
+  "solicitado",
   "confirmado",
   "retirado",
   "devuelto",
@@ -222,7 +222,9 @@ export function CalendarioWidget({
   const minCellHeight = compact ? "min-h-[78px]" : "min-h-[110px]";
   // Alto de fila fijo por carril — la altura de celda de arriba ya reserva
   // aire suficiente para maxCarriles filas de este alto + la fila del número.
-  const altoCarril = compact ? 20 : 22;
+  // La barra se centra en su carril (self-center) → el sobrante es el aire
+  // entre barras apiladas.
+  const altoCarril = compact ? 22 : 28;
 
   // Filas-semana de 7 días — la vista "semana" ya es una sola.
   const semanas = useMemo(() => {
@@ -351,10 +353,13 @@ export function CalendarioWidget({
                             gridRow: carril + 2,
                           }}
                           className={cn(
-                            "block w-full overflow-hidden truncate text-left px-1 py-0.5 text-2xs leading-tight transition hover:opacity-80",
+                            "block min-w-0 self-center truncate px-1.5 py-1 text-left text-2xs leading-tight transition hover:opacity-80 sm:text-xs",
                             estadoClase(p.estado),
-                            continuaIzq ? "rounded-l-none" : "rounded-l-sm",
-                            continuaDer ? "rounded-r-none" : "rounded-r-sm",
+                            // Aire para que la barra no toque las líneas del grid.
+                            // Un extremo que continúa en otra fila-semana SÍ pega
+                            // al borde (se lee como una sola barra que sigue).
+                            continuaIzq ? "rounded-l-none" : "ml-1 rounded-l-md",
+                            continuaDer ? "rounded-r-none" : "mr-1 rounded-r-md",
                           )}
                         >
                           {continuaIzq && "◂ "}#{p.numero_pedido ?? p.id} ·{" "}
@@ -387,7 +392,7 @@ export function CalendarioWidget({
                       <PopoverTrigger asChild>
                         <button
                           style={{ gridColumn: i + 1, gridRow: maxCarriles + 2 }}
-                          className="pl-1 text-left text-2xs text-muted-foreground transition hover:text-ink"
+                          className="ml-1 text-left text-2xs text-muted-foreground transition hover:text-ink sm:text-xs"
                         >
                           +{n} más
                         </button>

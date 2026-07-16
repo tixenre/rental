@@ -79,6 +79,17 @@
      el --color-azul brillante sobre bg-azul/10 da ~2.9:1 (falla AA). Mismo hue/chroma,
      L 0.64→0.48 → 4.9:1. El azul de marca (charts, labels) queda intacto. */
   --color-azul-ink: oklch(0.48 0.14 239);
+  /* Naranja/rosa más oscuros SOLO para TEXTO sobre sus tints de estado (Retirado /
+     Devuelto): el color brillante sobre el tint claro falla AA. Mismo hue/chroma,
+     L→~0.5. Mismo patrón que verde-ink/azul-ink (sin override dark — el badge de
+     estado no ramifica por tema; el uso real es light). */
+  --color-naranja-ink: oklch(0.5 0.16 42);
+  --color-rosa-ink: oklch(0.5 0.135 357);
+  /* Violeta — sello de "Facturado" (documento fiscal emitido). NO es un color del
+     ciclo de estados: es un tag administrativo aparte, junto al verde de "Pagado".
+     `-ink` para el ícono/texto sobre el tint violeta (AA). */
+  --color-violeta: #7c3aed; /* violet-600 */
+  --color-violeta-ink: oklch(0.47 0.2 293);
 
   /* ── Charts (orden oficial: amber → azul → naranja → verde → rosa) ── */
   --color-chart-1: var(--color-amber);

@@ -102,7 +102,7 @@ def test_linea_libre_no_rompe_el_gate_ni_reserva_stock(setup):
 
         # P2 pide el MISMO equipo en el mismo rango → sin stock (la línea libre de
         # P1 no liberó ni ocupó nada; el cuello sigue siendo la 1 unidad del equipo).
-        _crear_pedido(conn, P2, "presupuesto")
+        _crear_pedido(conn, P2, "solicitado")
         conn.execute(
             "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad) VALUES (%s,%s,%s)",
             (P2, EQ, 1),
@@ -163,7 +163,7 @@ def test_edicion_del_portal_preserva_lineas_libres(setup):
 
     conn = get_db()
     try:
-        _crear_pedido(conn, P1, "presupuesto")
+        _crear_pedido(conn, P1, "solicitado")
         conn.execute(
             "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, orden) VALUES (%s,%s,%s,%s,%s)",
             (P1, EQ, 1, 5000, 0),
@@ -211,7 +211,7 @@ def test_create_pedido_arma_la_linea_personalizada(setup, monkeypatch):
             cliente_nombre="Cliente #805",
             fecha_desde=FD,
             fecha_hasta=FH,
-            estado="presupuesto",
+            estado="solicitado",
             items=[
                 PedidoItem(equipo_id=EQ, cantidad=1, precio_jornada=5000),
                 PedidoItem(equipo_id=None, cantidad=2, nombre_libre="Flete",

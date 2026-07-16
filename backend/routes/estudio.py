@@ -1613,7 +1613,7 @@ def _agregar_items_pack(conn, pedido_id: int, fecha_desde, fecha_hasta, pack_ids
 @limiter.limit(CLIENTE_WRITE_LIMIT)
 def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, background: BackgroundTasks):
     """Reserva real del estudio por horas. Entra como solicitud
-    (estado='presupuesto'), en UNA transacción.
+    (estado='solicitado'), en UNA transacción.
 
     Requiere CLIENTE LOGUEADO (igual que /api/cliente/pedidos): el cliente_id sale
     de la sesión y nombre/email/teléfono del registro de `clientes` — nunca del body.
@@ -1685,7 +1685,7 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
                 """,
                 (
                     cliente_id, cliente_nombre, cliente_email, cliente_telefono,
-                    fecha_desde, fecha_hasta, monto_total, "presupuesto",
+                    fecha_desde, fecha_hasta, monto_total, "solicitado",
                     "estudio", "estudio", con_pack, next_num,
                 ),
             )

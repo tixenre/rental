@@ -86,7 +86,6 @@ export type ChangeRequest = {
 
 const ESTADO_MAP: Record<string, OrderStatus> = {
   borrador: "borrador",
-  presupuesto: "solicitado",
   solicitado: "solicitado",
   confirmado: "confirmado",
   entregado: "entregado",

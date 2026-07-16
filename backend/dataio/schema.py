@@ -254,7 +254,7 @@ class Alquiler(_Base):
     cliente_nombre: str
     cliente_telefono: str | None = None
     # Estado y fechas
-    estado: str = "presupuesto"
+    estado: str = "solicitado"
     fecha_desde: str
     fecha_hasta: str
     # Montos

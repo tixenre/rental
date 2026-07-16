@@ -637,6 +637,11 @@ def import_alquileres(
             (a.numero_pedido,),
         ).fetchone()
 
+        # Compat: un backup PRE-rename (2026-07-15) trae el viejo estado
+        # `presupuesto` → mapearlo a `solicitado` al importar, para que las filas
+        # restauradas queden dentro del gate de reservas (ESTADOS_RESERVADO).
+        estado = "solicitado" if a.estado == "presupuesto" else a.estado
+
         if existing:
             alq_id = existing["id"]
             conn.execute(
@@ -650,7 +655,7 @@ def import_alquileres(
                 WHERE id = %s
                 """,
                 (cliente_id, a.cliente_nombre, a.cliente_email, a.cliente_telefono,
-                 a.notas, a.estado, a.fecha_desde, a.fecha_hasta, a.monto_total,
+                 a.notas, estado, a.fecha_desde, a.fecha_hasta, a.monto_total,
                  a.monto_pagado, a.descuento_pct, a.fuente,
                  alq_id),
             )
@@ -667,7 +672,7 @@ def import_alquileres(
                 RETURNING id
                 """,
                 (a.numero_pedido, cliente_id, a.cliente_nombre, a.cliente_email,
-                 a.cliente_telefono, a.notas, a.estado, a.fecha_desde, a.fecha_hasta,
+                 a.cliente_telefono, a.notas, estado, a.fecha_desde, a.fecha_hasta,
                  a.monto_total, a.monto_pagado, a.descuento_pct, a.fuente),
             )
             alq_id = cur.fetchone()["id"]

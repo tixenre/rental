@@ -35,7 +35,7 @@ _CAL_NAME = "Rambla Rental — Reservas"
 _VENTANA_DIAS = 60  # cuánto hacia atrás incluimos (acota el tamaño del .ics)
 
 # Estados que se muestran en el calendario: confirmados en adelante. Es
-# DISTINTO de `reservas.estados.ESTADOS_RESERVADO` (que incluye 'presupuesto'
+# DISTINTO de `reservas.estados.ESTADOS_RESERVADO` (que incluye 'solicitado'
 # porque reserva stock) — acá el dueño eligió NO mostrar cotizaciones tentativas.
 _ESTADOS_FEED = ("confirmado", "retirado", "devuelto", "finalizado")
 

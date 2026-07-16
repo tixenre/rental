@@ -17,7 +17,7 @@ import type { EstadoPedido } from "./types";
 type PagoTag = { label: string; tone: PillTone };
 
 // Pre-confirmación = todavía es cotización, no hay deuda real que cobrar.
-const PRE_CONFIRM: string[] = ["borrador", "presupuesto", "solicitado", "cancelado"];
+const PRE_CONFIRM: string[] = ["borrador", "solicitado", "cancelado"];
 
 /** Estado de pago a mostrar (o null si no aplica). */
 function pagoEstado(pagado: number, total: number, estado: EstadoPedido | string): PagoTag | null {

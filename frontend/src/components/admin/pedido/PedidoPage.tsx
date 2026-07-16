@@ -156,8 +156,8 @@ export type PedidoPageProps = {
   onClose?: () => void;
 };
 
-// El mock muestra "Solicitado" para el estado interno 'presupuesto'.
-const estadoLabel = (e: PedidoEstado) => (e === "presupuesto" ? "Solicitado" : ESTADO_LABEL[e]);
+// El label visible de cada estado sale de la fuente única `ESTADO_LABEL`.
+const estadoLabel = (e: PedidoEstado) => ESTADO_LABEL[e];
 
 export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: PedidoPageProps) {
   const router = useRouter();
@@ -172,7 +172,7 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
   const pedido = pedidoQ.data;
 
   // En modo cliente el submitMode depende del estado del pedido:
-  //  - presupuesto: autosave (se aplica directo)
+  //  - solicitado: autosave (se aplica directo)
   //  - confirmado:  propose   (genera solicitud pendiente de aprobación)
   const clienteSubmitMode = pedido?.estado === "confirmado" ? "propose" : "autosave";
 
@@ -308,11 +308,11 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
     switch (pedido.estado) {
       case "borrador":
         return {
-          label: "Confirmar presupuesto",
-          estado: "presupuesto" as PedidoEstado,
+          label: "Confirmar solicitud",
+          estado: "solicitado" as PedidoEstado,
           needsItems: true,
         };
-      case "presupuesto":
+      case "solicitado":
         return {
           label: "Confirmar pedido",
           estado: "confirmado" as PedidoEstado,

@@ -213,7 +213,7 @@ const DOCS_COMPLETOS = {
 export const pedidoPresupuesto: Pedido = {
   id: 9101,
   numero_pedido: "R-1042",
-  estado: "presupuesto",
+  estado: "solicitado",
   ...FECHAS_PEDIDO,
   monto_pagado: 0,
   items: itemsPedidoDemo,
@@ -375,7 +375,7 @@ export const adminPedidoPresupuesto: AdminPedido = {
   cliente_nombre: "Productora Norte",
   cliente_email: "hola@productoranorte.test",
   cliente_telefono: "11 5555-4044",
-  estado: "presupuesto",
+  estado: "solicitado",
   monto_total: 222000,
   monto_pagado: 0,
   items: [

@@ -86,7 +86,7 @@ def setup():
             "INSERT INTO alquileres "
             "(id, cliente_id, cliente_nombre, estado, fecha_desde, fecha_hasta, "
             " descuento_pct, descuento_cliente_pct, descuento_jornadas_pct) "
-            "VALUES (%s,%s,'Cliente lista-detalle','presupuesto',%s,%s,0,5,20)",
+            "VALUES (%s,%s,'Cliente lista-detalle','solicitado',%s,%s,0,5,20)",
             (PEDIDO_ID, CLIENTE_ID, FD, FH),
         )
         conn.execute(

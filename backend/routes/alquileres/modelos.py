@@ -89,7 +89,7 @@ class PedidoCreate(BaseModel):
     fecha_desde:      Optional[str] = None
     fecha_hasta:      Optional[str] = None
     items:            list[PedidoItem] = []
-    estado:           Optional[str] = "presupuesto"
+    estado:           Optional[str] = "solicitado"
     # #1240: a nombre de quién se factura este pedido — mutuamente excluyentes
     # (validado por el caller, ej. `cliente_crear_pedido`), NULL/NULL = perfil
     # default de la cuenta. El admin (builder de pedidos) no los usa hoy.

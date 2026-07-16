@@ -114,7 +114,7 @@ def setup():
         conn.execute(
             "INSERT INTO alquileres "
             "(id, cliente_id, cliente_nombre, estado, fecha_desde, fecha_hasta) "
-            "VALUES (%s,%s,'Cliente gate-test M6','presupuesto',%s,%s)",
+            "VALUES (%s,%s,'Cliente gate-test M6','solicitado',%s,%s)",
             (PEDIDO_ID, CLIENTE_ID, FD, FH),
         )
         conn.execute(

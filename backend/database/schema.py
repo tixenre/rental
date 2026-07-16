@@ -475,7 +475,7 @@ def _init_db_schema(conn):
             cliente_email    TEXT,
             cliente_telefono TEXT,
             notas            TEXT,
-            estado           TEXT NOT NULL DEFAULT 'presupuesto',
+            estado           TEXT NOT NULL DEFAULT 'solicitado',
             fecha_desde      TIMESTAMP,
             fecha_hasta      TIMESTAMP,
             monto_total      INTEGER DEFAULT 0,

@@ -23,7 +23,7 @@ from services.precios import (
 )
 from descuentos.queries.decision import resolver_origen_pedido_monto
 from descuentos.queries.jornadas import obtener_descuento_jornadas
-from routes.alquileres.core import router
+from routes.alquileres.core import router, _resolver_descuentos_snapshot_o_vivo
 # Validadores de descuento: fuente única compartida con `PedidoDatos`
 # (routes/alquileres/modelos.py) — antes estaban duplicados byte a byte acá.
 from routes.alquileres.modelos import (
@@ -66,6 +66,14 @@ class CotizarRequest(BaseModel):
     # precio de línea) → dos totales del mismo pedido que podían no coincidir.
     # Ver MEMORIA 2026-06-06 "Datos del pedido: plata congelada".
     respetar_precio_item: Optional[bool] = False
+    # Solo lo honra una sesión admin: id del pedido que se está editando. Cuando
+    # el pedido ya NO está en `presupuesto` (plata congelada), el descuento de
+    # cliente/jornadas del preview sale del MISMO snapshot que la persistencia
+    # (`_resolver_descuentos_snapshot_o_vivo`), no en vivo — así el total del
+    # editor coincide con `monto_total` (y con la lista de pedidos). El editor
+    # solo lo manda para pedidos no-presupuesto; en presupuesto el descuento
+    # sigue al cliente en vivo. Ver MEMORIA 2026-06-06 "plata congelada".
+    pedido_id: Optional[int] = None
     # #1240: a nombre de quién se está cotizando (perfil personal alternativo o
     # productora) — solo lo honra una sesión cliente (mismo criterio que el resto
     # de este bloque: el admin cotiza para el cliente del pedido, no para sí
@@ -189,6 +197,22 @@ def cotizar(data: CotizarRequest, request: Request):
         descuento_manual_tipo = "pct"
         descuento_manual_monto = 0.0
         if tiene_fechas:
+            # ¿El preview es el editor de un pedido con la plata YA congelada?
+            # Entonces el descuento (cliente + jornadas) sale del MISMO snapshot
+            # que persiste el guardado (`_resolver_descuentos_snapshot_o_vivo`),
+            # NO en vivo — si no, el total del editor mostraría un descuento
+            # distinto al de `monto_total` / la lista de pedidos (MEMORIA
+            # 2026-06-06 "plata congelada"). El perfil fiscal (IVA) sí sigue en
+            # vivo. Presupuesto (o sin `pedido_id`) → flujo en vivo de siempre.
+            pedido_congelado = None
+            if es_admin and data.pedido_id:
+                pedido_congelado = conn.execute(
+                    "SELECT estado, cliente_id, descuento_jornadas_pct, "
+                    "descuento_cliente_pct FROM alquileres WHERE id=%s",
+                    (data.pedido_id,),
+                ).fetchone()
+                if pedido_congelado and pedido_congelado["estado"] == "solicitado":
+                    pedido_congelado = None  # presupuesto sigue el descuento en vivo
             # ¿Para qué cliente se cotiza?
             #   - Admin (back-office): SIEMPRE el cliente del pedido (`data.cliente_id`),
             #     nunca la ficha de la propia sesión. La admin-ness la da el EMAIL
@@ -216,7 +240,10 @@ def cotizar(data: CotizarRequest, request: Request):
                 ).fetchone()
                 if c:
                     perfil = c["perfil_impuestos"]
-                    descuento_cliente_pct = c["descuento"] or 0.0
+                    # Congelado: el descuento sale del snapshot (más abajo), no
+                    # del vivo. El perfil (IVA) sí es en vivo siempre.
+                    if pedido_congelado is None:
+                        descuento_cliente_pct = c["descuento"] or 0.0
                 # #1240: solo la sesión cliente puede elegir facturar a nombre de
                 # un perfil personal alternativo o una productora (el admin no
                 # manda estos campos para el pedido de otro cliente).
@@ -253,7 +280,15 @@ def cotizar(data: CotizarRequest, request: Request):
                 descuento_manual_tipo = data.descuento_manual_tipo
             if es_admin and data.descuento_manual_monto:
                 descuento_manual_monto = data.descuento_manual_monto
-            descuento_jornadas_pct = obtener_descuento_jornadas(conn, jornadas)
+            if pedido_congelado is None:
+                descuento_jornadas_pct = obtener_descuento_jornadas(conn, jornadas)
+            else:
+                # Pedido no-presupuesto: descuento (jornadas + cliente) del MISMO
+                # snapshot que la persistencia → el editor no puede divergir de
+                # `monto_total`. El override manual (arriba) sí sigue en vivo.
+                descuento_jornadas_pct, descuento_cliente_pct = (
+                    _resolver_descuentos_snapshot_o_vivo(conn, pedido_congelado, jornadas)
+                )
 
         desglose = calcular_total(
             items=items_para_total,

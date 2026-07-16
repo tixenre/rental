@@ -128,7 +128,7 @@ def test_apply_pedido_items_no_aplica_descuento_global_al_combo(setup):
     pedido = create_pedido(PedidoCreate(
         cliente_id=CLIENTE_ID,
         fecha_desde=FD, fecha_hasta=FH,
-        estado="presupuesto",
+        estado="solicitado",
         items=[PedidoItem(equipo_id=EQ_SIMPLE, cantidad=1, precio_jornada=10000)],
     ), es_admin=True)
     pid = pedido["id"]
@@ -209,7 +209,7 @@ def test_desglose_de_pedido_no_aplica_descuento_global_al_combo(setup):
     pedido = create_pedido(PedidoCreate(
         cliente_id=CLIENTE_ID,
         fecha_desde=FD, fecha_hasta=FH,
-        estado="presupuesto",
+        estado="solicitado",
         items=[PedidoItem(equipo_id=EQ_SIMPLE, cantidad=1, precio_jornada=10000)],
     ), es_admin=True)
     pid = pedido["id"]

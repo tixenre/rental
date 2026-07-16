@@ -25,8 +25,8 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-CANON = "('presupuesto','confirmado','retirado')"
-ESTADOS_CANONICOS = {"presupuesto", "confirmado", "retirado"}
+CANON = "('solicitado','confirmado','retirado')"
+ESTADOS_CANONICOS = {"solicitado", "confirmado", "retirado"}
 
 # Tokens que el motor PUEDE interpolar en su SQL sin riesgo de inyección:
 #   ESTADOS_RESERVADO → constante interna (su seguridad se verifica abajo)
@@ -119,6 +119,19 @@ def test_estados_reservado_es_literal_seguro():
         assert veneno not in ESTADOS_RESERVADO, f"ESTADOS_RESERVADO contiene {veneno!r}"
     # Solo los estados canónicos, entre comillas simples.
     assert set(re.findall(r"'([^']+)'", ESTADOS_RESERVADO)) == ESTADOS_CANONICOS
+
+
+def test_solicitado_reserva_stock_y_presupuesto_ya_no_existe():
+    """Candado del rename `presupuesto` → `solicitado` (2026-07-14): el estado
+    INICIAL del pedido reserva stock bajo su nuevo nombre. Si un cambio futuro
+    saca 'solicitado' del IN de reservas (o reaparece el viejo 'presupuesto'), se
+    caza acá — el motor dejaría de reservar los pedidos recién solicitados y
+    habría SOBREVENTA (dos pedidos del mismo equipo escaso, ambos "solicitados",
+    sin que el gate cuente al primero)."""
+    from reservas import ESTADOS_RESERVADO
+
+    assert "'solicitado'" in ESTADOS_RESERVADO, "un pedido solicitado DEBE reservar stock"
+    assert "'presupuesto'" not in ESTADOS_RESERVADO, "'presupuesto' se renombró a 'solicitado'"
 
 
 def test_estados_reservado_es_fuente_unica():
