@@ -60,6 +60,7 @@ import {
   AlertDialogTitle,
 } from "@/design-system/ui/alert-dialog";
 import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
+import { estadoClase, ESTADO_TEXT } from "@/design-system/ui/estado-color";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import {
   adminApi,
@@ -1056,29 +1057,37 @@ function FlowStrip({ estado }: { estado: PedidoEstado }) {
   if (estado === "cancelado") {
     return (
       <div className="flex items-center">
-        <span className="inline-flex items-center gap-1 rounded-md border border-destructive/40 bg-destructive/5 px-2 py-1 font-mono text-2xs text-destructive">
+        <span className="inline-flex items-center rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-2xs font-semibold text-destructive">
           Cancelado
         </span>
       </div>
     );
   }
   const idx = FLOW.indexOf(estado);
+  // Breadcrumb del ciclo de vida: colorea el camino recorrido con la paleta de
+  // marca (cada etapa su color), destaca la actual en pill, deja tenues las que
+  // faltan. El color sale de la fuente única `estado-color.ts`.
   return (
-    <div className="flex items-center gap-1 flex-wrap">
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
       {FLOW.map((e, i) => (
-        <span key={e} className="inline-flex items-center gap-1">
-          <span
-            className={cn(
-              "font-mono text-2xs",
-              i < idx && "text-verde-ink",
-              i === idx && "text-ink font-semibold",
-              i > idx && "text-muted-foreground/60",
-            )}
-            title={ESTADO_LABEL[e]}
-          >
-            {ESTADO_LABEL[e].slice(0, 5)}
-          </span>
-          {i < FLOW.length - 1 && <span className="text-muted-foreground/40 text-2xs">›</span>}
+        <span key={e} className="inline-flex items-center gap-x-1.5">
+          {i === idx ? (
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full border px-2 py-0.5 text-2xs font-semibold",
+                estadoClase(e),
+              )}
+            >
+              {ESTADO_LABEL[e]}
+            </span>
+          ) : (
+            <span
+              className={cn("font-medium", i < idx ? ESTADO_TEXT[e] : "text-muted-foreground/50")}
+            >
+              {ESTADO_LABEL[e]}
+            </span>
+          )}
+          {i < FLOW.length - 1 && <span className="text-muted-foreground/40">›</span>}
         </span>
       ))}
     </div>
