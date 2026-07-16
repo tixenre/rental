@@ -19,6 +19,7 @@ from database import get_db, row_to_dict
 from auth.guards import require_admin
 from busqueda import construir
 from rate_limit import limiter, ADMIN_WRITE_LIMIT
+from services.facturacion.repo import pedidos_con_factura_emitida
 from reservas import validar_stock as _check_stock
 from routes.alquileres.core import (
     router,
@@ -140,6 +141,11 @@ def list_pedidos(
 
         # Pedidos con solicitud de modificación pendiente — para badge en UI.
         pedido_ids = [p["id"] for p in pedidos]
+        # `facturado` = tiene factura PRINCIPAL emitida. La puerta única
+        # `pedidos_con_factura_emitida` excluye las notas de crédito (una NC
+        # también es una fila 'emitida' → un EXISTS crudo marcaría "facturado" un
+        # pedido ya anulado). Batch, sin N+1.
+        facturados = pedidos_con_factura_emitida(pedido_ids, conn)
         pendientes: set[int] = set()
         if pedido_ids:
             ph = ",".join(["%s"] * len(pedido_ids))
@@ -153,6 +159,7 @@ def list_pedidos(
         for p in pedidos:
             p["items"] = items_map.get(p["id"], [])
             p["tiene_solicitud_pendiente"] = p["id"] in pendientes
+            p["facturado"] = p["id"] in facturados
 
         return {"total": total, "page": page, "per_page": per_page, "items": pedidos}
 

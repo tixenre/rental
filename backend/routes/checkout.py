@@ -260,7 +260,7 @@ def checkout_contrato_preview(data: ContratoPreviewIn, request: Request):
 
             pedido = {
                 "id": "preview",
-                "estado": "presupuesto",
+                "estado": "solicitado",
                 "fecha_desde": carrito.get("fecha_desde"),
                 "fecha_hasta": carrito.get("fecha_hasta"),
                 "emitido": now_ar(),

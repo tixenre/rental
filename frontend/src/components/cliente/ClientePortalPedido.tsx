@@ -119,7 +119,7 @@ const FLOW_STEPS: ReadonlyArray<{ tipo: string; label: string; desc: string }> =
 // Cuántos FLOW_STEPS están completados según el estado actual.
 const ESTADO_PROGRESS: Record<string, number> = {
   borrador: 0,
-  presupuesto: 1,
+  solicitado: 1,
   confirmado: 2,
   retirado: 3,
   devuelto: 4,
@@ -314,7 +314,7 @@ export function PedidoCard({
   const { documentos_disponibles: docs } = pedido;
   const numero = pedido.numero_pedido ?? pedido.id;
   // Pedido recién enviado: banner de bienvenida con los próximos pasos.
-  const showWelcome = highlight && pedido.estado === "presupuesto";
+  const showWelcome = highlight && pedido.estado === "solicitado";
   const jornadas = jornadasEntre(pedido.fecha_desde, pedido.fecha_hasta);
   const tlCurrent = buildTimelineSteps(pedido).find((s) => s.state === "current");
   const cardRef = useRef<HTMLDivElement>(null);

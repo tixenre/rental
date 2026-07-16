@@ -78,7 +78,7 @@ class PedidoClienteCreate(BaseModel):
 def cliente_crear_pedido(
     data: PedidoClienteCreate, request: Request, background: BackgroundTasks,
 ):
-    """Crea un pedido (estado 'presupuesto') ligado al cliente autenticado."""
+    """Crea un pedido (estado 'solicitado') ligado al cliente autenticado."""
     session = require_cliente_verificado(request)
     cliente_id = session["cliente_id"]
 
@@ -165,7 +165,7 @@ def cliente_crear_pedido(
         fecha_desde=data.fecha_desde,
         fecha_hasta=data.fecha_hasta,
         notas=data.notas,
-        estado="presupuesto",
+        estado="solicitado",
         perfil_fiscal_id=data.perfil_fiscal_id,
         productora_id=data.productora_id,
         items=[

@@ -112,14 +112,14 @@ function estadosSet(...estados: EstadoPedido[]): Set<string> {
 // esos estados ya cae en Activos, no en el limbo.
 export const ACTIVE_STATES = estadosSet(
   "borrador",
-  "presupuesto",
+  "solicitado",
   "solicitado",
   "confirmado",
   "retirado",
   "entregado",
 );
 export const HIST_STATES = estadosSet("devuelto", "finalizado", "cancelado");
-export const MODIFICABLE_STATES = new Set(["presupuesto", "confirmado"]);
+export const MODIFICABLE_STATES = new Set(["solicitado", "confirmado"]);
 
 // "packing-list" (Checklist de retiro) queda afuera a propósito, igual que
 // "remito": ambos están disponibles desde el mismo momento que se crea el

@@ -178,7 +178,7 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
                 conn.execute("SELECT pg_advisory_xact_lock(%s, %s)",
                              (_ADVISORY_NS_PEDIDO, _eid))
 
-            estado_inicial = data.estado if data.estado in {"borrador", "presupuesto"} else "presupuesto"
+            estado_inicial = data.estado if data.estado in {"borrador", "solicitado"} else "solicitado"
             next_num = _next_numero_pedido(conn)
             # `fuente`: distingue quién originó el pedido para que el label del admin
             # ("back-office" vs "portal del cliente") sea confiable — antes esta columna
@@ -209,7 +209,7 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
             if data.items:
                 _apply_pedido_items(conn, pedido_id, data.items)
 
-            if estado_inicial == "presupuesto" and data.fecha_desde and data.fecha_hasta:
+            if estado_inicial == "solicitado" and data.fecha_desde and data.fecha_hasta:
                 problemas = _check_stock(conn, pedido_id, data.fecha_desde, data.fecha_hasta)
                 if problemas:
                     raise HTTPException(409, "Sin stock: " + "; ".join(problemas))
@@ -279,7 +279,7 @@ def _resolver_descuentos_snapshot_o_vivo(conn, p, jornadas: int) -> tuple[float,
     caller (`estado`, `descuento_jornadas_pct`, `descuento_cliente_pct`,
     `cliente_id`).
     """
-    if p["estado"] == "presupuesto":
+    if p["estado"] == "solicitado":
         return obtener_descuento_jornadas(conn, jornadas), obtener_descuento_cliente(conn, p["cliente_id"])
     return p["descuento_jornadas_pct"] or 0, p["descuento_cliente_pct"] or 0
 
@@ -312,7 +312,7 @@ def _recalcular_total_pedido(conn, id: int) -> None:
     Lo usan `_apply_pedido_datos` (editar fechas/cliente/descuento) y la
     edición de ítems. `propagar_descuento_a_presupuestos` también dispara esto
     cuando cambia el descuento de un cliente — pero solo alcanza presupuestos
-    (columna `estado='presupuesto'` en su propio WHERE), así que el guard de
+    (columna `estado='solicitado'` en su propio WHERE), así que el guard de
     acá nunca lo bloquea a él.
 
     `FOR UPDATE`: lockea la fila del pedido para todo el resto de la
@@ -398,7 +398,7 @@ def propagar_descuento_a_presupuestos(conn, cliente_id: int) -> int:
     ids = [
         r["id"]
         for r in conn.execute(
-            "SELECT id FROM alquileres WHERE cliente_id=%s AND estado='presupuesto' "
+            "SELECT id FROM alquileres WHERE cliente_id=%s AND estado='solicitado' "
             "AND (descuento_pct IS NULL OR descuento_pct = 0)",
             (cliente_id,),
         ).fetchall()

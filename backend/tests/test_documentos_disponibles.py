@@ -1,7 +1,7 @@
 """Candado de `_documentos_disponibles` (routes/cliente_portal/core.py).
 
 Remito, Contrato, Detalle de seguro (albarán) y Checklist de retiro (packing
-list) están disponibles desde "presupuesto" — apenas se solicita el pedido,
+list) están disponibles desde "solicitado" — apenas se solicita el pedido,
 antes de que Rambla lo confirme — para que el cliente tenga tiempo de leerlos
 o consultar a su aseguradora sin esperar la confirmación. "borrador" (solo
 admin, nunca un pedido de cliente) y "cancelado" quedan afuera.
@@ -22,7 +22,7 @@ _NINGUNO_DISPONIBLE = {
 
 @pytest.mark.parametrize(
     "estado",
-    ["presupuesto", "confirmado", "retirado", "devuelto", "finalizado"],
+    ["solicitado", "confirmado", "retirado", "devuelto", "finalizado"],
 )
 def test_documentos_disponibles_desde_presupuesto(estado):
     docs = _documentos_disponibles(estado)

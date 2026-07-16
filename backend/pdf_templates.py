@@ -145,7 +145,7 @@ def _active_wordmark() -> str:
 # Paleta de ESTADO (EstadoBadge oficial) → (color, fondo soft)
 _ESTADOS = {
     "borrador":    ("oklch(0.42 0.01 70)", "color-mix(in oklch, oklch(0.42 0.01 70) 14%, transparent)"),
-    "presupuesto": ("#1097DB", "color-mix(in oklch, #1097DB 14%, transparent)"),
+    "solicitado":  ("#1097DB", "color-mix(in oklch, #1097DB 14%, transparent)"),
     "confirmado":  ("#009971", "color-mix(in oklch, #009971 14%, transparent)"),
     "retirado":    ("#FAB428", "color-mix(in oklch, #FAB428 18%, transparent)"),
     "devuelto":    ("#ED7BAD", "color-mix(in oklch, #ED7BAD 16%, transparent)"),

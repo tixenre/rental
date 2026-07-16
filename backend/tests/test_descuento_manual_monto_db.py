@@ -98,7 +98,7 @@ def test_override_monto_fijo_gana_outright_y_se_persiste(setup):
     pedido = create_pedido(PedidoCreate(
         cliente_id=CLIENTE_ID,
         fecha_desde=FD, fecha_hasta=FH,
-        estado="presupuesto",
+        estado="solicitado",
         items=[PedidoItem(equipo_id=EQ_ID, cantidad=1, precio_jornada=1000)],
     ), es_admin=True)
     pid = pedido["id"]
@@ -137,7 +137,7 @@ def test_override_monto_fijo_se_capea_al_bruto_neto_no_negativo(setup):
     pedido = create_pedido(PedidoCreate(
         cliente_id=CLIENTE_ID,
         fecha_desde=FD, fecha_hasta=FH,
-        estado="presupuesto",
+        estado="solicitado",
         items=[PedidoItem(equipo_id=EQ_ID, cantidad=1, precio_jornada=1000)],
     ), es_admin=True)
     pid = pedido["id"]
@@ -172,7 +172,7 @@ def test_confirmado_con_override_monto_queda_congelado(setup):
     pedido = create_pedido(PedidoCreate(
         cliente_id=CLIENTE_ID,
         fecha_desde=FD, fecha_hasta=FH,
-        estado="presupuesto",
+        estado="solicitado",
         items=[PedidoItem(equipo_id=EQ_ID, cantidad=1, precio_jornada=1000)],
     ), es_admin=True)
     pid = pedido["id"]

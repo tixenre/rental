@@ -212,7 +212,7 @@ class TestContratoHtmlMostrarLocador:
     def _pedido(self):
         return {
             "id": "preview",
-            "estado": "presupuesto",
+            "estado": "solicitado",
             "fecha_desde": "2026-07-10",
             "fecha_hasta": "2026-07-12",
             "emitido": None,

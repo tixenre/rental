@@ -81,8 +81,8 @@ const PERFILES = [
   { value: "exento", label: "Exento" },
 ];
 
-const estadoLabel = (e: string) =>
-  e === "presupuesto" ? "Solicitado" : (ESTADO_LABEL[e as keyof typeof ESTADO_LABEL] ?? e);
+// El label visible sale de la fuente única `ESTADO_LABEL`.
+const estadoLabel = (e: string) => ESTADO_LABEL[e as keyof typeof ESTADO_LABEL] ?? e;
 const fmtFecha = (s: string | null) => formatFechaDisplay(s);
 
 export function ClienteDetalleDialog({ open, onOpenChange, cliente, onSaved }: Props) {

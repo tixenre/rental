@@ -6,7 +6,6 @@
  */
 export type EstadoPedido =
   | "borrador"
-  | "presupuesto"
   | "solicitado"
   | "confirmado"
   | "retirado"
@@ -17,8 +16,7 @@ export type EstadoPedido =
 
 /** Label del CTA del "siguiente paso feliz" — compartido entre lista y editor de pedidos. */
 export const PEDIDO_NEXT_LABEL: Partial<Record<EstadoPedido, string>> = {
-  borrador: "Presupuestar",
-  presupuesto: "Confirmar pedido",
+  borrador: "Pasar a solicitud",
   solicitado: "Confirmar pedido",
   confirmado: "Marcar retirado",
   retirado: "Registrar devolución",
@@ -41,7 +39,7 @@ export const PEDIDO_NEXT_LABEL: Partial<Record<EstadoPedido, string>> = {
 
 /** Secuencia del "camino feliz" para el indicador de progreso (FlowStrip). */
 export const FLOW: EstadoPedido[] = [
-  "presupuesto",
+  "solicitado",
   "confirmado",
   "retirado",
   "devuelto",
@@ -50,18 +48,18 @@ export const FLOW: EstadoPedido[] = [
 
 /**
  * Transiciones permitidas por estado (espeja el backend, grafo completo
- * incluyendo retrocesos). `solicitado`/`entregado` son estados de display del
- * portal, no valores reales de `alquileres.estado` — sus entradas quedan tal
- * cual estaban (nunca se consultan con un `estado` real del editor admin).
+ * incluyendo retrocesos). `entregado` es un estado de display del portal, no un
+ * valor real de `alquileres.estado` — su entrada queda tal cual (nunca se
+ * consulta con un `estado` real del editor admin). `solicitado` (ex-`presupuesto`,
+ * renombrado 2026-07-14) SÍ es el estado real inicial del pedido.
  */
 export const TRANSICIONES: Partial<Record<EstadoPedido, EstadoPedido[]>> = {
-  borrador: ["presupuesto", "confirmado", "retirado", "devuelto", "cancelado"],
-  presupuesto: ["borrador", "confirmado", "retirado", "devuelto", "cancelado"],
-  solicitado: ["confirmado", "cancelado"], // estado del portal → se confirma igual
-  confirmado: ["borrador", "presupuesto", "retirado", "devuelto", "cancelado"],
-  retirado: ["borrador", "presupuesto", "confirmado", "devuelto"],
+  borrador: ["solicitado", "confirmado", "retirado", "devuelto", "cancelado"],
+  solicitado: ["borrador", "confirmado", "retirado", "devuelto", "cancelado"],
+  confirmado: ["borrador", "solicitado", "retirado", "devuelto", "cancelado"],
+  retirado: ["borrador", "solicitado", "confirmado", "devuelto"],
   entregado: ["devuelto", "cancelado"], // estado del portal
-  devuelto: ["borrador", "presupuesto", "confirmado", "retirado", "finalizado"],
+  devuelto: ["borrador", "solicitado", "confirmado", "retirado", "finalizado"],
   finalizado: ["devuelto"],
   cancelado: [],
 };
@@ -76,8 +74,7 @@ export const transiciones = (e: EstadoPedido): EstadoPedido[] => TRANSICIONES[e]
  * de avance" — por eso es una tabla aparte, no derivada.
  */
 const SIGUIENTE_PASO: Partial<Record<EstadoPedido, EstadoPedido>> = {
-  borrador: "presupuesto",
-  presupuesto: "confirmado",
+  borrador: "solicitado",
   solicitado: "confirmado",
   confirmado: "retirado",
   retirado: "devuelto",

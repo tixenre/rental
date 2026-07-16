@@ -164,7 +164,7 @@ class TestAlquiler:
             fecha_desde="2026-01-01",
             fecha_hasta="2026-01-03",
         )
-        assert a.estado == "presupuesto"
+        assert a.estado == "solicitado"
         assert a.monto_total == 0
         assert a.items == []
         assert a.pagos == []

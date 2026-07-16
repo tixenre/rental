@@ -53,7 +53,7 @@ const primerNombre = (s: string | null | undefined): string => {
 
 export type TemplateKey =
   | "saludo"
-  | "presupuesto"
+  | "solicitado"
   | "confirmacion"
   | "recordatorio_retiro"
   | "recordatorio_devolucion"
@@ -87,7 +87,7 @@ export function templatesForPedido(p: PedidoMinimal): TemplateOption[] {
       message: `Hola${nombre ? " " + nombre : ""}! Te escribo desde Rambla Rental.`,
     },
     {
-      key: "presupuesto",
+      key: "solicitado",
       label: "Cotización lista",
       message:
         `Hola${nombre ? " " + nombre : ""}! Te paso tu cotización ${num}:\n` +

@@ -252,7 +252,7 @@ def _crear(barrera, idx, resultados, errores):
 
     data = PedidoCreate(
         cliente_nombre=_NOMBRE_TEST, fecha_desde=FD2, fecha_hasta=FH2,
-        estado="presupuesto",
+        estado="solicitado",
         items=[PedidoItem(equipo_id=EQ_ID2, cantidad=1, precio_jornada=1000)],
     )
     try:

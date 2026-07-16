@@ -23,7 +23,7 @@ import { AdminTable, type Column } from "@/components/admin/AdminTable";
 
 const PEDIDOS = [
   { numero: "#1042", cliente: "Pablo Ferrari", estado: "Confirmado", monto: "$ 48.500" },
-  { numero: "#1043", cliente: "María González", estado: "Presupuesto", monto: "$ 12.000" },
+  { numero: "#1043", cliente: "María González", estado: "Solicitud", monto: "$ 12.000" },
   { numero: "#1044", cliente: "Juan Pérez", estado: "Retirado", monto: "$ 31.200" },
 ];
 
@@ -142,7 +142,7 @@ export const containersSection: CatalogSection = {
         <Stack className="max-w-md">
           <Alert>
             <Info />
-            <AlertTitle>Pedido en presupuesto</AlertTitle>
+            <AlertTitle>Pedido en solicitud</AlertTitle>
             <AlertDescription>
               Todavía no está confirmado. El stock se reserva recién al confirmar.
             </AlertDescription>
