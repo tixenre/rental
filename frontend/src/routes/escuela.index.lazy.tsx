@@ -7,7 +7,7 @@ import { SectionBanner } from "@/components/rental/landing/SectionBanner";
 import { apiGetTalleres, type Taller } from "@/lib/api";
 import { formatARS } from "@/lib/format";
 
-export const Route = createLazyFileRoute("/workshops/")({
+export const Route = createLazyFileRoute("/escuela/")({
   component: TalleresPage,
 });
 
@@ -70,7 +70,7 @@ function WorkshopCard({ taller }: { taller: Taller }) {
 
   return (
     <Link
-      to="/workshops/$slug"
+      to="/escuela/$slug"
       params={{ slug: taller.slug }}
       className={`group flex flex-col sm:flex-row rounded-2xl border overflow-hidden transition-all duration-200 ${
         soldOut

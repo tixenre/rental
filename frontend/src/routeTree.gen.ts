@@ -13,20 +13,20 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkshopsRouteImport } from './routes/workshops'
 import { Route as TerminosRouteImport } from './routes/terminos'
-import { Route as TalleresRouteImport } from './routes/talleres'
 import { Route as RentalRouteImport } from './routes/rental'
 import { Route as PrivacidadRouteImport } from './routes/privacidad'
 import { Route as PreguntasFrecuentesRouteImport } from './routes/preguntas-frecuentes'
 import { Route as KitPreviewRouteImport } from './routes/kit-preview'
 import { Route as EstudioRouteImport } from './routes/estudio'
+import { Route as EscuelaRouteImport } from './routes/escuela'
 import { Route as ClienteRouteImport } from './routes/cliente'
 import { Route as CatalogoRouteImport } from './routes/catalogo'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as TalleresIndexRouteImport } from './routes/talleres.index'
+import { Route as WorkshopsIndexRouteImport } from './routes/workshops.index'
 import { Route as ClienteIndexRouteImport } from './routes/cliente.index'
 import { Route as WorkshopsSlugRouteImport } from './routes/workshops.$slug'
-import { Route as TalleresSlugRouteImport } from './routes/talleres.$slug'
+import { Route as EscuelaSlugRouteImport } from './routes/escuela.$slug'
 import { Route as EquipoSlugRouteImport } from './routes/equipo.$slug'
 import { Route as ClienteRegistroRouteImport } from './routes/cliente.registro'
 import { Route as ClientePortalRouteImport } from './routes/cliente.portal'
@@ -42,7 +42,7 @@ import { Route as AdminEstudioRouteImport } from './routes/admin/estudio'
 import { Route as AdminEquiposRouteImport } from './routes/admin/equipos'
 import { Route as ClientePedidosIdEditarRouteImport } from './routes/cliente.pedidos.$id.editar'
 
-const WorkshopsIndexLazyRouteImport = createFileRoute('/workshops/')()
+const EscuelaIndexLazyRouteImport = createFileRoute('/escuela/')()
 const AdminIndexLazyRouteImport = createFileRoute('/admin/')()
 const AdminUnidadesLazyRouteImport = createFileRoute('/admin/unidades')()
 const AdminSolicitudesLazyRouteImport = createFileRoute('/admin/solicitudes')()
@@ -120,15 +120,10 @@ const WorkshopsRoute = WorkshopsRouteImport.update({
   id: '/workshops',
   path: '/workshops',
   getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/workshops.lazy').then((d) => d.Route))
+} as any)
 const TerminosRoute = TerminosRouteImport.update({
   id: '/terminos',
   path: '/terminos',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TalleresRoute = TalleresRouteImport.update({
-  id: '/talleres',
-  path: '/talleres',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RentalRoute = RentalRouteImport.update({
@@ -156,6 +151,11 @@ const EstudioRoute = EstudioRouteImport.update({
   path: '/estudio',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/estudio.lazy').then((d) => d.Route))
+const EscuelaRoute = EscuelaRouteImport.update({
+  id: '/escuela',
+  path: '/escuela',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/escuela.lazy').then((d) => d.Route))
 const ClienteRoute = ClienteRouteImport.update({
   id: '/cliente',
   path: '/cliente',
@@ -176,22 +176,20 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WorkshopsIndexLazyRoute = WorkshopsIndexLazyRouteImport.update({
+const EscuelaIndexLazyRoute = EscuelaIndexLazyRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => WorkshopsRoute,
-} as any).lazy(() =>
-  import('./routes/workshops.index.lazy').then((d) => d.Route),
-)
+  getParentRoute: () => EscuelaRoute,
+} as any).lazy(() => import('./routes/escuela.index.lazy').then((d) => d.Route))
 const AdminIndexLazyRoute = AdminIndexLazyRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any).lazy(() => import('./routes/admin/index.lazy').then((d) => d.Route))
-const TalleresIndexRoute = TalleresIndexRouteImport.update({
+const WorkshopsIndexRoute = WorkshopsIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => TalleresRoute,
+  getParentRoute: () => WorkshopsRoute,
 } as any)
 const ClienteIndexRoute = ClienteIndexRouteImport.update({
   id: '/',
@@ -300,14 +298,12 @@ const WorkshopsSlugRoute = WorkshopsSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
   getParentRoute: () => WorkshopsRoute,
-} as any).lazy(() =>
-  import('./routes/workshops.$slug.lazy').then((d) => d.Route),
-)
-const TalleresSlugRoute = TalleresSlugRouteImport.update({
+} as any)
+const EscuelaSlugRoute = EscuelaSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
-  getParentRoute: () => TalleresRoute,
-} as any)
+  getParentRoute: () => EscuelaRoute,
+} as any).lazy(() => import('./routes/escuela.$slug.lazy').then((d) => d.Route))
 const EquipoSlugRoute = EquipoSlugRouteImport.update({
   id: '/equipo/$slug',
   path: '/equipo/$slug',
@@ -541,12 +537,12 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/catalogo': typeof CatalogoRoute
   '/cliente': typeof ClienteRouteWithChildren
+  '/escuela': typeof EscuelaRouteWithChildren
   '/estudio': typeof EstudioRoute
   '/kit-preview': typeof KitPreviewRoute
   '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
   '/privacidad': typeof PrivacidadRoute
   '/rental': typeof RentalRoute
-  '/talleres': typeof TalleresRouteWithChildren
   '/terminos': typeof TerminosRoute
   '/workshops': typeof WorkshopsRouteWithChildren
   '/admin/equipos': typeof AdminEquiposRouteWithChildren
@@ -562,7 +558,7 @@ export interface FileRoutesByFullPath {
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
   '/equipo/$slug': typeof EquipoSlugRoute
-  '/talleres/$slug': typeof TalleresSlugRoute
+  '/escuela/$slug': typeof EscuelaSlugRoute
   '/workshops/$slug': typeof WorkshopsSlugRoute
   '/admin/carritos': typeof AdminCarritosLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
@@ -581,9 +577,9 @@ export interface FileRoutesByFullPath {
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
   '/admin/unidades': typeof AdminUnidadesLazyRoute
   '/cliente/': typeof ClienteIndexRoute
-  '/talleres/': typeof TalleresIndexRoute
+  '/workshops/': typeof WorkshopsIndexRoute
   '/admin/': typeof AdminIndexLazyRoute
-  '/workshops/': typeof WorkshopsIndexLazyRoute
+  '/escuela/': typeof EscuelaIndexLazyRoute
   '/admin/contabilidad/cuentas': typeof AdminContabilidadCuentasLazyRoute
   '/admin/contabilidad/glosario': typeof AdminContabilidadGlosarioLazyRoute
   '/admin/contabilidad/liquidacion': typeof AdminContabilidadLiquidacionLazyRoute
@@ -626,7 +622,7 @@ export interface FileRoutesByTo {
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
   '/equipo/$slug': typeof EquipoSlugRoute
-  '/talleres/$slug': typeof TalleresSlugRoute
+  '/escuela/$slug': typeof EscuelaSlugRoute
   '/workshops/$slug': typeof WorkshopsSlugRoute
   '/admin/carritos': typeof AdminCarritosLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
@@ -645,9 +641,9 @@ export interface FileRoutesByTo {
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
   '/admin/unidades': typeof AdminUnidadesLazyRoute
   '/cliente': typeof ClienteIndexRoute
-  '/talleres': typeof TalleresIndexRoute
+  '/workshops': typeof WorkshopsIndexRoute
   '/admin': typeof AdminIndexLazyRoute
-  '/workshops': typeof WorkshopsIndexLazyRoute
+  '/escuela': typeof EscuelaIndexLazyRoute
   '/admin/contabilidad/cuentas': typeof AdminContabilidadCuentasLazyRoute
   '/admin/contabilidad/glosario': typeof AdminContabilidadGlosarioLazyRoute
   '/admin/contabilidad/liquidacion': typeof AdminContabilidadLiquidacionLazyRoute
@@ -677,12 +673,12 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/catalogo': typeof CatalogoRoute
   '/cliente': typeof ClienteRouteWithChildren
+  '/escuela': typeof EscuelaRouteWithChildren
   '/estudio': typeof EstudioRoute
   '/kit-preview': typeof KitPreviewRoute
   '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
   '/privacidad': typeof PrivacidadRoute
   '/rental': typeof RentalRoute
-  '/talleres': typeof TalleresRouteWithChildren
   '/terminos': typeof TerminosRoute
   '/workshops': typeof WorkshopsRouteWithChildren
   '/admin/equipos': typeof AdminEquiposRouteWithChildren
@@ -698,7 +694,7 @@ export interface FileRoutesById {
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
   '/equipo/$slug': typeof EquipoSlugRoute
-  '/talleres/$slug': typeof TalleresSlugRoute
+  '/escuela/$slug': typeof EscuelaSlugRoute
   '/workshops/$slug': typeof WorkshopsSlugRoute
   '/admin/carritos': typeof AdminCarritosLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
@@ -717,9 +713,9 @@ export interface FileRoutesById {
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
   '/admin/unidades': typeof AdminUnidadesLazyRoute
   '/cliente/': typeof ClienteIndexRoute
-  '/talleres/': typeof TalleresIndexRoute
+  '/workshops/': typeof WorkshopsIndexRoute
   '/admin/': typeof AdminIndexLazyRoute
-  '/workshops/': typeof WorkshopsIndexLazyRoute
+  '/escuela/': typeof EscuelaIndexLazyRoute
   '/admin/contabilidad/cuentas': typeof AdminContabilidadCuentasLazyRoute
   '/admin/contabilidad/glosario': typeof AdminContabilidadGlosarioLazyRoute
   '/admin/contabilidad/liquidacion': typeof AdminContabilidadLiquidacionLazyRoute
@@ -750,12 +746,12 @@ export interface FileRouteTypes {
     | '/admin'
     | '/catalogo'
     | '/cliente'
+    | '/escuela'
     | '/estudio'
     | '/kit-preview'
     | '/preguntas-frecuentes'
     | '/privacidad'
     | '/rental'
-    | '/talleres'
     | '/terminos'
     | '/workshops'
     | '/admin/equipos'
@@ -771,7 +767,7 @@ export interface FileRouteTypes {
     | '/cliente/portal'
     | '/cliente/registro'
     | '/equipo/$slug'
-    | '/talleres/$slug'
+    | '/escuela/$slug'
     | '/workshops/$slug'
     | '/admin/carritos'
     | '/admin/clientes'
@@ -790,9 +786,9 @@ export interface FileRouteTypes {
     | '/admin/solicitudes'
     | '/admin/unidades'
     | '/cliente/'
-    | '/talleres/'
-    | '/admin/'
     | '/workshops/'
+    | '/admin/'
+    | '/escuela/'
     | '/admin/contabilidad/cuentas'
     | '/admin/contabilidad/glosario'
     | '/admin/contabilidad/liquidacion'
@@ -835,7 +831,7 @@ export interface FileRouteTypes {
     | '/cliente/portal'
     | '/cliente/registro'
     | '/equipo/$slug'
-    | '/talleres/$slug'
+    | '/escuela/$slug'
     | '/workshops/$slug'
     | '/admin/carritos'
     | '/admin/clientes'
@@ -854,9 +850,9 @@ export interface FileRouteTypes {
     | '/admin/solicitudes'
     | '/admin/unidades'
     | '/cliente'
-    | '/talleres'
-    | '/admin'
     | '/workshops'
+    | '/admin'
+    | '/escuela'
     | '/admin/contabilidad/cuentas'
     | '/admin/contabilidad/glosario'
     | '/admin/contabilidad/liquidacion'
@@ -885,12 +881,12 @@ export interface FileRouteTypes {
     | '/admin'
     | '/catalogo'
     | '/cliente'
+    | '/escuela'
     | '/estudio'
     | '/kit-preview'
     | '/preguntas-frecuentes'
     | '/privacidad'
     | '/rental'
-    | '/talleres'
     | '/terminos'
     | '/workshops'
     | '/admin/equipos'
@@ -906,7 +902,7 @@ export interface FileRouteTypes {
     | '/cliente/portal'
     | '/cliente/registro'
     | '/equipo/$slug'
-    | '/talleres/$slug'
+    | '/escuela/$slug'
     | '/workshops/$slug'
     | '/admin/carritos'
     | '/admin/clientes'
@@ -925,9 +921,9 @@ export interface FileRouteTypes {
     | '/admin/solicitudes'
     | '/admin/unidades'
     | '/cliente/'
-    | '/talleres/'
-    | '/admin/'
     | '/workshops/'
+    | '/admin/'
+    | '/escuela/'
     | '/admin/contabilidad/cuentas'
     | '/admin/contabilidad/glosario'
     | '/admin/contabilidad/liquidacion'
@@ -957,12 +953,12 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   CatalogoRoute: typeof CatalogoRoute
   ClienteRoute: typeof ClienteRouteWithChildren
+  EscuelaRoute: typeof EscuelaRouteWithChildren
   EstudioRoute: typeof EstudioRoute
   KitPreviewRoute: typeof KitPreviewRoute
   PreguntasFrecuentesRoute: typeof PreguntasFrecuentesRoute
   PrivacidadRoute: typeof PrivacidadRoute
   RentalRoute: typeof RentalRoute
-  TalleresRoute: typeof TalleresRouteWithChildren
   TerminosRoute: typeof TerminosRoute
   WorkshopsRoute: typeof WorkshopsRouteWithChildren
   CTokenRoute: typeof CTokenRoute
@@ -984,13 +980,6 @@ declare module '@tanstack/react-router' {
       path: '/terminos'
       fullPath: '/terminos'
       preLoaderRoute: typeof TerminosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/talleres': {
-      id: '/talleres'
-      path: '/talleres'
-      fullPath: '/talleres'
-      preLoaderRoute: typeof TalleresRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/rental': {
@@ -1028,6 +1017,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EstudioRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/escuela': {
+      id: '/escuela'
+      path: '/escuela'
+      fullPath: '/escuela'
+      preLoaderRoute: typeof EscuelaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/cliente': {
       id: '/cliente'
       path: '/cliente'
@@ -1056,12 +1052,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/workshops/': {
-      id: '/workshops/'
+    '/escuela/': {
+      id: '/escuela/'
       path: '/'
-      fullPath: '/workshops/'
-      preLoaderRoute: typeof WorkshopsIndexLazyRouteImport
-      parentRoute: typeof WorkshopsRoute
+      fullPath: '/escuela/'
+      preLoaderRoute: typeof EscuelaIndexLazyRouteImport
+      parentRoute: typeof EscuelaRoute
     }
     '/admin/': {
       id: '/admin/'
@@ -1070,12 +1066,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexLazyRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/talleres/': {
-      id: '/talleres/'
+    '/workshops/': {
+      id: '/workshops/'
       path: '/'
-      fullPath: '/talleres/'
-      preLoaderRoute: typeof TalleresIndexRouteImport
-      parentRoute: typeof TalleresRoute
+      fullPath: '/workshops/'
+      preLoaderRoute: typeof WorkshopsIndexRouteImport
+      parentRoute: typeof WorkshopsRoute
     }
     '/cliente/': {
       id: '/cliente/'
@@ -1203,12 +1199,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkshopsSlugRouteImport
       parentRoute: typeof WorkshopsRoute
     }
-    '/talleres/$slug': {
-      id: '/talleres/$slug'
+    '/escuela/$slug': {
+      id: '/escuela/$slug'
       path: '/$slug'
-      fullPath: '/talleres/$slug'
-      preLoaderRoute: typeof TalleresSlugRouteImport
-      parentRoute: typeof TalleresRoute
+      fullPath: '/escuela/$slug'
+      preLoaderRoute: typeof EscuelaSlugRouteImport
+      parentRoute: typeof EscuelaRoute
     }
     '/equipo/$slug': {
       id: '/equipo/$slug'
@@ -1605,28 +1601,27 @@ const ClienteRouteChildren: ClienteRouteChildren = {
 const ClienteRouteWithChildren =
   ClienteRoute._addFileChildren(ClienteRouteChildren)
 
-interface TalleresRouteChildren {
-  TalleresSlugRoute: typeof TalleresSlugRoute
-  TalleresIndexRoute: typeof TalleresIndexRoute
+interface EscuelaRouteChildren {
+  EscuelaSlugRoute: typeof EscuelaSlugRoute
+  EscuelaIndexLazyRoute: typeof EscuelaIndexLazyRoute
 }
 
-const TalleresRouteChildren: TalleresRouteChildren = {
-  TalleresSlugRoute: TalleresSlugRoute,
-  TalleresIndexRoute: TalleresIndexRoute,
+const EscuelaRouteChildren: EscuelaRouteChildren = {
+  EscuelaSlugRoute: EscuelaSlugRoute,
+  EscuelaIndexLazyRoute: EscuelaIndexLazyRoute,
 }
 
-const TalleresRouteWithChildren = TalleresRoute._addFileChildren(
-  TalleresRouteChildren,
-)
+const EscuelaRouteWithChildren =
+  EscuelaRoute._addFileChildren(EscuelaRouteChildren)
 
 interface WorkshopsRouteChildren {
   WorkshopsSlugRoute: typeof WorkshopsSlugRoute
-  WorkshopsIndexLazyRoute: typeof WorkshopsIndexLazyRoute
+  WorkshopsIndexRoute: typeof WorkshopsIndexRoute
 }
 
 const WorkshopsRouteChildren: WorkshopsRouteChildren = {
   WorkshopsSlugRoute: WorkshopsSlugRoute,
-  WorkshopsIndexLazyRoute: WorkshopsIndexLazyRoute,
+  WorkshopsIndexRoute: WorkshopsIndexRoute,
 }
 
 const WorkshopsRouteWithChildren = WorkshopsRoute._addFileChildren(
@@ -1638,12 +1633,12 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   CatalogoRoute: CatalogoRoute,
   ClienteRoute: ClienteRouteWithChildren,
+  EscuelaRoute: EscuelaRouteWithChildren,
   EstudioRoute: EstudioRoute,
   KitPreviewRoute: KitPreviewRoute,
   PreguntasFrecuentesRoute: PreguntasFrecuentesRoute,
   PrivacidadRoute: PrivacidadRoute,
   RentalRoute: RentalRoute,
-  TalleresRoute: TalleresRouteWithChildren,
   TerminosRoute: TerminosRoute,
   WorkshopsRoute: WorkshopsRouteWithChildren,
   CTokenRoute: CTokenRoute,

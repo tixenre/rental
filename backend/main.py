@@ -997,7 +997,8 @@ def estudio_page():
         return _serve_frontend("index.html")
 
 
-@app.get("/workshops/{slug}", include_in_schema=False)
+@app.get("/escuela/{slug}", include_in_schema=False)
+@app.get("/workshops/{slug}", include_in_schema=False)  # alias viejo: el front lo redirige a /escuela, acá sirve OG para scrapers
 def workshop_page(slug: str):
     """Sirve el SPA del taller con OG tags dinámicos (foto del instructor).
     Ante cualquier error sirve el index.html plano — nunca rompe la página."""
@@ -1045,11 +1046,11 @@ def workshop_page(slug: str):
         if len(desc_raw) > 200:
             desc_raw = desc_raw[:197].rstrip() + "…"
         if not desc_raw:
-            desc_raw = f"Workshop con {instructor} en Rambla, Mar del Plata." if instructor else "Workshops audiovisuales en Mar del Plata."
+            desc_raw = f"Taller con {instructor} en Rambla, Mar del Plata." if instructor else "Talleres audiovisuales en Mar del Plata."
         title = f"{nombre} con {instructor} — Rambla" if instructor else f"{nombre} — Rambla"
         if not og_img.startswith("http"):
             og_img = f"{SITE_URL}/icon-512.png"
-        taller_url = f"{SITE_URL}/workshops/{slug}"
+        taller_url = f"{SITE_URL}/escuela/{slug}"
         html_text = _inject_og_meta(
             index_file.read_text(encoding="utf-8"),
             title=title, description=desc_raw, image=og_img, url=taller_url,
@@ -1100,7 +1101,7 @@ def workshop_page(slug: str):
         html_text = _inject_json_ld(html_text, event_schema)
         return HTMLResponse(content=html_text)
     except Exception:
-        logger.warning("OG injection falló para /workshops/%s — sirvo index plano", slug, exc_info=True)
+        logger.warning("OG injection falló para el taller %s — sirvo index plano", slug, exc_info=True)
         return _serve_frontend("index.html")
 
 
