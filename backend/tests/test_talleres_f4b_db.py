@@ -328,3 +328,89 @@ def test_admin_notificar_interesado_404_si_no_existe(taller_base):
     with pytest.raises(t.HTTPException) as exc:
         t.admin_notificar_interesado(TALLER_ID, 999_999_999, None)
     assert exc.value.status_code == 404
+
+
+def test_eliminar_inscripcion_espera_lock_y_ve_estado_fresco(taller_base):
+    """Regresión (hallazgo del supervisor, reproducido con dos conexiones
+    reales): admin_delete_inscripcion no tomaba FOR UPDATE — si el reclamo de
+    un cupo (POST /talleres/sena/{token}) commiteaba en_lista_espera=False +
+    cupos_confirmados+1 justo ENTRE el SELECT y el DELETE del admin, este
+    borraba la fila con el en_lista_espera VIEJO (True), se saltaba el
+    decremento, y cupos_confirmados quedaba contando de más para siempre. Con
+    el FOR UPDATE del fix, el DELETE del admin espera a que el reclamo libere
+    el lock y ve el estado fresco post-commit → decrementa correctamente."""
+    import threading
+    import time
+    from database import get_db
+    t = taller_base
+
+    ed = _crear_edicion_activa(t, cupos_total=5, cupos_confirmados=3)
+    ins_id = _insertar_inscripcion(ed["id"], en_lista_espera=True, estado="cupo_ofrecido")
+
+    orden: list[str] = []
+    lock_tomado = threading.Event()
+    liberar_lock = threading.Event()
+    errores: dict[str, Exception] = {}
+
+    def _simular_reclamo():
+        conn = get_db()
+        try:
+            conn.execute(
+                "SELECT id FROM taller_inscripciones WHERE id = %s FOR UPDATE", (ins_id,)
+            )
+            orden.append("reclamo_tomo_lock")
+            lock_tomado.set()
+            liberar_lock.wait(timeout=5)
+            # Lo mismo que hace claim_oferta_cupo antes de comittear.
+            conn.execute(
+                "UPDATE taller_inscripciones SET en_lista_espera = FALSE, "
+                "estado = 'pendiente_sena' WHERE id = %s",
+                (ins_id,),
+            )
+            conn.execute(
+                "UPDATE ediciones_taller SET cupos_confirmados = cupos_confirmados + 1 "
+                "WHERE id = %s",
+                (ed["id"],),
+            )
+            conn.commit()
+            orden.append("reclamo_commiteo")
+        except Exception as e:  # noqa: BLE001
+            errores["reclamo"] = e
+        finally:
+            conn.close()
+
+    def _borrar():
+        lock_tomado.wait(timeout=5)
+        try:
+            t.admin_delete_inscripcion(TALLER_ID, ins_id, None)
+            orden.append("admin_borro")
+        except Exception as e:  # noqa: BLE001
+            errores["admin"] = e
+
+    ta = threading.Thread(target=_simular_reclamo)
+    tb = threading.Thread(target=_borrar)
+    ta.start()
+    lock_tomado.wait(timeout=5)
+    tb.start()
+    time.sleep(0.3)  # admin debería seguir esperando el lock en este punto.
+    assert "admin_borro" not in orden, "el admin no debería poder borrar mientras el reclamo retiene el lock"
+    liberar_lock.set()
+    ta.join(timeout=5)
+    tb.join(timeout=5)
+
+    assert not ta.is_alive() and not tb.is_alive(), "deadlock: algún hilo no terminó"
+    assert not errores, f"errores en los hilos: {errores}"
+    assert orden == ["reclamo_tomo_lock", "reclamo_commiteo", "admin_borro"], orden
+
+    with get_db() as conn:
+        edicion = conn.execute(
+            "SELECT cupos_confirmados FROM ediciones_taller WHERE id = %s", (ed["id"],)
+        ).fetchone()
+    # El reclamo sumó 1 (3→4); el admin borró una inscripción que YA estaba
+    # confirmada (en_lista_espera=False fresco) → debe restar 1 (4→3). Sin el
+    # fix, el admin veía el en_lista_espera VIEJO (True) y no restaba nada →
+    # hubiera quedado en 4 (contado de más para siempre).
+    assert edicion["cupos_confirmados"] == 3, (
+        f"esperaba 3 (el reclamo sumó, el borrado de la confirmada resta) — "
+        f"quedó en {edicion['cupos_confirmados']}: cupos contados de más"
+    )

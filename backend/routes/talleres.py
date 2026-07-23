@@ -820,7 +820,8 @@ def crear_interesado(slug: str, body: InteresadoBody, request: Request):
 
 
 @router.get("/talleres/sena/{token}")
-def get_oferta_cupo(token: str):
+@limiter.limit("30/minute")
+def get_oferta_cupo(token: str, request: Request):
     """Contexto público de una oferta de cupo vigente ("completá tu seña").
     404 si el token es inválido/venció; 410 si esta inscripción particular ya
     no está en estado `cupo_ofrecido` (ya la reclamó, o nunca fue ofrecida)."""
@@ -880,8 +881,8 @@ def claim_oferta_cupo(token: str, body: ClaimCupoBody, request: Request):
     with get_db() as conn:
         try:
             ins = conn.execute(
-                "SELECT id, taller_id, edicion_id, estado, nombre, email FROM taller_inscripciones "
-                "WHERE id = %s FOR UPDATE",
+                "SELECT id, taller_id, edicion_id, estado, nombre, email, telefono "
+                "FROM taller_inscripciones WHERE id = %s FOR UPDATE",
                 (insid,),
             ).fetchone()
             if ins is None:
@@ -937,7 +938,7 @@ def claim_oferta_cupo(token: str, body: ClaimCupoBody, request: Request):
         "taller_nombre": edicion_row["taller_nombre"],
         "nombre": ins["nombre"],
         "email": ins["email"],
-        "telefono": "",
+        "telefono": ins["telefono"] or "",
         "experiencia": "",
         "comprobante_url": _comprobante_url_para_email(body.comprobante_key, body.comprobante_url),
         "en_lista_espera": False,
@@ -1993,13 +1994,21 @@ def admin_export_inscripciones_csv(taller_id: int, request: Request):
 
 @router.delete("/admin/talleres/{taller_id}/inscripciones/{ins_id}", status_code=200)
 def admin_delete_inscripcion(taller_id: int, ins_id: int, request: Request):
-    """Elimina una inscripción. Si era confirmada, decrementa cupos en la edición."""
+    """Elimina una inscripción. Si era confirmada, decrementa cupos en la edición.
+
+    `FOR UPDATE`: sin el lock, un reclamo de cupo concurrente
+    (POST /talleres/sena/{token}, que también toma FOR UPDATE sobre esta
+    misma fila) podía commitear `en_lista_espera=False` justo entre este
+    SELECT y el DELETE — el admin borraba la fila leyendo el `en_lista_espera`
+    viejo (True) y se saltaba el decremento, dejando `cupos_confirmados`
+    contando de más para siempre (hallazgo del supervisor, reproducido con
+    dos conexiones reales)."""
     require_admin(request)
     with get_db() as conn:
         try:
             ins = conn.execute(
                 "SELECT id, en_lista_espera, edicion_id FROM taller_inscripciones "
-                "WHERE id = %s AND taller_id = %s",
+                "WHERE id = %s AND taller_id = %s FOR UPDATE",
                 (ins_id, taller_id),
             ).fetchone()
             if ins is None:
