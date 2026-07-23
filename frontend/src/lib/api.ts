@@ -527,3 +527,73 @@ export async function apiUploadComprobante(
 export function apiCrearInscripcion(slug: string, body: InscripcionBody) {
   return post<InscripcionResult>(`/api/talleres/${slug}/inscripcion`, body);
 }
+
+// ── F5: página pública "completá tu seña" (/escuela/sena/$token) ───────────
+
+export type OfertaCupo = {
+  taller_nombre: string;
+  nombre_pila: string;
+  fecha_inicio_str: string;
+  fecha_fin_str: string;
+  horario: string;
+  direccion: string;
+  precio_sena_str: string;
+  pago_alias: string;
+  pago_cbu: string;
+  pago_banco: string;
+};
+
+class ApiStatusError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/** 404 = link inválido/vencido; 410 = oferta ya no vigente (reclamada o
+ *  nunca ofrecida) — el caller distingue por `err.status`, no por texto. */
+export async function apiGetOfertaCupo(token: string): Promise<OfertaCupo> {
+  const res = await fetch(`${API_BASE}/api/talleres/sena/${token}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiStatusError(res.status, err?.detail ?? `Error ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function apiUploadComprobanteSena(
+  token: string,
+  file: File,
+): Promise<{ url: string; key: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(`${API_BASE}/api/talleres/sena/${token}/upload-comprobante`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiStatusError(
+      res.status,
+      err?.detail ?? `No se pudo subir el comprobante (${res.status})`,
+    );
+  }
+  return res.json();
+}
+
+export async function apiClaimOfertaCupo(
+  token: string,
+  body: { comprobante_url?: string; comprobante_key?: string },
+): Promise<{ ok: boolean }> {
+  const res = await fetch(`${API_BASE}/api/talleres/sena/${token}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiStatusError(res.status, err?.detail ?? `Error ${res.status}`);
+  }
+  return res.json();
+}
