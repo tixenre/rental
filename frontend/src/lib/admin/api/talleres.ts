@@ -1,5 +1,12 @@
 import { authedFetch, authedJson, authedPostJson } from "@/lib/authedFetch";
-import type { ClaseBody, EdicionAdmin, TallerConcepto, Inscripcion, Instructor } from "./types";
+import type {
+  ClaseBody,
+  EdicionAdmin,
+  TallerConcepto,
+  Inscripcion,
+  Instructor,
+  Interesado,
+} from "./types";
 
 async function _ok<T>(r: Response): Promise<T> {
   if (!r.ok) {
@@ -75,6 +82,28 @@ export const talleresAdminApi = {
   confirmarInscripcion: (conceptoId: number, inscripcionId: number) =>
     authedJson<{ ok: boolean }>(
       `/api/admin/talleres/${conceptoId}/inscripciones/${inscripcionId}/confirmar`,
+      { method: "POST" },
+    ),
+
+  // F4b: seña + ofrecer cupo al siguiente.
+  verificarSena: (conceptoId: number, inscripcionId: number) =>
+    authedJson<{ ok: boolean }>(
+      `/api/admin/talleres/${conceptoId}/inscripciones/${inscripcionId}/verificar-sena`,
+      { method: "POST" },
+    ),
+
+  ofrecerCupo: (conceptoId: number, inscripcionId: number) =>
+    authedJson<{ ok: boolean }>(
+      `/api/admin/talleres/${conceptoId}/inscripciones/${inscripcionId}/ofrecer-cupo`,
+      { method: "POST" },
+    ),
+
+  listInteresados: (conceptoId: number) =>
+    authedJson<Interesado[]>(`/api/admin/talleres/${conceptoId}/interesados`),
+
+  notificarInteresado: (conceptoId: number, interesadoId: number) =>
+    authedJson<{ ok: boolean }>(
+      `/api/admin/talleres/${conceptoId}/interesados/${interesadoId}/notificar`,
       { method: "POST" },
     ),
 
