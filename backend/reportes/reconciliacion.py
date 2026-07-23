@@ -7,6 +7,8 @@ para cazar la divergencia entre las dos formas de marcar "pagado":
 del reporte).
 """
 
+from tipos_pedido import TIPOS_ESTUDIO
+
 from .comisiones import cargar_modelo
 from .liquidacion import LIQUIDACION_INICIO, SALDADO_CTE
 
@@ -17,6 +19,14 @@ _SAMPLE = 25
 # integridad solo miran pedidos cuyo alquiler entra en la ventana de liquidación.
 # Un pedido pre-junio 2026 ya no afecta al reporte → no debe ensuciar el semáforo.
 _CLEAN_START = f"AND a.fecha_desde >= '{LIQUIDACION_INICIO}'"
+
+# ⏰ LEGACY (economía del Estudio, Fase 1): los pedidos del Estudio HOY insertan
+# sus ítems con `subtotal=0` (el monto real vive solo en `alquileres.monto_total`)
+# → `desglose_de_pedido` recalcula 0 y el chequeo de abajo los marca divergentes
+# en falso. Se excluyen acá mientras tanto. Remover este filtro (y el import de
+# arriba si queda sin otro uso) cuando la Fase 2 los haga "ítems veraces"
+# (`cobro_modo='fijo'` con el monto real) — el chequeo vuelve a cubrirlos solo.
+_EXCLUYE_ESTUDIO = "AND a.tipo NOT IN ({})".format(", ".join(f"'{t}'" for t in TIPOS_ESTUDIO))
 
 
 def _pedidos_para_desglose(conn) -> list[dict]:
@@ -34,6 +44,7 @@ def _pedidos_para_desglose(conn) -> list[dict]:
         WHERE a.estado <> 'cancelado'
           AND a.monto_total > 0
           {_CLEAN_START}
+          {_EXCLUYE_ESTUDIO}
         ORDER BY a.id
         """
     ).fetchall()
