@@ -73,15 +73,23 @@ def upgrade() -> None:
     # Backfill: crear/reusar instructor por nombre EXACTO + linkear. Idempotente
     # (WHERE NOT EXISTS en el link; el INSERT de instructor está gateado por
     # "no existe ya uno con ese nombre EXACTO" para no duplicar en un re-run).
+    #
+    # DISTINCT ON (no DISTINCT plano) por `instructor_nombre`: dos talleres con
+    # el MISMO instructor pero bio/foto que difieren aunque sea un carácter
+    # (ej. un typo corregido en uno y no en el otro) generaban 2 filas — DISTINCT
+    # dedupea por la combinación de las 4 columnas, no por el nombre. Desempate
+    # determinístico por `t.id` ASC (el taller más viejo con ese nombre gana).
     op.execute(text("""
         INSERT INTO instructores (nombre, descripcion, foto_media_id, foto_url)
-        SELECT DISTINCT t.instructor_nombre, t.instructor_bio,
+        SELECT DISTINCT ON (t.instructor_nombre)
+               t.instructor_nombre, t.instructor_bio,
                t.instructor_media_id, t.instructor_foto_url
         FROM talleres t
         WHERE t.instructor_nombre != ''
           AND NOT EXISTS (
               SELECT 1 FROM instructores i WHERE i.nombre = t.instructor_nombre
           )
+        ORDER BY t.instructor_nombre, t.id
     """))
     op.execute(text("""
         INSERT INTO taller_instructores (taller_id, instructor_id, orden)

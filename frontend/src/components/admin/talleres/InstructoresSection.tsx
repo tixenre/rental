@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import type { TallerConcepto, Instructor } from "@/lib/admin/api/types";
 import { talleresAdminApi } from "@/lib/admin/api/talleres";
 import { updateConceptoInstructoresInCache } from "./cache";
+import { useConfirm } from "@/components/admin/useConfirm";
 import { Button } from "@/design-system/ui/button";
 import { IconButton } from "@/design-system/ui/icon-button";
 import { Input } from "@/design-system/ui/input";
@@ -184,6 +185,7 @@ function InstructorDialog({
   onCreated: (i: Instructor) => void;
 }) {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [form, setForm] = useState({
     nombre: instructor?.nombre ?? "",
     rol: instructor?.rol ?? "",
@@ -208,11 +210,40 @@ function InstructorDialog({
     onSuccess: (saved) => {
       toast.success(instructor ? "Instructor actualizado" : "Instructor creado");
       qc.invalidateQueries({ queryKey: ["admin", "instructores"] });
+      // La lista "Instructores de este taller" lee de concepto.instructores,
+      // que viene de esta query — sin invalidarla, un nombre/foto editado
+      // queda desactualizado en pantalla hasta recargar.
+      qc.invalidateQueries({ queryKey: ["admin", "talleres"] });
       if (!instructor) onCreated(saved);
       onClose();
     },
     onError: (e) => toast.error((e as Error).message),
   });
+
+  const deleteMut = useMutation({
+    mutationFn: () => talleresAdminApi.deleteInstructor(instructor!.id),
+    onSuccess: () => {
+      toast.success("Instructor eliminado");
+      qc.invalidateQueries({ queryKey: ["admin", "instructores"] });
+      onClose();
+    },
+    // 409 esperado si sigue vinculado a algún taller — el mensaje del backend
+    // ("Desvinculalo de sus talleres antes de borrarlo") ya es claro.
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  async function handleDelete() {
+    if (
+      !(await confirm({
+        title: `¿Eliminar a ${instructor!.nombre}?`,
+        description: "Esta acción no se puede deshacer.",
+        danger: true,
+        confirmLabel: "Eliminar",
+      }))
+    )
+      return;
+    deleteMut.mutate();
+  }
 
   const field = (label: string, key: keyof typeof form, opts?: { rows?: number }) => (
     <div className="flex flex-col gap-1.5">
@@ -272,6 +303,17 @@ function InstructorDialog({
           </div>
         </div>
         <DialogFooter>
+          {instructor && (
+            <Button
+              variant="ghost"
+              onClick={handleDelete}
+              disabled={deleteMut.isPending}
+              className="mr-auto text-muted-foreground hover:text-destructive gap-2"
+            >
+              {deleteMut.isPending ? <Spinner size="sm" /> : null}
+              Eliminar
+            </Button>
+          )}
           <DialogClose asChild>
             <Button variant="ghost">Cancelar</Button>
           </DialogClose>
