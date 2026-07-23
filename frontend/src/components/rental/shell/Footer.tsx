@@ -215,7 +215,7 @@ function FooterDesktop() {
                   to="/workshops"
                   className="text-ink hover:text-[var(--area-accent)] transition"
                 >
-                  Workshops & Talleres
+                  Escuela
                 </Link>
               </li>
               <li>

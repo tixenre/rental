@@ -3,6 +3,7 @@ import { ArrowRight } from "lucide-react";
 import { SITE_URL } from "@/lib/site";
 import { useHeroPhotos } from "@/lib/studio/hero-photos";
 import { Logo } from "@/components/rental/shell/Logo";
+import { AreaMenu } from "@/components/rental/shell/AreaMenu";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -11,7 +12,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Alquilá equipos audiovisuales, reservá el estudio de foto y video, y sumate a un workshop. Todo en Rambla, Mar del Plata.",
+          "Alquilá equipos audiovisuales, reservá el estudio de foto y video, y sumate a un taller. Todo en Rambla, Mar del Plata.",
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: `${SITE_URL}/` },
@@ -19,7 +20,7 @@ export const Route = createFileRoute("/")({
       {
         property: "og:description",
         content:
-          "Alquilá equipos audiovisuales, reservá el estudio y sumate a un workshop. Mar del Plata.",
+          "Alquilá equipos audiovisuales, reservá el estudio y sumate a un taller. Mar del Plata.",
       },
       { property: "og:locale", content: "es_AR" },
     ],
@@ -36,13 +37,19 @@ function LandingHub() {
     <div className="min-h-screen flex flex-col">
       <main className="flex-1 flex flex-col">
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
-        <section className="flex flex-col items-center justify-center text-center px-4 py-16 sm:py-24 bg-background">
+        <section className="relative flex flex-col items-center justify-center text-center px-4 py-16 sm:py-24 bg-background">
+          {/* Menú de navegación entre áreas — la landing no lleva topbar, pero el
+              menú da acceso a las áreas, al portal y a los links secundarios.
+              `tone="onLight"` porque el hero es hueso, no un color de área. */}
+          <div className="absolute top-3 right-3 sm:top-5 sm:right-5 z-20">
+            <AreaMenu tone="onLight" />
+          </div>
           <p className="font-mono text-2xs tracking-[0.35em] uppercase text-muted-foreground mb-6">
             Chaco 1392 — Mar del Plata
           </p>
           <Logo linkTo={null} color="text-ink" className="!h-[clamp(3rem,12vw,8rem)]" />
           <p className="mt-5 text-base sm:text-lg text-muted-foreground max-w-md leading-relaxed">
-            Equipos audiovisuales, estudio de foto y video, y workshops — todo en un lugar.
+            Equipos audiovisuales, estudio de foto y video, y talleres — todo en un lugar.
           </p>
         </section>
 
@@ -126,13 +133,13 @@ function LandingHub() {
             style={{ backgroundColor: "var(--color-rosa)" }}
           >
             <p className="font-mono text-2xs tracking-[0.28em] uppercase text-ink/55 mb-5">
-              Workshops & Talleres
+              La Escuela
             </p>
             <h2
               className="font-display font-black lowercase leading-[0.9] tracking-[-0.02em] text-ink mb-4"
               style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)" }}
             >
-              workshops.
+              escuela.
               <br />
               <span className="opacity-60">
                 aprender
