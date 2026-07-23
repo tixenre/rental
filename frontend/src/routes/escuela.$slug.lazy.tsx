@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createLazyFileRoute, Link, notFound } from "@tanstack/react-router";
-import { CheckCircle2, X } from "lucide-react";
+import { CalendarPlus, CheckCircle2, X } from "lucide-react";
 
 import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { Button } from "@/design-system/ui/button";
@@ -10,15 +10,18 @@ import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 import { Logo } from "@/components/rental/shell/Logo";
 import { WorkshopInscripcionForm } from "@/components/talleres/WorkshopInscripcionForm";
 import { TallerHero } from "@/components/talleres/TallerHero";
+import { TallerCalendario } from "@/components/talleres/TallerCalendario";
 import { ProgramaSection } from "@/components/talleres/ProgramaSection";
 import { InstructorCard } from "@/components/talleres/InstructorCard";
 import { PrecioCard } from "@/components/talleres/PrecioCard";
 import { TallerTrabajos } from "@/components/talleres/TallerTrabajos";
 import { TallerFAQ } from "@/components/talleres/TallerFAQ";
+import { TallerCTABar } from "@/components/talleres/TallerCTABar";
 import { Input } from "@/design-system/ui/input";
 import { apiGetTaller, type EdicionLite, type Taller } from "@/lib/api";
 import { clasesParaPrograma } from "@/lib/talleres/legacy";
 import { ordinalEdicion } from "@/lib/talleres/formato";
+import { descargarIcsTaller } from "@/lib/talleres/ical";
 
 export const Route = createLazyFileRoute("/escuela/$slug")({
   component: TallerLandingPage,
@@ -218,7 +221,7 @@ function TallerLandingPage() {
       <PublicLayout
         topBar={{ variant: "escuela", cta: { label: "Inscribirme", href: "#inscripcion" } }}
       >
-        <div className="min-h-dvh bg-background">
+        <div className="min-h-dvh bg-background pb-24 lg:pb-0">
           {/* F2: preview admin de una edición en borrador — el público recibe
               404; este banner solo puede aparecer con sesión admin. */}
           {taller.borrador && (
@@ -256,6 +259,32 @@ function TallerLandingPage() {
                   )}
                 </section>
 
+                {formTaller.sesiones.length > 0 && (
+                  <section>
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                      <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa">
+                        Cuándo
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 h-7 text-xs"
+                        onClick={() =>
+                          descargarIcsTaller({
+                            tallerNombre: taller.nombre,
+                            slug: formTaller.slug,
+                            direccion: formTaller.direccion,
+                            clases: formTaller.sesiones,
+                          })
+                        }
+                      >
+                        <CalendarPlus className="h-3 w-3" />
+                        Agregar a mi calendario
+                      </Button>
+                    </div>
+                    <TallerCalendario sesiones={formTaller.sesiones} horario={formTaller.horario} />
+                  </section>
+                )}
                 <ProgramaSection clases={clases} />
                 <InstructorCard taller={taller} />
                 <TallerTrabajos trabajos={taller.trabajos} />
@@ -335,6 +364,12 @@ function TallerLandingPage() {
           </footer>
         </div>
       </PublicLayout>
+      {!isFrozen && (
+        <TallerCTABar
+          taller={formTaller}
+          label={isFullySoldOut ? "Avisame de nuevas fechas" : "Inscribirme"}
+        />
+      )}
     </>
   );
 }
