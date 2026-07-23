@@ -443,6 +443,17 @@ export type Taller = {
   mensaje_confirmacion: string;
   /** True solo cuando una sesión admin previsualiza una edición despublicada. */
   borrador: boolean;
+  // F3: instructores como entidad (además de instructor_* legacy arriba).
+  instructores: {
+    id: number;
+    nombre: string;
+    rol: string;
+    descripcion: string;
+    instagram: string;
+    web: string;
+    foto_url: string;
+    foto_media_id: number | null;
+  }[];
   sesiones: Sesion[];
 };
 

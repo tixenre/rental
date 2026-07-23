@@ -147,11 +147,31 @@ def _get_taller_clase_media(conn, entity_id: int) -> list[dict]:
     return [_build_asset(conn, adapted)]
 
 
+def _get_instructor_perfil_media(conn, entity_id: int) -> list[dict]:
+    """Foto de un instructor-ENTIDAD (F3). entity_id = instructor_id — kind
+    propio, NO reusa `instructor` (ese sigue siendo entity_id=taller_id, legacy
+    hasta F6; reusarlo con semántica de entity_id distinta arriesgaba romper
+    el flujo ya en producción)."""
+    row = conn.execute(
+        "SELECT id, foto_url, foto_media_id FROM instructores WHERE id = %s",
+        (entity_id,),
+    ).fetchone()
+    if not row:
+        return []
+    media_id = row["foto_media_id"]
+    url = row["foto_url"] or ""
+    if not media_id and not url:
+        return []
+    adapted = {"id": row["id"], "media_id": media_id, "orden": 0, "es_principal": True, "url": url}
+    return [_build_asset(conn, adapted)]
+
+
 _KIND_HANDLERS = {
     "equipo": _get_equipo_media,
     "estudio": _get_estudio_media,
     "instructor": _get_instructor_media,
     "taller-clase": _get_taller_clase_media,
+    "instructor-perfil": _get_instructor_perfil_media,
 }
 
 

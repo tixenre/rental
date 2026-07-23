@@ -2138,6 +2138,43 @@ def _init_db_schema(conn):
     conn.execute("ALTER TABLE clases_taller ADD COLUMN IF NOT EXISTS portada_media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL")
     conn.execute("ALTER TABLE clases_taller ADD COLUMN IF NOT EXISTS portada_url TEXT NOT NULL DEFAULT ''")
 
+    # Escuela v2 F3: instructores como ENTIDAD propia (antes solo texto suelto en
+    # `talleres.instructor_*`) — un taller puede tener varios, un instructor puede
+    # dar varios talleres (caso Filmar: mismo instructor en Principiante y
+    # Avanzado). Las columnas `talleres.instructor_*` quedan servidas como
+    # legacy hasta F6 (backfill las migra a filas de `instructores` + link).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS instructores (
+            id            SERIAL PRIMARY KEY,
+            nombre        TEXT NOT NULL,
+            rol           TEXT NOT NULL DEFAULT '',
+            descripcion   TEXT NOT NULL DEFAULT '',
+            instagram     TEXT NOT NULL DEFAULT '',
+            web           TEXT NOT NULL DEFAULT '',
+            foto_media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL,
+            foto_url      TEXT NOT NULL DEFAULT '',
+            activo        BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS taller_instructores (
+            taller_id     INTEGER NOT NULL REFERENCES talleres(id) ON DELETE CASCADE,
+            instructor_id INTEGER NOT NULL REFERENCES instructores(id) ON DELETE CASCADE,
+            orden         INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (taller_id, instructor_id)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_taller_instructores_taller "
+        "ON taller_instructores(taller_id, orden)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_taller_instructores_instructor "
+        "ON taller_instructores(instructor_id)"
+    )
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS interesados_taller (
             id            SERIAL PRIMARY KEY,

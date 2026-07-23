@@ -1419,7 +1419,22 @@ export type TallerConcepto = {
   beneficios: string;
   pregunta_experiencia: string;
   mensaje_confirmacion: string;
+  // F3: instructores como entidad (además de instructor_* legacy arriba).
+  instructores: Instructor[];
   ediciones: EdicionAdmin[];
+};
+
+// F3: instructor como entidad propia (N↔N con talleres — reemplaza de a poco
+// a los campos instructor_* legacy del concepto, servidos en paralelo hasta F6).
+export type Instructor = {
+  id: number;
+  nombre: string;
+  rol: string;
+  descripcion: string;
+  instagram: string;
+  web: string;
+  foto_url: string;
+  foto_media_id: number | null;
 };
 
 export type Inscripcion = {
