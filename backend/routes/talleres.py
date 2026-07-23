@@ -390,7 +390,7 @@ def get_taller(slug: str, request: Request):
         ant = conn.execute(
             """
             SELECT * FROM ediciones_taller
-            WHERE taller_id = %s AND numero_edicion < %s
+            WHERE taller_id = %s AND numero_edicion < %s AND activo = TRUE
             ORDER BY numero_edicion DESC LIMIT 1
             """,
             (row["taller_id"], row["numero_edicion"]),

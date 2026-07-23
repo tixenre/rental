@@ -287,3 +287,40 @@ def test_borrador_404_publico_y_preview_admin(taller_base, monkeypatch):
     r = client.get(f"/api/talleres/{ed['slug']}")
     assert r.status_code == 200
     assert r.json()["borrador"] is True
+
+
+def test_edicion_anterior_no_expone_borrador(taller_base):
+    """'edicion_anterior' (dato de contexto en la página pública de OTRA edición)
+    no debe traer una edición vuelta a borrador — antes filtraba solo por
+    numero_edicion (sin `activo = TRUE`, a diferencia de 'proxima_edicion' 5
+    líneas arriba en el mismo archivo), filtrando pago_alias/pago_cbu/pago_banco
+    de una edición que el dueño despublicó."""
+    from fastapi.testclient import TestClient
+    from database import get_db
+    import main
+    t = taller_base
+
+    d1 = _crear_edicion(t, numero=1)
+    ed1 = d1["ediciones"][0] if "ediciones" in d1 else d1
+    d2 = _crear_edicion(t, numero=2)
+    ed2 = d2["ediciones"][0] if "ediciones" in d2 else d2
+
+    with get_db() as conn:
+        # ed1 = "anterior" de ed2: en algún momento estuvo publicada (con sus
+        # datos bancarios reales) y el dueño la volvió a borrador — el
+        # escenario real que motiva el fix.
+        conn.execute(
+            "UPDATE ediciones_taller SET activo = FALSE, pago_alias = %s, "
+            "pago_cbu = %s, pago_banco = %s WHERE id = %s",
+            ("alias-secreto-1", "cbu-secreto-1", "Banco Secreto", ed1["id"]),
+        )
+        conn.execute("UPDATE ediciones_taller SET activo = TRUE WHERE id = %s", (ed2["id"],))
+        conn.commit()
+
+    client = TestClient(main.app)
+    r = client.get(f"/api/talleres/{ed2['slug']}")
+    assert r.status_code == 200, r.text
+    assert r.json()["edicion_anterior"] is None, (
+        "una edición en borrador no debe aparecer como 'edicion_anterior' "
+        "(antes filtraba solo por numero_edicion, exponiendo datos bancarios)"
+    )
