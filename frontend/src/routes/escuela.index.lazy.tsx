@@ -4,53 +4,15 @@ import { ArrowRight, Calendar, MapPin, Users } from "lucide-react";
 
 import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { SectionBanner } from "@/components/rental/landing/SectionBanner";
+import { EmptyState } from "@/design-system/composites/EmptyState";
+import { Grain } from "@/components/common/Grain";
 import { apiGetTalleres, type Taller } from "@/lib/api";
 import { formatARS } from "@/lib/format";
+import { useBusinessContact } from "@/hooks/useBusinessContact";
 
 export const Route = createLazyFileRoute("/escuela/")({
   component: TalleresPage,
 });
-
-// ── Talleres pasados (hardcodeados, sin landing) ──────────────────────────────
-type PastWorkshop = {
-  nombre: string;
-  subtitulo: string;
-  descripcion: string;
-  fechaLabel: string;
-  direccion: string;
-};
-
-const TALLERES_PASADOS: PastWorkshop[] = [
-  {
-    nombre: "Taller de Rodaje",
-    subtitulo: "rambla × filmar escuela",
-    descripcion:
-      "Espacio práctico de análisis y grabación. Los alumnos debaten y crean escenas de películas, video clips, publicidades y fashion films con equipos profesionales de Rambla Rental.",
-    fechaLabel: "Abril – junio 2026 · Miércoles",
-    direccion: "Chaco 1392 — Rambla Estudio",
-  },
-  {
-    nombre: "Taller de Rodaje",
-    subtitulo: "rambla × filmar escuela",
-    descripcion:
-      "Espacio práctico de análisis y grabación. Los alumnos debaten y crean escenas de películas, video clips, publicidades y fashion films con equipos profesionales de Rambla Rental.",
-    fechaLabel: "Octubre – diciembre 2025 · Miércoles",
-    direccion: "Chaco 1392 — Rambla Estudio",
-  },
-];
-
-// ── Grain overlay ─────────────────────────────────────────────────────────────
-function Grain() {
-  return (
-    <div
-      className="pointer-events-none absolute inset-0 opacity-[0.06]"
-      style={{
-        backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)",
-        backgroundSize: "5px 5px",
-      }}
-    />
-  );
-}
 
 // ── Card activa (horizontal) ──────────────────────────────────────────────────
 function WorkshopCard({ taller }: { taller: Taller }) {
@@ -80,7 +42,7 @@ function WorkshopCard({ taller }: { taller: Taller }) {
     >
       {/* Bloque oscuro izquierdo */}
       <div className="relative bg-ink sm:w-64 shrink-0 px-6 pt-7 pb-6 flex flex-col justify-between overflow-hidden min-h-[130px] sm:min-h-0">
-        <Grain />
+        <Grain color="white" opacity={6} />
         <div className="relative">
           <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa mb-3">Taller</p>
           <h2
@@ -131,46 +93,6 @@ function WorkshopCard({ taller }: { taller: Taller }) {
   );
 }
 
-// ── Card pasada (horizontal, sin link) ────────────────────────────────────────
-function PastWorkshopCard({ pw }: { pw: PastWorkshop }) {
-  return (
-    <div className="flex flex-col sm:flex-row rounded-2xl border border-border/30 overflow-hidden opacity-55">
-      {/* Bloque oscuro izquierdo */}
-      <div className="relative bg-ink sm:w-64 shrink-0 px-6 pt-7 pb-6 flex flex-col justify-between overflow-hidden min-h-[130px] sm:min-h-0">
-        <Grain />
-        <div className="relative">
-          <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa/70 mb-3">Taller</p>
-          <h2
-            className="font-display font-black lowercase leading-[0.9] tracking-[-0.015em] text-background"
-            style={{ fontSize: "clamp(1.2rem, 2vw, 1.5rem)" }}
-          >
-            {pw.nombre}
-          </h2>
-          <p className="text-background/55 mt-1.5 text-sm">{pw.subtitulo}</p>
-        </div>
-        <span className="relative self-start mt-5 inline-block rounded-full border border-background/20 text-background/50 text-2xs font-mono tracking-widest uppercase px-3 py-1">
-          Finalizado
-        </span>
-      </div>
-
-      {/* Cuerpo derecho */}
-      <div className="flex-1 px-6 sm:px-8 py-5 flex flex-col justify-center gap-3">
-        <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5 shrink-0" />
-            {pw.fechaLabel}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <MapPin className="h-3.5 w-3.5 shrink-0" />
-            {pw.direccion}
-          </span>
-        </div>
-        <p className="text-sm text-muted-foreground line-clamp-2">{pw.descripcion}</p>
-      </div>
-    </div>
-  );
-}
-
 function SectionLabel({ label }: { label: string }) {
   return (
     <p className="font-mono text-xs tracking-[0.2em] uppercase text-muted-foreground mt-4 mb-1">
@@ -181,6 +103,7 @@ function SectionLabel({ label }: { label: string }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 function TalleresPage() {
+  const contact = useBusinessContact();
   const {
     data: talleres = [],
     isLoading,
@@ -196,7 +119,9 @@ function TalleresPage() {
 
   const proximos = talleres
     .filter((t) => new Date(t.fecha_inicio + "T00:00:00") > hoy)
-    .sort((a, b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime());
+    // ASC: el más cercano primero (antes ordenaba DESC — el más cercano
+    // quedaba al final de la lista, bug reportado en el plan de F5).
+    .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime());
 
   const enCurso = talleres
     .filter((t) => {
@@ -227,10 +152,20 @@ function TalleresPage() {
         )}
 
         {!isLoading && !isError && !hayTalleres && (
-          <div className="py-8 text-center text-muted-foreground text-sm">
-            No hay talleres activos por el momento. Seguinos en Instagram para enterarte de los
-            próximos.
-          </div>
+          <EmptyState
+            icon={<Calendar className="h-6 w-6" />}
+            title="No hay talleres activos por el momento"
+            sub="Seguinos en Instagram para enterarte de los próximos."
+          >
+            <a
+              href={`https://instagram.com/${contact.instagram}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-semibold text-ink hover:text-rosa transition"
+            >
+              @{contact.instagram}
+            </a>
+          </EmptyState>
         )}
 
         {proximos.length > 0 && (
@@ -251,15 +186,11 @@ function TalleresPage() {
           </>
         )}
 
-        {/* Pasados: primero los de la API, luego los hardcodeados */}
-        {(pasadosApi.length > 0 || TALLERES_PASADOS.length > 0) && (
+        {pasadosApi.length > 0 && (
           <>
             <SectionLabel label="Ediciones anteriores" />
             {pasadosApi.map((t) => (
               <WorkshopCard key={t.id} taller={t} />
-            ))}
-            {TALLERES_PASADOS.map((pw, i) => (
-              <PastWorkshopCard key={i} pw={pw} />
             ))}
           </>
         )}

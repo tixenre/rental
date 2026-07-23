@@ -11,6 +11,7 @@ import { Logo } from "@/components/rental/shell/Logo";
 import { WorkshopInscripcionForm } from "@/components/talleres/WorkshopInscripcionForm";
 import { TallerCalendario } from "@/components/talleres/TallerCalendario";
 import { ResponsiveImage } from "@/components/common/ResponsiveImage";
+import { Grain } from "@/components/common/Grain";
 import { apiGetTaller, type EdicionLite, type Taller } from "@/lib/api";
 import { formatARS } from "@/lib/format";
 import { useEntityMedia } from "@/hooks/useEntityMedia";
@@ -19,17 +20,6 @@ import { findVariant } from "@/lib/media/types";
 export const Route = createLazyFileRoute("/escuela/$slug")({
   component: TallerLandingPage,
 });
-
-const Grain = ({ opacity = 8 }: { opacity?: number }) => (
-  <div
-    className="pointer-events-none absolute inset-0"
-    style={{
-      backgroundImage: "radial-gradient(circle, oklch(0.85 0 0 / 12%) 1px, transparent 1px)",
-      backgroundSize: "5px 5px",
-      opacity: opacity / 100,
-    }}
-  />
-);
 
 function ProgramaItem({ text, index }: { text: string; index: number }) {
   return (
