@@ -30,6 +30,7 @@ from services.email.service import get_admin_to
 from services.media.models import DeriveSpec
 from services.media.errors import MediaError
 from services.media.service import store_upload, store_raw_document
+from services.media.youtube import extract_video_id, youtube_nocookie_url, store_youtube_poster
 from services import telefono as telefono_svc
 
 logger = logging.getLogger(__name__)
@@ -66,7 +67,7 @@ _EDICION_JOIN_SELECT = """
            t.publico_objetivo, t.programa_teorica, t.programa_practica,
            t.instructor_foto_url, t.instructor_media_id, t.notif_email,
            t.slug_base, t.terminos, t.beneficios, t.pregunta_experiencia,
-           t.mensaje_confirmacion
+           t.mensaje_confirmacion, t.video_url, t.video_poster_url
     FROM ediciones_taller e
     JOIN talleres t ON t.id = e.taller_id
 """
@@ -149,6 +150,55 @@ def _get_clases(conn, edicion_id: int) -> list:
     return [_clase_dict(r) for r in rows]
 
 
+def _modalidad_dict(row) -> dict:
+    """F4a: una modalidad de pago (row de DB o dict normalizado de
+    _validar_modalidades). `monto_total_str` resuelto acá — el front no
+    formatea plata a mano."""
+    monto = _row_get(row, "monto_total", 0) or 0
+    return {
+        "id": _row_get(row, "id"),
+        "codigo": row["codigo"],
+        "label": row["label"],
+        "nota": _row_get(row, "nota", ""),
+        "monto_total": monto,
+        "monto_total_str": _fmt_pesos(monto),
+    }
+
+
+def _get_modalidades(conn, edicion_id: int) -> list[dict]:
+    rows = conn.execute(
+        "SELECT id, codigo, label, nota, monto_total FROM edicion_modalidades_pago "
+        "WHERE edicion_id = %s ORDER BY orden, id",
+        (edicion_id,),
+    ).fetchall()
+    return [_modalidad_dict(r) for r in rows]
+
+
+def _modalidades_publicas(modalidades: list[dict] | None, precio_total: int) -> list[dict]:
+    """Shape público de las modalidades: sin ninguna configurada, sintetiza 1
+    sola opción ("Pago total" = precio_total) — cero ruptura para ediciones
+    que nunca las configuran (Jime)."""
+    if modalidades:
+        return modalidades
+    return [_modalidad_dict({"codigo": "total", "label": "Pago total", "nota": "", "monto_total": precio_total})]
+
+
+def _video_dict(row) -> dict | None:
+    """Shape público del video hero: None si no hay URL o no se pudo extraer
+    un video_id (URL mal pegada) — la landing no debe romper por esto."""
+    url = _row_get(row, "video_url", "")
+    if not url:
+        return None
+    vid = extract_video_id(url)
+    if not vid:
+        return None
+    return {
+        "youtube_id": vid,
+        "embed_url": youtube_nocookie_url(vid),
+        "poster": _row_get(row, "video_poster_url", "") or None,
+    }
+
+
 def _edicion_lite(row) -> dict:
     """Datos mínimos de una edición para mostrar en el contexto de otra."""
     return {
@@ -169,7 +219,7 @@ def _edicion_lite(row) -> dict:
     }
 
 
-def _edicion_to_public_dict(row, clases=None, instructores=None) -> dict:
+def _edicion_to_public_dict(row, clases=None, instructores=None, modalidades=None) -> dict:
     """Convierte edicion_row (JOIN talleres) al shape plano del API público."""
     return {
         "id": row["id"],
@@ -214,10 +264,14 @@ def _edicion_to_public_dict(row, clases=None, instructores=None) -> dict:
         "instructores": instructores if instructores is not None else [],
         # sesiones = backward compat con el frontend (lee de clases_taller)
         "sesiones": clases if clases is not None else [],
+        # F4a: video hero del concepto + modalidades de pago (con fallback
+        # sintético — ver _modalidades_publicas).
+        "video": _video_dict(row),
+        "modalidades": _modalidades_publicas(modalidades, row["precio_total"]),
     }
 
 
-def _edicion_to_admin_dict(edicion_row, clases=None) -> dict:
+def _edicion_to_admin_dict(edicion_row, clases=None, modalidades=None) -> dict:
     """Convierte una fila de ediciones_taller al shape de admin (anidado en concepto)."""
     return {
         "id": edicion_row["id"],
@@ -240,6 +294,9 @@ def _edicion_to_admin_dict(edicion_row, clases=None) -> dict:
         "activo": bool(edicion_row["activo"]),
         "frozen_at": edicion_row["frozen_at"].isoformat() if edicion_row["frozen_at"] else None,
         "clases": clases if clases is not None else [],
+        # F4a: modalidades RAW (sin fallback sintético — el admin ve el
+        # estado real: lista vacía = "no configuradas todavía").
+        "modalidades": modalidades if modalidades is not None else [],
     }
 
 
@@ -264,6 +321,8 @@ def _concepto_to_admin_dict(taller_row, ediciones=None, instructores=None) -> di
         "beneficios": _row_get(taller_row, "beneficios", ""),
         "pregunta_experiencia": _row_get(taller_row, "pregunta_experiencia", ""),
         "mensaje_confirmacion": _row_get(taller_row, "mensaje_confirmacion", ""),
+        "video_url": _row_get(taller_row, "video_url", ""),
+        "video_poster_url": _row_get(taller_row, "video_poster_url", ""),
         "instructores": instructores if instructores is not None else [],
         "ediciones": ediciones if ediciones is not None else [],
     }
@@ -373,6 +432,74 @@ def _upsert_clases(conn, edicion_id: int, clases: list) -> None:
         )
 
 
+def _validar_modalidades(modalidades: list) -> list[dict]:
+    """Valida y normaliza una lista de modalidades de pago. Sin motor de
+    descuentos: `monto_total` lo carga el admin a mano; los "%" de ahorro son
+    texto libre en `nota`. Lanza 400 si hay errores."""
+    result = []
+    seen_codigos = set()
+    for m in modalidades:
+        def _campo(nombre: str, default=""):
+            return _row_get(m, nombre, default) if isinstance(m, dict) else getattr(m, nombre, default)
+
+        codigo = str(_campo("codigo") or "").strip()
+        label = str(_campo("label") or "").strip()
+        monto = _campo("monto_total", 0)
+        if not codigo:
+            raise HTTPException(400, "Cada modalidad de pago necesita un código")
+        if not label:
+            raise HTTPException(400, f"La modalidad '{codigo}' necesita un label")
+        if not isinstance(monto, int) or monto <= 0:
+            raise HTTPException(400, f"La modalidad '{codigo}' necesita un monto_total > 0")
+        if codigo in seen_codigos:
+            raise HTTPException(400, f"Código de modalidad duplicado: '{codigo}'")
+        seen_codigos.add(codigo)
+        result.append({
+            "id": _campo("id", None),
+            "codigo": codigo,
+            "label": label,
+            "nota": str(_campo("nota") or "").strip(),
+            "monto_total": monto,
+        })
+    return result
+
+
+def _upsert_modalidades(conn, edicion_id: int, modalidades: list) -> None:
+    """Sincroniza las modalidades de pago de una edición (mismo patrón que
+    _upsert_clases): con `id` → UPDATE; sin `id` → INSERT; ids que no vienen
+    en la lista → DELETE. El `orden` es la posición en la lista recibida."""
+    existentes = {
+        r["id"]
+        for r in conn.execute(
+            "SELECT id FROM edicion_modalidades_pago WHERE edicion_id = %s", (edicion_id,)
+        ).fetchall()
+    }
+    vistos: set[int] = set()
+    for orden, m in enumerate(modalidades):
+        mid = m.get("id")
+        if mid and mid in existentes:
+            conn.execute(
+                "UPDATE edicion_modalidades_pago SET orden = %s, codigo = %s, "
+                "label = %s, nota = %s, monto_total = %s "
+                "WHERE id = %s AND edicion_id = %s",
+                (orden, m["codigo"], m["label"], m["nota"], m["monto_total"], mid, edicion_id),
+            )
+            vistos.add(mid)
+        else:
+            conn.execute(
+                "INSERT INTO edicion_modalidades_pago "
+                "(edicion_id, orden, codigo, label, nota, monto_total) "
+                "VALUES (%s, %s, %s, %s, %s, %s)",
+                (edicion_id, orden, m["codigo"], m["label"], m["nota"], m["monto_total"]),
+            )
+    sobrantes = existentes - vistos
+    for mid in sobrantes:
+        conn.execute(
+            "DELETE FROM edicion_modalidades_pago WHERE id = %s AND edicion_id = %s",
+            (mid, edicion_id),
+        )
+
+
 # ── Endpoints públicos ────────────────────────────────────────────────────────
 
 @router.get("/talleres")
@@ -384,7 +511,8 @@ def list_talleres():
         ).fetchall()
         return [
             _edicion_to_public_dict(
-                r, _get_clases(conn, r["id"]), _get_instructores_taller(conn, r["taller_id"])
+                r, _get_clases(conn, r["id"]), _get_instructores_taller(conn, r["taller_id"]),
+                _get_modalidades(conn, r["id"]),
             )
             for r in rows
         ]
@@ -405,7 +533,8 @@ def get_taller(slug: str, request: Request):
     with get_db() as conn:
         row = _get_edicion_row(conn, slug, incluir_borrador=es_admin)
         d = _edicion_to_public_dict(
-            row, _get_clases(conn, row["id"]), _get_instructores_taller(conn, row["taller_id"])
+            row, _get_clases(conn, row["id"]), _get_instructores_taller(conn, row["taller_id"]),
+            _get_modalidades(conn, row["id"]),
         )
 
         # Próxima edición: misma concepto (taller_id), numero_edicion mayor
@@ -477,6 +606,10 @@ class InscripcionBody(BaseModel):
     # registra si viene, pero NO se exige hasta que el form nuevo (F5) mande
     # el campo — exigirlo hoy rompería el form actual (patrón #1125/#1126).
     acepta_terminos: bool = False
+    # F4a: modalidad de pago elegida (código de edicion_modalidades_pago).
+    # CABLEADO-APAGADO: el form v1 no manda el campo — default a la primera
+    # modalidad configurada (o al fallback sintético "Pago total").
+    modalidad_codigo: str | None = None
 
 
 def _comprobante_url_para_email(key: str | None, fallback_url: str | None) -> str:
@@ -533,14 +666,29 @@ def crear_inscripcion(slug: str, body: InscripcionBody, request: Request):
                     "Ya hay una inscripción con ese email para esta edición del taller.",
                 )
 
+            # F4a: snapshot de la modalidad elegida (mismo criterio que el
+            # precio de línea de un pedido: congelado al inscribirse, no en
+            # vivo — ver _modalidades_publicas para el fallback sintético).
+            modalidades_edicion = _modalidades_publicas(
+                _get_modalidades(conn, edicion_id), edicion_row["precio_total"]
+            )
+            if body.modalidad_codigo:
+                elegida = next(
+                    (m for m in modalidades_edicion if m["codigo"] == body.modalidad_codigo), None
+                )
+                if elegida is None:
+                    raise HTTPException(400, "Modalidad de pago inválida")
+            else:
+                elegida = modalidades_edicion[0]
+
             cur = conn.execute(
                 """
                 INSERT INTO taller_inscripciones
                     (taller_id, edicion_id, nombre, email, telefono, experiencia,
                      comprobante_url, comprobante_key, en_lista_espera, estado,
-                     tyc_aceptado_at)
+                     tyc_aceptado_at, modalidad_codigo, modalidad_label, modalidad_monto)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        CASE WHEN %s THEN NOW() ELSE NULL END)
+                        CASE WHEN %s THEN NOW() ELSE NULL END, %s, %s, %s)
                 RETURNING id, created_at
                 """,
                 (
@@ -553,6 +701,7 @@ def crear_inscripcion(slug: str, body: InscripcionBody, request: Request):
                     en_lista,
                     estado,
                     body.acepta_terminos,
+                    elegida["codigo"], elegida["label"], elegida["monto_total"],
                 ),
             )
             row = cur.fetchone()
@@ -647,6 +796,16 @@ def crear_interesado(slug: str, body: InteresadoBody, request: Request):
 
 # ── Endpoints admin ───────────────────────────────────────────────────────────
 
+class ModalidadPagoBody(BaseModel):
+    # `id` presente = actualizar esa modalidad; ausente = nueva. `orden` es
+    # la posición en la lista recibida (no viaja como campo propio).
+    id: int | None = None
+    codigo: str
+    label: str
+    nota: str = ""
+    monto_total: int = Field(..., gt=0)
+
+
 class ClaseBody(BaseModel):
     fecha: str  # YYYY-MM-DD
     hora_inicio_min: int = Field(..., ge=0, le=1440)  # minutos desde medianoche (510 = 8:30)
@@ -735,6 +894,8 @@ class TallerConceptoUpdateBody(BaseModel):
     beneficios: str | None = None
     pregunta_experiencia: str | None = None
     mensaje_confirmacion: str | None = None
+    # F4a: video hero (YouTube). '' → borra el video (y su poster).
+    video_url: str | None = None
 
 
 class EdicionUpdateBody(BaseModel):
@@ -749,6 +910,7 @@ class EdicionUpdateBody(BaseModel):
     direccion: str | None = None
     activo: bool | None = None
     clases: list[ClaseBody] | None = None
+    modalidades: list[ModalidadPagoBody] | None = None
 
 
 @router.get("/admin/talleres")
@@ -773,7 +935,7 @@ def admin_list_talleres(request: Request):
                 (t["id"],),
             ).fetchall()
             ediciones = [
-                _edicion_to_admin_dict(e, _get_clases(conn, e["id"]))
+                _edicion_to_admin_dict(e, _get_clases(conn, e["id"]), _get_modalidades(conn, e["id"]))
                 for e in edicion_rows
             ]
             result.append(
@@ -1029,7 +1191,9 @@ def admin_update_concepto(taller_id: int, body: TallerConceptoUpdateBody, reques
     if body.mensaje_confirmacion is not None:
         sets.append("mensaje_confirmacion = %s"); params.append(body.mensaje_confirmacion.strip())
 
-    if not sets:
+    video_url_provisto = body.video_url is not None
+
+    if not sets and not video_url_provisto:
         raise HTTPException(400, "No hay campos para actualizar")
 
     with get_db() as conn:
@@ -1037,6 +1201,29 @@ def admin_update_concepto(taller_id: int, body: TallerConceptoUpdateBody, reques
             existing = conn.execute("SELECT id FROM talleres WHERE id = %s", (taller_id,)).fetchone()
             if existing is None:
                 raise HTTPException(404, "Taller no encontrado")
+
+            if video_url_provisto:
+                nuevo_video = body.video_url.strip()
+                if not nuevo_video:
+                    # '' borra el video (y desengancha el poster — el asset
+                    # queda en media_assets, no se purga R2, mismo criterio
+                    # que la portada de una clase / la foto de instructor).
+                    sets.append("video_url = %s"); params.append("")
+                    sets.append("video_poster_media_id = NULL")
+                    sets.append("video_poster_url = %s"); params.append("")
+                else:
+                    vid = extract_video_id(nuevo_video)
+                    if vid is None:
+                        raise HTTPException(400, "URL de YouTube inválida")
+                    try:
+                        asset = store_youtube_poster(vid, kind="taller", conn=conn)
+                    except MediaError as e:
+                        raise HTTPException(e.status, e.detail)
+                    display = asset.variant("display") or (asset.variants[0] if asset.variants else None)
+                    sets.append("video_url = %s"); params.append(nuevo_video)
+                    sets.append("video_poster_media_id = %s"); params.append(asset.id)
+                    sets.append("video_poster_url = %s"); params.append(display.url if display else "")
+
             sets.append("updated_at = NOW()")
             params.append(taller_id)
             conn.execute(f"UPDATE talleres SET {', '.join(sets)} WHERE id = %s", params)
@@ -1047,7 +1234,7 @@ def admin_update_concepto(taller_id: int, body: TallerConceptoUpdateBody, reques
                 (taller_id,),
             ).fetchall()
             ediciones = [
-                _edicion_to_admin_dict(e, _get_clases(conn, e["id"]))
+                _edicion_to_admin_dict(e, _get_clases(conn, e["id"]), _get_modalidades(conn, e["id"]))
                 for e in edicion_rows
             ]
             instructores_out = _get_instructores_taller(conn, taller_id)
@@ -1092,7 +1279,11 @@ def admin_update_edicion(edicion_id: int, body: EdicionUpdateBody, request: Requ
     if body.clases is not None:
         new_clases = _validar_clases(body.clases)
 
-    if not sets and new_clases is None:
+    new_modalidades = None
+    if body.modalidades is not None:
+        new_modalidades = _validar_modalidades(body.modalidades)
+
+    if not sets and new_clases is None and new_modalidades is None:
         raise HTTPException(400, "No hay campos para actualizar")
 
     with get_db() as conn:
@@ -1146,6 +1337,9 @@ def admin_update_edicion(edicion_id: int, body: EdicionUpdateBody, request: Requ
                 # el delete+insert ciego de antes la perdía en cada edición.
                 _upsert_clases(conn, edicion_id, new_clases)
 
+            if new_modalidades is not None:
+                _upsert_modalidades(conn, edicion_id, new_modalidades)
+
             if sets:
                 sets.append("updated_at = NOW()")
                 params.append(edicion_id)
@@ -1160,10 +1354,11 @@ def admin_update_edicion(edicion_id: int, body: EdicionUpdateBody, request: Requ
             ).fetchone()
             # DENTRO del `with` — ver comentario gemelo en admin_create_taller.
             clases_out = _get_clases(conn, edicion_id)
+            modalidades_out = _get_modalidades(conn, edicion_id)
         except Exception:
             conn.rollback()
             raise
-    return _edicion_to_admin_dict(e_row, clases_out)
+    return _edicion_to_admin_dict(e_row, clases_out, modalidades_out)
 
 
 @router.delete("/admin/talleres/{taller_id}", status_code=200)
@@ -1545,6 +1740,10 @@ def admin_list_inscripciones(taller_id: int, request: Request):
             "numero_edicion": r["numero_edicion"],
             "edicion_slug": r["edicion_slug"],
             "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            "tyc_aceptado_at": r["tyc_aceptado_at"].isoformat() if r["tyc_aceptado_at"] else None,
+            "modalidad_codigo": r["modalidad_codigo"],
+            "modalidad_label": r["modalidad_label"],
+            "modalidad_monto": r["modalidad_monto"],
         }
         for r in rows
     ]
@@ -1579,6 +1778,10 @@ def admin_list_inscripciones_edicion(edicion_id: int, request: Request):
             "numero_edicion": r["numero_edicion"],
             "edicion_slug": r["edicion_slug"],
             "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            "tyc_aceptado_at": r["tyc_aceptado_at"].isoformat() if r["tyc_aceptado_at"] else None,
+            "modalidad_codigo": r["modalidad_codigo"],
+            "modalidad_label": r["modalidad_label"],
+            "modalidad_monto": r["modalidad_monto"],
         }
         for r in rows
     ]
@@ -1597,7 +1800,8 @@ def admin_export_inscripciones_csv(taller_id: int, request: Request):
         rows = conn.execute(
             """
             SELECT ti.nombre, ti.email, ti.telefono, ti.experiencia,
-                   ti.en_lista_espera, ti.created_at, e.numero_edicion
+                   ti.en_lista_espera, ti.created_at, e.numero_edicion,
+                   ti.modalidad_label, ti.tyc_aceptado_at
             FROM taller_inscripciones ti
             LEFT JOIN ediciones_taller e ON e.id = ti.edicion_id
             WHERE ti.taller_id = %s
@@ -1607,7 +1811,10 @@ def admin_export_inscripciones_csv(taller_id: int, request: Request):
         ).fetchall()
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["nombre", "email", "telefono", "experiencia", "edicion", "estado", "inscripto_at"])
+    w.writerow([
+        "nombre", "email", "telefono", "experiencia", "edicion", "estado",
+        "modalidad_pago", "acepto_terminos", "inscripto_at",
+    ])
     for r in rows:
         estado = "lista espera" if r["en_lista_espera"] else "confirmado"
         w.writerow([
@@ -1615,6 +1822,8 @@ def admin_export_inscripciones_csv(taller_id: int, request: Request):
             r["experiencia"] or "",
             r["numero_edicion"] or "",
             estado,
+            r["modalidad_label"] or "",
+            "sí" if r["tyc_aceptado_at"] else "no",
             r["created_at"].isoformat() if r["created_at"] else "",
         ])
     csv_bytes = buf.getvalue().encode("utf-8-sig")

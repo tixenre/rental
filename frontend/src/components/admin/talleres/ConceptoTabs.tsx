@@ -92,6 +92,7 @@ export function ContenidoSection({ concepto }: { concepto: TallerConcepto }) {
     beneficios: concepto.beneficios ?? "",
     pregunta_experiencia: concepto.pregunta_experiencia ?? "",
     mensaje_confirmacion: concepto.mensaje_confirmacion ?? "",
+    video_url: concepto.video_url ?? "",
   });
 
   useEffect(() => {
@@ -110,6 +111,7 @@ export function ContenidoSection({ concepto }: { concepto: TallerConcepto }) {
       beneficios: concepto.beneficios ?? "",
       pregunta_experiencia: concepto.pregunta_experiencia ?? "",
       mensaje_confirmacion: concepto.mensaje_confirmacion ?? "",
+      video_url: concepto.video_url ?? "",
     });
   }, [concepto.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -123,7 +125,7 @@ export function ContenidoSection({ concepto }: { concepto: TallerConcepto }) {
   });
 
   function handleSave() {
-    mut.mutate({
+    const body: Record<string, unknown> = {
       nombre: form.nombre,
       subtitulo: form.subtitulo,
       instructor_nombre: form.instructor_nombre,
@@ -144,7 +146,14 @@ export function ContenidoSection({ concepto }: { concepto: TallerConcepto }) {
       beneficios: form.beneficios,
       pregunta_experiencia: form.pregunta_experiencia,
       mensaje_confirmacion: form.mensaje_confirmacion,
-    });
+    };
+    // F4a: solo se manda si CAMBIÓ — el backend, al recibirlo, descarga y
+    // guarda el poster de YouTube; mandarlo sin cambios en cada guardado
+    // re-descargaría el poster de nuevo por nada.
+    if (form.video_url !== (concepto.video_url ?? "")) {
+      body.video_url = form.video_url;
+    }
+    mut.mutate(body);
   }
 
   const field = (
@@ -193,6 +202,30 @@ export function ContenidoSection({ concepto }: { concepto: TallerConcepto }) {
       })}
       {field("Programa clase teórica (1 ítem por línea)", "programa_teorica", { rows: 6 })}
       {field("Programa clase práctica (1 ítem por línea)", "programa_practica", { rows: 6 })}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+          Video hero (YouTube)
+        </label>
+        <p className="text-xs text-muted-foreground/70 -mt-1">
+          Pegá el link del video — se muestra arriba de todo en la landing. Vacío → hero de texto
+          (sin video).
+        </p>
+        <div className="flex items-start gap-3">
+          <Input
+            value={form.video_url}
+            onChange={(e) => setForm((f) => ({ ...f, video_url: e.target.value }))}
+            placeholder="https://www.youtube.com/watch?v=..."
+            className="flex-1"
+          />
+          {concepto.video_poster_url && form.video_url === concepto.video_url && (
+            <img
+              src={concepto.video_poster_url}
+              alt=""
+              className="h-12 w-20 rounded-md object-cover border border-border/40 shrink-0"
+            />
+          )}
+        </div>
+      </div>
       {field("Email del instructor/a", "notif_email", {
         type: "email",
         hint: "Recibe las notificaciones de inscripción.",
