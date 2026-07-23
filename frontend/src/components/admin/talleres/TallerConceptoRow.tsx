@@ -6,6 +6,7 @@ import type { TallerConcepto } from "@/lib/admin/api/types";
 import { Button } from "@/design-system/ui/button";
 import { ContenidoSection, FotoSection } from "./ConceptoTabs";
 import { EdicionSubRow } from "./EdicionSubRow";
+import { InstructoresSection } from "./InstructoresSection";
 
 export function TallerConceptoRow({
   concepto,
@@ -19,7 +20,7 @@ export function TallerConceptoRow({
   onNuevaEdicion: (c: TallerConcepto) => void;
 }) {
   const qc = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"ediciones" | "taller">("ediciones");
+  const [activeTab, setActiveTab] = useState<"ediciones" | "taller" | "instructores">("ediciones");
 
   const totalConfirmados = concepto.ediciones.reduce((s, e) => s + e.cupos_confirmados, 0);
   const activeEdiciones = concepto.ediciones.filter((e) => e.activo);
@@ -83,7 +84,8 @@ export function TallerConceptoRow({
               [
                 { id: "ediciones", label: "Ediciones" },
                 { id: "taller", label: "El taller" },
-              ] as { id: "ediciones" | "taller"; label: string }[]
+                { id: "instructores", label: "Instructores" },
+              ] as { id: "ediciones" | "taller" | "instructores"; label: string }[]
             ).map((tab) => (
               <button
                 key={tab.id}
@@ -135,6 +137,8 @@ export function TallerConceptoRow({
                 </div>
               </div>
             )}
+
+            {activeTab === "instructores" && <InstructoresSection concepto={concepto} />}
           </div>
         </div>
       )}

@@ -114,6 +114,31 @@ def _clase_dict(c) -> dict:
     }
 
 
+def _instructor_dict(row) -> dict:
+    return {
+        "id": row["id"],
+        "nombre": row["nombre"],
+        "rol": row["rol"],
+        "descripcion": row["descripcion"],
+        "instagram": row["instagram"],
+        "web": row["web"],
+        "foto_url": row["foto_url"] or "",
+        "foto_media_id": row["foto_media_id"],
+    }
+
+
+def _get_instructores_taller(conn, taller_id: int) -> list[dict]:
+    """Instructores de un taller (F3), ordenados. Reemplaza de a poco a los
+    campos legacy `talleres.instructor_*` (servidos en paralelo hasta F6)."""
+    rows = conn.execute(
+        "SELECT i.* FROM instructores i "
+        "JOIN taller_instructores ti ON ti.instructor_id = i.id "
+        "WHERE ti.taller_id = %s ORDER BY ti.orden, i.id",
+        (taller_id,),
+    ).fetchall()
+    return [_instructor_dict(r) for r in rows]
+
+
 def _get_clases(conn, edicion_id: int) -> list:
     rows = conn.execute(
         "SELECT id, fecha, hora_inicio_min, hora_fin_min, titulo, descripcion, "
@@ -144,7 +169,7 @@ def _edicion_lite(row) -> dict:
     }
 
 
-def _edicion_to_public_dict(row, clases=None) -> dict:
+def _edicion_to_public_dict(row, clases=None, instructores=None) -> dict:
     """Convierte edicion_row (JOIN talleres) al shape plano del API público."""
     return {
         "id": row["id"],
@@ -184,6 +209,9 @@ def _edicion_to_public_dict(row, clases=None) -> dict:
         "mensaje_confirmacion": _row_get(row, "mensaje_confirmacion", ""),
         # F2 preview admin: True cuando se sirve una edición despublicada
         "borrador": not bool(row["activo"]),
+        # F3: instructores como entidad (además de los campos legacy arriba,
+        # servidos en paralelo hasta F6).
+        "instructores": instructores if instructores is not None else [],
         # sesiones = backward compat con el frontend (lee de clases_taller)
         "sesiones": clases if clases is not None else [],
     }
@@ -215,7 +243,7 @@ def _edicion_to_admin_dict(edicion_row, clases=None) -> dict:
     }
 
 
-def _concepto_to_admin_dict(taller_row, ediciones=None) -> dict:
+def _concepto_to_admin_dict(taller_row, ediciones=None, instructores=None) -> dict:
     """Convierte una fila de talleres (concepto) al shape admin con ediciones anidadas."""
     return {
         "id": taller_row["id"],
@@ -236,6 +264,7 @@ def _concepto_to_admin_dict(taller_row, ediciones=None) -> dict:
         "beneficios": _row_get(taller_row, "beneficios", ""),
         "pregunta_experiencia": _row_get(taller_row, "pregunta_experiencia", ""),
         "mensaje_confirmacion": _row_get(taller_row, "mensaje_confirmacion", ""),
+        "instructores": instructores if instructores is not None else [],
         "ediciones": ediciones if ediciones is not None else [],
     }
 
@@ -354,7 +383,9 @@ def list_talleres():
             f"{_EDICION_JOIN_SELECT} WHERE e.activo = TRUE ORDER BY e.fecha_inicio",
         ).fetchall()
         return [
-            _edicion_to_public_dict(r, _get_clases(conn, r["id"]))
+            _edicion_to_public_dict(
+                r, _get_clases(conn, r["id"]), _get_instructores_taller(conn, r["taller_id"])
+            )
             for r in rows
         ]
 
@@ -373,7 +404,9 @@ def get_taller(slug: str, request: Request):
     es_admin = dev_bypass_enabled() or bool(session and is_admin_email(session.get("email")))
     with get_db() as conn:
         row = _get_edicion_row(conn, slug, incluir_borrador=es_admin)
-        d = _edicion_to_public_dict(row, _get_clases(conn, row["id"]))
+        d = _edicion_to_public_dict(
+            row, _get_clases(conn, row["id"]), _get_instructores_taller(conn, row["taller_id"])
+        )
 
         # Próxima edición: misma concepto (taller_id), numero_edicion mayor
         pr = conn.execute(
@@ -666,6 +699,27 @@ class TallerConceptoCreateBody(BaseModel):
     edicion: EdicionCreateBody
 
 
+class InstructorBody(BaseModel):
+    nombre: str
+    rol: str = ""
+    descripcion: str = ""
+    instagram: str = ""
+    web: str = ""
+
+
+class InstructorUpdateBody(BaseModel):
+    nombre: str | None = None
+    rol: str | None = None
+    descripcion: str | None = None
+    instagram: str | None = None
+    web: str | None = None
+    activo: bool | None = None
+
+
+class TallerInstructoresBody(BaseModel):
+    instructor_ids: list[int]
+
+
 class TallerConceptoUpdateBody(BaseModel):
     nombre: str | None = None
     subtitulo: str | None = None
@@ -722,7 +776,9 @@ def admin_list_talleres(request: Request):
                 _edicion_to_admin_dict(e, _get_clases(conn, e["id"]))
                 for e in edicion_rows
             ]
-            result.append(_concepto_to_admin_dict(t, ediciones))
+            result.append(
+                _concepto_to_admin_dict(t, ediciones, _get_instructores_taller(conn, t["id"]))
+            )
     return result
 
 
@@ -994,10 +1050,11 @@ def admin_update_concepto(taller_id: int, body: TallerConceptoUpdateBody, reques
                 _edicion_to_admin_dict(e, _get_clases(conn, e["id"]))
                 for e in edicion_rows
             ]
+            instructores_out = _get_instructores_taller(conn, taller_id)
         except Exception:
             conn.rollback()
             raise
-    return _concepto_to_admin_dict(t_row, ediciones)
+    return _concepto_to_admin_dict(t_row, ediciones, instructores_out)
 
 
 @router.patch("/admin/ediciones/{edicion_id}")
@@ -1213,6 +1270,178 @@ async def admin_upload_foto_instructor(taller_id: int, request: Request):
         raise HTTPException(502, "No se pudo subir la foto. Intentá de nuevo.")
 
     return {"ok": True, "url": url, "media_id": asset.id}
+
+
+# ── Instructores: entidad propia + mini-CRUD (F3) ────────────────────────────
+# Un taller puede tener varios instructores; un instructor puede dar varios
+# talleres (Filmar: mismo instructor en Principiante y Avanzado). Reemplaza de
+# a poco a los campos legacy `talleres.instructor_*` (servidos en paralelo
+# hasta F6). Kind de media PROPIO ("instructor-perfil", entity_id=instructor.id)
+# — no reusa el kind legacy "instructor" (entity_id=taller_id) para no arriesgar
+# el flujo ya en producción.
+
+_INSTRUCTOR_PERFIL_SPECS = [
+    DeriveSpec(name="display", square=False, max_width=400),
+    DeriveSpec(name="display-sm", square=False, max_width=200),
+]
+
+
+@router.get("/admin/instructores")
+def admin_list_instructores(request: Request):
+    """Lista todos los instructores (para el selector del taller)."""
+    require_admin(request)
+    with get_db() as conn:
+        rows = conn.execute("SELECT * FROM instructores ORDER BY nombre").fetchall()
+        return [_instructor_dict(r) for r in rows]
+
+
+@router.post("/admin/instructores", status_code=201)
+def admin_create_instructor(body: InstructorBody, request: Request):
+    require_admin(request)
+    if not body.nombre.strip():
+        raise HTTPException(400, "El nombre es obligatorio")
+    with get_db() as conn:
+        cur = conn.execute(
+            "INSERT INTO instructores (nombre, rol, descripcion, instagram, web) "
+            "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (body.nombre.strip(), body.rol.strip(), body.descripcion.strip(),
+             body.instagram.strip(), body.web.strip()),
+        )
+        instructor_id = cur.fetchone()["id"]
+        conn.commit()
+        row = conn.execute("SELECT * FROM instructores WHERE id = %s", (instructor_id,)).fetchone()
+    return _instructor_dict(row)
+
+
+@router.patch("/admin/instructores/{instructor_id}")
+def admin_update_instructor(instructor_id: int, body: InstructorUpdateBody, request: Request):
+    require_admin(request)
+    sets = []
+    params: list = []
+    if body.nombre is not None:
+        if not body.nombre.strip():
+            raise HTTPException(400, "El nombre es obligatorio")
+        sets.append("nombre = %s"); params.append(body.nombre.strip())
+    if body.rol is not None:
+        sets.append("rol = %s"); params.append(body.rol.strip())
+    if body.descripcion is not None:
+        sets.append("descripcion = %s"); params.append(body.descripcion.strip())
+    if body.instagram is not None:
+        sets.append("instagram = %s"); params.append(body.instagram.strip())
+    if body.web is not None:
+        sets.append("web = %s"); params.append(body.web.strip())
+    if body.activo is not None:
+        sets.append("activo = %s"); params.append(body.activo)
+    if not sets:
+        raise HTTPException(400, "No hay campos para actualizar")
+    with get_db() as conn:
+        existing = conn.execute(
+            "SELECT id FROM instructores WHERE id = %s", (instructor_id,)
+        ).fetchone()
+        if existing is None:
+            raise HTTPException(404, "Instructor no encontrado")
+        sets.append("updated_at = NOW()")
+        params.append(instructor_id)
+        conn.execute(f"UPDATE instructores SET {', '.join(sets)} WHERE id = %s", params)
+        conn.commit()
+        row = conn.execute("SELECT * FROM instructores WHERE id = %s", (instructor_id,)).fetchone()
+    return _instructor_dict(row)
+
+
+@router.delete("/admin/instructores/{instructor_id}", status_code=200)
+def admin_delete_instructor(instructor_id: int, request: Request):
+    """Borra un instructor. 409 si está vinculado a algún taller (desvincular
+    primero) — más simple y seguro que distinguir por taller/edición activa."""
+    require_admin(request)
+    with get_db() as conn:
+        existing = conn.execute(
+            "SELECT id FROM instructores WHERE id = %s", (instructor_id,)
+        ).fetchone()
+        if existing is None:
+            raise HTTPException(404, "Instructor no encontrado")
+        vinculado = conn.execute(
+            "SELECT 1 FROM taller_instructores WHERE instructor_id = %s LIMIT 1",
+            (instructor_id,),
+        ).fetchone()
+        if vinculado:
+            raise HTTPException(409, "Desvinculalo de sus talleres antes de borrarlo")
+        conn.execute("DELETE FROM instructores WHERE id = %s", (instructor_id,))
+        conn.commit()
+    return {"ok": True}
+
+
+@router.post("/admin/instructores/{instructor_id}/upload-foto")
+async def admin_upload_foto_instructor_perfil(instructor_id: int, request: Request):
+    """Sube la foto de un instructor (entidad F3) a R2 vía el motor de media."""
+    require_admin(request)
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT id FROM instructores WHERE id = %s", (instructor_id,)
+        ).fetchone()
+        if row is None:
+            raise HTTPException(404, "Instructor no encontrado")
+
+    form = await request.form()
+    file = form.get("file")
+    if file is None or not hasattr(file, "read"):
+        raise HTTPException(400, "Falta el campo 'file' en el form-data")
+
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "Archivo vacío")
+    if len(raw) > FOTO_MAX_MB * 1024 * 1024:
+        raise HTTPException(413, f"Archivo muy grande (máx {FOTO_MAX_MB} MB)")
+
+    try:
+        with get_db() as conn:
+            asset = store_upload(
+                raw, kind="instructor-perfil", derive_specs=_INSTRUCTOR_PERFIL_SPECS, conn=conn
+            )
+            display = asset.variant("display") or (asset.variants[0] if asset.variants else None)
+            url = display.url if display else ""
+            conn.execute(
+                "UPDATE instructores SET foto_media_id = %s, foto_url = %s, "
+                "updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                (asset.id, url, instructor_id),
+            )
+            conn.commit()
+    except MediaError as e:
+        raise HTTPException(e.status, e.detail)
+    except Exception as e:
+        logger.error("upload_foto_instructor_perfil: error inesperado: %s", e, exc_info=True)
+        raise HTTPException(502, "No se pudo subir la foto. Intentá de nuevo.")
+
+    return {"ok": True, "url": url, "media_id": asset.id}
+
+
+@router.put("/admin/talleres/{taller_id}/instructores")
+def admin_set_taller_instructores(taller_id: int, body: TallerInstructoresBody, request: Request):
+    """Reemplaza la lista (ordenada) de instructores de un taller."""
+    require_admin(request)
+    with get_db() as conn:
+        t = conn.execute("SELECT id FROM talleres WHERE id = %s", (taller_id,)).fetchone()
+        if t is None:
+            raise HTTPException(404, "Taller no encontrado")
+        if body.instructor_ids:
+            existentes = {
+                r["id"]
+                for r in conn.execute(
+                    "SELECT id FROM instructores WHERE id = ANY(%s)", (body.instructor_ids,)
+                ).fetchall()
+            }
+            faltantes = set(body.instructor_ids) - existentes
+            if faltantes:
+                raise HTTPException(400, f"Instructor(es) inexistente(s): {sorted(faltantes)}")
+        conn.execute("DELETE FROM taller_instructores WHERE taller_id = %s", (taller_id,))
+        for orden, instructor_id in enumerate(body.instructor_ids):
+            conn.execute(
+                "INSERT INTO taller_instructores (taller_id, instructor_id, orden) "
+                "VALUES (%s, %s, %s)",
+                (taller_id, instructor_id, orden),
+            )
+        conn.commit()
+        instructores_out = _get_instructores_taller(conn, taller_id)
+    return {"instructores": instructores_out}
 
 
 # ── Portada por clase (F2) ────────────────────────────────────────────────────

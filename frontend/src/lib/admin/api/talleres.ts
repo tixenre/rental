@@ -1,5 +1,5 @@
 import { authedFetch, authedJson, authedPostJson } from "@/lib/authedFetch";
-import type { ClaseBody, EdicionAdmin, TallerConcepto, Inscripcion } from "./types";
+import type { ClaseBody, EdicionAdmin, TallerConcepto, Inscripcion, Instructor } from "./types";
 
 async function _ok<T>(r: Response): Promise<T> {
   if (!r.ok) {
@@ -91,4 +91,41 @@ export const talleresAdminApi = {
   /** Devuelve el Response crudo — el consumidor arma el blob/URL de descarga. */
   exportInscripcionesCsv: (conceptoId: number) =>
     authedFetch(`/api/admin/talleres/${conceptoId}/inscripciones/export-csv`),
+
+  // F3: instructores como entidad (mini-CRUD) + link N↔N con el taller.
+  listInstructores: () => authedJson<Instructor[]>("/api/admin/instructores"),
+
+  createInstructor: (body: {
+    nombre: string;
+    rol?: string;
+    descripcion?: string;
+    instagram?: string;
+    web?: string;
+  }) => authedPostJson<Instructor>("/api/admin/instructores", body),
+
+  updateInstructor: (instructorId: number, body: object) =>
+    authedJson<Instructor>(`/api/admin/instructores/${instructorId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+
+  deleteInstructor: (instructorId: number) =>
+    authedJson<{ ok: boolean }>(`/api/admin/instructores/${instructorId}`, { method: "DELETE" }),
+
+  uploadFotoInstructorPerfil: (instructorId: number, file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return authedFetch(`/api/admin/instructores/${instructorId}/upload-foto`, {
+      method: "POST",
+      body: fd,
+    }).then((r) => _ok<{ ok: boolean; url: string; media_id: number }>(r));
+  },
+
+  setTallerInstructores: (conceptoId: number, instructorIds: number[]) =>
+    authedJson<{ instructores: Instructor[] }>(`/api/admin/talleres/${conceptoId}/instructores`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ instructor_ids: instructorIds }),
+    }),
 };
