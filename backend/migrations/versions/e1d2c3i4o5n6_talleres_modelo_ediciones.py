@@ -21,6 +21,7 @@ Create Date: 2026-06-27
 from typing import Sequence, Union
 
 from alembic import op
+from sqlalchemy import text
 
 revision: str = "e1d2c3i4o5n6"
 down_revision: Union[str, Sequence[str], None] = "t4ll3rs3s01"
@@ -169,18 +170,43 @@ def upgrade() -> None:
         )
     """)
 
-    # Migrar clases desde taller_sesiones (si existen)
-    op.execute("""
-        INSERT INTO clases_taller (edicion_id, fecha, hora_inicio, hora_fin)
-        SELECT e.id, s.fecha, s.hora_inicio, s.hora_fin
-        FROM taller_sesiones s
-        JOIN talleres t ON t.id = s.taller_id
-        JOIN ediciones_taller e ON e.slug = t.slug
-        WHERE NOT EXISTS (
-            SELECT 1 FROM clases_taller c
-            WHERE c.edicion_id = e.id AND c.fecha = s.fecha
-        )
-    """)
+    # Migrar clases desde taller_sesiones (si existen).
+    # Guard post-Escuela-v2-F1 (esc1m2i3n4t5): en una DB fresca, init_db() ya
+    # crea clases_taller con `hora_inicio_min`/`hora_fin_min` (minutos) — el
+    # CREATE IF NOT EXISTS de arriba es no-op y este backfill debe escribir a
+    # las columnas que EXISTAN (regla del bootstrap dual init_db+upgrade, ver
+    # test_alembic_upgrade_db). En DBs históricas (columnas viejas en horas) el
+    # INSERT original sigue tal cual; esc1m2i3n4t5 las convierte después.
+    conn = op.get_bind()
+    tiene_viejas = conn.execute(text(
+        "SELECT 1 FROM information_schema.columns "
+        "WHERE table_name = 'clases_taller' AND column_name = 'hora_inicio'"
+    )).fetchone() is not None
+    if tiene_viejas:
+        op.execute("""
+            INSERT INTO clases_taller (edicion_id, fecha, hora_inicio, hora_fin)
+            SELECT e.id, s.fecha, s.hora_inicio, s.hora_fin
+            FROM taller_sesiones s
+            JOIN talleres t ON t.id = s.taller_id
+            JOIN ediciones_taller e ON e.slug = t.slug
+            WHERE NOT EXISTS (
+                SELECT 1 FROM clases_taller c
+                WHERE c.edicion_id = e.id AND c.fecha = s.fecha
+            )
+        """)
+    else:
+        # taller_sesiones guarda HORAS enteras → ×60 al escribir en minutos.
+        op.execute("""
+            INSERT INTO clases_taller (edicion_id, fecha, hora_inicio_min, hora_fin_min)
+            SELECT e.id, s.fecha, s.hora_inicio * 60, s.hora_fin * 60
+            FROM taller_sesiones s
+            JOIN talleres t ON t.id = s.taller_id
+            JOIN ediciones_taller e ON e.slug = t.slug
+            WHERE NOT EXISTS (
+                SELECT 1 FROM clases_taller c
+                WHERE c.edicion_id = e.id AND c.fecha = s.fecha
+            )
+        """)
 
     # Linkear inscripciones existentes a su edición correspondiente
     op.execute("""
