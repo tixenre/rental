@@ -455,6 +455,18 @@ export type Taller = {
     foto_media_id: number | null;
   }[];
   sesiones: Sesion[];
+  // F4a: video hero (YouTube) — null si no hay video configurado o la URL no
+  // se pudo interpretar. El embed es siempre youtube-nocookie.com.
+  video: { youtube_id: string; embed_url: string; poster: string | null } | null;
+  // F4a: modalidades de pago. NUNCA vacío para el público — sin configurar
+  // ninguna, el backend sintetiza 1 sola opción ("Pago total" = precio_total).
+  modalidades: {
+    codigo: string;
+    label: string;
+    nota: string;
+    monto_total: number;
+    monto_total_str: string;
+  }[];
 };
 
 export type InscripcionBody = {
@@ -464,6 +476,9 @@ export type InscripcionBody = {
   experiencia?: string;
   comprobante_url?: string;
   comprobante_key?: string;
+  /** F4a: código de la modalidad elegida (de `Taller.modalidades`). Cableado-
+   *  apagado: el form v1 (pre-F5) no lo manda — default a la primera. */
+  modalidad_codigo?: string;
 };
 
 export type InscripcionResult = {

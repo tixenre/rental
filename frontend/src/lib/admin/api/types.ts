@@ -1375,6 +1375,19 @@ export type ClaseBody = {
   portada_url?: string;
 };
 
+// F4a: modalidad de pago de una edición. `id` presente al escribir = editar
+// esa fila (preserva su posición salvo reorden); ausente = nueva. Sin motor
+// de descuentos: `monto_total` lo carga el admin a mano, los "%" son texto
+// libre en `nota`. `monto_total_str` viene resuelto del backend en lecturas.
+export type ModalidadPagoBody = {
+  id?: number | null;
+  codigo: string;
+  label: string;
+  nota?: string;
+  monto_total: number;
+  monto_total_str?: string;
+};
+
 export type EdicionAdmin = {
   id: number;
   taller_id: number;
@@ -1396,6 +1409,8 @@ export type EdicionAdmin = {
   activo: boolean;
   frozen_at: string | null;
   clases: ClaseBody[];
+  // F4a: RAW (sin fallback sintético — [] = "no configuradas todavía").
+  modalidades: ModalidadPagoBody[];
 };
 
 export type TallerConcepto = {
@@ -1419,6 +1434,9 @@ export type TallerConcepto = {
   beneficios: string;
   pregunta_experiencia: string;
   mensaje_confirmacion: string;
+  // F4a: video hero (YouTube). '' → sin video.
+  video_url: string;
+  video_poster_url: string;
   // F3: instructores como entidad (además de instructor_* legacy arriba).
   instructores: Instructor[];
   ediciones: EdicionAdmin[];
@@ -1450,6 +1468,11 @@ export type Inscripcion = {
   numero_edicion: number | null;
   edicion_slug: string | null;
   created_at: string | null;
+  tyc_aceptado_at: string | null;
+  // F4a: snapshot de la modalidad de pago elegida (null = inscripción previa a F4a).
+  modalidad_codigo: string | null;
+  modalidad_label: string | null;
+  modalidad_monto: number | null;
 };
 
 // ── Solicitudes ───────────────────────────────────────────────────────────────
