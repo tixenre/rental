@@ -77,12 +77,11 @@ desktop **y** mobile. `grid` vs `list` son **variantes por URL** (`?view=grid|li
 
 | name (= archivo) | path | qué |
 |---|---|---|
-| `hub` | `/` | landing hub (3 cards rental/estudio/workshops) |
+| `hub` | `/` | landing hub (3 cards rental/estudio/escuela) |
 | `rental-grid` | `/rental?view=grid` | catálogo, vista grid |
 | `rental-list` | `/rental?view=list` | catálogo, vista lista |
 | `estudio` | `/estudio` | landing del estudio |
-| `workshops` | `/workshops` | workshops/talleres (hub) |
-| `talleres` | `/talleres` | talleres |
+| `escuela` | `/escuela` | escuela / talleres (hub) |
 | `equipo-detail` | `/equipo/213` | ficha de equipo (la ruta fetchea por **id**; `/equipo/<slug>` crudo sin id = "no encontrado") |
 | `login` / `registro` | `/cliente/login` · `/cliente/registro` | auth |
 | `portal` | `/cliente/portal` | portal cliente (tab Pedidos) |

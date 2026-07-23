@@ -4,7 +4,7 @@ const PUBLIC_ROUTES = [
   "/",
   "/rental",
   "/estudio",
-  "/workshops",
+  "/escuela",
   "/preguntas-frecuentes",
   "/cliente/login",
   "/cliente/registro",

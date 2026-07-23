@@ -112,13 +112,13 @@ Para cada página, verificar **todos** estos puntos antes de marcar como OK:
 
 | Página | URL | Status | Notas |
 |---|---|---|---|
-| Landing hub | `/` | 🟡 Nuevo | Hub de tres áreas (rental / estudio / workshops). TopBar default. Verificar cards y spacing mobile. |
+| Landing hub | `/` | 🟡 Nuevo | Hub de tres áreas (rental / estudio / escuela). TopBar default. Verificar cards y spacing mobile. |
 | Catálogo (grid) | `/rental` | 🟢 OK | Movido de `/` a `/rental` (antes /catalogo). Hero escala (text-5xl→7xl→[7rem]). MobileStickyBar + CartMiniBar. |
 | Catálogo (list mode) | `/rental` con toggle list | 🟢 OK | Row simplificado post-PR #111. Sin expand inline. |
 | Ficha de equipo | `/equipo/{id}` | 🟢 OK | Precio sticky bottom `md:hidden` + galería responsive. Code audit post-#249 confirma 🟢. |
 | El Estudio | `/estudio` | 🟡 Verificar | Galería 2 cols mobile, grids responsive. **Validar hero `text-[14vw]` en 375px** — ~52px multilínea, riesgo de desborde. Resto del código OK. |
-| Talleres (listado) | `/workshops` | 🟡 Nuevo | TopBar rosa + SectionBanner + cards horizontales que se apilan en mobile. Verificar sin scroll horizontal. |
-| Taller (detalle) | `/workshops/{slug}` | 🟡 Nuevo | TopBar rosa con CTA "Inscribirme". Hero dark + formulario de inscripción con file upload. Verificar inputs ≥ 16px y form usable en mobile. |
+| Escuela (listado) | `/escuela` | 🟡 Nuevo | TopBar rosa + SectionBanner + cards horizontales que se apilan en mobile. Verificar sin scroll horizontal. |
+| Taller (detalle) | `/escuela/{slug}` | 🟡 Nuevo | TopBar rosa con CTA "Inscribirme". Hero dark + formulario de inscripción con file upload. Verificar inputs ≥ 16px y form usable en mobile. |
 | Preguntas frecuentes | `/preguntas-frecuentes` | 🟢 OK | Accordion + layout `max-w-3xl`. Code audit post-#249 confirma 🟢. |
 | Términos | `/terminos` | 🟢 OK | Página legal trivial (lectura centrada). `px-4 md:px-6`, `max-w-3xl`. |
 | Privacidad | `/privacidad` | 🟢 OK | Página legal trivial. Mismo patrón que `/terminos`. |
