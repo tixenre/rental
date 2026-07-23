@@ -8,6 +8,7 @@ Verifica:
 """
 
 import json
+import re
 from unittest.mock import MagicMock
 
 import pytest
@@ -380,7 +381,7 @@ class CentinelaFakeConn:
 
         # Query dedicada de overlap del centinela.
         if "SELECT COUNT(*) AS CNT FROM ALQUILER_ITEMS PI JOIN ALQUILERES P" in s:
-            _eq, _excl, _excl2, hi, lo = params
+            _eq, _excl, _excl2, _excl_slot, _excl_slot2, hi, lo = params
             hi_d, lo_d = self._parse(hi), self._parse(lo)
             cnt = sum(
                 1 for (fd, fh) in self.reservas
@@ -698,13 +699,42 @@ class TestPackCrud:
         assert out == {"pack": []}
 
 
+_INSERT_COLS_RE = re.compile(r"\(([^()]+)\)\s*VALUES\s*\(([^()]+)\)", re.IGNORECASE)
+
+
+def _parse_insert(sql: str, params: tuple) -> dict:
+    """Parsea un `INSERT INTO t (col1, col2, ...) VALUES (v1, v2, ...)` a
+    {columna: valor} — resolviendo tanto placeholders (`%s`, consumidos en
+    orden desde `params`) como literales escritos directo en el SQL (`NULL`,
+    `1`, `'fijo'`). Los distintos INSERT de `alquiler_items` (pack a $0, línea
+    fija del pack, centinela con el monto real) mandan subconjuntos de
+    columnas DISTINTOS — parsear por NOMBRE evita que el fake dependa de la
+    posición exacta de cada `%s`, que cambia según qué campos son literales
+    en cada variante."""
+    m = _INSERT_COLS_RE.search(" ".join(sql.split()))
+    cols = [c.strip() for c in m.group(1).split(",")]
+    vals = [v.strip() for v in m.group(2).split(",")]
+    it = iter(params)
+    out = {}
+    for col, raw in zip(cols, vals):
+        if raw == "%s":
+            out[col] = next(it)
+        elif raw.upper() == "NULL":
+            out[col] = None
+        elif raw.startswith("'"):
+            out[col] = raw.strip("'")
+        else:
+            out[col] = int(raw)
+    return out
+
+
 class _RecordingConn(_ConnCM):
     """Graba INSERTs de alquileres/items para verificar la orquestación del POST."""
 
     def __init__(self, pedido_id=555):
         self.pedido_id = pedido_id
         self.alquiler_params = None
-        self.items = []  # {equipo_id, cantidad, precio}
+        self.items = []  # [{columna: valor}] — uno por INSERT INTO alquiler_items
         self.committed = False
 
     def execute(self, sql, params=()):
@@ -724,9 +754,7 @@ class _RecordingConn(_ConnCM):
             self.alquiler_params = params
             return _CurLastrowid([], lastrowid=self.pedido_id)
         if su.startswith("INSERT INTO ALQUILER_ITEMS"):
-            self.items.append(
-                {"equipo_id": params[1], "cantidad": params[2], "precio": params[3]}
-            )
+            self.items.append(_parse_insert(sql, params))
             return _Cur([])
         if su.startswith("DELETE FROM ALQUILER_ITEMS"):
             return _Cur([])
@@ -766,7 +794,7 @@ def _patch_post_collaborators(monkeypatch, conn, estudio_row, disp, pack_ids):
 
 def _estudio_row_full(**overrides):
     row = _estudio_row()
-    row.update({"pack_activo": True, "pack_precio": 30000})
+    row.update({"pack_activo": True, "pack_precio": 30000, "pack_nombre": "Pack Todo Incluido"})
     row.update(overrides)
     return row
 
@@ -800,9 +828,25 @@ class TestCrearReservaPack:
         params = conn.alquiler_params
         assert 50000 in params           # monto_total
         assert True in params            # estudio_con_pack = TRUE
-        # Items: centinela (equipo_id=99, cant 1) + pack 10 (×2) + 11 (×1)
-        by_eq = {it["equipo_id"]: it["cantidad"] for it in conn.items}
-        assert by_eq == {99: 1, 10: 2, 11: 1}
+        # 4 ítems: pack 10 (×2) + pack 11 (×1), ambos informativos a $0 — la
+        # línea personalizada con el precio FIJO del pack (Fase 2) — y el
+        # centinela (equipo_id=99) con el monto REAL del espacio.
+        by_eq = {it["equipo_id"]: it for it in conn.items if it.get("equipo_id") is not None}
+        assert by_eq[10]["cantidad"] == 2 and by_eq[10]["precio_jornada"] == 0
+        assert by_eq[11]["cantidad"] == 1 and by_eq[11]["precio_jornada"] == 0
+        centinela = by_eq[99]
+        assert centinela["precio_jornada"] == 20000  # precio_hora(10000) * 2 horas
+        assert centinela["subtotal"] == 20000
+        assert centinela["cobro_modo"] == "fijo"
+
+        linea_pack = next(it for it in conn.items if it.get("equipo_id") is None)
+        assert linea_pack["precio_jornada"] == 30000  # pack_precio
+        assert linea_pack["subtotal"] == 30000
+        assert linea_pack["cobro_modo"] == "fijo"
+        assert linea_pack["nombre_libre"] == "Pack Todo Incluido"
+
+        # espacio(20000) + pack(30000) + 0 + 0 = monto_total(50000): ítems veraces.
+        assert sum(it["subtotal"] for it in conn.items) == 50000
         assert conn.committed is True
 
     def test_sin_pack_no_crea_items_de_equipos(self, monkeypatch):
@@ -813,9 +857,12 @@ class TestCrearReservaPack:
         # monto_total = 10000*2 = 20000 (sin pack_precio)
         assert 20000 in conn.alquiler_params
         assert False in conn.alquiler_params  # estudio_con_pack = FALSE
-        # Solo el centinela; ningún equipo del pack.
-        by_eq = {it["equipo_id"]: it["cantidad"] for it in conn.items}
-        assert by_eq == {99: 1}
+        # Solo el centinela (con el monto real); ningún equipo del pack ni línea de pack.
+        assert len(conn.items) == 1
+        assert conn.items[0]["equipo_id"] == 99
+        assert conn.items[0]["precio_jornada"] == 20000
+        assert conn.items[0]["subtotal"] == 20000
+        assert conn.items[0]["cobro_modo"] == "fijo"
 
     def test_pack_inactivo_ignora_con_pack(self, monkeypatch):
         # pack_activo=False → aunque el cliente mande con_pack, no se cobra ni agrega.
@@ -825,8 +872,9 @@ class TestCrearReservaPack:
             disp={"10": 2}, pack_ids=[10], estudio_row=est,
         )
         assert 20000 in conn.alquiler_params
-        by_eq = {it["equipo_id"]: it["cantidad"] for it in conn.items}
-        assert by_eq == {99: 1}
+        assert len(conn.items) == 1
+        assert conn.items[0]["equipo_id"] == 99
+        assert conn.items[0]["precio_jornada"] == 20000
 
 
 # ── E4: slots fijos recurrentes mensuales ──────────────────────────────────────
@@ -922,13 +970,14 @@ class TestSlotBloqueante:
 
 
 class _SlotRegenConn(_ConnCM):
-    """Fake conn para _regenerar_pedidos_slot: graba INSERT/DELETE de alquileres."""
+    """Fake conn para _regenerar_pedidos_slot: graba INSERT/DELETE de alquileres
+    + el ítem centinela que cada pedido nuevo debe llevar (Fase 2, ítems veraces)."""
 
     def __init__(self, existing=None):
         self.existing = existing or []  # [{id, fecha_desde, monto_pagado}]
         self.inserted = []              # params de cada INSERT alquileres
         self.deleted = []               # ids borrados
-        self.item_inserts = 0           # NO debe haber items (no doble-bloqueo)
+        self.item_inserts = []          # [{columna: valor}] — uno por pedido creado
         self._num = 1000
 
     def execute(self, sql, params=()):
@@ -940,14 +989,19 @@ class _SlotRegenConn(_ConnCM):
             return _Cur([{0: self._num}])
         if su.startswith("INSERT INTO ALQUILERES"):
             self.inserted.append(params)
-            return _CurLastrowid([], lastrowid=self._num)
+            self._num += 1
+            return _Cur([{"id": self._num}])
         if su.startswith("INSERT INTO ALQUILER_ITEMS"):
-            self.item_inserts += 1
+            self.item_inserts.append(_parse_insert(sql, params))
             return _Cur([])
         if su.startswith("DELETE FROM ALQUILERES WHERE ID = "):
             self.deleted.append(params[0])
             return _Cur([])
         return _Cur([])
+
+    def insert_returning(self, sql, params=(), *, column="id"):
+        row = self.execute(sql, params).fetchone()
+        return row[column] if row else None
 
 
 def _mes_offset_ym(n: int) -> tuple[int, int]:
@@ -978,7 +1032,7 @@ class TestRegenerarPedidosSlot:
     def test_genera_un_pedido_por_mes_con_el_valor(self):
         from routes.estudio import _regenerar_pedidos_slot
         conn = _SlotRegenConn(existing=[])
-        _regenerar_pedidos_slot(conn, _slot_full())  # mes actual + los 2 siguientes (todos futuros)
+        _regenerar_pedidos_slot(conn, _estudio_row(), _slot_full())  # mes actual + los 2 siguientes (todos futuros)
         assert len(conn.inserted) == 3
         for p in conn.inserted:
             # (cliente, fd, fh, monto, estado, fuente, tipo, num, slot_id)
@@ -988,8 +1042,15 @@ class TestRegenerarPedidosSlot:
             assert p[5] == "estudio"
             assert p[6] == "estudio_fijo"
             assert p[8] == 1
-        # NO se crean items → el slot no doble-bloquea el centinela.
-        assert conn.item_inserts == 0
+        # Cada pedido lleva su ítem centinela con el monto REAL (Fase 2, ítems
+        # veraces) — antes NO llevaba ítem (el bloqueo lo hacía _slot_bloqueante
+        # solamente), y quedaba invisible para la liquidación.
+        assert len(conn.item_inserts) == 3
+        for it in conn.item_inserts:
+            assert it["equipo_id"] == 99  # equipo_id del centinela (_estudio_row)
+            assert it["precio_jornada"] == 50000
+            assert it["subtotal"] == 50000
+            assert it["cobro_modo"] == "fijo"
 
     def test_editar_regenera_futuros_sin_tocar_pagados(self):
         from datetime import datetime
@@ -1001,24 +1062,26 @@ class TestRegenerarPedidosSlot:
             {"id": 91, "fecha_desde": datetime(y0, m0, 3, 8), "monto_pagado": 0},       # futuro impago → borrar+recrear
         ]
         conn = _SlotRegenConn(existing=existing)
-        _regenerar_pedidos_slot(conn, _slot_full())  # rango: mes actual .. mes actual + 2
+        _regenerar_pedidos_slot(conn, _estudio_row(), _slot_full())  # rango: mes actual .. mes actual + 2
         assert 91 in conn.deleted       # impago borrado
         assert 90 not in conn.deleted   # pagado intocable
         # Recrea el primer mes (borrado) + el tercero (nuevo); el del medio queda conservado.
         assert len(conn.inserted) == 2
+        assert len(conn.item_inserts) == 2  # un centinela por pedido recreado
 
     def test_slot_inactivo_no_genera(self):
         from routes.estudio import _regenerar_pedidos_slot
         conn = _SlotRegenConn(existing=[])
-        _regenerar_pedidos_slot(conn, _slot_full(activo=False))
+        _regenerar_pedidos_slot(conn, _estudio_row(), _slot_full(activo=False))
         assert conn.inserted == []
+        assert conn.item_inserts == []
 
     def test_slot_que_cierra_a_medianoche_no_crashea(self):
         # hora_hasta=24 (cierre a medianoche, válido) rompía con
         # rep.replace(hour=24); ahora se arma con timedelta → 00:00 del día sig.
         from routes.estudio import _regenerar_pedidos_slot
         conn = _SlotRegenConn(existing=[])
-        _regenerar_pedidos_slot(conn, _slot_full(hora_desde=20, hora_hasta=24))
+        _regenerar_pedidos_slot(conn, _estudio_row(), _slot_full(hora_desde=20, hora_hasta=24))
         assert len(conn.inserted) == 3  # mes actual + los 2 siguientes
         for p in conn.inserted:
             fd, fh = p[1], p[2]

@@ -1,20 +1,20 @@
 """Fase 1 de la economía del Estudio (issue de tracking de la iniciativa): el
 editor genérico de pedidos NO debe poder pisar la plata/ítems de un pedido
-`tipo IN ('estudio', 'estudio_fijo')`, y el semáforo de reconciliación no debe
-marcarlos en falso mientras sus ítems sigan a $0.
+`tipo IN ('estudio', 'estudio_fijo')`.
 
-Bugs vivos reales encontrados auditando la economía del Estudio (2026-07-23):
-los ítems de un pedido del Estudio se insertan con `precio_jornada=0` — la
-plata real vive HOY solo en `alquileres.monto_total` (recién en la Fase 2 pasan
-a ser "ítems veraces", con el monto real en el ítem centinela). Sin guard:
+Bug vivo real encontrado auditando la economía del Estudio (2026-07-23): los
+ítems de un pedido del Estudio se insertaban con `precio_jornada=0` — la plata
+real vivía HOY solo en `alquileres.monto_total` (la Fase 2 los pasó a ser
+"ítems veraces", con el monto real en el ítem centinela — ver
+`test_estudio_items_veraces_db.py`/`test_backfill_items_estudio_migration_db.py`).
+Sin guard, editar el pedido (notas, fechas, ítems) disparaba
+`_recalcular_total_pedido`/`_apply_pedido_items`, que recalculaban
+`monto_total` desde esos ítems ($0) — pisando la plata real a cero.
 
-1. Editar el pedido (notas, fechas, ítems) dispara `_recalcular_total_pedido`/
-   `_apply_pedido_items`, que recalculan `monto_total` desde esos ítems ($0) —
-   pisando la plata real a cero.
-2. `_pedidos_para_desglose` (usado por el chequeo `desglose_divergente`) los
-   incluye igual que cualquier pedido → `desglose_de_pedido` recalcula
-   `monto_neto=0 ≠ monto_total` → el semáforo de reconciliación queda en rojo
-   para TODO pedido del estudio existente, aunque esté perfectamente cobrado.
+Nota: este archivo tenía un 4to test (`test_reconciliacion_ignora_pedidos_estudio_legacy`)
+que verificaba la exclusión ⏰ LEGACY de `reportes/reconciliacion.py` — la Fase 2
+la revirtió a propósito (los ítems veraces hacen que el chequeo cierre solo,
+sin necesitar excepciones) y el test se retiró con ella.
 
 OPT-IN y SEGURO POR DEFECTO (mismo gating que test_pedido_concurrencia_db.py):
 
@@ -202,26 +202,3 @@ def test_put_items_pedido_estudio_rechazado(db_setup):
         assert row["monto_total"] == 50000, "no debería haber tocado nada al rechazar"
     finally:
         conn.close()
-
-
-def test_reconciliacion_ignora_pedidos_estudio_legacy(db_setup):
-    """`_pedidos_para_desglose` (universo del chequeo `desglose_divergente`) NO
-    debe incluir pedidos del estudio mientras sus ítems sigan a $0 (⏰ LEGACY,
-    Fase 1) — si los incluyera, `desglose_de_pedido` recalcularía
-    `monto_neto=0 ≠ monto_total=50000` y marcaría el semáforo de
-    reconciliación en rojo para TODO pedido del estudio existente."""
-    from database import get_db
-    from reportes.reconciliacion import _pedidos_para_desglose
-
-    conn = get_db()
-    try:
-        pedidos = _pedidos_para_desglose(conn)
-    finally:
-        conn.close()
-
-    ids = {p["id"] for p in pedidos}
-    assert PEDIDO_ESTUDIO_ID not in ids, (
-        "un pedido tipo='estudio' con ítems a $0 no debería entrar al universo "
-        "de desglose_divergente (Fase 1) — entraría con monto_neto recalculado "
-        "en 0 ≠ monto_total real, marcando el semáforo en rojo en falso"
-    )

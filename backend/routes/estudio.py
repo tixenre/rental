@@ -5,6 +5,7 @@ routes/estudio.py — CRUD del Estudio (singleton) + galería de fotos (E1)
 
 import json
 import time
+from collections import namedtuple
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -15,7 +16,7 @@ from auth.guards import require_admin
 from database import MARCA_SUBQUERY, get_db, now_ar, to_datetime
 from rate_limit import limiter, ADMIN_WRITE_LIMIT, ADMIN_UPLOAD_LIMIT, CLIENTE_WRITE_LIMIT
 from clientes.queries.identidad import nombre_completo_cliente
-from reservas import ESTADOS_RESERVADO, validar_stock as _check_stock
+from reservas import ESTADOS_RESERVADO, validar_stock as _check_stock, validar_stock_hipotetico
 from routes.alquileres import (
     _dispatch_pedido_creado_emails,
     _get_alquiler_detail,
@@ -1120,7 +1121,8 @@ def _viola_anticipacion(estudio, fecha_desde) -> bool:
 
 
 def _centinela_libre(conn, equipo_id: int, fecha_desde, fecha_hasta,
-                     buffer_horas: int, exclude_pedido_id: int | None = None) -> bool:
+                     buffer_horas: int, exclude_pedido_id: int | None = None,
+                     exclude_slot_id: int | None = None) -> bool:
     """True si el centinela del estudio está libre en [fecha_desde, fecha_hasta],
     aplicando SOLO el buffer propio del estudio (expande el rango por
     `buffer_horas` a cada lado). Query dedicada — NO usa el motor sagrado, así
@@ -1129,6 +1131,12 @@ def _centinela_libre(conn, equipo_id: int, fecha_desde, fecha_hasta,
     El centinela es un recurso único (stock=1): cualquier reserva activa que se
     pise con la franja expandida (half-open: fecha_desde < hi AND fecha_hasta > lo)
     significa ocupado. `exclude_pedido_id` excluye el propio pedido en el POST.
+
+    `exclude_slot_id`: los pedidos `estudio_fijo` llevan su propio ítem
+    centinela (Fase 2, ítems veraces) — sin esto, revalidar la disponibilidad
+    de un slot fijo (`actualizar_slot`, ANTES de regenerar sus pedidos)
+    chocaría contra los pedidos YA EXISTENTES del propio slot para ese mismo
+    día/hora, bloqueándose a sí mismo.
     """
     lo = fecha_desde - timedelta(hours=max(0, buffer_horas or 0))
     hi = fecha_hasta + timedelta(hours=max(0, buffer_horas or 0))
@@ -1140,10 +1148,12 @@ def _centinela_libre(conn, equipo_id: int, fecha_desde, fecha_hasta,
         WHERE pi.equipo_id = %s
           AND p.estado IN {ESTADOS_RESERVADO}
           AND (%s IS NULL OR p.id != %s)
+          AND (%s IS NULL OR p.estudio_slot_id IS DISTINCT FROM %s)
           AND p.fecha_desde < %s
           AND p.fecha_hasta > %s
         """,
-        (equipo_id, exclude_pedido_id, exclude_pedido_id, hi, lo),
+        (equipo_id, exclude_pedido_id, exclude_pedido_id,
+         exclude_slot_id, exclude_slot_id, hi, lo),
     ).fetchone()
     return (row["cnt"] or 0) == 0
 
@@ -1455,9 +1465,53 @@ def _estudio_disponible(conn, estudio, fecha_desde, fecha_hasta,
     if t:
         return False, f"taller «{t}»"
     if not _centinela_libre(conn, estudio["equipo_id"], fecha_desde, fecha_hasta,
-                            estudio["buffer_horas"], exclude_pedido_id=exclude_pedido_id):
+                            estudio["buffer_horas"], exclude_pedido_id=exclude_pedido_id,
+                            exclude_slot_id=exclude_slot_id):
         return False, "ya reservado en esa franja"
     return True, None
+
+
+def revalidar_disponibilidad_estudio(conn, pedido) -> list[str]:
+    """Re-valida un pedido del Estudio YA EXISTENTE (turno o slot fijo) al
+    transicionar de estado — la usa `transiciones.cambiar_estado` EN VEZ DEL
+    `_check_stock` genérico (bug encontrado auditando la economía del
+    Estudio: ese gate leería el ítem centinela como un equipo más y lo
+    validaría con el buffer GLOBAL, no con el buffer propio del espacio).
+
+    ESPACIO (centinela): por `_estudio_disponible` (buffer propio), excluyendo
+    el propio pedido y —si es un `estudio_fijo`— su propio slot (para no
+    chocar contra sí mismo). EQUIPOS reales (pack/sueltos, si los hay): por el
+    motor sagrado `validar_stock_hipotetico`, excluyendo el centinela (que no
+    es un equipo real).
+
+    `pedido` es la fila de `alquileres` (dict o `PGRow`) ya leída `FOR UPDATE`
+    por el caller — esta función no relockea nada."""
+    estudio = _get_estudio_row(conn)
+    errores: list[str] = []
+
+    fd, fh = to_datetime(pedido["fecha_desde"]), to_datetime(pedido["fecha_hasta"])
+    libre, motivo = _estudio_disponible(
+        conn, estudio, fd, fh,
+        exclude_pedido_id=pedido["id"],
+        exclude_slot_id=pedido["estudio_slot_id"],
+    )
+    if not libre:
+        errores.append(f"El espacio no está disponible: {motivo}")
+
+    items = conn.execute(
+        "SELECT equipo_id, cantidad FROM alquiler_items "
+        "WHERE pedido_id=%s AND equipo_id IS NOT NULL AND equipo_id != %s",
+        (pedido["id"], estudio["equipo_id"]),
+    ).fetchall()
+    if items:
+        _Item = namedtuple("_Item", ["equipo_id", "cantidad"])
+        sin_stock = validar_stock_hipotetico(
+            conn, pedido["id"], pedido["fecha_desde"], pedido["fecha_hasta"],
+            [_Item(it["equipo_id"], it["cantidad"]) for it in items],
+        )
+        errores.extend(f"Sin stock suficiente: {s}" for s in sin_stock)
+
+    return errores
 
 
 def verificar_sesiones_disponibles(conn, estudio, sesiones: list,
@@ -1491,11 +1545,18 @@ def verificar_sesiones_disponibles(conn, estudio, sesiones: list,
             )
 
 
-def _regenerar_pedidos_slot(conn, slot: dict) -> None:
+def _regenerar_pedidos_slot(conn, estudio, slot: dict) -> None:
     """(Re)genera un pedido `estudio_fijo` por mes del rango del slot. Preserva
     los pasados y los que ya tienen pagos; borra y recrea los futuros impagos.
     Fecha representativa = primer `dia_semana` del mes a [hora_desde, hora_hasta].
-    SIN ítem del centinela (el bloqueo lo hace `_slot_bloqueante`)."""
+
+    Cada pedido lleva su ítem centinela con el monto real (Fase 2, ítems
+    veraces: `cobro_modo='fijo'`, `precio_jornada=subtotal=valor_mensual`) —
+    antes el pedido no tenía NINGÚN ítem y quedaba invisible para la
+    liquidación (`filas_atribucion` hace INNER JOIN a `alquiler_items`), sin
+    atribuirse a nadie pese a cobrarse. El BLOQUEO del slot lo sigue haciendo
+    `_slot_bloqueante` (la regla, no el ítem) — el ítem acá es solo para que
+    la plata se vea y se atribuya (dueño del centinela = 'Estudio')."""
     slot_id = slot["id"]
     mes_actual = _mes_actual_ar()
     existentes = conn.execute(
@@ -1527,7 +1588,7 @@ def _regenerar_pedidos_slot(conn, slot: dict) -> None:
         fd = base + timedelta(hours=slot["hora_desde"])
         fh = base + timedelta(hours=slot["hora_hasta"])
         num = _next_numero_pedido(conn)
-        conn.execute(
+        pedido_id = conn.insert_returning(
             """
             INSERT INTO alquileres (cliente_nombre, fecha_desde, fecha_hasta, monto_total,
                                     estado, fuente, tipo, numero_pedido, estudio_slot_id)
@@ -1535,6 +1596,14 @@ def _regenerar_pedidos_slot(conn, slot: dict) -> None:
             """,
             (slot["cliente"], fd, fh, slot["valor_mensual"], "confirmado",
              "estudio", "estudio_fijo", num, slot_id),
+        )
+        conn.execute(
+            """
+            INSERT INTO alquiler_items
+                (pedido_id, equipo_id, cantidad, precio_jornada, subtotal, cobro_modo)
+            VALUES (%s,%s,1,%s,%s,'fijo')
+            """,
+            (pedido_id, estudio["equipo_id"], slot["valor_mensual"], slot["valor_mensual"]),
         )
 
 
@@ -1686,7 +1755,11 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
                 raise HTTPException(409, f"Esa franja está reservada para el taller «{taller_nombre}»")
 
             con_pack = bool(body.con_pack) and bool(estudio["pack_activo"])
-            monto_total = (estudio["precio_hora"] or 0) * body.horas
+            # `espacio_monto` es la plata REAL del espacio (va al ítem centinela,
+            # Fase 2 — ítems veraces); `monto_total` sigue siendo espacio + pack,
+            # como siempre.
+            espacio_monto = (estudio["precio_hora"] or 0) * body.horas
+            monto_total = espacio_monto
             if con_pack:
                 monto_total += estudio["pack_precio"] or 0
 
@@ -1727,13 +1800,39 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
                         )
                         _agregar_items_pack(conn, pedido_id, fecha_desde, fecha_hasta, pack_ids)
 
+                # Línea personalizada con el precio FIJO del pack (Fase 2, ítems
+                # veraces): antes el pack no tenía NINGÚN ítem con plata propia —
+                # el prorrateo de la liquidación (que reparte `monto_total` por
+                # `subtotal` de ítem) caía al fallback "partes iguales" entre el
+                # centinela y los equipos del pack (todos a $0), derramando valor
+                # del espacio hacia los DUEÑOS de esos equipos. `equipo_id=NULL`
+                # → dueño 'Rambla' por default en la liquidación (`COALESCE`) —
+                # coherente con que la promo es plata de Rambla, no de los
+                # dueños tradicionales. Se cobra el precio fijo del pack pase lo
+                # que pase con la disponibilidad de sus equipos (best-effort de
+                # arriba: lo que no entró, no entró — el precio no cambia).
+                pack_precio = estudio["pack_precio"] or 0
+                conn.execute(
+                    """
+                    INSERT INTO alquiler_items
+                        (pedido_id, equipo_id, cantidad, precio_jornada, subtotal, nombre_libre, cobro_modo)
+                    VALUES (%s,NULL,1,%s,%s,%s,'fijo')
+                    """,
+                    (pedido_id, pack_precio, pack_precio, estudio["pack_nombre"] or "Pack de equipos"),
+                )
+
             # ── Espacio (centinela): requisito DURO ─────────────────────────────────
+            # `cobro_modo='fijo'` con el monto real (Fase 2, ítems veraces): antes
+            # este ítem iba a $0 (la plata vivía solo en el header) — sin esto,
+            # cualquier recálculo/desglose/reconciliación que sume por ítem daba
+            # $0 en vez del total real (bugs vivos arreglados en la Fase 1/2).
             conn.execute(
                 """
-                INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
-                VALUES (%s,%s,%s,%s,%s)
+                INSERT INTO alquiler_items
+                    (pedido_id, equipo_id, cantidad, precio_jornada, subtotal, cobro_modo)
+                VALUES (%s,%s,1,%s,%s,'fijo')
                 """,
-                (pedido_id, estudio["equipo_id"], 1, 0, 0),
+                (pedido_id, estudio["equipo_id"], espacio_monto, espacio_monto),
             )
             # Lock del centinela (recurso único) + chequeo con SU buffer propio. Una
             # 2da reserva concurrente espera el lock y ve la 1ra commiteada.
@@ -1837,7 +1936,7 @@ def crear_slot(body: SlotFijoCreate, request: Request):
                  data["valor_mensual"], data["mes_desde"], data["mes_hasta"], data["activo"]),
             )
             slot = _get_slot(conn, slot_id)
-            _regenerar_pedidos_slot(conn, slot)
+            _regenerar_pedidos_slot(conn, estudio, slot)
             conn.commit()
             return slot
         except Exception:
@@ -1872,7 +1971,7 @@ def actualizar_slot(slot_id: int, body: SlotFijoUpdate, request: Request):
                     (*updates.values(), slot_id),
                 )
             slot = _get_slot(conn, slot_id)
-            _regenerar_pedidos_slot(conn, slot)
+            _regenerar_pedidos_slot(conn, estudio, slot)
             conn.commit()
             return slot
         except Exception:

@@ -7,8 +7,6 @@ para cazar la divergencia entre las dos formas de marcar "pagado":
 del reporte).
 """
 
-from tipos_pedido import TIPOS_ESTUDIO
-
 from .comisiones import cargar_modelo
 from .liquidacion import LIQUIDACION_INICIO, SALDADO_CTE
 
@@ -20,19 +18,18 @@ _SAMPLE = 25
 # Un pedido pre-junio 2026 ya no afecta al reporte → no debe ensuciar el semáforo.
 _CLEAN_START = f"AND a.fecha_desde >= '{LIQUIDACION_INICIO}'"
 
-# ⏰ LEGACY (economía del Estudio, Fase 1): los pedidos del Estudio HOY insertan
-# sus ítems con `subtotal=0` (el monto real vive solo en `alquileres.monto_total`)
-# → `desglose_de_pedido` recalcula 0 y el chequeo de abajo los marca divergentes
-# en falso. Se excluyen acá mientras tanto. Remover este filtro (y el import de
-# arriba si queda sin otro uso) cuando la Fase 2 los haga "ítems veraces"
-# (`cobro_modo='fijo'` con el monto real) — el chequeo vuelve a cubrirlos solo.
-_EXCLUYE_ESTUDIO = "AND a.tipo NOT IN ({})".format(", ".join(f"'{t}'" for t in TIPOS_ESTUDIO))
-
 
 def _pedidos_para_desglose(conn) -> list[dict]:
     """Pedidos activos (no cancelados, `monto_total > 0`) dentro del clean start,
     con sus ítems — la forma que espera `finanzas_flujo.pedido.desglose_de_pedido`.
-    Un solo `IN` para los ítems (no N+1 por pedido)."""
+    Un solo `IN` para los ítems (no N+1 por pedido).
+
+    Cubre TAMBIÉN los pedidos del Estudio (Fase 2, ítems veraces): sus ítems
+    llevan el monto real (`cobro_modo='fijo'`, `subtotal` = precio del espacio/
+    promo) en vez de $0, así que `desglose_de_pedido` cierra contra
+    `monto_total` igual que un alquiler normal — no hace falta excluirlos.
+    Backfill de los pedidos creados ANTES de este cambio: migración
+    `q2r3s4t5u6v7_backfill_items_estudio_veraces`."""
     from database import row_to_dict
 
     rows = conn.execute(
@@ -44,7 +41,6 @@ def _pedidos_para_desglose(conn) -> list[dict]:
         WHERE a.estado <> 'cancelado'
           AND a.monto_total > 0
           {_CLEAN_START}
-          {_EXCLUYE_ESTUDIO}
         ORDER BY a.id
         """
     ).fetchall()
