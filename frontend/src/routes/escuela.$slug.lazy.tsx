@@ -246,7 +246,7 @@ function TallerLandingPage() {
         />
       )}
       <PublicLayout
-        topBar={{ variant: "workshops", cta: { label: "Inscribirme", href: "#inscripcion" } }}
+        topBar={{ variant: "escuela", cta: { label: "Inscribirme", href: "#inscripcion" } }}
       >
         <div className="min-h-dvh bg-background">
           {/* ── Hero ───────────────────────────────────────────────────────── */}

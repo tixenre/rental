@@ -213,8 +213,8 @@ function TalleresPage() {
   const hayTalleres = talleres.length > 0;
 
   return (
-    <PublicLayout topBar={{ variant: "workshops" }}>
-      <SectionBanner section="workshops" />
+    <PublicLayout topBar={{ variant: "escuela" }}>
+      <SectionBanner section="escuela" />
 
       <div className="max-w-[900px] mx-auto px-4 sm:px-6 py-10 sm:py-14 flex flex-col gap-4">
         {isLoading && (

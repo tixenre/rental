@@ -27,12 +27,12 @@ export const AREAS = {
     fg: "text-ink",
     accent: "text-estudio",
   },
-  // La vertical de formación: se muestra "escuela." y su ruta es `/escuela`. La
-  // `key` interna sigue siendo `workshops` (invisible; acoplada al theming
-  // `[data-area="workshops"]` y al variant del TopBar — cambiarla no aporta nada
-  // al usuario). Las clases que ofrece se siguen llamando "talleres". `/workshops`
-  // redirige a `/escuela` (única redirección; `/talleres` ya no se soporta).
-  workshops: {
+  // La vertical de formación: key `escuela`, ruta `/escuela`, label "escuela.",
+  // theming `[data-area="escuela"]`. Las clases que ofrece se siguen llamando
+  // "talleres" — la API `/api/talleres` y la tabla `talleres` NO se renombran (un
+  // taller es un taller; la escuela los ofrece). `/workshops` redirige a `/escuela`
+  // (única redirección; `/talleres` ya no se soporta).
+  escuela: {
     label: "escuela.",
     desc: "Talleres y formación",
     href: "/escuela",
