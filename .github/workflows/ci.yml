@@ -373,6 +373,16 @@ jobs:
           export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
           export RESERVAS_DB_TEST=1
           python -m pytest tests/test_talleres_f4a_db.py -v --tb=short -m integration
+      - name: Escuela v2 — seña + ofrecer cupo al siguiente + interesados contra Postgres real (F4b, #1278)
+        run: |
+          cd backend
+          # Verificar seña, ofrecer cupo (no reserva hasta reclamar), reclamo
+          # transaccional vía token (409 si se agotó en carrera), interesados.
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_talleres_f4b_db.py -v --tb=short -m integration
 
   e2e-admin:
     name: E2E admin (Playwright + backend real)
