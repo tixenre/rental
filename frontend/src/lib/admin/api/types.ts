@@ -1411,6 +1411,20 @@ export type EdicionAdmin = {
   clases: ClaseBody[];
   // F4a: RAW (sin fallback sintético — [] = "no configuradas todavía").
   modalidades: ModalidadPagoBody[];
+  // F4c: NULL = sin cierre (siempre abierto).
+  fecha_cierre_inscripcion: string | null;
+};
+
+// F4c: FAQ del concepto — ninguna pregunta es obligatoria.
+export type FaqItem = { pregunta: string; respuesta: string };
+
+// F4c: trabajo pasado del taller (link de YouTube, sin testimonios/reseñas).
+export type Trabajo = {
+  id: number;
+  titulo: string;
+  youtube_url: string;
+  poster_url: string;
+  poster_media_id: number | null;
 };
 
 export type TallerConcepto = {
@@ -1440,6 +1454,9 @@ export type TallerConcepto = {
   // F3: instructores como entidad (además de instructor_* legacy arriba).
   instructores: Instructor[];
   ediciones: EdicionAdmin[];
+  // F4c: FAQ del concepto + trabajos pasados (solo YouTube).
+  faqs: FaqItem[];
+  trabajos: Trabajo[];
 };
 
 // F3: instructor como entidad propia (N↔N con talleres — reemplaza de a poco
