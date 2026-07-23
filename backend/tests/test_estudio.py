@@ -79,6 +79,7 @@ class TestBuildResponse:
             "pack_nombre": "Pack Todo Incluido",
             "pack_descripcion": "Todo incluido.",
             "pack_precio": 10000,
+            "promo_combo_id": None,
             "features_json": json.dumps([{"label": "Superficie", "value": "50 m²"}]),
             "faq_json": json.dumps([{"q": "¿Mínimo?", "a": "2 h"}]),
             "direccion": "",
@@ -228,6 +229,7 @@ def _estudio_row(**overrides):
         "anticipacion_min_horas": 0,
         "precio_hora": 10000,
         "equipo_id": 99,  # id del centinela
+        "promo_combo_id": None,
     }
     defaults.update(overrides)
     return defaults

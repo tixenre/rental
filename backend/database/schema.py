@@ -1655,6 +1655,13 @@ def _init_db_schema(conn):
             UNIQUE (estudio_id, equipo_id)
         )
     """)
+    # Promo combo (#1283 Fase 5): reemplaza al pack curado por un equipo real
+    # tipo='combo' (dueno='Rambla', oculto del catálogo) — el precio deriva de
+    # sus componentes (precio_combo) en vez de un `pack_precio` fijo suelto.
+    # NULL = todavía no se creó (el pack sigue siendo el mecanismo vigente,
+    # ⏰ LEGACY hasta que la Fase 8 lo retire). ON DELETE SET NULL: si el combo
+    # se borra, el estudio no rompe — vuelve al estado "sin promo".
+    conn.execute("ALTER TABLE estudio ADD COLUMN IF NOT EXISTS promo_combo_id INTEGER REFERENCES equipos(id) ON DELETE SET NULL")
 
     # Registro de búsquedas del catálogo público (analítica interna). Acompaña a
     # la migración i1c2d3e4f5a6 — acá garantizamos su creación en cada boot

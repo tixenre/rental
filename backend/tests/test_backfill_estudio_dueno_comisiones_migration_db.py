@@ -127,12 +127,15 @@ def test_backfill_dueno_estudio_y_comisiones_respeta_modelo_custom(clean_db):
         assert modelo["Pablo"] == {"Pablo": 60, "Rambla": 40}
         assert modelo["Tincho"] == {"Tincho": 50, "Rambla": 45, "Pablo": 5}
         assert modelo["Rambla"] == {"Rambla": 100}
-
-        # Idempotencia: correr el backfill de nuevo no duplica ni rompe nada.
-        command.downgrade(cfg, "-1")
-        command.upgrade(cfg, "head")
     finally:
         conn.close()
+
+    # Idempotencia: correr el backfill de nuevo no duplica ni rompe nada. `conn`
+    # tiene que estar CERRADO antes de esto — downgrade/upgrade corren en su
+    # propia conexión y el ALTER/UPDATE necesita un lock que una transacción
+    # abierta en `conn` (aunque sea de solo lectura) bloquearía indefinidamente.
+    command.downgrade(cfg, "-1")
+    command.upgrade(cfg, "head")
 
     conn = get_db()
     try:
