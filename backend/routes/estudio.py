@@ -34,6 +34,7 @@ from services.media import (
     store_upload,
 )
 from services.media_fastapi import media_http
+from services.fechas import fmt_hhmm
 
 router = APIRouter()
 
@@ -1352,8 +1353,12 @@ _ADVISORY_NS_ESTUDIO = 5390413
 
 def _sesiones_de_slot(slot: dict) -> list:
     """Genera todas las fechas con `dia_semana` en el rango de meses del slot,
-    como lista de dicts {fecha, hora_inicio, hora_fin}. Usada para validar
-    disponibilidad antes de crear o editar un slot."""
+    como lista de dicts {fecha, hora_inicio_min, hora_fin_min}. Usada para validar
+    disponibilidad antes de crear o editar un slot.
+
+    OJO unidades: `estudio_slots_fijos.hora_desde/hasta` siguen en HORAS enteras
+    (su tabla no cambió); las sesiones se emiten en MINUTOS (contrato de
+    `verificar_sesiones_disponibles` desde Escuela v2 F1) → conversión ×60 acá."""
     y0, m0 = int(slot["mes_desde"][:4]), int(slot["mes_desde"][5:7])
     y1, m1 = int(slot["mes_hasta"][:4]), int(slot["mes_hasta"][5:7])
     import calendar as _cal
@@ -1366,8 +1371,8 @@ def _sesiones_de_slot(slot: dict) -> list:
         while d.month == m:
             sesiones.append({
                 "fecha": d,
-                "hora_inicio": slot["hora_desde"],
-                "hora_fin": slot["hora_hasta"],
+                "hora_inicio_min": slot["hora_desde"] * 60,
+                "hora_fin_min": slot["hora_hasta"] * 60,
             })
             d = d + timedelta(weeks=1)
         cur = (y + 1, 1) if m == 12 else (y, m + 1)
@@ -1405,28 +1410,34 @@ def _slot_bloqueante(conn, fecha_desde, fecha_hasta,
 
 def _taller_bloqueante(conn, fecha_desde, fecha_hasta,
                        exclude_taller_id: Optional[int] = None) -> Optional[str]:
-    """Si la franja solapa una sesión de un taller activo, devuelve el nombre del
-    taller. Compara contra la fecha literal — no deriva weekday ni rango.
-    Minutos desde medianoche (igual que _slot_bloqueante; hora_fin=24 OK).
-    Consulta clases_taller (modelo vigente; taller_sesiones era el modelo anterior)."""
+    """Si la franja solapa una clase de un taller PUBLICADO (concepto Y edición
+    activos), devuelve el nombre del taller. Compara contra la fecha literal — no
+    deriva weekday ni rango. `hora_*_min` ya está en minutos desde medianoche
+    (Escuela v2 F1) — misma unidad que `ini`/`fin`, sin conversión.
+    Consulta clases_taller (modelo vigente; taller_sesiones era el modelo anterior).
+
+    `AND e.activo`: fix del bloqueo fantasma (Escuela v2 F1, decisión del dueño) —
+    una edición desactivada/borrador NO bloquea el estudio; antes solo se miraba
+    `t.activo` (concepto) y una edición dada de baja seguía reservando la franja."""
     dia = fecha_desde.date()
     dia_base = fecha_desde.replace(hour=0, minute=0, second=0, microsecond=0)
     ini = int((fecha_desde - dia_base).total_seconds() // 60)
     fin = int((fecha_hasta - dia_base).total_seconds() // 60)
     rows = conn.execute(
         """
-        SELECT t.nombre, c.hora_inicio, c.hora_fin
+        SELECT t.nombre, c.hora_inicio_min, c.hora_fin_min
         FROM clases_taller c
         JOIN ediciones_taller e ON e.id = c.edicion_id
         JOIN talleres t ON t.id = e.taller_id
         WHERE t.activo = TRUE
+          AND e.activo = TRUE
           AND c.fecha = %s
           AND (%s IS NULL OR t.id != %s)
         """,
         (dia, exclude_taller_id, exclude_taller_id),
     ).fetchall()
     for r in rows:
-        if ini < r["hora_fin"] * 60 and fin > r["hora_inicio"] * 60:
+        if ini < r["hora_fin_min"] and fin > r["hora_inicio_min"]:
             return r["nombre"]
     return None
 
@@ -1454,14 +1465,17 @@ def verificar_sesiones_disponibles(conn, estudio, sesiones: list,
                                    exclude_taller_id: Optional[int] = None,
                                    exclude_slot_id: Optional[int] = None) -> None:
     """Valida cada sesión futura contra _estudio_disponible. Lanza 409 al primer
-    conflicto. Usada por talleres (sesiones explícitas) y slots (sesiones generadas)."""
+    conflicto. Usada por talleres (clases explícitas) y slots (sesiones generadas).
+    Contrato: sesiones = [{fecha, hora_inicio_min, hora_fin_min}] en MINUTOS desde
+    medianoche (Escuela v2 F1) — timedelta(minutes) representa 1440 = medianoche
+    sin el caso especial que `datetime.time` no banca (`replace(hour=24)` rompe)."""
     hoy = now_ar().date()
     for s in sesiones:
         if s["fecha"] < hoy:
             continue
         base = datetime(s["fecha"].year, s["fecha"].month, s["fecha"].day)
-        desde = base + timedelta(hours=s["hora_inicio"])
-        hasta = base + timedelta(hours=s["hora_fin"])
+        desde = base + timedelta(minutes=s["hora_inicio_min"])
+        hasta = base + timedelta(minutes=s["hora_fin_min"])
         libre, motivo = _estudio_disponible(
             conn, estudio, desde, hasta,
             exclude_pedido_id=exclude_pedido_id,
@@ -1472,7 +1486,8 @@ def verificar_sesiones_disponibles(conn, estudio, sesiones: list,
             raise HTTPException(
                 409,
                 f"El estudio no está libre el "
-                f"{s['fecha'].strftime('%d/%m/%Y')} de {s['hora_inicio']} a {s['hora_fin']} hs: {motivo}",
+                f"{s['fecha'].strftime('%d/%m/%Y')} de {fmt_hhmm(s['hora_inicio_min'])} "
+                f"a {fmt_hhmm(s['hora_fin_min'])} hs: {motivo}",
             )
 
 

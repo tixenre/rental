@@ -1357,7 +1357,15 @@ export type DescuentoJornada = { id: number; jornadas: number; pct: number };
 
 // ── Talleres ──────────────────────────────────────────────────────────────────
 
-export type ClaseBody = { fecha: string; hora_inicio: number; hora_fin: number };
+// Horas en MINUTOS desde medianoche (510 = 8:30). Los `_str` vienen resueltos
+// del backend en las lecturas; al ESCRIBIR solo viajan los `_min`.
+export type ClaseBody = {
+  fecha: string;
+  hora_inicio_min: number;
+  hora_fin_min: number;
+  hora_inicio_str?: string;
+  hora_fin_str?: string;
+};
 
 export type EdicionAdmin = {
   id: number;

@@ -392,7 +392,15 @@ export type EdicionLite = {
   direccion: string;
 };
 
-export type Sesion = { fecha: string; hora_inicio: number; hora_fin: number };
+// Horas en MINUTOS desde medianoche (510 = 8:30, Escuela v2 F1); los `_str`
+// ("08:30") vienen resueltos del backend — el front no formatea horarios a mano.
+export type Sesion = {
+  fecha: string;
+  hora_inicio_min: number;
+  hora_fin_min: number;
+  hora_inicio_str: string;
+  hora_fin_str: string;
+};
 
 export type Taller = {
   id: number;

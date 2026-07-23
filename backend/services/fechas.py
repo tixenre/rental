@@ -150,6 +150,17 @@ def inicio_desde_fecha_hora(fecha, hora) -> datetime.datetime | None:
     return datetime.datetime.combine(d.date(), t)
 
 
+# ── Formato de horario en minutos-desde-medianoche ─────────────────────────────
+
+
+def fmt_hhmm(minutos: int) -> str:
+    """510 → \"08:30\", 780 → \"13:00\", 1440 → \"24:00\". Formato único de display
+    para horarios guardados en minutos desde medianoche (clases de talleres,
+    Escuela v2 F1). El backend resuelve el string — el front no formatea horarios
+    a mano (mismo criterio que la plata)."""
+    return f"{minutos // 60:02d}:{minutos % 60:02d}"
+
+
 # ── Mes actual (wall-clock AR) ──────────────────────────────────────────────────
 
 
