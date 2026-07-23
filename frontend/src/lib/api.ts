@@ -436,6 +436,13 @@ export type Taller = {
   tipo_taller: string;
   notif_email: string;
   frozen_at: string | null;
+  // F2: textos configurables del taller + flag de preview admin.
+  terminos: string;
+  beneficios: string;
+  pregunta_experiencia: string;
+  mensaje_confirmacion: string;
+  /** True solo cuando una sesión admin previsualiza una edición despublicada. */
+  borrador: boolean;
   sesiones: Sesion[];
 };
 
