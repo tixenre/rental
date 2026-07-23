@@ -143,7 +143,7 @@ export function EdicionSubRow({
             aria-label={edicion.activo ? "Desactivar edición" : "Activar edición"}
           />
           <a
-            href={`/workshops/${edicion.slug}`}
+            href={`/escuela/${edicion.slug}`}
             target="_blank"
             rel="noopener noreferrer"
             className="p-1 rounded text-muted-foreground hover:text-ink transition"

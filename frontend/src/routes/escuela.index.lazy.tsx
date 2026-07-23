@@ -7,7 +7,7 @@ import { SectionBanner } from "@/components/rental/landing/SectionBanner";
 import { apiGetTalleres, type Taller } from "@/lib/api";
 import { formatARS } from "@/lib/format";
 
-export const Route = createLazyFileRoute("/workshops/")({
+export const Route = createLazyFileRoute("/escuela/")({
   component: TalleresPage,
 });
 
@@ -70,7 +70,7 @@ function WorkshopCard({ taller }: { taller: Taller }) {
 
   return (
     <Link
-      to="/workshops/$slug"
+      to="/escuela/$slug"
       params={{ slug: taller.slug }}
       className={`group flex flex-col sm:flex-row rounded-2xl border overflow-hidden transition-all duration-200 ${
         soldOut
@@ -213,8 +213,8 @@ function TalleresPage() {
   const hayTalleres = talleres.length > 0;
 
   return (
-    <PublicLayout topBar={{ variant: "workshops" }}>
-      <SectionBanner section="workshops" />
+    <PublicLayout topBar={{ variant: "escuela" }}>
+      <SectionBanner section="escuela" />
 
       <div className="max-w-[900px] mx-auto px-4 sm:px-6 py-10 sm:py-14 flex flex-col gap-4">
         {isLoading && (

@@ -6,7 +6,7 @@ import { AREAS, type AreaKey } from "@/data/areas";
 const EYEBROW: Record<AreaKey, string> = {
   rental: "Equipos audiovisuales",
   estudio: "Foto & video",
-  workshops: "Talleres & formación",
+  escuela: "Talleres & formación",
 };
 
 /**

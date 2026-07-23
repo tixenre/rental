@@ -16,7 +16,7 @@ import { formatARS } from "@/lib/format";
 import { useEntityMedia } from "@/hooks/useEntityMedia";
 import { findVariant } from "@/lib/media/types";
 
-export const Route = createLazyFileRoute("/workshops/$slug")({
+export const Route = createLazyFileRoute("/escuela/$slug")({
   component: TallerLandingPage,
 });
 
@@ -89,7 +89,7 @@ function SoldOutModal({
           {fechaA} y {fechaB}.
         </p>
         <Link
-          to="/workshops/$slug"
+          to="/escuela/$slug"
           params={{ slug: proxima.slug }}
           className="flex items-center justify-center w-full rounded-full bg-rosa text-ink font-bold py-3 hover:brightness-110 active:scale-[0.97] transition-all"
           onClick={onDismiss}
@@ -246,7 +246,7 @@ function TallerLandingPage() {
         />
       )}
       <PublicLayout
-        topBar={{ variant: "workshops", cta: { label: "Inscribirme", href: "#inscripcion" } }}
+        topBar={{ variant: "escuela", cta: { label: "Inscribirme", href: "#inscripcion" } }}
       >
         <div className="min-h-dvh bg-background">
           {/* ── Hero ───────────────────────────────────────────────────────── */}
@@ -285,7 +285,7 @@ function TallerLandingPage() {
                 <div className="mt-5 flex flex-wrap items-center gap-4">
                   {taller.edicion_anterior && (
                     <Link
-                      to="/workshops/$slug"
+                      to="/escuela/$slug"
                       params={{ slug: taller.edicion_anterior.slug }}
                       className="text-xs text-background/35 hover:text-background/60 transition"
                     >
@@ -294,7 +294,7 @@ function TallerLandingPage() {
                   )}
                   {taller.proxima_edicion && taller.cupos_disponibles === 0 && (
                     <Link
-                      to="/workshops/$slug"
+                      to="/escuela/$slug"
                       params={{ slug: taller.proxima_edicion.slug }}
                       className="inline-flex items-center gap-2 rounded-full border border-rosa/50 bg-rosa/10 px-4 py-1.5 text-sm font-semibold text-rosa hover:bg-rosa/20 transition"
                     >

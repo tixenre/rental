@@ -128,7 +128,7 @@ function LandingHub() {
 
           {/* Talleres */}
           <Link
-            to="/workshops"
+            to="/escuela"
             className="group relative flex flex-col justify-start p-8 sm:p-10 text-ink min-h-[320px] md:min-h-0 transition-[filter] hover:brightness-105 active:brightness-95"
             style={{ backgroundColor: "var(--color-rosa)" }}
           >
