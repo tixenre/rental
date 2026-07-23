@@ -333,6 +333,16 @@ jobs:
           export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
           export RESERVAS_DB_TEST=1
           python -m pytest tests/test_talleres_inscripcion_db.py -v --tb=short -m integration
+      - name: Escuela v2 — clases ricas + borradores + T&C contra Postgres real (F2, #1278)
+        run: |
+          cd backend
+          # Borradores (activo=False al crear), publicar re-verifica el estudio,
+          # upsert de clases preserva la portada, tyc_aceptado_at.
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_talleres_f2_db.py -v --tb=short -m integration
 
   e2e-admin:
     name: E2E admin (Playwright + backend real)
