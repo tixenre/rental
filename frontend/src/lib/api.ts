@@ -400,6 +400,11 @@ export type Sesion = {
   hora_fin_min: number;
   hora_inicio_str: string;
   hora_fin_str: string;
+  // F2: clases ricas — talleres sin estos datos cargados los reciben en "".
+  titulo: string;
+  descripcion: string;
+  nota: string;
+  portada_url: string;
 };
 
 export type Taller = {
