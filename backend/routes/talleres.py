@@ -60,19 +60,25 @@ def _fmt_pesos(n: int) -> str:
 
 # ── Helpers de lectura ────────────────────────────────────────────────────────
 
-def _get_edicion_row(conn, slug: str):
-    """Busca una edición activa por slug. Lanza 404 si no existe."""
+_EDICION_JOIN_SELECT = """
+    SELECT e.*, t.nombre, t.subtitulo, t.instructor_nombre,
+           t.instructor_bio, t.instructor_proyectos, t.descripcion,
+           t.publico_objetivo, t.programa_teorica, t.programa_practica,
+           t.instructor_foto_url, t.instructor_media_id, t.notif_email,
+           t.slug_base, t.terminos, t.beneficios, t.pregunta_experiencia,
+           t.mensaje_confirmacion
+    FROM ediciones_taller e
+    JOIN talleres t ON t.id = e.taller_id
+"""
+
+
+def _get_edicion_row(conn, slug: str, incluir_borrador: bool = False):
+    """Busca una edición activa por slug. Lanza 404 si no existe.
+    `incluir_borrador=True` (SOLO preview admin, F2): también sirve ediciones
+    despublicadas — el caller es responsable de haber verificado la sesión."""
+    filtro_activo = "" if incluir_borrador else "AND e.activo = TRUE"
     row = conn.execute(
-        """
-        SELECT e.*, t.nombre, t.subtitulo, t.instructor_nombre,
-               t.instructor_bio, t.instructor_proyectos, t.descripcion,
-               t.publico_objetivo, t.programa_teorica, t.programa_practica,
-               t.instructor_foto_url, t.instructor_media_id, t.notif_email,
-               t.slug_base
-        FROM ediciones_taller e
-        JOIN talleres t ON t.id = e.taller_id
-        WHERE e.slug = %s AND e.activo = TRUE
-        """,
+        f"{_EDICION_JOIN_SELECT} WHERE e.slug = %s {filtro_activo}",
         (slug,),
     ).fetchone()
     if row is None:
@@ -80,21 +86,38 @@ def _get_edicion_row(conn, slug: str):
     return row
 
 
+def _row_get(c, key, default=None):
+    """Lectura tolerante: row de DB o dict normalizado pueden no traer el campo."""
+    try:
+        v = c[key]
+        return default if v is None else v
+    except (KeyError, IndexError):
+        return default
+
+
 def _clase_dict(c) -> dict:
     """Serialización única de una clase (row de DB o dict normalizado de
-    _validar_clases): minutos crudos + strings \"HH:MM\" resueltos acá."""
+    _validar_clases): minutos crudos + strings \"HH:MM\" resueltos acá +
+    el contenido rico (F2: titulo/descripcion/nota/portada)."""
     return {
+        "id": _row_get(c, "id"),
         "fecha": str(c["fecha"]),
         "hora_inicio_min": c["hora_inicio_min"],
         "hora_fin_min": c["hora_fin_min"],
         "hora_inicio_str": _fmt_hhmm(c["hora_inicio_min"]),
         "hora_fin_str": _fmt_hhmm(c["hora_fin_min"]),
+        "titulo": _row_get(c, "titulo", ""),
+        "descripcion": _row_get(c, "descripcion", ""),
+        "nota": _row_get(c, "nota", ""),
+        "portada_media_id": _row_get(c, "portada_media_id"),
+        "portada_url": _row_get(c, "portada_url", ""),
     }
 
 
 def _get_clases(conn, edicion_id: int) -> list:
     rows = conn.execute(
-        "SELECT fecha, hora_inicio_min, hora_fin_min FROM clases_taller "
+        "SELECT id, fecha, hora_inicio_min, hora_fin_min, titulo, descripcion, "
+        "nota, portada_media_id, portada_url FROM clases_taller "
         "WHERE edicion_id = %s ORDER BY fecha, hora_inicio_min",
         (edicion_id,),
     ).fetchall()
@@ -154,6 +177,13 @@ def _edicion_to_public_dict(row, clases=None) -> dict:
         "tipo_taller": row["tipo_taller"],
         "numero_edicion": row["numero_edicion"],
         "frozen_at": row["frozen_at"].isoformat() if row["frozen_at"] else None,
+        # F2: textos del concepto que consume la landing/form
+        "terminos": _row_get(row, "terminos", ""),
+        "beneficios": _row_get(row, "beneficios", ""),
+        "pregunta_experiencia": _row_get(row, "pregunta_experiencia", ""),
+        "mensaje_confirmacion": _row_get(row, "mensaje_confirmacion", ""),
+        # F2 preview admin: True cuando se sirve una edición despublicada
+        "borrador": not bool(row["activo"]),
         # sesiones = backward compat con el frontend (lee de clases_taller)
         "sesiones": clases if clases is not None else [],
     }
@@ -202,6 +232,10 @@ def _concepto_to_admin_dict(taller_row, ediciones=None) -> dict:
         "instructor_foto_url": taller_row["instructor_foto_url"] or "",
         "instructor_media_id": taller_row["instructor_media_id"],
         "notif_email": taller_row["notif_email"],
+        "terminos": _row_get(taller_row, "terminos", ""),
+        "beneficios": _row_get(taller_row, "beneficios", ""),
+        "pregunta_experiencia": _row_get(taller_row, "pregunta_experiencia", ""),
+        "mensaje_confirmacion": _row_get(taller_row, "mensaje_confirmacion", ""),
         "ediciones": ediciones if ediciones is not None else [],
     }
 
@@ -231,22 +265,82 @@ def _validar_clases(clases: list) -> list[dict]:
             raise HTTPException(
                 400, f"El horario debe ser múltiplo de 15 minutos ({fecha_str})"
             )
-        key = (fecha, h_ini, h_fin)
+        titulo = str(_row_get(s, "titulo", "") if isinstance(s, dict) else getattr(s, "titulo", "")).strip()
+        # La key de duplicado incluye el título: "Clase 11 y 12 se dictan juntas"
+        # (caso Filmar) = 2 clases con la misma fecha/franja y títulos distintos.
+        key = (fecha, h_ini, h_fin, titulo)
         if key in seen:
             raise HTTPException(
                 400, f"Clase duplicada: {fecha_str} {_fmt_hhmm(h_ini)}-{_fmt_hhmm(h_fin)}"
             )
         seen.add(key)
-        result.append({"fecha": fecha, "hora_inicio_min": h_ini, "hora_fin_min": h_fin})
+
+        def _campo(nombre: str, default=""):
+            return _row_get(s, nombre, default) if isinstance(s, dict) else getattr(s, nombre, default)
+
+        result.append({
+            "id": _campo("id", None),
+            "fecha": fecha,
+            "hora_inicio_min": h_ini,
+            "hora_fin_min": h_fin,
+            "titulo": titulo,
+            "descripcion": str(_campo("descripcion") or "").strip(),
+            "nota": str(_campo("nota") or "").strip(),
+            "portada_media_id": _campo("portada_media_id", None),
+            "portada_url": str(_campo("portada_url") or ""),
+        })
     return result
 
 
 def _insert_clases(conn, edicion_id: int, clases: list) -> None:
     for c in clases:
         conn.execute(
-            "INSERT INTO clases_taller (edicion_id, fecha, hora_inicio_min, hora_fin_min) "
-            "VALUES (%s, %s, %s, %s)",
-            (edicion_id, c["fecha"], c["hora_inicio_min"], c["hora_fin_min"]),
+            "INSERT INTO clases_taller (edicion_id, fecha, hora_inicio_min, hora_fin_min, "
+            "titulo, descripcion, nota, portada_media_id, portada_url) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (
+                edicion_id, c["fecha"], c["hora_inicio_min"], c["hora_fin_min"],
+                c.get("titulo", ""), c.get("descripcion", ""), c.get("nota", ""),
+                c.get("portada_media_id"), c.get("portada_url", ""),
+            ),
+        )
+
+
+def _upsert_clases(conn, edicion_id: int, clases: list) -> None:
+    """Sincroniza las clases de una edición SIN el delete+insert ciego de antes:
+    - con `id` (y perteneciente a la edición) → UPDATE de fecha/horario/contenido
+      — la PORTADA no se toca (solo cambia vía sus endpoints de upload/delete);
+    - sin `id` → INSERT (acá sí puede traer portada_* — caso "copiar clases");
+    - ids existentes que no vienen en la lista → DELETE.
+    Preserva `portada_media_id` al reordenar/editar (el delete+insert la perdía)."""
+    existentes = {
+        r["id"]
+        for r in conn.execute(
+            "SELECT id FROM clases_taller WHERE edicion_id = %s", (edicion_id,)
+        ).fetchall()
+    }
+    vistos: set[int] = set()
+    for c in clases:
+        cid = c.get("id")
+        if cid and cid in existentes:
+            conn.execute(
+                "UPDATE clases_taller SET fecha = %s, hora_inicio_min = %s, "
+                "hora_fin_min = %s, titulo = %s, descripcion = %s, nota = %s "
+                "WHERE id = %s AND edicion_id = %s",
+                (
+                    c["fecha"], c["hora_inicio_min"], c["hora_fin_min"],
+                    c.get("titulo", ""), c.get("descripcion", ""), c.get("nota", ""),
+                    cid, edicion_id,
+                ),
+            )
+            vistos.add(cid)
+        else:
+            _insert_clases(conn, edicion_id, [c])
+    sobrantes = existentes - vistos
+    for cid in sobrantes:
+        conn.execute(
+            "DELETE FROM clases_taller WHERE id = %s AND edicion_id = %s",
+            (cid, edicion_id),
         )
 
 
@@ -257,17 +351,7 @@ def list_talleres():
     """Lista todas las ediciones activas de talleres (una card por edición)."""
     with get_db() as conn:
         rows = conn.execute(
-            """
-            SELECT e.*, t.nombre, t.subtitulo, t.instructor_nombre,
-                   t.instructor_bio, t.instructor_proyectos, t.descripcion,
-                   t.publico_objetivo, t.programa_teorica, t.programa_practica,
-                   t.instructor_foto_url, t.instructor_media_id, t.notif_email,
-                   t.slug_base
-            FROM ediciones_taller e
-            JOIN talleres t ON t.id = e.taller_id
-            WHERE e.activo = TRUE
-            ORDER BY e.fecha_inicio
-            """,
+            f"{_EDICION_JOIN_SELECT} WHERE e.activo = TRUE ORDER BY e.fecha_inicio",
         ).fetchall()
         return [
             _edicion_to_public_dict(r, _get_clases(conn, r["id"]))
@@ -276,10 +360,19 @@ def list_talleres():
 
 
 @router.get("/talleres/{slug}")
-def get_taller(slug: str):
-    """Detalle de una edición de taller. Incluye proxima_edicion y edicion_anterior."""
+def get_taller(slug: str, request: Request):
+    """Detalle de una edición de taller. Incluye proxima_edicion y edicion_anterior.
+
+    F2 borradores: una edición despublicada da 404 al público, pero se sirve a
+    una SESIÓN ADMIN (preview del "ver en web" mientras se arma el taller) con
+    `borrador: true` — el front muestra el banner "solo visible para vos"."""
+    from auth.guards import is_admin_email
+    from auth.session import dev_bypass_enabled, get_session
+
+    session = get_session(request)
+    es_admin = dev_bypass_enabled() or bool(session and is_admin_email(session.get("email")))
     with get_db() as conn:
-        row = _get_edicion_row(conn, slug)
+        row = _get_edicion_row(conn, slug, incluir_borrador=es_admin)
         d = _edicion_to_public_dict(row, _get_clases(conn, row["id"]))
 
         # Próxima edición: misma concepto (taller_id), numero_edicion mayor
@@ -347,6 +440,10 @@ class InscripcionBody(BaseModel):
     experiencia: str | None = None
     comprobante_url: str | None = None
     comprobante_key: str | None = None
+    # F2: checkbox "Acepto los términos" del form v2. CABLEADO-APAGADO: se
+    # registra si viene, pero NO se exige hasta que el form nuevo (F5) mande
+    # el campo — exigirlo hoy rompería el form actual (patrón #1125/#1126).
+    acepta_terminos: bool = False
 
 
 def _comprobante_url_para_email(key: str | None, fallback_url: str | None) -> str:
@@ -407,8 +504,10 @@ def crear_inscripcion(slug: str, body: InscripcionBody, request: Request):
                 """
                 INSERT INTO taller_inscripciones
                     (taller_id, edicion_id, nombre, email, telefono, experiencia,
-                     comprobante_url, comprobante_key, en_lista_espera, estado)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     comprobante_url, comprobante_key, en_lista_espera, estado,
+                     tyc_aceptado_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        CASE WHEN %s THEN NOW() ELSE NULL END)
                 RETURNING id, created_at
                 """,
                 (
@@ -420,6 +519,7 @@ def crear_inscripcion(slug: str, body: InscripcionBody, request: Request):
                     body.comprobante_key or None,
                     en_lista,
                     estado,
+                    body.acepta_terminos,
                 ),
             )
             row = cur.fetchone()
@@ -518,6 +618,16 @@ class ClaseBody(BaseModel):
     fecha: str  # YYYY-MM-DD
     hora_inicio_min: int = Field(..., ge=0, le=1440)  # minutos desde medianoche (510 = 8:30)
     hora_fin_min: int = Field(..., ge=0, le=1440)
+    # Contenido rico (F2). `id` presente = actualizar esa clase (preserva su
+    # portada); ausente = clase nueva. `portada_*` solo se honra en INSERT
+    # (caso "copiar clases de otra edición") — el cambio de portada de una
+    # clase existente va por sus endpoints dedicados.
+    id: int | None = None
+    titulo: str = ""
+    descripcion: str = ""
+    nota: str = ""
+    portada_media_id: int | None = None
+    portada_url: str = ""
 
 
 # Body usado en POST /admin/talleres y POST /admin/talleres/{id}/ediciones
@@ -532,7 +642,10 @@ class EdicionCreateBody(BaseModel):
     pago_cbu: str = ""
     pago_banco: str = ""
     direccion: str = ""
-    activo: bool = True
+    # F2 borradores: una edición NACE despublicada ("ir armándolo sin que esté
+    # en la web") — el Switch "Publicado" del admin es la puerta. Publicar
+    # re-verifica la disponibilidad del estudio.
+    activo: bool = False
     numero_edicion: int = 1
 
 
@@ -545,6 +658,10 @@ class TallerConceptoCreateBody(BaseModel):
     instructor_bio: str = ""
     instructor_proyectos: str = ""
     notif_email: str = ""
+    terminos: str = ""
+    beneficios: str = ""
+    pregunta_experiencia: str = ""
+    mensaje_confirmacion: str = ""
     # Primera edición (requerida al crear el concepto)
     edicion: EdicionCreateBody
 
@@ -560,6 +677,10 @@ class TallerConceptoUpdateBody(BaseModel):
     programa_teorica: list[str] | None = None
     programa_practica: list[str] | None = None
     notif_email: str | None = None
+    terminos: str | None = None
+    beneficios: str | None = None
+    pregunta_experiencia: str | None = None
+    mensaje_confirmacion: str | None = None
 
 
 class EdicionUpdateBody(BaseModel):
@@ -634,16 +755,23 @@ def admin_create_taller(body: TallerConceptoCreateBody, request: Request):
                 f"{slug_base}-{ed_numero}", ocupados_e
             )
 
-            estudio = _get_estudio_row(conn)
-            if estudio["equipo_id"]:
-                conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (_ADVISORY_NS_ESTUDIO, 1))
-                verificar_sesiones_disponibles(conn, estudio, clases)
+            # F2 borradores: un borrador no bloquea el estudio (fix e.activo de
+            # F1), así que solo se verifica disponibilidad si nace PUBLICADA.
+            # El chequeo de un borrador corre al publicarlo (PATCH activo=true).
+            if ed.activo:
+                estudio = _get_estudio_row(conn)
+                if estudio["equipo_id"]:
+                    conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (_ADVISORY_NS_ESTUDIO, 1))
+                    verificar_sesiones_disponibles(conn, estudio, clases)
 
             fechas = [c["fecha"] for c in clases]
             fecha_inicio = min(fechas)
             fecha_fin = max(fechas)
 
-            # Crear concepto en talleres
+            # Crear concepto en talleres. OJO: `activo` del CONCEPTO queda TRUE
+            # (kill-switch general, no la puerta de publicación) — la puerta es
+            # el `activo` de la EDICIÓN: sin edición activa no aparece nada
+            # público, así el concepto se arma en borrador igual.
             cur = conn.execute(
                 """
                 INSERT INTO talleres (
@@ -655,12 +783,14 @@ def admin_create_taller(body: TallerConceptoCreateBody, request: Request):
                     cupos_total, precio_total, precio_sena,
                     pago_alias, pago_cbu, pago_banco,
                     direccion, notif_email, activo,
-                    tipo_taller, numero_edicion, slug_base
+                    tipo_taller, numero_edicion, slug_base,
+                    terminos, beneficios, pregunta_experiencia, mensaje_confirmacion
                 ) VALUES (
                     %s, %s, %s, %s, %s, %s, %s, %s,
                     %s::jsonb, %s::jsonb,
                     %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s
+                    %s, %s, TRUE, %s, %s, %s,
+                    %s, %s, %s, %s
                 ) RETURNING id
                 """,
                 (
@@ -672,8 +802,10 @@ def admin_create_taller(body: TallerConceptoCreateBody, request: Request):
                     fecha_inicio, fecha_fin, ed.horario.strip(),
                     ed.cupos_total, ed.precio_total, ed.precio_sena,
                     ed.pago_alias.strip(), ed.pago_cbu.strip(), ed.pago_banco.strip(),
-                    ed.direccion.strip(), body.notif_email.strip(), ed.activo,
+                    ed.direccion.strip(), body.notif_email.strip(),
                     ed.tipo_taller, ed_numero, slug_base,
+                    body.terminos.strip(), body.beneficios.strip(),
+                    body.pregunta_experiencia.strip(), body.mensaje_confirmacion.strip(),
                 ),
             )
             taller_id = cur.fetchone()["id"]
@@ -704,13 +836,18 @@ def admin_create_taller(body: TallerConceptoCreateBody, request: Request):
 
             t_row = conn.execute("SELECT * FROM talleres WHERE id = %s", (taller_id,)).fetchone()
             e_row = conn.execute("SELECT * FROM ediciones_taller WHERE id = %s", (edicion_id,)).fetchone()
+            # Re-leer de la DB: las clases recién insertadas tienen id (el admin
+            # lo necesita para subir portadas / upsert sin refetch). DEBE ir
+            # DENTRO del `with` — usar `conn` después de que el context manager
+            # lo devuelve al pool deja una transacción implícita abierta que
+            # bloquea el próximo `ALTER TABLE`/lock de otra sesión (candado:
+            # test_talleres_f2_db.py, se colgaba justo por esto).
+            clases_out = _get_clases(conn, e_row["id"])
         except Exception:
             conn.rollback()
             raise
 
-    return _concepto_to_admin_dict(t_row, [
-        _edicion_to_admin_dict(e_row, [_clase_dict(c) for c in clases])
-    ])
+    return _concepto_to_admin_dict(t_row, [_edicion_to_admin_dict(e_row, clases_out)])
 
 
 @router.post("/admin/talleres/{taller_id}/ediciones", status_code=201)
@@ -753,10 +890,13 @@ def admin_create_edicion(taller_id: int, body: EdicionCreateBody, request: Reque
                 ocupados,
             )
 
-            estudio = _get_estudio_row(conn)
-            if estudio["equipo_id"]:
-                conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (_ADVISORY_NS_ESTUDIO, 1))
-                verificar_sesiones_disponibles(conn, estudio, clases)
+            # F2 borradores: solo verificar el estudio si nace PUBLICADA (el
+            # chequeo de un borrador corre al publicar).
+            if body.activo:
+                estudio = _get_estudio_row(conn)
+                if estudio["equipo_id"]:
+                    conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (_ADVISORY_NS_ESTUDIO, 1))
+                    verificar_sesiones_disponibles(conn, estudio, clases)
 
             fechas = [c["fecha"] for c in clases]
             fecha_inicio = min(fechas)
@@ -785,11 +925,15 @@ def admin_create_edicion(taller_id: int, body: EdicionCreateBody, request: Reque
             _insert_clases(conn, edicion_id, clases)
             conn.commit()
             e_row = conn.execute("SELECT * FROM ediciones_taller WHERE id = %s", (edicion_id,)).fetchone()
+            # Re-leer de la DB: las clases recién insertadas tienen id (el admin
+            # lo necesita para subir portadas / upsert sin refetch). DENTRO del
+            # `with` — ver comentario gemelo en admin_create_taller.
+            clases_out = _get_clases(conn, edicion_id)
         except Exception:
             conn.rollback()
             raise
 
-    return _edicion_to_admin_dict(e_row, [_clase_dict(c) for c in clases])
+    return _edicion_to_admin_dict(e_row, clases_out)
 
 
 @router.patch("/admin/talleres/{taller_id}")
@@ -820,6 +964,14 @@ def admin_update_concepto(taller_id: int, body: TallerConceptoUpdateBody, reques
         params.append(_json.dumps(body.programa_practica, ensure_ascii=False))
     if body.notif_email is not None:
         sets.append("notif_email = %s"); params.append(body.notif_email.strip())
+    if body.terminos is not None:
+        sets.append("terminos = %s"); params.append(body.terminos.strip())
+    if body.beneficios is not None:
+        sets.append("beneficios = %s"); params.append(body.beneficios.strip())
+    if body.pregunta_experiencia is not None:
+        sets.append("pregunta_experiencia = %s"); params.append(body.pregunta_experiencia.strip())
+    if body.mensaje_confirmacion is not None:
+        sets.append("mensaje_confirmacion = %s"); params.append(body.mensaje_confirmacion.strip())
 
     if not sets:
         raise HTTPException(400, "No hay campos para actualizar")
@@ -889,8 +1041,8 @@ def admin_update_edicion(edicion_id: int, body: EdicionUpdateBody, request: Requ
     with get_db() as conn:
         try:
             existing = conn.execute(
-                "SELECT cupos_total, cupos_confirmados FROM ediciones_taller "
-                "WHERE id = %s FOR UPDATE",
+                "SELECT taller_id, cupos_total, cupos_confirmados, activo "
+                "FROM ediciones_taller WHERE id = %s FOR UPDATE",
                 (edicion_id,),
             ).fetchone()
             if existing is None:
@@ -903,22 +1055,39 @@ def admin_update_edicion(edicion_id: int, body: EdicionUpdateBody, request: Requ
                     f"No se puede bajar cupos a {new_cupos}: hay {existing['cupos_confirmados']} confirmados",
                 )
 
-            if new_clases is not None:
+            # F2 borradores: el estudio se verifica cuando el estado RESULTANTE
+            # es publicado — al editar clases de una edición activa, o al
+            # PUBLICAR (activo false→true; un borrador no bloqueó su franja, así
+            # que puede haber aparecido una reserva → 409 claro acá, no choque
+            # silencioso). Editar un borrador no chequea nada.
+            resultara_activa = body.activo if body.activo is not None else existing["activo"]
+            publicando = bool(body.activo) and not existing["activo"]
+            clases_a_verificar = new_clases
+            if publicando and clases_a_verificar is None:
+                from datetime import date as _dt_date
+                clases_a_verificar = [
+                    {"fecha": _dt_date.fromisoformat(c["fecha"]),
+                     "hora_inicio_min": c["hora_inicio_min"],
+                     "hora_fin_min": c["hora_fin_min"]}
+                    for c in _get_clases(conn, edicion_id)
+                ]
+            if resultara_activa and clases_a_verificar and (new_clases is not None or publicando):
                 estudio = _get_estudio_row(conn)
                 if estudio["equipo_id"]:
                     conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (_ADVISORY_NS_ESTUDIO, 1))
-                    # Excluir esta edición del chequeo de disponibilidad del estudio
+                    # Excluir este taller del chequeo (sus propias clases activas)
                     verificar_sesiones_disponibles(
-                        conn, estudio, new_clases,
-                        exclude_taller_id=conn.execute(
-                            "SELECT taller_id FROM ediciones_taller WHERE id = %s", (edicion_id,)
-                        ).fetchone()["taller_id"],
+                        conn, estudio, clases_a_verificar,
+                        exclude_taller_id=existing["taller_id"],
                     )
-                conn.execute("DELETE FROM clases_taller WHERE edicion_id = %s", (edicion_id,))
+
+            if new_clases is not None:
                 fechas = [c["fecha"] for c in new_clases]
                 sets.append("fecha_inicio = %s"); params.append(min(fechas))
                 sets.append("fecha_fin = %s"); params.append(max(fechas))
-                _insert_clases(conn, edicion_id, new_clases)
+                # Upsert (F2): preserva la portada de las clases existentes —
+                # el delete+insert ciego de antes la perdía en cada edición.
+                _upsert_clases(conn, edicion_id, new_clases)
 
             if sets:
                 sets.append("updated_at = NOW()")
@@ -932,10 +1101,12 @@ def admin_update_edicion(edicion_id: int, body: EdicionUpdateBody, request: Requ
             e_row = conn.execute(
                 "SELECT * FROM ediciones_taller WHERE id = %s", (edicion_id,)
             ).fetchone()
+            # DENTRO del `with` — ver comentario gemelo en admin_create_taller.
+            clases_out = _get_clases(conn, edicion_id)
         except Exception:
             conn.rollback()
             raise
-    return _edicion_to_admin_dict(e_row, _get_clases(conn, edicion_id))
+    return _edicion_to_admin_dict(e_row, clases_out)
 
 
 @router.delete("/admin/talleres/{taller_id}", status_code=200)
@@ -1042,6 +1213,76 @@ async def admin_upload_foto_instructor(taller_id: int, request: Request):
         raise HTTPException(502, "No se pudo subir la foto. Intentá de nuevo.")
 
     return {"ok": True, "url": url, "media_id": asset.id}
+
+
+# ── Portada por clase (F2) ────────────────────────────────────────────────────
+# La portada es la imagen de marketing de una clase (se ve en la card colapsable
+# de la landing). Solo clases YA GUARDADAS (necesitan id); el upsert de clases
+# NO la toca — cambia únicamente por estos dos endpoints.
+
+_PORTADA_SPECS = [
+    DeriveSpec(name="display", square=False, max_width=1200),
+    DeriveSpec(name="display-sm", square=False, max_width=480),
+]
+
+
+@router.post("/admin/clases/{clase_id}/portada")
+@limiter.limit("20/minute")
+async def admin_upload_portada_clase(clase_id: int, request: Request):
+    """Sube la portada de una clase a R2 vía el motor de media."""
+    require_admin(request)
+    with get_db() as conn:
+        row = conn.execute("SELECT id FROM clases_taller WHERE id = %s", (clase_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "Clase no encontrada")
+
+    form = await request.form()
+    file = form.get("file")
+    if file is None or not hasattr(file, "read"):
+        raise HTTPException(400, "Falta el campo 'file' en el form-data")
+
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "Archivo vacío")
+    if len(raw) > FOTO_MAX_MB * 1024 * 1024:
+        raise HTTPException(413, f"Archivo muy grande (máx {FOTO_MAX_MB} MB)")
+
+    try:
+        with get_db() as conn:
+            asset = store_upload(raw, kind="taller", derive_specs=_PORTADA_SPECS, conn=conn)
+            display = asset.variant("display") or (asset.variants[0] if asset.variants else None)
+            url = display.url if display else ""
+            conn.execute(
+                "UPDATE clases_taller SET portada_media_id = %s, portada_url = %s WHERE id = %s",
+                (asset.id, url, clase_id),
+            )
+            conn.commit()
+    except MediaError as e:
+        raise HTTPException(e.status, e.detail)
+    except Exception as e:
+        logger.error("upload_portada_clase: error inesperado: %s", e, exc_info=True)
+        raise HTTPException(502, "No se pudo subir la portada. Intentá de nuevo.")
+
+    return {"ok": True, "url": url, "media_id": asset.id}
+
+
+@router.delete("/admin/clases/{clase_id}/portada")
+@limiter.limit("30/minute")
+def admin_delete_portada_clase(clase_id: int, request: Request):
+    """Quita la portada de una clase (el asset queda en media_assets; el
+    SET NULL del FK lo desengancha — no se purga R2 acá, mismo criterio que
+    la foto de instructor)."""
+    require_admin(request)
+    with get_db() as conn:
+        row = conn.execute("SELECT id FROM clases_taller WHERE id = %s", (clase_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "Clase no encontrada")
+        conn.execute(
+            "UPDATE clases_taller SET portada_media_id = NULL, portada_url = '' WHERE id = %s",
+            (clase_id,),
+        )
+        conn.commit()
+    return {"ok": True}
 
 
 # ── Inscripciones (admin) ─────────────────────────────────────────────────────

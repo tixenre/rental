@@ -88,6 +88,10 @@ export function ContenidoSection({ concepto }: { concepto: TallerConcepto }) {
     programa_teorica: (concepto.programa_teorica ?? []).join("\n"),
     programa_practica: (concepto.programa_practica ?? []).join("\n"),
     notif_email: concepto.notif_email ?? "",
+    terminos: concepto.terminos ?? "",
+    beneficios: concepto.beneficios ?? "",
+    pregunta_experiencia: concepto.pregunta_experiencia ?? "",
+    mensaje_confirmacion: concepto.mensaje_confirmacion ?? "",
   });
 
   useEffect(() => {
@@ -102,6 +106,10 @@ export function ContenidoSection({ concepto }: { concepto: TallerConcepto }) {
       programa_teorica: (concepto.programa_teorica ?? []).join("\n"),
       programa_practica: (concepto.programa_practica ?? []).join("\n"),
       notif_email: concepto.notif_email ?? "",
+      terminos: concepto.terminos ?? "",
+      beneficios: concepto.beneficios ?? "",
+      pregunta_experiencia: concepto.pregunta_experiencia ?? "",
+      mensaje_confirmacion: concepto.mensaje_confirmacion ?? "",
     });
   }, [concepto.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -132,6 +140,10 @@ export function ContenidoSection({ concepto }: { concepto: TallerConcepto }) {
         .map((s) => s.trim())
         .filter(Boolean),
       notif_email: form.notif_email,
+      terminos: form.terminos,
+      beneficios: form.beneficios,
+      pregunta_experiencia: form.pregunta_experiencia,
+      mensaje_confirmacion: form.mensaje_confirmacion,
     });
   }
 
@@ -184,6 +196,21 @@ export function ContenidoSection({ concepto }: { concepto: TallerConcepto }) {
       {field("Email del instructor/a", "notif_email", {
         type: "email",
         hint: "Recibe las notificaciones de inscripción.",
+      })}
+      {field("Beneficios", "beneficios", {
+        rows: 2,
+        hint: "Ej: 15% off en alquiler de equipos y estudio para alumnos.",
+      })}
+      {field("Términos y condiciones del taller", "terminos", {
+        rows: 5,
+        hint: "Vacío → el form linkea a los términos generales de la web.",
+      })}
+      {field("Pregunta del formulario", "pregunta_experiencia", {
+        hint: "Vacío → '¿Tenés algún tipo de experiencia en arte?' (default).",
+      })}
+      {field("Mensaje de confirmación", "mensaje_confirmacion", {
+        rows: 2,
+        hint: "Se muestra al inscribirse (ej: link al grupo, qué llevar).",
       })}
       <div className="flex justify-end pt-2">
         <Button onClick={handleSave} disabled={mut.isPending} className="gap-2">

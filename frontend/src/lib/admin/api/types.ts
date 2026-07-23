@@ -1358,13 +1358,21 @@ export type DescuentoJornada = { id: number; jornadas: number; pct: number };
 // ── Talleres ──────────────────────────────────────────────────────────────────
 
 // Horas en MINUTOS desde medianoche (510 = 8:30). Los `_str` vienen resueltos
-// del backend en las lecturas; al ESCRIBIR solo viajan los `_min`.
+// del backend en las lecturas; al ESCRIBIR solo viajan los `_min` + contenido.
+// F2 (clase rica): `id` presente al escribir = actualizar esa clase (preserva
+// su portada); ausente = clase nueva. La portada solo cambia por sus endpoints.
 export type ClaseBody = {
+  id?: number | null;
   fecha: string;
   hora_inicio_min: number;
   hora_fin_min: number;
   hora_inicio_str?: string;
   hora_fin_str?: string;
+  titulo?: string;
+  descripcion?: string;
+  nota?: string;
+  portada_media_id?: number | null;
+  portada_url?: string;
 };
 
 export type EdicionAdmin = {
@@ -1405,6 +1413,12 @@ export type TallerConcepto = {
   instructor_foto_url: string;
   instructor_media_id: number | null;
   notif_email: string;
+  // F2: T&C propios ('' → /terminos general), beneficios, pregunta del form
+  // configurable y mensaje post-inscripción.
+  terminos: string;
+  beneficios: string;
+  pregunta_experiencia: string;
+  mensaje_confirmacion: string;
   ediciones: EdicionAdmin[];
 };
 

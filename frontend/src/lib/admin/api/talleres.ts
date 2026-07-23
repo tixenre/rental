@@ -50,6 +50,19 @@ export const talleresAdminApi = {
   deleteEdicion: (edicionId: number) =>
     authedJson<{ ok: boolean }>(`/api/admin/ediciones/${edicionId}`, { method: "DELETE" }),
 
+  // F2: portada de una clase (solo clases guardadas — necesitan id).
+  uploadPortadaClase: (claseId: number, file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return authedFetch(`/api/admin/clases/${claseId}/portada`, {
+      method: "POST",
+      body: fd,
+    }).then((r) => _ok<{ ok: boolean; url: string; media_id: number }>(r));
+  },
+
+  deletePortadaClase: (claseId: number) =>
+    authedJson<{ ok: boolean }>(`/api/admin/clases/${claseId}/portada`, { method: "DELETE" }),
+
   listInscripciones: (edicionId: number) =>
     authedJson<Inscripcion[]>(`/api/admin/ediciones/${edicionId}/inscripciones`),
 

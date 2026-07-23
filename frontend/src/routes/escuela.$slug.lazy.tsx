@@ -249,6 +249,13 @@ function TallerLandingPage() {
         topBar={{ variant: "escuela", cta: { label: "Inscribirme", href: "#inscripcion" } }}
       >
         <div className="min-h-dvh bg-background">
+          {/* F2: preview admin de una edición en borrador — el público recibe
+              404; este banner solo puede aparecer con sesión admin. */}
+          {taller.borrador && (
+            <div className="bg-amber text-ink text-center text-sm font-semibold px-4 py-2">
+              Borrador — solo visible para vos. Publicalo desde el admin cuando esté listo.
+            </div>
+          )}
           {/* ── Hero ───────────────────────────────────────────────────────── */}
           <section className="relative bg-ink overflow-hidden">
             <Grain opacity={10} />

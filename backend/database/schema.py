@@ -1912,6 +1912,14 @@ def _init_db_schema(conn):
     conn.execute("ALTER TABLE taller_inscripciones ADD COLUMN IF NOT EXISTS comprobante_key TEXT")
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS instructor_media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL")
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS tipo_taller TEXT NOT NULL DEFAULT 'intensivo'")
+    # Escuela v2 F2: T&C propios del taller ('' → linkea /terminos general),
+    # beneficios ("15% off en rental..."), pregunta del form configurable
+    # ('' → default actual) y mensaje de confirmación post-inscripción.
+    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS terminos TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS beneficios TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS pregunta_experiencia TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS mensaje_confirmacion TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE taller_inscripciones ADD COLUMN IF NOT EXISTS tyc_aceptado_at TIMESTAMPTZ")
     import json as _json_t
     _programa_teorica = _json_t.dumps([
         "Qué es la dirección de arte y cuál es su función dentro de un proyecto",
@@ -2103,6 +2111,8 @@ def _init_db_schema(conn):
     # El sufijo _min es deliberado: un lector legacy que espere horas enteras
     # falla ruidoso en SQL en vez de comparar horas contra minutos en silencio.
     # (Migración esc1m2i3n4t5 convirtió los datos existentes ×60.)
+    # Escuela v2 F2: la clase es RICA — titulo/descripcion/nota/portada son el
+    # contenido de marketing que muestra la landing (colapsables por clase).
     conn.execute("""
         CREATE TABLE IF NOT EXISTS clases_taller (
             id              SERIAL PRIMARY KEY,
@@ -2110,6 +2120,11 @@ def _init_db_schema(conn):
             fecha           DATE    NOT NULL,
             hora_inicio_min INTEGER NOT NULL,
             hora_fin_min    INTEGER NOT NULL,
+            titulo          TEXT NOT NULL DEFAULT '',
+            descripcion     TEXT NOT NULL DEFAULT '',
+            nota            TEXT NOT NULL DEFAULT '',
+            portada_media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL,
+            portada_url     TEXT NOT NULL DEFAULT '',
             created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -2117,6 +2132,11 @@ def _init_db_schema(conn):
         "CREATE INDEX IF NOT EXISTS idx_clases_taller_edicion "
         "ON clases_taller(edicion_id)"
     )
+    conn.execute("ALTER TABLE clases_taller ADD COLUMN IF NOT EXISTS titulo TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE clases_taller ADD COLUMN IF NOT EXISTS descripcion TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE clases_taller ADD COLUMN IF NOT EXISTS nota TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE clases_taller ADD COLUMN IF NOT EXISTS portada_media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL")
+    conn.execute("ALTER TABLE clases_taller ADD COLUMN IF NOT EXISTS portada_url TEXT NOT NULL DEFAULT ''")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS interesados_taller (

@@ -129,10 +129,29 @@ def _get_instructor_media(conn, entity_id: int) -> list[dict]:
     return [_build_asset(conn, adapted)]
 
 
+def _get_taller_clase_media(conn, entity_id: int) -> list[dict]:
+    """Portada de una clase de taller (F2). entity_id = clase_id.
+    Misma adaptación single-asset que `instructor` (el 'id' devuelto es el
+    clase_id; el front no opera sobre ese campo)."""
+    row = conn.execute(
+        "SELECT id, portada_url, portada_media_id FROM clases_taller WHERE id = %s",
+        (entity_id,),
+    ).fetchone()
+    if not row:
+        return []
+    media_id = row["portada_media_id"]
+    url = row["portada_url"] or ""
+    if not media_id and not url:
+        return []
+    adapted = {"id": row["id"], "media_id": media_id, "orden": 0, "es_principal": True, "url": url}
+    return [_build_asset(conn, adapted)]
+
+
 _KIND_HANDLERS = {
     "equipo": _get_equipo_media,
     "estudio": _get_estudio_media,
     "instructor": _get_instructor_media,
+    "taller-clase": _get_taller_clase_media,
 }
 
 
