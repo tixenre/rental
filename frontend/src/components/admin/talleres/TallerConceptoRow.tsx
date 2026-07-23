@@ -6,8 +6,10 @@ import type { TallerConcepto } from "@/lib/admin/api/types";
 import { Button } from "@/design-system/ui/button";
 import { ContenidoSection, FotoSection } from "./ConceptoTabs";
 import { EdicionSubRow } from "./EdicionSubRow";
+import { FaqSection } from "./FaqSection";
 import { InstructoresSection } from "./InstructoresSection";
 import { InteresadosSection } from "./InteresadosSection";
+import { TrabajosSection } from "./TrabajosSection";
 
 export function TallerConceptoRow({
   concepto,
@@ -22,7 +24,7 @@ export function TallerConceptoRow({
 }) {
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<
-    "ediciones" | "taller" | "instructores" | "interesados"
+    "ediciones" | "taller" | "instructores" | "interesados" | "trabajos" | "faq"
   >("ediciones");
 
   const totalConfirmados = concepto.ediciones.reduce((s, e) => s + e.cupos_confirmados, 0);
@@ -89,8 +91,10 @@ export function TallerConceptoRow({
                 { id: "taller", label: "El taller" },
                 { id: "instructores", label: "Instructores" },
                 { id: "interesados", label: "Interesados" },
+                { id: "trabajos", label: "Trabajos" },
+                { id: "faq", label: "FAQ" },
               ] as {
-                id: "ediciones" | "taller" | "instructores" | "interesados";
+                id: "ediciones" | "taller" | "instructores" | "interesados" | "trabajos" | "faq";
                 label: string;
               }[]
             ).map((tab) => (
@@ -147,6 +151,8 @@ export function TallerConceptoRow({
 
             {activeTab === "instructores" && <InstructoresSection concepto={concepto} />}
             {activeTab === "interesados" && <InteresadosSection concepto={concepto} />}
+            {activeTab === "trabajos" && <TrabajosSection concepto={concepto} />}
+            {activeTab === "faq" && <FaqSection concepto={concepto} />}
           </div>
         </div>
       )}

@@ -92,7 +92,7 @@ _EDICION_JOIN_SELECT = """
            t.publico_objetivo, t.programa_teorica, t.programa_practica,
            t.instructor_foto_url, t.instructor_media_id, t.notif_email,
            t.slug_base, t.terminos, t.beneficios, t.pregunta_experiencia,
-           t.mensaje_confirmacion, t.video_url, t.video_poster_url
+           t.mensaje_confirmacion, t.video_url, t.video_poster_url, t.faqs
     FROM ediciones_taller e
     JOIN talleres t ON t.id = e.taller_id
 """
@@ -163,6 +163,26 @@ def _get_instructores_taller(conn, taller_id: int) -> list[dict]:
         (taller_id,),
     ).fetchall()
     return [_instructor_dict(r) for r in rows]
+
+
+def _trabajo_dict(row) -> dict:
+    return {
+        "id": row["id"],
+        "titulo": row["titulo"],
+        "youtube_url": row["youtube_url"],
+        "poster_url": row["poster_url"] or "",
+        "poster_media_id": row["poster_media_id"],
+    }
+
+
+def _get_trabajos_taller(conn, taller_id: int) -> list[dict]:
+    """Trabajos pasados (F4c) — solo links de YouTube, sin testimonios/
+    reseñas (decisión del dueño). Prueba social de una escuela de cine."""
+    rows = conn.execute(
+        "SELECT * FROM taller_trabajos WHERE taller_id = %s ORDER BY orden, id",
+        (taller_id,),
+    ).fetchall()
+    return [_trabajo_dict(r) for r in rows]
 
 
 def _get_clases(conn, edicion_id: int) -> list:
@@ -293,6 +313,11 @@ def _edicion_to_public_dict(row, clases=None, instructores=None, modalidades=Non
         # sintético — ver _modalidades_publicas).
         "video": _video_dict(row),
         "modalidades": _modalidades_publicas(modalidades, row["precio_total"]),
+        # F4c: FAQ del concepto + cierre de inscripciones de ESTA edición.
+        "faqs": _row_get(row, "faqs", []) or [],
+        "fecha_cierre_inscripcion": (
+            str(row["fecha_cierre_inscripcion"]) if _row_get(row, "fecha_cierre_inscripcion") else None
+        ),
     }
 
 
@@ -322,10 +347,15 @@ def _edicion_to_admin_dict(edicion_row, clases=None, modalidades=None) -> dict:
         # F4a: modalidades RAW (sin fallback sintético — el admin ve el
         # estado real: lista vacía = "no configuradas todavía").
         "modalidades": modalidades if modalidades is not None else [],
+        # F4c: NULL = sin cierre (default, siempre abierto).
+        "fecha_cierre_inscripcion": (
+            str(edicion_row["fecha_cierre_inscripcion"])
+            if _row_get(edicion_row, "fecha_cierre_inscripcion") else None
+        ),
     }
 
 
-def _concepto_to_admin_dict(taller_row, ediciones=None, instructores=None) -> dict:
+def _concepto_to_admin_dict(taller_row, ediciones=None, instructores=None, trabajos=None) -> dict:
     """Convierte una fila de talleres (concepto) al shape admin con ediciones anidadas."""
     return {
         "id": taller_row["id"],
@@ -350,6 +380,9 @@ def _concepto_to_admin_dict(taller_row, ediciones=None, instructores=None) -> di
         "video_poster_url": _row_get(taller_row, "video_poster_url", ""),
         "instructores": instructores if instructores is not None else [],
         "ediciones": ediciones if ediciones is not None else [],
+        # F4c: FAQ del concepto + trabajos pasados (solo YouTube, sin testimonios).
+        "faqs": _row_get(taller_row, "faqs", []) or [],
+        "trabajos": trabajos if trabajos is not None else [],
     }
 
 
@@ -666,6 +699,11 @@ def crear_inscripcion(slug: str, body: InscripcionBody, request: Request):
             edicion_row = _get_edicion_row(conn, slug)
             edicion_id = edicion_row["id"]
             taller_id = edicion_row["taller_id"]
+
+            # F4c: cierre de inscripciones por fecha (NULL = siempre abierto).
+            cierre = edicion_row["fecha_cierre_inscripcion"]
+            if cierre and now_ar().date() > cierre:
+                raise HTTPException(400, "Las inscripciones a este taller ya cerraron.")
 
             # FOR UPDATE serializa el conteo de cupos de esta edición
             locked = conn.execute(
@@ -1036,6 +1074,11 @@ class TallerInstructoresBody(BaseModel):
     instructor_ids: list[int]
 
 
+class FaqItemBody(BaseModel):
+    pregunta: str
+    respuesta: str = ""
+
+
 class TallerConceptoUpdateBody(BaseModel):
     nombre: str | None = None
     subtitulo: str | None = None
@@ -1053,6 +1096,8 @@ class TallerConceptoUpdateBody(BaseModel):
     mensaje_confirmacion: str | None = None
     # F4a: video hero (YouTube). '' → borra el video (y su poster).
     video_url: str | None = None
+    # F4c: FAQ del concepto — [{pregunta, respuesta}]. Ninguna es obligatoria.
+    faqs: list[FaqItemBody] | None = None
 
 
 class EdicionUpdateBody(BaseModel):
@@ -1068,6 +1113,8 @@ class EdicionUpdateBody(BaseModel):
     activo: bool | None = None
     clases: list[ClaseBody] | None = None
     modalidades: list[ModalidadPagoBody] | None = None
+    # F4c: cierre de inscripciones. '' → borra el cierre (siempre abierto).
+    fecha_cierre_inscripcion: str | None = None
 
 
 @router.get("/admin/talleres")
@@ -1096,7 +1143,10 @@ def admin_list_talleres(request: Request):
                 for e in edicion_rows
             ]
             result.append(
-                _concepto_to_admin_dict(t, ediciones, _get_instructores_taller(conn, t["id"]))
+                _concepto_to_admin_dict(
+                    t, ediciones, _get_instructores_taller(conn, t["id"]),
+                    _get_trabajos_taller(conn, t["id"]),
+                )
             )
     return result
 
@@ -1347,6 +1397,12 @@ def admin_update_concepto(taller_id: int, body: TallerConceptoUpdateBody, reques
         sets.append("pregunta_experiencia = %s"); params.append(body.pregunta_experiencia.strip())
     if body.mensaje_confirmacion is not None:
         sets.append("mensaje_confirmacion = %s"); params.append(body.mensaje_confirmacion.strip())
+    if body.faqs is not None:
+        faqs_limpio = [
+            {"pregunta": f.pregunta.strip(), "respuesta": f.respuesta.strip()}
+            for f in body.faqs if f.pregunta.strip()
+        ]
+        sets.append("faqs = %s::jsonb"); params.append(_json.dumps(faqs_limpio, ensure_ascii=False))
 
     video_url_provisto = body.video_url is not None
 
@@ -1395,10 +1451,11 @@ def admin_update_concepto(taller_id: int, body: TallerConceptoUpdateBody, reques
                 for e in edicion_rows
             ]
             instructores_out = _get_instructores_taller(conn, taller_id)
+            trabajos_out = _get_trabajos_taller(conn, taller_id)
         except Exception:
             conn.rollback()
             raise
-    return _concepto_to_admin_dict(t_row, ediciones, instructores_out)
+    return _concepto_to_admin_dict(t_row, ediciones, instructores_out, trabajos_out)
 
 
 @router.patch("/admin/ediciones/{edicion_id}")
@@ -1431,6 +1488,17 @@ def admin_update_edicion(edicion_id: int, body: EdicionUpdateBody, request: Requ
         sets.append("direccion = %s"); params.append(body.direccion.strip())
     if body.activo is not None:
         sets.append("activo = %s"); params.append(body.activo)
+    if body.fecha_cierre_inscripcion is not None:
+        if body.fecha_cierre_inscripcion == "":
+            sets.append("fecha_cierre_inscripcion = NULL")
+        else:
+            from datetime import date as _dt_date
+            try:
+                _dt_date.fromisoformat(body.fecha_cierre_inscripcion)
+            except ValueError:
+                raise HTTPException(400, f"Fecha inválida: {body.fecha_cierre_inscripcion}")
+            sets.append("fecha_cierre_inscripcion = %s")
+            params.append(body.fecha_cierre_inscripcion)
 
     new_clases = None
     if body.clases is not None:
@@ -1796,6 +1864,114 @@ def admin_set_taller_instructores(taller_id: int, body: TallerInstructoresBody, 
     return {"instructores": instructores_out}
 
 
+# ── Trabajos pasados (F4c) ─────────────────────────────────────────────────────
+# Solo links de YouTube (sin testimonios/reseñas, decisión del dueño). Mismo
+# patrón de poster que el video hero del concepto (F4a): se descarga y guarda
+# en R2, no se depende de img.youtube.com en cada visita.
+
+class TrabajoBody(BaseModel):
+    titulo: str = ""
+    youtube_url: str
+
+
+class TrabajoUpdateBody(BaseModel):
+    titulo: str | None = None
+    youtube_url: str | None = None
+    orden: int | None = None
+
+
+def _procesar_youtube_poster(youtube_url: str, conn) -> tuple[int, str]:
+    """Valida la URL de YouTube y descarga+guarda el poster. 400 si la URL no
+    es de YouTube. Devuelve (media_id, poster_url)."""
+    vid = extract_video_id(youtube_url)
+    if vid is None:
+        raise HTTPException(400, "URL de YouTube inválida")
+    try:
+        asset = store_youtube_poster(vid, kind="taller", conn=conn)
+    except MediaError as e:
+        raise HTTPException(e.status, e.detail)
+    display = asset.variant("display") or (asset.variants[0] if asset.variants else None)
+    return asset.id, (display.url if display else "")
+
+
+@router.post("/admin/talleres/{taller_id}/trabajos", status_code=201)
+def admin_crear_trabajo(taller_id: int, body: TrabajoBody, request: Request):
+    """Agrega un trabajo pasado (link de YouTube) al taller."""
+    require_admin(request)
+    with get_db() as conn:
+        try:
+            existing = conn.execute("SELECT id FROM talleres WHERE id = %s", (taller_id,)).fetchone()
+            if existing is None:
+                raise HTTPException(404, "Taller no encontrado")
+            media_id, poster_url = _procesar_youtube_poster(body.youtube_url, conn)
+            next_orden = conn.execute(
+                "SELECT COALESCE(MAX(orden), -1) + 1 AS next FROM taller_trabajos "
+                "WHERE taller_id = %s",
+                (taller_id,),
+            ).fetchone()["next"]
+            row = conn.execute(
+                "INSERT INTO taller_trabajos "
+                "(taller_id, titulo, youtube_url, poster_media_id, poster_url, orden) "
+                "VALUES (%s, %s, %s, %s, %s, %s) RETURNING *",
+                (taller_id, body.titulo.strip(), body.youtube_url.strip(), media_id, poster_url, next_orden),
+            ).fetchone()
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    return _trabajo_dict(row)
+
+
+@router.patch("/admin/trabajos/{trabajo_id}")
+def admin_editar_trabajo(trabajo_id: int, body: TrabajoUpdateBody, request: Request):
+    """Edita un trabajo. Cambiar `youtube_url` re-descarga el poster."""
+    require_admin(request)
+    sets = []
+    params: list = []
+    if body.titulo is not None:
+        sets.append("titulo = %s"); params.append(body.titulo.strip())
+    if body.orden is not None:
+        sets.append("orden = %s"); params.append(body.orden)
+
+    with get_db() as conn:
+        try:
+            existing = conn.execute(
+                "SELECT id FROM taller_trabajos WHERE id = %s", (trabajo_id,)
+            ).fetchone()
+            if existing is None:
+                raise HTTPException(404, "Trabajo no encontrado")
+            if body.youtube_url is not None:
+                media_id, poster_url = _procesar_youtube_poster(body.youtube_url, conn)
+                sets.append("youtube_url = %s"); params.append(body.youtube_url.strip())
+                sets.append("poster_media_id = %s"); params.append(media_id)
+                sets.append("poster_url = %s"); params.append(poster_url)
+            if not sets:
+                raise HTTPException(400, "No hay campos para actualizar")
+            params.append(trabajo_id)
+            row = conn.execute(
+                f"UPDATE taller_trabajos SET {', '.join(sets)} WHERE id = %s RETURNING *",
+                params,
+            ).fetchone()
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    return _trabajo_dict(row)
+
+
+@router.delete("/admin/trabajos/{trabajo_id}", status_code=200)
+def admin_eliminar_trabajo(trabajo_id: int, request: Request):
+    require_admin(request)
+    with get_db() as conn:
+        row = conn.execute(
+            "DELETE FROM taller_trabajos WHERE id = %s RETURNING id", (trabajo_id,)
+        ).fetchone()
+        if row is None:
+            raise HTTPException(404, "Trabajo no encontrado")
+        conn.commit()
+    return {"ok": True}
+
+
 # ── Portada por clase (F2) ────────────────────────────────────────────────────
 # La portada es la imagen de marketing de una clase (se ve en la card colapsable
 # de la landing). Solo clases YA GUARDADAS (necesitan id); el upsert de clases
@@ -1942,6 +2118,42 @@ def admin_list_inscripciones_edicion(edicion_id: int, request: Request):
         }
         for r in rows
     ]
+
+
+@router.get("/admin/ediciones/{edicion_id}/kpis")
+def admin_edicion_kpis(edicion_id: int, request: Request):
+    """Mini-KPIs de una edición: señas verificadas/pendientes/en espera + plata
+    señada esperada (comprobante subido, sin verificar) vs recibida (verificada).
+    `precio_sena` es un monto plano de la edición (no una regla de precio/combo/
+    descuento): la plata acá es cantidad × ese monto, resuelta en el backend —
+    el front solo la muestra (regla "el front no calcula plata", MEMORIA
+    2026-06-29)."""
+    require_admin(request)
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            SELECT e.precio_sena,
+                   COUNT(*) FILTER (WHERE ti.estado = 'confirmada') AS senas_verificadas,
+                   COUNT(*) FILTER (WHERE ti.estado = 'pendiente_sena') AS senas_pendientes,
+                   COUNT(*) FILTER (WHERE ti.estado = 'en_espera') AS en_espera,
+                   COUNT(*) FILTER (WHERE ti.estado = 'cupo_ofrecido') AS cupo_ofrecido
+            FROM ediciones_taller e
+            LEFT JOIN taller_inscripciones ti ON ti.edicion_id = e.id
+            WHERE e.id = %s
+            GROUP BY e.id
+            """,
+            (edicion_id,),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(404, "Edición no encontrada")
+    return {
+        "senas_verificadas": row["senas_verificadas"],
+        "senas_pendientes": row["senas_pendientes"],
+        "en_espera": row["en_espera"],
+        "cupo_ofrecido": row["cupo_ofrecido"],
+        "plata_recibida_str": _fmt_pesos(row["precio_sena"] * row["senas_verificadas"]),
+        "plata_esperada_str": _fmt_pesos(row["precio_sena"] * row["senas_pendientes"]),
+    }
 
 
 @router.get("/admin/talleres/{taller_id}/inscripciones/export-csv")

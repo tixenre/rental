@@ -2,10 +2,12 @@ import { authedFetch, authedJson, authedPostJson } from "@/lib/authedFetch";
 import type {
   ClaseBody,
   EdicionAdmin,
+  EdicionKpis,
   TallerConcepto,
   Inscripcion,
   Instructor,
   Interesado,
+  Trabajo,
 } from "./types";
 
 async function _ok<T>(r: Response): Promise<T> {
@@ -72,6 +74,10 @@ export const talleresAdminApi = {
 
   listInscripciones: (edicionId: number) =>
     authedJson<Inscripcion[]>(`/api/admin/ediciones/${edicionId}/inscripciones`),
+
+  // F4c: mini-KPIs de una edición (señas + plata, ya resuelta por el backend).
+  getEdicionKpis: (edicionId: number) =>
+    authedJson<EdicionKpis>(`/api/admin/ediciones/${edicionId}/kpis`),
 
   eliminarInscripcion: (conceptoId: number, inscripcionId: number) =>
     authedJson<{ ok: boolean }>(
@@ -157,4 +163,21 @@ export const talleresAdminApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ instructor_ids: instructorIds }),
     }),
+
+  // F4c: trabajos pasados (solo YouTube, sin testimonios).
+  crearTrabajo: (conceptoId: number, body: { titulo?: string; youtube_url: string }) =>
+    authedPostJson<Trabajo>(`/api/admin/talleres/${conceptoId}/trabajos`, body),
+
+  editarTrabajo: (
+    trabajoId: number,
+    body: { titulo?: string; youtube_url?: string; orden?: number },
+  ) =>
+    authedJson<Trabajo>(`/api/admin/trabajos/${trabajoId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+
+  eliminarTrabajo: (trabajoId: number) =>
+    authedJson<{ ok: boolean }>(`/api/admin/trabajos/${trabajoId}`, { method: "DELETE" }),
 };

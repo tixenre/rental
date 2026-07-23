@@ -383,6 +383,17 @@ jobs:
           export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
           export RESERVAS_DB_TEST=1
           python -m pytest tests/test_talleres_f4b_db.py -v --tb=short -m integration
+      - name: Escuela v2 — cierre de inscripciones + trabajos YouTube + FAQ contra Postgres real (F4c, #1278)
+        run: |
+          cd backend
+          # fecha_cierre_inscripcion rechaza inscripción pasada la fecha, CRUD
+          # de taller_trabajos (poster mockeado, sin red real), FAQ filtra
+          # preguntas vacías al guardar.
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_talleres_f4c_db.py -v --tb=short -m integration
 
   e2e-admin:
     name: E2E admin (Playwright + backend real)

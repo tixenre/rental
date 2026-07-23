@@ -1920,6 +1920,10 @@ def _init_db_schema(conn):
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS pregunta_experiencia TEXT NOT NULL DEFAULT ''")
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS mensaje_confirmacion TEXT NOT NULL DEFAULT ''")
     conn.execute("ALTER TABLE taller_inscripciones ADD COLUMN IF NOT EXISTS tyc_aceptado_at TIMESTAMPTZ")
+    # Escuela v2 F4c: FAQ editable del taller — [{pregunta, respuesta}]. El
+    # admin arma la lista de a una (hay preguntas sugeridas precargables en
+    # el front); ninguna es obligatoria.
+    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS faqs JSONB NOT NULL DEFAULT '[]'")
     import json as _json_t
     _programa_teorica = _json_t.dumps([
         "Qué es la dirección de arte y cuál es su función dentro de un proyecto",
@@ -2205,6 +2209,33 @@ def _init_db_schema(conn):
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_edicion_modalidades_pago_edicion "
         "ON edicion_modalidades_pago(edicion_id, orden)"
+    )
+
+    # Escuela v2 F4c: cierre de inscripciones por fecha. NULL = sin cierre
+    # (comportamiento actual, siempre abierto). Pasada la fecha, el público
+    # ve "inscripciones cerradas" y el POST de inscripción rechaza con 400.
+    conn.execute(
+        "ALTER TABLE ediciones_taller ADD COLUMN IF NOT EXISTS fecha_cierre_inscripcion DATE"
+    )
+
+    # Escuela v2 F4c: trabajos pasados del taller — SOLO links de YouTube (sin
+    # testimonios/reseñas, decisión del dueño), mismo patrón de poster que el
+    # video hero del concepto (F4a: se descarga y guarda en R2).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS taller_trabajos (
+            id                SERIAL PRIMARY KEY,
+            taller_id         INTEGER NOT NULL REFERENCES talleres(id) ON DELETE CASCADE,
+            titulo            TEXT NOT NULL DEFAULT '',
+            youtube_url       TEXT NOT NULL,
+            poster_media_id   BIGINT REFERENCES media_assets(id) ON DELETE SET NULL,
+            poster_url        TEXT NOT NULL DEFAULT '',
+            orden             INTEGER NOT NULL DEFAULT 0,
+            created_at        TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_taller_trabajos_taller "
+        "ON taller_trabajos(taller_id, orden)"
     )
 
     conn.execute("""
