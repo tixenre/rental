@@ -18,13 +18,14 @@ import json as _json
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 from auth.guards import require_admin
 from database import get_db, now_ar
 from rate_limit import limiter
 from dataio.slug import slugify, slug_unico
 from services.email import send_email
+from services.fechas import fmt_hhmm as _fmt_hhmm
 from services.email.service import get_admin_to
 from services.media.models import DeriveSpec
 from services.media.errors import MediaError
@@ -79,16 +80,25 @@ def _get_edicion_row(conn, slug: str):
     return row
 
 
+def _clase_dict(c) -> dict:
+    """Serialización única de una clase (row de DB o dict normalizado de
+    _validar_clases): minutos crudos + strings \"HH:MM\" resueltos acá."""
+    return {
+        "fecha": str(c["fecha"]),
+        "hora_inicio_min": c["hora_inicio_min"],
+        "hora_fin_min": c["hora_fin_min"],
+        "hora_inicio_str": _fmt_hhmm(c["hora_inicio_min"]),
+        "hora_fin_str": _fmt_hhmm(c["hora_fin_min"]),
+    }
+
+
 def _get_clases(conn, edicion_id: int) -> list:
     rows = conn.execute(
-        "SELECT fecha, hora_inicio, hora_fin FROM clases_taller "
-        "WHERE edicion_id = %s ORDER BY fecha, hora_inicio",
+        "SELECT fecha, hora_inicio_min, hora_fin_min FROM clases_taller "
+        "WHERE edicion_id = %s ORDER BY fecha, hora_inicio_min",
         (edicion_id,),
     ).fetchall()
-    return [
-        {"fecha": str(r["fecha"]), "hora_inicio": r["hora_inicio"], "hora_fin": r["hora_fin"]}
-        for r in rows
-    ]
+    return [_clase_dict(r) for r in rows]
 
 
 def _edicion_lite(row) -> dict:
@@ -197,7 +207,9 @@ def _concepto_to_admin_dict(taller_row, ediciones=None) -> dict:
 
 
 def _validar_clases(clases: list) -> list[dict]:
-    """Valida y normaliza una lista de clases. Devuelve lista de dicts. Lanza 400 si hay errores."""
+    """Valida y normaliza una lista de clases (horas en MINUTOS desde medianoche,
+    múltiplo de 15 — la UI ofrece pasos de 30, 15 da margen sin granularidad
+    arbitraria). Devuelve lista de dicts. Lanza 400 si hay errores."""
     if not clases:
         raise HTTPException(400, "Debe tener al menos una clase")
     from datetime import date as _dt_date
@@ -205,28 +217,36 @@ def _validar_clases(clases: list) -> list[dict]:
     seen = set()
     for s in clases:
         fecha_str = s.fecha if hasattr(s, "fecha") else s["fecha"]
-        h_ini = s.hora_inicio if hasattr(s, "hora_inicio") else s["hora_inicio"]
-        h_fin = s.hora_fin if hasattr(s, "hora_fin") else s["hora_fin"]
+        h_ini = s.hora_inicio_min if hasattr(s, "hora_inicio_min") else s["hora_inicio_min"]
+        h_fin = s.hora_fin_min if hasattr(s, "hora_fin_min") else s["hora_fin_min"]
         try:
             fecha = _dt_date.fromisoformat(fecha_str)
         except (ValueError, TypeError):
             raise HTTPException(400, f"Fecha inválida: {fecha_str}")
-        if not (0 <= h_ini < h_fin <= 24):
-            raise HTTPException(400, f"Horas inválidas en {fecha_str}: {h_ini}-{h_fin}")
+        if not (0 <= h_ini < h_fin <= 1440):
+            raise HTTPException(
+                400, f"Horario inválido en {fecha_str}: {_fmt_hhmm(h_ini)}-{_fmt_hhmm(h_fin)}"
+            )
+        if h_ini % 15 or h_fin % 15:
+            raise HTTPException(
+                400, f"El horario debe ser múltiplo de 15 minutos ({fecha_str})"
+            )
         key = (fecha, h_ini, h_fin)
         if key in seen:
-            raise HTTPException(400, f"Clase duplicada: {fecha_str} {h_ini}-{h_fin}")
+            raise HTTPException(
+                400, f"Clase duplicada: {fecha_str} {_fmt_hhmm(h_ini)}-{_fmt_hhmm(h_fin)}"
+            )
         seen.add(key)
-        result.append({"fecha": fecha, "hora_inicio": h_ini, "hora_fin": h_fin})
+        result.append({"fecha": fecha, "hora_inicio_min": h_ini, "hora_fin_min": h_fin})
     return result
 
 
 def _insert_clases(conn, edicion_id: int, clases: list) -> None:
     for c in clases:
         conn.execute(
-            "INSERT INTO clases_taller (edicion_id, fecha, hora_inicio, hora_fin) "
+            "INSERT INTO clases_taller (edicion_id, fecha, hora_inicio_min, hora_fin_min) "
             "VALUES (%s, %s, %s, %s)",
-            (edicion_id, c["fecha"], c["hora_inicio"], c["hora_fin"]),
+            (edicion_id, c["fecha"], c["hora_inicio_min"], c["hora_fin_min"]),
         )
 
 
@@ -496,8 +516,8 @@ def crear_interesado(slug: str, body: InteresadoBody, request: Request):
 
 class ClaseBody(BaseModel):
     fecha: str  # YYYY-MM-DD
-    hora_inicio: int
-    hora_fin: int
+    hora_inicio_min: int = Field(..., ge=0, le=1440)  # minutos desde medianoche (510 = 8:30)
+    hora_fin_min: int = Field(..., ge=0, le=1440)
 
 
 # Body usado en POST /admin/talleres y POST /admin/talleres/{id}/ediciones
@@ -689,10 +709,7 @@ def admin_create_taller(body: TallerConceptoCreateBody, request: Request):
             raise
 
     return _concepto_to_admin_dict(t_row, [
-        _edicion_to_admin_dict(e_row, [
-            {"fecha": str(c["fecha"]), "hora_inicio": c["hora_inicio"], "hora_fin": c["hora_fin"]}
-            for c in clases
-        ])
+        _edicion_to_admin_dict(e_row, [_clase_dict(c) for c in clases])
     ])
 
 
@@ -772,10 +789,7 @@ def admin_create_edicion(taller_id: int, body: EdicionCreateBody, request: Reque
             conn.rollback()
             raise
 
-    return _edicion_to_admin_dict(e_row, [
-        {"fecha": str(c["fecha"]), "hora_inicio": c["hora_inicio"], "hora_fin": c["hora_fin"]}
-        for c in clases
-    ])
+    return _edicion_to_admin_dict(e_row, [_clase_dict(c) for c in clases])
 
 
 @router.patch("/admin/talleres/{taller_id}")

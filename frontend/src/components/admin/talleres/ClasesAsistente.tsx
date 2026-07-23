@@ -13,15 +13,17 @@ import {
   SelectValue,
 } from "@/design-system/ui/select";
 import { HoraSelect } from "./HoraSelect";
+import { fmtHhmm } from "@/lib/talleres/formato";
 
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
+// Horarios en MINUTOS desde medianoche (Escuela v2 F1): 510 = 8:30.
 function generarClasesSemanales(
   diaSemana: number,
   mesDesde: string,
   mesHasta: string,
-  horaInicio: number,
-  horaFin: number,
+  horaInicioMin: number,
+  horaFinMin: number,
 ): ClaseBody[] {
   const [yD, mD] = mesDesde.split("-").map(Number);
   const [yH, mH] = mesHasta.split("-").map(Number);
@@ -33,8 +35,8 @@ function generarClasesSemanales(
   while (cur <= end) {
     result.push({
       fecha: cur.toISOString().slice(0, 10),
-      hora_inicio: horaInicio,
-      hora_fin: horaFin,
+      hora_inicio_min: horaInicioMin,
+      hora_fin_min: horaFinMin,
     });
     cur.setDate(cur.getDate() + 7);
   }
@@ -52,14 +54,15 @@ export function ClasesAsistente({
   clases: ClaseBody[];
   onChange: (s: ClaseBody[]) => void;
 }) {
+  // Estado en minutos: 540 = 9:00, 780 = 13:00.
   const [newFecha, setNewFecha] = useState("");
-  const [newIni, setNewIni] = useState(9);
-  const [newFin, setNewFin] = useState(13);
+  const [newIni, setNewIni] = useState(540);
+  const [newFin, setNewFin] = useState(780);
   const [diaSemana, setDiaSemana] = useState(0);
   const [mesDesde, setMesDesde] = useState("");
   const [mesHasta, setMesHasta] = useState("");
-  const [semIni, setSemIni] = useState(9);
-  const [semFin, setSemFin] = useState(13);
+  const [semIni, setSemIni] = useState(540);
+  const [semFin, setSemFin] = useState(780);
 
   function addIntensivo() {
     if (!newFecha) {
@@ -75,7 +78,7 @@ export function ClasesAsistente({
       return;
     }
     onChange(
-      [...clases, { fecha: newFecha, hora_inicio: newIni, hora_fin: newFin }].sort((a, b) =>
+      [...clases, { fecha: newFecha, hora_inicio_min: newIni, hora_fin_min: newFin }].sort((a, b) =>
         a.fecha.localeCompare(b.fecha),
       ),
     );
@@ -135,12 +138,12 @@ export function ClasesAsistente({
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted-foreground">Desde (h)</label>
-            <HoraSelect value={newIni} onChange={setNewIni} min={0} max={23} />
+            <label className="text-xs text-muted-foreground">Desde</label>
+            <HoraSelect value={newIni} onChange={setNewIni} min={0} max={1410} />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted-foreground">Hasta (h)</label>
-            <HoraSelect value={newFin} onChange={setNewFin} min={1} max={24} />
+            <label className="text-xs text-muted-foreground">Hasta</label>
+            <HoraSelect value={newFin} onChange={setNewFin} min={30} max={1440} />
           </div>
           <Button variant="outline" size="sm" onClick={addIntensivo} className="gap-1.5">
             <Plus className="h-3.5 w-3.5" />
@@ -185,12 +188,12 @@ export function ClasesAsistente({
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted-foreground">Desde (h)</label>
-            <HoraSelect value={semIni} onChange={setSemIni} min={0} max={23} />
+            <label className="text-xs text-muted-foreground">Desde</label>
+            <HoraSelect value={semIni} onChange={setSemIni} min={0} max={1410} />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted-foreground">Hasta (h)</label>
-            <HoraSelect value={semFin} onChange={setSemFin} min={1} max={24} />
+            <label className="text-xs text-muted-foreground">Hasta</label>
+            <HoraSelect value={semFin} onChange={setSemFin} min={30} max={1440} />
           </div>
           <Button variant="outline" size="sm" onClick={generateSemanal} className="gap-1.5">
             <Plus className="h-3.5 w-3.5" />
@@ -217,7 +220,7 @@ export function ClasesAsistente({
                   month: "short",
                 })}
                 <span className="text-muted-foreground">
-                  {s.hora_inicio}–{s.hora_fin}h
+                  {fmtHhmm(s.hora_inicio_min)}–{fmtHhmm(s.hora_fin_min)}
                 </span>
                 <button
                   onClick={() => remove(s.fecha)}

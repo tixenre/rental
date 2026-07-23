@@ -79,7 +79,7 @@ def _hasta(year, month, day, hour):
 def test_taller_bloqueante_solapa():
     from routes.estudio import _taller_bloqueante
     # Sesión 10-14, franja 12-16 → solapa
-    conn = FakeConn([[FakeRow(nombre="Taller X", hora_inicio=10, hora_fin=14)]])
+    conn = FakeConn([[FakeRow(nombre="Taller X", hora_inicio_min=600, hora_fin_min=840)]])
     result = _taller_bloqueante(conn, _desde(2026, 8, 1, 12), _hasta(2026, 8, 1, 16))
     assert result == "Taller X"
 
@@ -87,7 +87,7 @@ def test_taller_bloqueante_solapa():
 def test_taller_bloqueante_no_solapa():
     from routes.estudio import _taller_bloqueante
     # Sesión 10-14, franja 14-16 → no solapa (half-open: fin==inicio OK)
-    conn = FakeConn([[FakeRow(nombre="Taller X", hora_inicio=10, hora_fin=14)]])
+    conn = FakeConn([[FakeRow(nombre="Taller X", hora_inicio_min=600, hora_fin_min=840)]])
     result = _taller_bloqueante(conn, _desde(2026, 8, 1, 14), _hasta(2026, 8, 1, 16))
     assert result is None
 
@@ -95,7 +95,7 @@ def test_taller_bloqueante_no_solapa():
 def test_taller_bloqueante_no_solapa_antes():
     from routes.estudio import _taller_bloqueante
     # Sesión 14-18, franja 10-14 → no solapa
-    conn = FakeConn([[FakeRow(nombre="Taller Y", hora_inicio=14, hora_fin=18)]])
+    conn = FakeConn([[FakeRow(nombre="Taller Y", hora_inicio_min=840, hora_fin_min=1080)]])
     result = _taller_bloqueante(conn, _desde(2026, 8, 1, 10), _hasta(2026, 8, 1, 14))
     assert result is None
 
@@ -125,7 +125,7 @@ def test_taller_bloqueante_exclude_taller_id():
 def test_taller_bloqueante_hora_fin_24():
     """Sesión que termina a medianoche (hora_fin=24) con franja 22-24."""
     from routes.estudio import _taller_bloqueante
-    conn = FakeConn([[FakeRow(nombre="Nocturno", hora_inicio=20, hora_fin=24)]])
+    conn = FakeConn([[FakeRow(nombre="Nocturno", hora_inicio_min=1200, hora_fin_min=1440)]])
     result = _taller_bloqueante(conn, _desde(2026, 8, 1, 22), _hasta(2026, 8, 2, 0))
     assert result == "Nocturno"
 
@@ -198,7 +198,7 @@ def test_estudio_disponible_bloquea_taller():
     """Taller bloqueante → (False, motivo con 'taller')."""
     from routes.estudio import _estudio_disponible
     # slot vacío → taller con sesión solapada
-    conn = FakeConn([[], [FakeRow(nombre="Workshop", hora_inicio=9, hora_fin=15)]])
+    conn = FakeConn([[], [FakeRow(nombre="Workshop", hora_inicio_min=540, hora_fin_min=900)]])
     estudio = _estudio()
     libre, motivo = _estudio_disponible(
         conn, estudio, _desde(2026, 8, 1, 10), _hasta(2026, 8, 1, 14)
@@ -241,8 +241,8 @@ def test_verificar_sesiones_libres():
     """Todas las sesiones libres → no lanza excepción."""
     from routes.estudio import verificar_sesiones_disponibles
     sesiones = [
-        {"fecha": date(2026, 8, 15), "hora_inicio": 9, "hora_fin": 13},
-        {"fecha": date(2026, 8, 22), "hora_inicio": 9, "hora_fin": 13},
+        {"fecha": date(2026, 8, 15), "hora_inicio_min": 540, "hora_fin_min": 780},
+        {"fecha": date(2026, 8, 22), "hora_inicio_min": 540, "hora_fin_min": 780},
     ]
     # Cada sesión: slot vacío + taller vacío + centinela libre (3 queries × 2 = 6)
     conn = FakeConn([[], [], FakeRow(cnt=0)] * 2)
@@ -255,8 +255,8 @@ def test_verificar_sesiones_primera_conflicto_lanza_409():
     from fastapi import HTTPException
     from routes.estudio import verificar_sesiones_disponibles
     sesiones = [
-        {"fecha": date(2026, 8, 15), "hora_inicio": 9, "hora_fin": 13},
-        {"fecha": date(2026, 8, 22), "hora_inicio": 9, "hora_fin": 13},
+        {"fecha": date(2026, 8, 15), "hora_inicio_min": 540, "hora_fin_min": 780},
+        {"fecha": date(2026, 8, 22), "hora_inicio_min": 540, "hora_fin_min": 780},
     ]
     # Primera sesión: slot bloquea
     conn = FakeConn([
@@ -273,8 +273,8 @@ def test_verificar_sesiones_salta_pasadas():
     """Sesiones anteriores a hoy se saltean sin consultar la DB."""
     from routes.estudio import verificar_sesiones_disponibles
     sesiones = [
-        {"fecha": date(2020, 1, 1), "hora_inicio": 9, "hora_fin": 13},  # pasada
-        {"fecha": date(2020, 1, 2), "hora_inicio": 9, "hora_fin": 13},  # pasada
+        {"fecha": date(2020, 1, 1), "hora_inicio_min": 540, "hora_fin_min": 780},  # pasada
+        {"fecha": date(2020, 1, 2), "hora_inicio_min": 540, "hora_fin_min": 780},  # pasada
     ]
     conn = FakeConn([])  # si se hiciera alguna query, fallaría (lista vacía)
     estudio = _estudio()
@@ -288,15 +288,15 @@ def test_verificar_sesiones_segunda_conflicto():
     hoy = datetime.now().date()
     desde_futuro = date(2026, 9, 1)
     sesiones = [
-        {"fecha": desde_futuro, "hora_inicio": 9, "hora_fin": 13},
-        {"fecha": date(2026, 9, 8), "hora_inicio": 9, "hora_fin": 13},
+        {"fecha": desde_futuro, "hora_inicio_min": 540, "hora_fin_min": 780},
+        {"fecha": date(2026, 9, 8), "hora_inicio_min": 540, "hora_fin_min": 780},
     ]
     # Primera sesión: libre (slot vacío, taller vacío, centinela libre)
     # Segunda sesión: taller bloquea
     conn = FakeConn([
         [], [], FakeRow(cnt=0),                   # sesión 1: libre
         [],                                        # sesión 2: slot vacío
-        [FakeRow(nombre="Otro", hora_inicio=8, hora_fin=14)],  # sesión 2: taller bloquea
+        [FakeRow(nombre="Otro", hora_inicio_min=480, hora_fin_min=840)],  # sesión 2: taller bloquea
     ])
     estudio = _estudio()
     with pytest.raises(HTTPException) as exc:
@@ -312,7 +312,7 @@ def test_taller_vs_slot_bloquea():
     """Un taller no puede ocupar un horario donde ya hay un slot fijo."""
     from routes.estudio import verificar_sesiones_disponibles
     # Slot fijo lunes 10-18
-    sesiones = [{"fecha": date(2026, 9, 7), "hora_inicio": 10, "hora_fin": 18}]
+    sesiones = [{"fecha": date(2026, 9, 7), "hora_inicio_min": 600, "hora_fin_min": 1080}]
     conn = FakeConn([
         [FakeRow(id=2, cliente="Slot Fijo", hora_desde=9, hora_hasta=19)],
     ])
@@ -325,7 +325,7 @@ def test_taller_vs_slot_bloquea():
 def test_taller_vs_reserva_web_bloquea():
     """Un taller no puede ocupar un horario donde ya hay una reserva web (centinela)."""
     from routes.estudio import verificar_sesiones_disponibles
-    sesiones = [{"fecha": date(2026, 9, 7), "hora_inicio": 10, "hora_fin": 14}]
+    sesiones = [{"fecha": date(2026, 9, 7), "hora_inicio_min": 600, "hora_fin_min": 840}]
     conn = FakeConn([[], [], FakeRow(cnt=1)])  # slot vacío, taller vacío, centinela ocupado
     estudio = _estudio()
     with pytest.raises(Exception) as exc:
@@ -336,11 +336,11 @@ def test_taller_vs_reserva_web_bloquea():
 def test_taller_vs_taller_bloquea():
     """Dos talleres que solapan en la misma fecha son detectados."""
     from routes.estudio import verificar_sesiones_disponibles
-    sesiones = [{"fecha": date(2026, 9, 7), "hora_inicio": 10, "hora_fin": 14}]
+    sesiones = [{"fecha": date(2026, 9, 7), "hora_inicio_min": 600, "hora_fin_min": 840}]
     # El taller existente (excluído con exclude_taller_id) no bloquea, pero hay otro
     conn = FakeConn([
         [],  # slot vacío
-        [FakeRow(nombre="Taller Existente", hora_inicio=9, hora_fin=16)],  # taller bloquea
+        [FakeRow(nombre="Taller Existente", hora_inicio_min=540, hora_fin_min=960)],  # taller bloquea
     ])
     estudio = _estudio()
     with pytest.raises(Exception) as exc:
@@ -366,8 +366,8 @@ def test_sesiones_de_slot_genera_correctas():
     fechas = [s["fecha"] for s in sesiones]
     assert len(fechas) == 5
     assert all(d.weekday() == 2 for d in fechas)
-    assert all(s["hora_inicio"] == 18 for s in sesiones)
-    assert all(s["hora_fin"] == 22 for s in sesiones)
+    assert all(s["hora_inicio_min"] == 1080 for s in sesiones)
+    assert all(s["hora_fin_min"] == 1320 for s in sesiones)
     assert fechas[0] == date(2026, 7, 1)
     assert fechas[-1] == date(2026, 7, 29)
 
@@ -386,3 +386,75 @@ def test_sesiones_de_slot_rango_dos_meses():
     meses = {s["fecha"].month for s in sesiones}
     assert 7 in meses and 8 in meses
     assert len(sesiones) > 5
+
+
+# ── Medias horas (Escuela v2 F1) ──────────────────────────────────────────────
+
+
+def _desde_min(year, month, day, hour, minute):
+    return datetime(year, month, day, hour, minute, 0)
+
+
+def test_taller_bloqueante_media_hora_conflicto():
+    """Clase 8:30–12:30 (510–750 min) vs pedido de estudio 12:00–14:00 → conflicto
+    (el modelo viejo de horas enteras no podía representar este caso)."""
+    from routes.estudio import _taller_bloqueante
+    conn = FakeConn([[FakeRow(nombre="Principiante", hora_inicio_min=510, hora_fin_min=750)]])
+    result = _taller_bloqueante(
+        conn, _desde_min(2026, 9, 5, 12, 0), _desde_min(2026, 9, 5, 14, 0)
+    )
+    assert result == "Principiante"
+
+
+def test_taller_bloqueante_media_hora_libre():
+    """Clase 8:30–12:30 vs pedido 12:30–14:00 → libre (half-open, borde exacto)."""
+    from routes.estudio import _taller_bloqueante
+    conn = FakeConn([[FakeRow(nombre="Principiante", hora_inicio_min=510, hora_fin_min=750)]])
+    result = _taller_bloqueante(
+        conn, _desde_min(2026, 9, 5, 12, 30), _desde_min(2026, 9, 5, 14, 0)
+    )
+    assert result is None
+
+
+def test_taller_bloqueante_filtra_edicion_activa():
+    """Candado del fix de bloqueo fantasma: el WHERE exige `e.activo = TRUE`
+    (una edición desactivada/borrador NO bloquea el estudio). Si alguien
+    remueve el filtro, este test lo caza por el SQL."""
+    from routes.estudio import _taller_bloqueante
+    conn = FakeConn([[]])
+    _taller_bloqueante(conn, _desde(2026, 8, 1, 10), _hasta(2026, 8, 1, 14))
+    sql, _params = conn._calls[0]
+    assert "e.activo = TRUE" in sql
+    assert "t.activo = TRUE" in sql
+
+
+def test_verificar_sesiones_409_formatea_hhmm():
+    """El mensaje del 409 muestra los horarios como HH:MM (8:30, no '510')."""
+    from fastapi import HTTPException
+    from routes.estudio import verificar_sesiones_disponibles
+    sesiones = [{"fecha": date(2026, 9, 5), "hora_inicio_min": 510, "hora_fin_min": 750}]
+    conn = FakeConn([
+        [FakeRow(id=1, cliente="Fijo", hora_desde=8, hora_hasta=14)],  # slot bloquea
+    ])
+    estudio = _estudio()
+    with pytest.raises(HTTPException) as exc:
+        verificar_sesiones_disponibles(conn, estudio, sesiones)
+    assert exc.value.status_code == 409
+    assert "08:30" in str(exc.value.detail)
+    assert "12:30" in str(exc.value.detail)
+
+
+def test_verificar_sesiones_media_hora_contra_slot_borde():
+    """Clase 12:30–16:30 contra slot fijo que termina 12 (hs) → libre: la
+    conversión ×60 de _sesiones_de_slot y los minutos de la clase comparan
+    en la MISMA unidad (candado de la doble unidad transitoria)."""
+    from routes.estudio import verificar_sesiones_disponibles
+    sesiones = [{"fecha": date(2026, 9, 7), "hora_inicio_min": 750, "hora_fin_min": 990}]
+    # slot 9–12 hs (en su tabla, horas): 540–720 min → NO solapa con 750–990
+    conn = FakeConn([
+        [FakeRow(id=1, cliente="Fijo", hora_desde=9, hora_hasta=12)],  # no solapa
+        [],                # taller vacío
+        FakeRow(cnt=0),    # centinela libre
+    ])
+    estudio = _estudio()
+    verificar_sesiones_disponibles(conn, estudio, sesiones)  # no lanza

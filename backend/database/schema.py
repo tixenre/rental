@@ -2099,14 +2099,18 @@ def _init_db_schema(conn):
     # TABLE de arriba — era 100% redundante (ver migración
     # q4r5s6t7u8v9_drop_redundant_plain_indexes).
 
+    # Horas en MINUTOS desde medianoche (0..1440) — soporta medias horas (8:30).
+    # El sufijo _min es deliberado: un lector legacy que espere horas enteras
+    # falla ruidoso en SQL en vez de comparar horas contra minutos en silencio.
+    # (Migración esc1m2i3n4t5 convirtió los datos existentes ×60.)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS clases_taller (
-            id          SERIAL PRIMARY KEY,
-            edicion_id  INTEGER NOT NULL REFERENCES ediciones_taller(id) ON DELETE CASCADE,
-            fecha       DATE    NOT NULL,
-            hora_inicio INTEGER NOT NULL,
-            hora_fin    INTEGER NOT NULL,
-            created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            id              SERIAL PRIMARY KEY,
+            edicion_id      INTEGER NOT NULL REFERENCES ediciones_taller(id) ON DELETE CASCADE,
+            fecha           DATE    NOT NULL,
+            hora_inicio_min INTEGER NOT NULL,
+            hora_fin_min    INTEGER NOT NULL,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
     """)
     conn.execute(

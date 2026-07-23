@@ -1,16 +1,27 @@
 import { Clock } from "lucide-react";
 import { es } from "date-fns/locale";
 import { Calendar } from "@/design-system/ui/calendar";
+import { fmtHhmm } from "@/lib/talleres/formato";
 
-export type Sesion = { fecha: string; hora_inicio: number; hora_fin: number };
+// Minutos desde medianoche (Escuela v2 F1). `_str` viene resuelto del backend
+// en datos guardados; el fallback fmtHhmm cubre estado local del admin (preview
+// del asistente antes de guardar).
+export type Sesion = {
+  fecha: string;
+  hora_inicio_min: number;
+  hora_fin_min: number;
+  hora_inicio_str?: string;
+  hora_fin_str?: string;
+};
 
 interface TallerCalendarioProps {
   sesiones: Sesion[];
   horario?: string;
 }
 
-function fmtHora(h: number): string {
-  return `${h}:00`;
+function fmtHora(s: Sesion, cual: "inicio" | "fin"): string {
+  if (cual === "inicio") return s.hora_inicio_str ?? fmtHhmm(s.hora_inicio_min);
+  return s.hora_fin_str ?? fmtHhmm(s.hora_fin_min);
 }
 
 export function TallerCalendario({ sesiones, horario }: TallerCalendarioProps) {
@@ -70,7 +81,7 @@ export function TallerCalendario({ sesiones, horario }: TallerCalendarioProps) {
                 </span>
                 <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3 text-rosa flex-none" />
-                  {fmtHora(s.hora_inicio)} — {fmtHora(s.hora_fin)} hs
+                  {fmtHora(s, "inicio")} — {fmtHora(s, "fin")} hs
                 </span>
               </div>
             </div>
