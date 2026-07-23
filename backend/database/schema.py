@@ -1760,11 +1760,15 @@ def _init_db_schema(conn):
     # SAGRADO sin lógica nueva. Es un recurso interno: invisible al catálogo,
     # filtros, listado admin, ranking y specs (es_recurso_interno=TRUE). Idempotente:
     # solo se crea si el estudio todavía no tiene un equipo asociado.
+    # `dueno='Estudio'` (economía separada, Fase 4 de #1283 — antes 'Rambla'): las
+    # horas del espacio se atribuyen al Estudio en la liquidación/P&L, no a Rambla
+    # rental. Una BD que YA tenía el centinela con dueno='Rambla' la migra la
+    # migración de backfill (esquema en dos capas para este dato puntual).
     est_row = conn.execute("SELECT equipo_id FROM estudio WHERE id = 1").fetchone()
     if est_row is not None and est_row["equipo_id"] is None:
         cur_cent = conn.execute("""
             INSERT INTO equipos (nombre, cantidad, visible_catalogo, dueno, es_recurso_interno)
-            VALUES ('Estudio (espacio)', 1, 0, 'Rambla', TRUE)
+            VALUES ('Estudio (espacio)', 1, 0, 'Estudio', TRUE)
             RETURNING id
         """)
         centinela_id = cur_cent.fetchone()["id"]
