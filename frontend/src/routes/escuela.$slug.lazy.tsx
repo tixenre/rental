@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createLazyFileRoute, Link, notFound } from "@tanstack/react-router";
-import { Calendar, MapPin, Users, CheckCircle2, Clock, X } from "lucide-react";
+import { CheckCircle2, X } from "lucide-react";
 
 import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { Button } from "@/design-system/ui/button";
@@ -9,33 +9,20 @@ import { IconButton } from "@/design-system/ui/icon-button";
 import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 import { Logo } from "@/components/rental/shell/Logo";
 import { WorkshopInscripcionForm } from "@/components/talleres/WorkshopInscripcionForm";
-import { TallerCalendario } from "@/components/talleres/TallerCalendario";
-import { ResponsiveImage } from "@/components/common/ResponsiveImage";
-import { Grain } from "@/components/common/Grain";
+import { TallerHero } from "@/components/talleres/TallerHero";
+import { ProgramaSection } from "@/components/talleres/ProgramaSection";
+import { InstructorCard } from "@/components/talleres/InstructorCard";
+import { PrecioCard } from "@/components/talleres/PrecioCard";
+import { TallerTrabajos } from "@/components/talleres/TallerTrabajos";
+import { TallerFAQ } from "@/components/talleres/TallerFAQ";
+import { Input } from "@/design-system/ui/input";
 import { apiGetTaller, type EdicionLite, type Taller } from "@/lib/api";
-import { formatARS } from "@/lib/format";
-import { useEntityMedia } from "@/hooks/useEntityMedia";
-import { findVariant } from "@/lib/media/types";
+import { clasesParaPrograma } from "@/lib/talleres/legacy";
+import { ordinalEdicion } from "@/lib/talleres/formato";
 
 export const Route = createLazyFileRoute("/escuela/$slug")({
   component: TallerLandingPage,
 });
-
-function ProgramaItem({ text, index }: { text: string; index: number }) {
-  return (
-    <li className="flex items-start gap-3">
-      <span className="shrink-0 mt-0.5 w-5 h-5 rounded-full bg-rosa text-white text-xs font-bold grid place-items-center">
-        {index + 1}
-      </span>
-      <span className="text-sm leading-relaxed text-muted-foreground">{text}</span>
-    </li>
-  );
-}
-
-function ordinalEdicion(n: number): string {
-  const map: Record<number, string> = { 1: "1ra", 2: "2da", 3: "3ra", 4: "4ta" };
-  return map[n] ?? `${n}ta`;
-}
 
 function SoldOutModal({
   proxima,
@@ -140,28 +127,25 @@ function InteresadoForm({ slug }: { slug: string }) {
       <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
         Avisame si hay más fechas
       </p>
-      <input
+      <Input
         required
         type="text"
         placeholder="Tu nombre"
         value={form.nombre}
         onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
-        className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm text-ink placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
       />
-      <input
+      <Input
         required
         type="email"
         placeholder="Tu email"
         value={form.email}
         onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-        className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm text-ink placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
       />
-      <input
+      <Input
         type="tel"
         placeholder="Tu teléfono (opcional)"
         value={form.telefono}
         onChange={(e) => setForm((f) => ({ ...f, telefono: e.target.value }))}
-        className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm text-ink placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
       />
       {status === "error" && <p className="text-xs text-destructive">{errorMsg}</p>}
       <Button
@@ -193,12 +177,6 @@ function TallerLandingPage() {
 
   // Hooks antes del early-return (regla de hooks de React)
   const [soldOutModalDismissed, setSoldOutModalDismissed] = useState(false);
-  const tallerId = taller?.id ?? null;
-  const { data: instructorMedia } = useEntityMedia("instructor", tallerId);
-  const instructorAsset = instructorMedia[0] ?? null;
-  const instructorVariant = instructorAsset
-    ? findVariant(instructorAsset.variants, "display")
-    : null;
 
   if (isLoading) {
     return (
@@ -226,6 +204,8 @@ function TallerLandingPage() {
   const fechaInicioStr = fechaInicio.toLocaleDateString("es-AR", optsLong);
   const fechaFinStr = fechaFin.toLocaleDateString("es-AR", optsLong);
 
+  const clases = clasesParaPrograma(formTaller);
+
   return (
     <>
       {switchToProxima && !soldOutModalDismissed && (
@@ -246,93 +226,13 @@ function TallerLandingPage() {
               Borrador — solo visible para vos. Publicalo desde el admin cuando esté listo.
             </div>
           )}
-          {/* ── Hero ───────────────────────────────────────────────────────── */}
-          <section className="relative bg-ink overflow-hidden">
-            <Grain opacity={10} />
-            <div className="relative max-w-[1100px] mx-auto px-4 sm:px-6 py-16 sm:py-24">
-              <p className="font-mono text-2xs tracking-[0.3em] uppercase text-rosa mb-4">Taller</p>
-              <h1
-                className="font-display font-black lowercase leading-[0.88] tracking-[-0.02em] text-background"
-                style={{ fontSize: "clamp(2.75rem, 8vw, 5.5rem)" }}
-              >
-                {taller.nombre}
-              </h1>
-              <p
-                className="font-display font-black lowercase leading-[0.88] tracking-[-0.02em] mt-1"
-                style={{
-                  fontSize: "clamp(2.75rem, 8vw, 5.5rem)",
-                  color: "color-mix(in oklch, var(--color-rosa) 80%, white)",
-                }}
-              >
-                {taller.subtitulo}
-              </p>
-              <p
-                className="font-display font-black lowercase leading-tight tracking-[-0.02em] mt-2"
-                style={{
-                  fontSize: "clamp(1.5rem, 4vw, 3rem)",
-                  color: "color-mix(in oklch, var(--color-rosa) 55%, white 45%)",
-                }}
-              >
-                {ordinalEdicion(taller.numero_edicion)} edición
-              </p>
 
-              {/* Contexto de ediciones */}
-              {(taller.edicion_anterior ||
-                (taller.proxima_edicion && taller.cupos_disponibles === 0)) && (
-                <div className="mt-5 flex flex-wrap items-center gap-4">
-                  {taller.edicion_anterior && (
-                    <Link
-                      to="/escuela/$slug"
-                      params={{ slug: taller.edicion_anterior.slug }}
-                      className="text-xs text-background/35 hover:text-background/60 transition"
-                    >
-                      {ordinalEdicion(taller.edicion_anterior.numero_edicion)} edición — agotada
-                    </Link>
-                  )}
-                  {taller.proxima_edicion && taller.cupos_disponibles === 0 && (
-                    <Link
-                      to="/escuela/$slug"
-                      params={{ slug: taller.proxima_edicion.slug }}
-                      className="inline-flex items-center gap-2 rounded-full border border-rosa/50 bg-rosa/10 px-4 py-1.5 text-sm font-semibold text-rosa hover:bg-rosa/20 transition"
-                    >
-                      {ordinalEdicion(taller.proxima_edicion.numero_edicion)} edición{" "}
-                      <span className="opacity-70">
-                        · {taller.proxima_edicion.cupos_disponibles} cupos
-                      </span>
-                    </Link>
-                  )}
-                </div>
-              )}
-
-              <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm text-background/60">
-                <span className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 shrink-0" />
-                  {fechaInicioStr} y {fechaFinStr}
-                </span>
-                <span className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 shrink-0" />
-                  {taller.horario}
-                </span>
-                <span className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 shrink-0" />
-                  {taller.direccion}
-                </span>
-                <span className="flex items-center gap-2">
-                  <Users className="h-4 w-4 shrink-0" />
-                  {taller.cupos_total} cupos
-                </span>
-              </div>
-
-              <div className="mt-8">
-                <a
-                  href="#inscripcion"
-                  className="inline-flex items-center gap-2 rounded-full bg-rosa text-ink px-7 py-3.5 text-base font-bold hover:brightness-110 active:scale-[0.97] transition-all"
-                >
-                  Quiero inscribirme
-                </a>
-              </div>
-            </div>
-          </section>
+          <TallerHero
+            taller={taller}
+            formTaller={formTaller}
+            fechaInicioStr={fechaInicioStr}
+            fechaFinStr={fechaFinStr}
+          />
 
           {/* ── Cuerpo ─────────────────────────────────────────────────────── */}
           <div className="max-w-[1100px] mx-auto px-4 sm:px-6 py-12 sm:py-16">
@@ -356,146 +256,14 @@ function TallerLandingPage() {
                   )}
                 </section>
 
-                {/* Cuándo */}
-                {formTaller.sesiones && formTaller.sesiones.length > 0 && (
-                  <section>
-                    <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa mb-4">
-                      Cuándo
-                    </p>
-                    <TallerCalendario sesiones={formTaller.sesiones} horario={formTaller.horario} />
-                  </section>
-                )}
-
-                {/* Clase teórica */}
-                {taller.programa_teorica.length > 0 && (
-                  <section>
-                    <div className="mb-4">
-                      <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa mb-1">
-                        Clase 1 — Teórica
-                      </p>
-                      <h2 className="font-display text-2xl font-bold text-ink lowercase tracking-tight">
-                        {fechaInicioStr}, {taller.horario}
-                      </h2>
-                    </div>
-                    <ul className="flex flex-col gap-3">
-                      {taller.programa_teorica.map((item, i) => (
-                        <ProgramaItem key={i} text={item} index={i} />
-                      ))}
-                    </ul>
-                    <p className="mt-5 text-sm text-muted-foreground italic">
-                      Al finalizar la clase teórica, elegiremos sobre qué proyecto queremos trabajar
-                      en la clase siguiente. Nos dividiremos en equipos y tendrán 1 semana de
-                      preproducción.
-                    </p>
-                  </section>
-                )}
-
-                {/* Clase práctica */}
-                {taller.programa_practica.length > 0 && (
-                  <section>
-                    <div className="mb-4">
-                      <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa mb-1">
-                        Clase 2 — Práctica
-                      </p>
-                      <h2 className="font-display text-2xl font-bold text-ink lowercase tracking-tight">
-                        {fechaFinStr}, {taller.horario}
-                      </h2>
-                    </div>
-                    <div className="flex flex-col gap-4">
-                      {taller.programa_practica.map((item, i) => (
-                        <p key={i} className="text-sm leading-relaxed text-foreground/80">
-                          {item}
-                        </p>
-                      ))}
-                    </div>
-                  </section>
-                )}
-
-                {/* About */}
-                <section className="rounded-2xl border border-border/60 bg-muted/20 px-6 py-7">
-                  <p className="font-mono text-2xs tracking-[0.25em] uppercase text-muted-foreground mb-4">
-                    Sobre
-                  </p>
-                  <div className="flex items-start gap-5 mb-5">
-                    {(instructorVariant || taller.instructor_foto_url) &&
-                      (instructorAsset && instructorAsset.variants.length > 0 ? (
-                        <ResponsiveImage
-                          variants={instructorAsset.variants}
-                          alt={taller.instructor_nombre}
-                          lqip={instructorAsset.lqip}
-                          className="shrink-0 w-20 h-20 rounded-full object-cover object-top border border-border/40"
-                          sizes="80px"
-                        />
-                      ) : (
-                        <img
-                          src={taller.instructor_foto_url}
-                          alt={taller.instructor_nombre}
-                          className="shrink-0 w-20 h-20 rounded-full object-cover object-top border border-border/40"
-                        />
-                      ))}
-                    <h2
-                      className="font-display font-black lowercase leading-[0.9] tracking-[-0.02em] text-ink self-center"
-                      style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)" }}
-                    >
-                      {taller.instructor_nombre}
-                    </h2>
-                  </div>
-                  <p className="text-base text-ink/80 leading-relaxed">{taller.instructor_bio}</p>
-                  {taller.instructor_proyectos?.length > 0 && (
-                    <div className="mt-6">
-                      <p className="font-mono text-2xs tracking-[0.2em] uppercase text-muted-foreground mb-3">
-                        Trabajó con
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {(Array.isArray(taller.instructor_proyectos)
-                          ? taller.instructor_proyectos
-                          : String(taller.instructor_proyectos)
-                              .split(",")
-                              .map((s: string) => s.trim())
-                        ).map((p: string) => (
-                          <span
-                            key={p}
-                            className="inline-block rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-medium text-ink/70"
-                          >
-                            {p}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </section>
+                <ProgramaSection clases={clases} />
+                <InstructorCard taller={taller} />
+                <TallerTrabajos trabajos={taller.trabajos} />
               </div>
 
               {/* Sidebar sticky */}
               <div className="lg:sticky lg:top-20">
-                {/* Precio */}
-                <div className="rounded-2xl border border-border/60 bg-background p-5 mb-4">
-                  <p className="text-xs text-muted-foreground mb-1">Costo total</p>
-                  <p className="font-display text-3xl font-bold text-ink tabular-nums">
-                    {formatARS(taller.precio_total)}
-                  </p>
-                  <ul className="mt-3 flex flex-col gap-1.5">
-                    {(() => {
-                      const porcentaje =
-                        taller.precio_total > 0
-                          ? Math.round((taller.precio_sena / taller.precio_total) * 100)
-                          : 0;
-                      const senaText = `Seña del ${porcentaje}% al inscribirte (${formatARS(taller.precio_sena)})`;
-                      return [senaText, `Resto antes de la primera clase`];
-                    })().map((item) => (
-                      <li
-                        key={item}
-                        className="flex items-start gap-2 text-xs text-muted-foreground"
-                      >
-                        <CheckCircle2
-                          className="h-3.5 w-3.5 shrink-0 mt-0.5 text-verde"
-                          strokeWidth={1.5}
-                        />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <PrecioCard taller={formTaller} />
 
                 {/* Formulario de inscripción */}
                 <div id="inscripcion" className="scroll-mt-20">
@@ -548,6 +316,10 @@ function TallerLandingPage() {
                   )}
                 </div>
               </div>
+            </div>
+
+            <div className="mt-16 flex flex-col gap-12">
+              <TallerFAQ faqs={taller.faqs} />
             </div>
           </div>
 

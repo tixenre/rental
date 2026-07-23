@@ -10,3 +10,9 @@ export function fmtHhmm(minutos: number): string {
   const m = minutos % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
+
+/** 1 → "1ra", 2 → "2da", 3 → "3ra", 4 → "4ta", n → "nta". */
+export function ordinalEdicion(n: number): string {
+  const map: Record<number, string> = { 1: "1ra", 2: "2da", 3: "3ra", 4: "4ta" };
+  return map[n] ?? `${n}ta`;
+}

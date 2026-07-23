@@ -472,6 +472,11 @@ export type Taller = {
     monto_total: number;
     monto_total_str: string;
   }[];
+  // F4c: FAQ del concepto, trabajos pasados (solo YouTube, sin testimonios) y
+  // cierre de inscripciones de ESTA edición (null = sin cierre).
+  faqs: { pregunta: string; respuesta: string }[];
+  trabajos: { id: number; titulo: string; youtube_url: string; poster_url: string }[];
+  fecha_cierre_inscripcion: string | null;
 };
 
 export type InscripcionBody = {
@@ -484,6 +489,8 @@ export type InscripcionBody = {
   /** F4a: código de la modalidad elegida (de `Taller.modalidades`). Cableado-
    *  apagado: el form v1 (pre-F5) no lo manda — default a la primera. */
   modalidad_codigo?: string;
+  /** F2: checkbox "Acepto los términos" — el form v2 (F5) lo manda siempre. */
+  acepta_terminos?: boolean;
 };
 
 export type InscripcionResult = {

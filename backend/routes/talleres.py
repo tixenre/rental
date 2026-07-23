@@ -264,7 +264,7 @@ def _edicion_lite(row) -> dict:
     }
 
 
-def _edicion_to_public_dict(row, clases=None, instructores=None, modalidades=None) -> dict:
+def _edicion_to_public_dict(row, clases=None, instructores=None, modalidades=None, trabajos=None) -> dict:
     """Convierte edicion_row (JOIN talleres) al shape plano del API público."""
     return {
         "id": row["id"],
@@ -313,11 +313,14 @@ def _edicion_to_public_dict(row, clases=None, instructores=None, modalidades=Non
         # sintético — ver _modalidades_publicas).
         "video": _video_dict(row),
         "modalidades": _modalidades_publicas(modalidades, row["precio_total"]),
-        # F4c: FAQ del concepto + cierre de inscripciones de ESTA edición.
+        # F4c: FAQ del concepto + cierre de inscripciones de ESTA edición +
+        # trabajos pasados del concepto (solo YouTube, sin testimonios —
+        # antes solo se servían al admin; F5 los muestra públicamente).
         "faqs": _row_get(row, "faqs", []) or [],
         "fecha_cierre_inscripcion": (
             str(row["fecha_cierre_inscripcion"]) if _row_get(row, "fecha_cierre_inscripcion") else None
         ),
+        "trabajos": trabajos if trabajos is not None else [],
     }
 
 
@@ -592,7 +595,7 @@ def get_taller(slug: str, request: Request):
         row = _get_edicion_row(conn, slug, incluir_borrador=es_admin)
         d = _edicion_to_public_dict(
             row, _get_clases(conn, row["id"]), _get_instructores_taller(conn, row["taller_id"]),
-            _get_modalidades(conn, row["id"]),
+            _get_modalidades(conn, row["id"]), _get_trabajos_taller(conn, row["taller_id"]),
         )
 
         # Próxima edición: misma concepto (taller_id), numero_edicion mayor
