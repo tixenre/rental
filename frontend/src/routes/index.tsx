@@ -12,7 +12,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Alquilá equipos audiovisuales, reservá el estudio de foto y video, y sumate a un workshop. Todo en Rambla, Mar del Plata.",
+          "Alquilá equipos audiovisuales, reservá el estudio de foto y video, y sumate a un taller. Todo en Rambla, Mar del Plata.",
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: `${SITE_URL}/` },
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/")({
       {
         property: "og:description",
         content:
-          "Alquilá equipos audiovisuales, reservá el estudio y sumate a un workshop. Mar del Plata.",
+          "Alquilá equipos audiovisuales, reservá el estudio y sumate a un taller. Mar del Plata.",
       },
       { property: "og:locale", content: "es_AR" },
     ],

@@ -253,9 +253,7 @@ function TallerLandingPage() {
           <section className="relative bg-ink overflow-hidden">
             <Grain opacity={10} />
             <div className="relative max-w-[1100px] mx-auto px-4 sm:px-6 py-16 sm:py-24">
-              <p className="font-mono text-2xs tracking-[0.3em] uppercase text-rosa mb-4">
-                Workshop
-              </p>
+              <p className="font-mono text-2xs tracking-[0.3em] uppercase text-rosa mb-4">Taller</p>
               <h1
                 className="font-display font-black lowercase leading-[0.88] tracking-[-0.02em] text-background"
                 style={{ fontSize: "clamp(2.75rem, 8vw, 5.5rem)" }}

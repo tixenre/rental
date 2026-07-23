@@ -82,7 +82,7 @@ function WorkshopCard({ taller }: { taller: Taller }) {
       <div className="relative bg-ink sm:w-64 shrink-0 px-6 pt-7 pb-6 flex flex-col justify-between overflow-hidden min-h-[130px] sm:min-h-0">
         <Grain />
         <div className="relative">
-          <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa mb-3">Workshop</p>
+          <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa mb-3">Taller</p>
           <h2
             className="font-display font-black lowercase leading-[0.9] tracking-[-0.015em] text-background"
             style={{ fontSize: "clamp(1.2rem, 2vw, 1.5rem)" }}
@@ -139,9 +139,7 @@ function PastWorkshopCard({ pw }: { pw: PastWorkshop }) {
       <div className="relative bg-ink sm:w-64 shrink-0 px-6 pt-7 pb-6 flex flex-col justify-between overflow-hidden min-h-[130px] sm:min-h-0">
         <Grain />
         <div className="relative">
-          <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa/70 mb-3">
-            Workshop
-          </p>
+          <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa/70 mb-3">Taller</p>
           <h2
             className="font-display font-black lowercase leading-[0.9] tracking-[-0.015em] text-background"
             style={{ fontSize: "clamp(1.2rem, 2vw, 1.5rem)" }}
