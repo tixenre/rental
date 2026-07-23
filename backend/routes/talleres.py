@@ -18,9 +18,11 @@ import json as _json
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from pydantic import BaseModel, EmailStr, Field
 
 from auth.guards import require_admin
+from config import SITE_URL, settings
 from database import get_db, now_ar
 from rate_limit import limiter
 from dataio.slug import slugify, slug_unico
@@ -39,6 +41,29 @@ router = APIRouter()
 
 COMPROBANTE_MAX_MB = 10
 FOTO_MAX_MB = 8
+
+# F4b: link de "completá tu seña" tras ofrecer un cupo liberado. NO es un
+# nonce single-use en tabla aparte (patrón auth/commands/magic.py) — el gate
+# real es el ESTADO de la inscripción (`estado == 'cupo_ofrecido'`): una vez
+# reclamado, el estado cambia y el mismo token ya no sirve, sin necesitar una
+# tabla de challenges. `max_age` es un techo de higiene, no el control de
+# negocio — "sin expiración automática" (el admin re-ofrece a mano) sigue
+# siendo cierto porque el admin puede re-ofrecer mucho antes de este techo.
+_CUPO_TOKEN_MAX_AGE = 60 * 60 * 24 * 30  # 30 días
+_cupo_signer = URLSafeTimedSerializer(settings.SECRET_KEY, salt="taller-cupo-ofrecido")
+
+
+def _generar_token_cupo(inscripcion_id: int) -> str:
+    return _cupo_signer.dumps({"insid": inscripcion_id})
+
+
+def _leer_token_cupo(token: str) -> int | None:
+    try:
+        data = _cupo_signer.loads(token, max_age=_CUPO_TOKEN_MAX_AGE)
+    except (BadSignature, SignatureExpired):
+        return None
+    insid = data.get("insid") if isinstance(data, dict) else None
+    return insid if isinstance(insid, int) else None
 
 _DIAS_ES = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 _MESES_ES = [
@@ -791,6 +816,137 @@ def crear_interesado(slug: str, body: InteresadoBody, request: Request):
         except Exception:
             conn.rollback()
             raise
+    return {"ok": True}
+
+
+@router.get("/talleres/sena/{token}")
+def get_oferta_cupo(token: str):
+    """Contexto público de una oferta de cupo vigente ("completá tu seña").
+    404 si el token es inválido/venció; 410 si esta inscripción particular ya
+    no está en estado `cupo_ofrecido` (ya la reclamó, o nunca fue ofrecida)."""
+    insid = _leer_token_cupo(token)
+    if insid is None:
+        raise HTTPException(404, "Este link no es válido o venció.")
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            SELECT ti.id, ti.nombre, ti.estado, e.fecha_inicio, e.fecha_fin, e.horario,
+                   e.direccion, e.precio_sena, e.pago_alias, e.pago_cbu, e.pago_banco,
+                   t.nombre AS taller_nombre
+            FROM taller_inscripciones ti
+            JOIN ediciones_taller e ON e.id = ti.edicion_id
+            JOIN talleres t ON t.id = ti.taller_id
+            WHERE ti.id = %s
+            """,
+            (insid,),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(404, "Este link no es válido o venció.")
+    if row["estado"] != "cupo_ofrecido":
+        raise HTTPException(410, "Esta oferta ya no está disponible.")
+    return {
+        "taller_nombre": row["taller_nombre"],
+        "nombre_pila": row["nombre"].split()[0],
+        "fecha_inicio_str": _fmt_fecha_es(row["fecha_inicio"]),
+        "fecha_fin_str": _fmt_fecha_es(row["fecha_fin"]),
+        "horario": row["horario"],
+        "direccion": row["direccion"],
+        "precio_sena_str": _fmt_pesos(row["precio_sena"]),
+        "pago_alias": row["pago_alias"],
+        "pago_cbu": row["pago_cbu"],
+        "pago_banco": row["pago_banco"],
+    }
+
+
+class ClaimCupoBody(BaseModel):
+    comprobante_url: str | None = None
+    comprobante_key: str | None = None
+
+
+@router.post("/talleres/sena/{token}")
+@limiter.limit("10/minute")
+def claim_oferta_cupo(token: str, body: ClaimCupoBody, request: Request):
+    """Reclama un cupo ofrecido: sube el comprobante y pasa a pendiente_sena.
+    Re-chequea cupos disponibles bajo lock — si alguien más ya lo tomó (u otro
+    cupo_ofrecido en carrera ganó primero), 409 con mensaje claro en vez de
+    sobrevender. No es un login: cualquiera con el link puede reclamar (mismo
+    modelo de confianza que un magic-link de invitación)."""
+    if not (body.comprobante_url or body.comprobante_key):
+        raise HTTPException(400, "Falta el comprobante de la seña")
+    insid = _leer_token_cupo(token)
+    if insid is None:
+        raise HTTPException(404, "Este link no es válido o venció.")
+
+    with get_db() as conn:
+        try:
+            ins = conn.execute(
+                "SELECT id, taller_id, edicion_id, estado, nombre, email FROM taller_inscripciones "
+                "WHERE id = %s FOR UPDATE",
+                (insid,),
+            ).fetchone()
+            if ins is None:
+                raise HTTPException(404, "Este link no es válido o venció.")
+            if ins["estado"] != "cupo_ofrecido":
+                raise HTTPException(410, "Esta oferta ya no está disponible.")
+
+            edicion = conn.execute(
+                "SELECT * FROM ediciones_taller WHERE id = %s FOR UPDATE",
+                (ins["edicion_id"],),
+            ).fetchone()
+            if edicion["cupos_confirmados"] >= edicion["cupos_total"]:
+                raise HTTPException(409, "Ese cupo ya fue tomado. Escribinos y vemos si se libera otro.")
+
+            conn.execute(
+                "UPDATE taller_inscripciones SET en_lista_espera = FALSE, estado = 'pendiente_sena', "
+                "comprobante_url = %s, comprobante_key = %s, confirmed_at = NOW() WHERE id = %s",
+                (body.comprobante_url, body.comprobante_key, insid),
+            )
+            conn.execute(
+                "UPDATE ediciones_taller SET cupos_confirmados = cupos_confirmados + 1, "
+                "updated_at = NOW() WHERE id = %s",
+                (edicion["id"],),
+            )
+            conn.commit()
+            # Contexto de mail resuelto DENTRO del `with` (mismo criterio que
+            # crear_inscripcion): el JOIN a talleres da nombre/notif_email.
+            edicion_row = conn.execute(
+                "SELECT e.*, t.nombre AS taller_nombre, t.notif_email FROM ediciones_taller e "
+                "JOIN talleres t ON t.id = e.taller_id WHERE e.id = %s",
+                (ins["edicion_id"],),
+            ).fetchone()
+        except Exception:
+            conn.rollback()
+            raise
+
+    nombre_pila = ins["nombre"].split()[0]
+    ctx_cliente = {
+        "taller_nombre": edicion_row["taller_nombre"],
+        "nombre_pila": nombre_pila,
+        "en_lista_espera": False,
+        "fecha_inicio_str": _fmt_fecha_es(edicion_row["fecha_inicio"]),
+        "fecha_fin_str": _fmt_fecha_es(edicion_row["fecha_fin"]),
+        "horario": edicion_row["horario"],
+        "direccion": edicion_row["direccion"],
+        "precio_sena_str": _fmt_pesos(edicion_row["precio_sena"]),
+        "pago_alias": edicion_row["pago_alias"],
+        "pago_cbu": edicion_row["pago_cbu"],
+        "pago_banco": edicion_row["pago_banco"],
+    }
+    admin_to = edicion_row["notif_email"] or get_admin_to()
+    ctx_admin = {
+        "taller_nombre": edicion_row["taller_nombre"],
+        "nombre": ins["nombre"],
+        "email": ins["email"],
+        "telefono": "",
+        "experiencia": "",
+        "comprobante_url": _comprobante_url_para_email(body.comprobante_key, body.comprobante_url),
+        "en_lista_espera": False,
+        "fecha": now_ar().strftime("%-d de %B de %Y, %H:%M hs"),
+    }
+    if admin_to:
+        send_email("taller_inscripcion_admin", admin_to, ctx_admin)
+    send_email("taller_inscripcion_cliente", ins["email"], ctx_cliente)
+
     return {"ok": True}
 
 
@@ -1907,6 +2063,92 @@ def admin_confirmar_inscripcion(taller_id: int, ins_id: int, request: Request):
     return {"ok": True}
 
 
+@router.post("/admin/talleres/{taller_id}/inscripciones/{ins_id}/verificar-sena", status_code=200)
+def admin_verificar_sena(taller_id: int, ins_id: int, request: Request):
+    """Verifica la seña de una inscripción `pendiente_sena` → `confirmada`.
+    Manda mail al inscripto ("tu lugar está confirmado")."""
+    require_admin(request)
+    with get_db() as conn:
+        try:
+            ins = conn.execute(
+                "SELECT id, estado, nombre, email, edicion_id FROM taller_inscripciones "
+                "WHERE id = %s AND taller_id = %s",
+                (ins_id, taller_id),
+            ).fetchone()
+            if ins is None:
+                raise HTTPException(404, "Inscripción no encontrada")
+            if ins["estado"] != "pendiente_sena":
+                raise HTTPException(400, "La inscripción no está pendiente de seña")
+            conn.execute(
+                "UPDATE taller_inscripciones SET sena_verificada_at = NOW(), estado = 'confirmada' "
+                "WHERE id = %s",
+                (ins_id,),
+            )
+            conn.commit()
+            edicion_row = conn.execute(
+                "SELECT e.*, t.nombre AS taller_nombre FROM ediciones_taller e "
+                "JOIN talleres t ON t.id = e.taller_id WHERE e.id = %s",
+                (ins["edicion_id"],),
+            ).fetchone()
+        except Exception:
+            conn.rollback()
+            raise
+
+    send_email("taller_sena_confirmada", ins["email"], {
+        "taller_nombre": edicion_row["taller_nombre"],
+        "nombre_pila": ins["nombre"].split()[0],
+        "fecha_inicio_str": _fmt_fecha_es(edicion_row["fecha_inicio"]),
+        "fecha_fin_str": _fmt_fecha_es(edicion_row["fecha_fin"]),
+        "horario": edicion_row["horario"],
+        "direccion": edicion_row["direccion"],
+    })
+    return {"ok": True}
+
+
+@router.post("/admin/talleres/{taller_id}/inscripciones/{ins_id}/ofrecer-cupo", status_code=200)
+def admin_ofrecer_cupo(taller_id: int, ins_id: int, request: Request):
+    """Ofrece el cupo liberado a alguien en lista de espera: manda un mail con
+    link tokenizado a "completá tu seña". NO reserva el cupo todavía — se
+    reserva recién cuando la persona lo reclama (POST /talleres/sena/{token});
+    así el admin puede re-ofrecer a otra persona si esta no responde, sin
+    tener que "devolver" nada primero."""
+    require_admin(request)
+    with get_db() as conn:
+        try:
+            ins = conn.execute(
+                "SELECT id, en_lista_espera, nombre, email, edicion_id FROM taller_inscripciones "
+                "WHERE id = %s AND taller_id = %s",
+                (ins_id, taller_id),
+            ).fetchone()
+            if ins is None:
+                raise HTTPException(404, "Inscripción no encontrada")
+            if not ins["en_lista_espera"]:
+                raise HTTPException(400, "Esta inscripción no está en lista de espera")
+            conn.execute(
+                "UPDATE taller_inscripciones SET estado = 'cupo_ofrecido', cupo_ofrecido_at = NOW() "
+                "WHERE id = %s",
+                (ins_id,),
+            )
+            conn.commit()
+            edicion_row = conn.execute(
+                "SELECT e.*, t.nombre AS taller_nombre FROM ediciones_taller e "
+                "JOIN talleres t ON t.id = e.taller_id WHERE e.id = %s",
+                (ins["edicion_id"],),
+            ).fetchone()
+        except Exception:
+            conn.rollback()
+            raise
+
+    token = _generar_token_cupo(ins_id)
+    send_email("taller_cupo_ofrecido", ins["email"], {
+        "taller_nombre": edicion_row["taller_nombre"],
+        "nombre_pila": ins["nombre"].split()[0],
+        "precio_sena_str": _fmt_pesos(edicion_row["precio_sena"]),
+        "link_sena": f"{SITE_URL}/escuela/sena/{token}",
+    })
+    return {"ok": True}
+
+
 class NotificarCambiosBody(BaseModel):
     mensaje: str | None = None
 
@@ -1943,3 +2185,56 @@ def admin_notificar_cambios(taller_id: int, body: NotificarCambiosBody, request:
             fallidos.append(ins["email"])
 
     return {"enviados": len(enviados), "fallidos": len(fallidos)}
+
+
+@router.get("/admin/talleres/{taller_id}/interesados")
+def admin_list_interesados(taller_id: int, request: Request):
+    """Lista los interesados (leads sin cupo en su momento) de un concepto —
+    hoy `interesados_taller` era write-only, nadie la veía desde el admin."""
+    require_admin(request)
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, nombre, email, telefono, created_at, notificado_at "
+            "FROM interesados_taller WHERE taller_id = %s ORDER BY created_at DESC",
+            (taller_id,),
+        ).fetchall()
+    return [
+        {
+            "id": r["id"],
+            "nombre": r["nombre"],
+            "email": r["email"],
+            "telefono": r["telefono"],
+            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            "notificado_at": r["notificado_at"].isoformat() if r["notificado_at"] else None,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/admin/talleres/{taller_id}/interesados/{interesado_id}/notificar", status_code=200)
+def admin_notificar_interesado(taller_id: int, interesado_id: int, request: Request):
+    """Avisa a un interesado que hay una nueva edición abierta. Setea la
+    dormida `notificado_at` — no reintenta si ya se avisó, pero no lo bloquea
+    (el admin puede re-avisar a propósito si hace falta)."""
+    require_admin(request)
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT i.nombre, i.email, t.nombre AS taller_nombre, t.slug_base "
+            "FROM interesados_taller i JOIN talleres t ON t.id = i.taller_id "
+            "WHERE i.id = %s AND i.taller_id = %s",
+            (interesado_id, taller_id),
+        ).fetchone()
+        if row is None:
+            raise HTTPException(404, "Interesado no encontrado")
+        conn.execute(
+            "UPDATE interesados_taller SET notificado_at = NOW() WHERE id = %s",
+            (interesado_id,),
+        )
+        conn.commit()
+
+    send_email("taller_interesado_nueva_edicion", row["email"], {
+        "taller_nombre": row["taller_nombre"],
+        "nombre_pila": row["nombre"].split()[0],
+        "taller_url": f"{SITE_URL}/escuela/{row['slug_base']}",
+    })
+    return {"ok": True}

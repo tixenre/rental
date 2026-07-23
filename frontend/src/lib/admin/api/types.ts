@@ -1475,6 +1475,17 @@ export type Inscripcion = {
   modalidad_monto: number | null;
 };
 
+// F4b: interesado (lead sin cupo en su momento). notificado_at = ya se le avisó
+// de una nueva edición (el admin puede re-avisar, no queda bloqueado).
+export type Interesado = {
+  id: number;
+  nombre: string;
+  email: string;
+  telefono: string;
+  created_at: string | null;
+  notificado_at: string | null;
+};
+
 // ── Solicitudes ───────────────────────────────────────────────────────────────
 export type ModificacionItem = { equipo_id: number; cantidad: number };
 export type CambiosJson = {

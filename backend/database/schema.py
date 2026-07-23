@@ -2262,6 +2262,15 @@ def _init_db_schema(conn):
     conn.execute(
         "ALTER TABLE taller_inscripciones ADD COLUMN IF NOT EXISTS modalidad_monto INTEGER"
     )
+    # Escuela v2 F4b: "ofrecer cupo al siguiente" — cuando se libera un cupo
+    # (baja de un confirmado), el admin le manda al primero de la lista un
+    # link tokenizado para completar la seña. NO toca cupos_confirmados ni
+    # en_lista_espera hasta que la persona efectivamente reclama el cupo
+    # (POST /talleres/sena/{token}) — así el admin puede re-ofrecer a otro si
+    # no responde, sin tener que "devolver" nada.
+    conn.execute(
+        "ALTER TABLE taller_inscripciones ADD COLUMN IF NOT EXISTS cupo_ofrecido_at TIMESTAMPTZ"
+    )
 
     # ── Carritos activos (#280 Fase 1): persistencia server-side ──────────────
     # Cada heartbeat del frontend hace upsert por session_id (UUID v4 generado
