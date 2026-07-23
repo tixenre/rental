@@ -1415,6 +1415,17 @@ export type EdicionAdmin = {
   fecha_cierre_inscripcion: string | null;
 };
 
+// F4c: mini-KPIs de una edición — plata ya resuelta por el backend (el front
+// solo la muestra, nunca la calcula).
+export type EdicionKpis = {
+  senas_verificadas: number;
+  senas_pendientes: number;
+  en_espera: number;
+  cupo_ofrecido: number;
+  plata_recibida_str: string;
+  plata_esperada_str: string;
+};
+
 // F4c: FAQ del concepto — ninguna pregunta es obligatoria.
 export type FaqItem = { pregunta: string; respuesta: string };
 

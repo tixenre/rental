@@ -182,6 +182,7 @@ export function PagosSection({ edicion }: { edicion: EdicionAdmin }) {
     pago_cbu: edicion.pago_cbu ?? "",
     pago_banco: edicion.pago_banco ?? "",
     direccion: edicion.direccion ?? "",
+    fecha_cierre_inscripcion: edicion.fecha_cierre_inscripcion ?? "",
   });
 
   useEffect(() => {
@@ -190,6 +191,7 @@ export function PagosSection({ edicion }: { edicion: EdicionAdmin }) {
       pago_cbu: edicion.pago_cbu ?? "",
       pago_banco: edicion.pago_banco ?? "",
       direccion: edicion.direccion ?? "",
+      fecha_cierre_inscripcion: edicion.fecha_cierre_inscripcion ?? "",
     });
   }, [edicion.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -221,6 +223,23 @@ export function PagosSection({ edicion }: { edicion: EdicionAdmin }) {
         {tf("Alias de pago", "pago_alias")}
         {tf("CBU", "pago_cbu")}
         {tf("Banco", "pago_banco")}
+      </div>
+      <div className="border-t border-border/40 pt-4">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+              Cierre de inscripciones
+            </label>
+            <Input
+              type="date"
+              value={form.fecha_cierre_inscripcion}
+              onChange={(e) => setForm((f) => ({ ...f, fecha_cierre_inscripcion: e.target.value }))}
+            />
+            <p className="text-2xs text-muted-foreground">
+              Vacío = sin cierre, siempre abierto. Pasada esta fecha, la inscripción se rechaza.
+            </p>
+          </div>
+        </div>
       </div>
       <div className="flex justify-end">
         <Button onClick={() => mut.mutate(form)} disabled={mut.isPending} className="gap-2">

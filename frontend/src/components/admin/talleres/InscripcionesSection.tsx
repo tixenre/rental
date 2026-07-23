@@ -29,6 +29,7 @@ import { useConfirm } from "@/components/admin/useConfirm";
 import { AdminTable, type Column } from "@/components/admin/AdminTable";
 import { ListSkeleton } from "@/components/admin/skeletons";
 import { EmptyState } from "@/design-system/composites/EmptyState";
+import { KpisStrip } from "./KpisStrip";
 
 function fmtDate(iso: string | null) {
   if (!iso) return "—";
@@ -261,6 +262,10 @@ export function InscripcionesSection({
 
   return (
     <>
+      <div className="mb-5">
+        <KpisStrip edicionId={edicion.id} />
+      </div>
+
       {confirmadas.length > 0 && (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">

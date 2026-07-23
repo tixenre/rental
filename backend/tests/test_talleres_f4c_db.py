@@ -246,6 +246,62 @@ def test_trabajo_youtube_url_invalida_400(taller_base):
     assert exc.value.status_code == 400
 
 
+def _insertar_inscripcion(edicion_id, *, en_lista_espera, estado, email=None):
+    from database import get_db
+
+    email = email or f"test-f4c-kpi-{edicion_id}-{estado}@example.com"
+    with get_db() as conn:
+        row = conn.execute(
+            "INSERT INTO taller_inscripciones "
+            "(taller_id, edicion_id, nombre, email, telefono, en_lista_espera, estado) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (TALLER_ID, edicion_id, "Test F4c KPI", email, "2235550099", en_lista_espera, estado),
+        ).fetchone()
+        conn.commit()
+    return row["id"]
+
+
+def test_kpis_cuenta_por_estado_y_resuelve_plata_con_precio_sena(taller_base):
+    from database import get_db
+    t = taller_base
+
+    ed = _crear_edicion_activa(t)
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE ediciones_taller SET precio_sena = 50000 WHERE id = %s", (ed["id"],)
+        )
+        conn.commit()
+
+    _insertar_inscripcion(ed["id"], en_lista_espera=False, estado="confirmada", email="v1@example.com")
+    _insertar_inscripcion(ed["id"], en_lista_espera=False, estado="confirmada", email="v2@example.com")
+    _insertar_inscripcion(ed["id"], en_lista_espera=False, estado="pendiente_sena", email="p1@example.com")
+    _insertar_inscripcion(ed["id"], en_lista_espera=True, estado="en_espera", email="e1@example.com")
+    _insertar_inscripcion(ed["id"], en_lista_espera=True, estado="cupo_ofrecido", email="o1@example.com")
+
+    kpis = t.admin_edicion_kpis(ed["id"], None)
+    assert kpis["senas_verificadas"] == 2
+    assert kpis["senas_pendientes"] == 1
+    assert kpis["en_espera"] == 1
+    assert kpis["cupo_ofrecido"] == 1
+    assert kpis["plata_recibida_str"] == "$100.000"
+    assert kpis["plata_esperada_str"] == "$50.000"
+
+
+def test_kpis_edicion_sin_inscripciones_no_explota(taller_base):
+    t = taller_base
+    ed = _crear_edicion_activa(t)
+    kpis = t.admin_edicion_kpis(ed["id"], None)
+    assert kpis["senas_verificadas"] == 0
+    assert kpis["plata_recibida_str"] == "$0"
+
+
+def test_kpis_404_si_edicion_no_existe(taller_base):
+    t = taller_base
+    with pytest.raises(t.HTTPException) as exc:
+        t.admin_edicion_kpis(9_999_999, None)
+    assert exc.value.status_code == 404
+
+
 def test_faqs_guarda_y_filtra_pregunta_vacia(taller_base):
     t = taller_base
     d = t.admin_update_concepto(

@@ -2120,6 +2120,42 @@ def admin_list_inscripciones_edicion(edicion_id: int, request: Request):
     ]
 
 
+@router.get("/admin/ediciones/{edicion_id}/kpis")
+def admin_edicion_kpis(edicion_id: int, request: Request):
+    """Mini-KPIs de una edición: señas verificadas/pendientes/en espera + plata
+    señada esperada (comprobante subido, sin verificar) vs recibida (verificada).
+    `precio_sena` es un monto plano de la edición (no una regla de precio/combo/
+    descuento): la plata acá es cantidad × ese monto, resuelta en el backend —
+    el front solo la muestra (regla "el front no calcula plata", MEMORIA
+    2026-06-29)."""
+    require_admin(request)
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            SELECT e.precio_sena,
+                   COUNT(*) FILTER (WHERE ti.estado = 'confirmada') AS senas_verificadas,
+                   COUNT(*) FILTER (WHERE ti.estado = 'pendiente_sena') AS senas_pendientes,
+                   COUNT(*) FILTER (WHERE ti.estado = 'en_espera') AS en_espera,
+                   COUNT(*) FILTER (WHERE ti.estado = 'cupo_ofrecido') AS cupo_ofrecido
+            FROM ediciones_taller e
+            LEFT JOIN taller_inscripciones ti ON ti.edicion_id = e.id
+            WHERE e.id = %s
+            GROUP BY e.id
+            """,
+            (edicion_id,),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(404, "Edición no encontrada")
+    return {
+        "senas_verificadas": row["senas_verificadas"],
+        "senas_pendientes": row["senas_pendientes"],
+        "en_espera": row["en_espera"],
+        "cupo_ofrecido": row["cupo_ofrecido"],
+        "plata_recibida_str": _fmt_pesos(row["precio_sena"] * row["senas_verificadas"]),
+        "plata_esperada_str": _fmt_pesos(row["precio_sena"] * row["senas_pendientes"]),
+    }
+
+
 @router.get("/admin/talleres/{taller_id}/inscripciones/export-csv")
 def admin_export_inscripciones_csv(taller_id: int, request: Request):
     """Descarga CSV de inscriptos de un concepto de taller."""
