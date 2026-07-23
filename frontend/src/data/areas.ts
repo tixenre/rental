@@ -27,8 +27,11 @@ export const AREAS = {
     fg: "text-ink",
     accent: "text-estudio",
   },
+  // La vertical de formación: se muestra "escuela." (el nombre de marca); las
+  // clases que ofrece se siguen llamando "talleres". La `key` y la ruta siguen
+  // siendo `workshops`/`/workshops` (interno; `/talleres` redirige links viejos).
   workshops: {
-    label: "workshops.",
+    label: "escuela.",
     desc: "Talleres y formación",
     href: "/workshops",
     bg: "bg-rosa",
