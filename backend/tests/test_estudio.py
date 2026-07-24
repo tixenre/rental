@@ -1132,3 +1132,73 @@ class TestReservaLoginObligatorio:
         from routes.estudio import EstudioReservaCreate
         assert "cliente_nombre" not in EstudioReservaCreate.model_fields
         assert "cliente_email" not in EstudioReservaCreate.model_fields
+
+
+class _OcupacionRangoConn(_ConnCM):
+    """Fake conn para _ocupacion_estudio_rango: devuelve slots/clases fijos
+    sin filtrar (el filtro por rango lo hace la función bajo test)."""
+
+    def __init__(self, slots=None, clases=None):
+        self.slots = slots or []
+        self.clases = clases or []
+
+    def execute(self, sql, params=()):
+        su = " ".join(sql.split()).upper()
+        if "FROM ESTUDIO_SLOTS_FIJOS" in su:
+            return _Cur(self.slots)
+        if "FROM CLASES_TALLER" in su:
+            return _Cur(self.clases)
+        return _Cur([])
+
+
+class TestOcupacionEstudioRango:
+    def test_slot_fijo_dentro_del_rango(self):
+        from routes.estudio import _ocupacion_estudio_rango, _primer_dia_semana
+
+        slot = _slot_full(cliente="Filmar")  # mes_desde/mes_hasta relativos a hoy
+        conn = _OcupacionRangoConn(slots=[slot])
+        y, m = _mes_offset_ym(0)
+        primera = _primer_dia_semana(y, m, slot["dia_semana"]).date()
+        out = _ocupacion_estudio_rango(conn, primera, primera)
+        assert len(out) == 1
+        assert out[0]["tipo"] == "slot_fijo"
+        assert "Filmar" in out[0]["label"]
+
+    def test_slot_fuera_del_rango_pedido_no_aparece(self):
+        from datetime import date
+        from routes.estudio import _ocupacion_estudio_rango
+
+        slot = _slot_full(cliente="Filmar", mes_desde="2026-06", mes_hasta="2026-12")
+        conn = _OcupacionRangoConn(slots=[slot])
+        out = _ocupacion_estudio_rango(conn, date(2030, 1, 1), date(2030, 1, 31))
+        assert out == []
+
+    def test_clase_de_taller_en_rango(self):
+        from datetime import date, datetime
+        from routes.estudio import _ocupacion_estudio_rango
+
+        clase = {
+            "nombre": "Taller de Rodaje", "fecha": date(2026, 9, 5),
+            "hora_inicio_min": 510, "hora_fin_min": 750,
+        }
+        conn = _OcupacionRangoConn(clases=[clase])
+        out = _ocupacion_estudio_rango(conn, date(2026, 9, 1), date(2026, 9, 30))
+        assert len(out) == 1
+        assert out[0]["tipo"] == "taller"
+        assert "Taller de Rodaje" in out[0]["label"]
+        assert out[0]["fecha_desde"] == datetime(2026, 9, 5, 8, 30)
+        assert out[0]["fecha_hasta"] == datetime(2026, 9, 5, 12, 30)
+
+    def test_combina_slots_y_talleres(self):
+        from datetime import date
+        from routes.estudio import _ocupacion_estudio_rango
+
+        slot = _slot_full(cliente="Filmar", mes_desde="2026-09", mes_hasta="2026-09")
+        clase = {
+            "nombre": "Jime", "fecha": date(2026, 9, 12),
+            "hora_inicio_min": 600, "hora_fin_min": 720,
+        }
+        conn = _OcupacionRangoConn(slots=[slot], clases=[clase])
+        out = _ocupacion_estudio_rango(conn, date(2026, 9, 1), date(2026, 9, 30))
+        tipos = {o["tipo"] for o in out}
+        assert tipos == {"slot_fijo", "taller"}

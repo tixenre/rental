@@ -6,7 +6,7 @@ routes/estudio.py — CRUD del Estudio (singleton) + galería de fotos (E1)
 import json
 import time
 from collections import namedtuple
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, Response
@@ -2495,6 +2495,92 @@ def editar_reserva_estudio_admin(pedido_id: int, body: EstudioReservaAdminUpdate
         except Exception:
             conn.rollback()
             raise
+
+
+# ── Admin: ocupación real del estudio para el calendario del dashboard ─────────
+#
+# `GET /admin/calendario` (routes/dashboard.py) lista pedidos — una reserva de
+# estudio confirmada/solicitada YA aparece ahí (es un alquiler normal sobre el
+# centinela). Lo que ese endpoint NO puede ver son los bloqueos que no son
+# pedidos: los slots fijos (el pedido mensual que genera `_regenerar_pedidos_slot`
+# es solo un marcador de facturación, sin `alquiler_items` — el INNER JOIN de
+# `get_calendario` lo excluye a propósito, y aunque no lo excluyera solo mostraría
+# UN día representativo por mes, no cada ocurrencia semanal real) y las clases de
+# taller publicadas. Mismas reglas que `_slot_bloqueante`/`_taller_bloqueante`
+# (una sola forma de decidir "¿está ocupado?"), en forma de lista para un rango
+# en vez de un chequeo puntual.
+
+def _ocupacion_estudio_rango(conn, desde: date, hasta: date) -> list[dict]:
+    """Slots fijos + clases de taller que ocupan el estudio en [desde, hasta].
+    Deliberadamente NO incluye reservas del centinela (ya las cubre el
+    calendario de pedidos) — si un futuro consumidor las necesita también
+    (ej. un selector de fecha del cliente), que las pida aparte vía
+    `_centinela_libre`, no que se dupliquen acá."""
+    mes_desde = f"{desde.year:04d}-{desde.month:02d}"
+    mes_hasta = f"{hasta.year:04d}-{hasta.month:02d}"
+    out: list[dict] = []
+
+    slots = conn.execute(
+        """
+        SELECT cliente, dia_semana, hora_desde, hora_hasta, mes_desde, mes_hasta
+        FROM estudio_slots_fijos
+        WHERE activo = TRUE AND mes_desde <= %s AND mes_hasta >= %s
+        """,
+        (mes_hasta, mes_desde),
+    ).fetchall()
+    for slot in slots:
+        for s in _sesiones_de_slot(slot):
+            if not (desde <= s["fecha"] <= hasta):
+                continue
+            base = datetime(s["fecha"].year, s["fecha"].month, s["fecha"].day)
+            out.append({
+                "tipo": "slot_fijo",
+                "label": f"Slot fijo · {slot['cliente']}",
+                "fecha_desde": base + timedelta(minutes=s["hora_inicio_min"]),
+                "fecha_hasta": base + timedelta(minutes=s["hora_fin_min"]),
+            })
+
+    clases = conn.execute(
+        """
+        SELECT t.nombre, c.fecha, c.hora_inicio_min, c.hora_fin_min
+        FROM clases_taller c
+        JOIN ediciones_taller e ON e.id = c.edicion_id
+        JOIN talleres t ON t.id = e.taller_id
+        WHERE t.activo = TRUE AND e.activo = TRUE
+          AND c.fecha BETWEEN %s AND %s
+        """,
+        (desde, hasta),
+    ).fetchall()
+    for c in clases:
+        base = datetime(c["fecha"].year, c["fecha"].month, c["fecha"].day)
+        out.append({
+            "tipo": "taller",
+            "label": f"Taller · {c['nombre']}",
+            "fecha_desde": base + timedelta(minutes=c["hora_inicio_min"]),
+            "fecha_hasta": base + timedelta(minutes=c["hora_fin_min"]),
+        })
+
+    return out
+
+
+@router.get("/admin/estudio/ocupacion")
+def estudio_ocupacion_admin(
+    request: Request,
+    desde: str = Query(..., description="YYYY-MM-DD"),
+    hasta: str = Query(..., description="YYYY-MM-DD"),
+):
+    """Bloqueos no-pedido del estudio en [desde, hasta], para overlay en el
+    calendario del dashboard admin. Ver nota de sección arriba."""
+    require_admin(request)
+    try:
+        d0 = datetime.strptime(desde, "%Y-%m-%d").date()
+        d1 = datetime.strptime(hasta, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(400, "Fecha inválida (esperado YYYY-MM-DD)")
+    if d1 < d0:
+        raise HTTPException(400, "hasta no puede ser anterior a desde")
+    with get_db() as conn:
+        return {"bloqueos": _ocupacion_estudio_rango(conn, d0, d1)}
 
 
 # ── Admin: CRUD de slots fijos (E4) ────────────────────────────────────────────
