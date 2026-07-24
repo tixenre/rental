@@ -58,45 +58,59 @@ def upgrade() -> None:
     # Backfill Jime: ediciones con exactamente 2 clases sin título + programas legacy.
     # array_to_string sobre el JSONB → un bullet por línea (el formato que el
     # admin edita en textarea y la landing splitea).
-    op.execute(text(
-        """
-        WITH candidatas AS (
-            SELECT e.id AS edicion_id, t.programa_teorica, t.programa_practica
-            FROM ediciones_taller e
-            JOIN talleres t ON t.id = e.taller_id
-            WHERE jsonb_array_length(t.programa_teorica) > 0
-              AND (SELECT COUNT(*) FROM clases_taller c WHERE c.edicion_id = e.id) = 2
-              AND NOT EXISTS (
-                  SELECT 1 FROM clases_taller c
-                  WHERE c.edicion_id = e.id AND c.titulo != ''
-              )
-        ),
-        ordenadas AS (
-            SELECT c.id, c.edicion_id,
-                   ROW_NUMBER() OVER (PARTITION BY c.edicion_id ORDER BY c.fecha, c.hora_inicio_min) AS pos
-            FROM clases_taller c
-            JOIN candidatas ca ON ca.edicion_id = c.edicion_id
-        )
-        UPDATE clases_taller c
-        SET titulo = CASE o.pos WHEN 1 THEN 'Clase teórica' ELSE 'Clase práctica' END,
-            descripcion = CASE o.pos
-                WHEN 1 THEN (
-                    SELECT COALESCE(string_agg(x.v, E'\n'), '')
-                    FROM candidatas ca2,
-                         LATERAL jsonb_array_elements_text(ca2.programa_teorica) AS x(v)
-                    WHERE ca2.edicion_id = o.edicion_id
-                )
-                ELSE (
-                    SELECT COALESCE(string_agg(x.v, E'\n'), '')
-                    FROM candidatas ca2,
-                         LATERAL jsonb_array_elements_text(ca2.programa_practica) AS x(v)
-                    WHERE ca2.edicion_id = o.edicion_id
-                )
-            END
-        FROM ordenadas o
-        WHERE c.id = o.id
-        """
-    ))
+    #
+    # Guard post-Escuela-v2-F6 (esc7l8i9m0p1): en una DB fresca, init_db() ya
+    # crea `talleres` sin `programa_teorica`/`programa_practica` (retiradas en
+    # F6) — no hay nada de qué leer. (De cualquier forma esta guarda de arriba
+    # -COUNT(*) = 2- nunca matcheó en la práctica contra datos reales: ninguna
+    # migración anterior insertó esas 2 filas vacías; el backfill real de F6
+    # las inserta directo, ver esc7l8i9m0p1.)
+    conn = op.get_bind()
+    tiene_programa = conn.execute(text(
+        "SELECT 1 FROM information_schema.columns "
+        "WHERE table_name = 'talleres' AND column_name = 'programa_teorica'"
+    )).fetchone() is not None
+
+    if tiene_programa:
+        op.execute(text(
+            """
+            WITH candidatas AS (
+                SELECT e.id AS edicion_id, t.programa_teorica, t.programa_practica
+                FROM ediciones_taller e
+                JOIN talleres t ON t.id = e.taller_id
+                WHERE jsonb_array_length(t.programa_teorica) > 0
+                  AND (SELECT COUNT(*) FROM clases_taller c WHERE c.edicion_id = e.id) = 2
+                  AND NOT EXISTS (
+                      SELECT 1 FROM clases_taller c
+                      WHERE c.edicion_id = e.id AND c.titulo != ''
+                  )
+            ),
+            ordenadas AS (
+                SELECT c.id, c.edicion_id,
+                       ROW_NUMBER() OVER (PARTITION BY c.edicion_id ORDER BY c.fecha, c.hora_inicio_min) AS pos
+                FROM clases_taller c
+                JOIN candidatas ca ON ca.edicion_id = c.edicion_id
+            )
+            UPDATE clases_taller c
+            SET titulo = CASE o.pos WHEN 1 THEN 'Clase teórica' ELSE 'Clase práctica' END,
+                descripcion = CASE o.pos
+                    WHEN 1 THEN (
+                        SELECT COALESCE(string_agg(x.v, E'\n'), '')
+                        FROM candidatas ca2,
+                             LATERAL jsonb_array_elements_text(ca2.programa_teorica) AS x(v)
+                        WHERE ca2.edicion_id = o.edicion_id
+                    )
+                    ELSE (
+                        SELECT COALESCE(string_agg(x.v, E'\n'), '')
+                        FROM candidatas ca2,
+                             LATERAL jsonb_array_elements_text(ca2.programa_practica) AS x(v)
+                        WHERE ca2.edicion_id = o.edicion_id
+                    )
+                END
+            FROM ordenadas o
+            WHERE c.id = o.id
+            """
+        ))
 
 
 def downgrade() -> None:

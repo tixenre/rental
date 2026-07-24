@@ -19,7 +19,6 @@ import { TallerFAQ } from "@/components/talleres/TallerFAQ";
 import { TallerCTABar } from "@/components/talleres/TallerCTABar";
 import { Input } from "@/design-system/ui/input";
 import { apiGetTaller, type EdicionLite, type Taller } from "@/lib/api";
-import { clasesParaPrograma } from "@/lib/talleres/legacy";
 import { ordinalEdicion } from "@/lib/talleres/formato";
 import { descargarIcsTaller } from "@/lib/talleres/ical";
 
@@ -207,7 +206,7 @@ function TallerLandingPage() {
   const fechaInicioStr = fechaInicio.toLocaleDateString("es-AR", optsLong);
   const fechaFinStr = fechaFin.toLocaleDateString("es-AR", optsLong);
 
-  const clases = clasesParaPrograma(formTaller);
+  const clases = formTaller.sesiones;
 
   return (
     <>

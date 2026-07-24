@@ -28,13 +28,16 @@ export const Route = createFileRoute("/escuela/$slug")({
       };
     }
     const url = `${SITE_URL}/escuela/${taller.slug}`;
-    const title = `${taller.nombre} con ${taller.instructor_nombre} — Rambla Rental`;
+    const instructoresStr = taller.instructores.map((i) => i.nombre).join(" y ");
+    const title = instructoresStr
+      ? `${taller.nombre} con ${instructoresStr} — Rambla Rental`
+      : `${taller.nombre} — Rambla Rental`;
     const desc = `${taller.descripcion}`.slice(0, 155).replace(/\s+/g, " ").trim();
 
     const eventJsonLd = {
       "@context": "https://schema.org",
       "@type": "Event",
-      name: `${taller.nombre} con ${taller.instructor_nombre}`,
+      name: instructoresStr ? `${taller.nombre} con ${instructoresStr}` : taller.nombre,
       description: desc,
       startDate: taller.fecha_inicio,
       endDate: taller.fecha_fin,

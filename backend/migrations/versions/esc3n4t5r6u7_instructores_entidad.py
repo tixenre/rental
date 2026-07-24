@@ -79,29 +79,40 @@ def upgrade() -> None:
     # (ej. un typo corregido en uno y no en el otro) generaban 2 filas — DISTINCT
     # dedupea por la combinación de las 4 columnas, no por el nombre. Desempate
     # determinístico por `t.id` ASC (el taller más viejo con ese nombre gana).
-    op.execute(text("""
-        INSERT INTO instructores (nombre, descripcion, foto_media_id, foto_url)
-        SELECT DISTINCT ON (t.instructor_nombre)
-               t.instructor_nombre, t.instructor_bio,
-               t.instructor_media_id, t.instructor_foto_url
-        FROM talleres t
-        WHERE t.instructor_nombre != ''
-          AND NOT EXISTS (
-              SELECT 1 FROM instructores i WHERE i.nombre = t.instructor_nombre
-          )
-        ORDER BY t.instructor_nombre, t.id
-    """))
-    op.execute(text("""
-        INSERT INTO taller_instructores (taller_id, instructor_id, orden)
-        SELECT t.id, i.id, 0
-        FROM talleres t
-        JOIN instructores i ON i.nombre = t.instructor_nombre
-        WHERE t.instructor_nombre != ''
-          AND NOT EXISTS (
-              SELECT 1 FROM taller_instructores ti
-              WHERE ti.taller_id = t.id AND ti.instructor_id = i.id
-          )
-    """))
+    #
+    # Guard post-Escuela-v2-F6 (esc7l8i9m0p1): en una DB fresca, init_db() ya
+    # crea `talleres` sin `instructor_nombre` (retirada en F6) — no hay nada de
+    # qué leer (esc7l8i9m0p1 re-corre esta misma lógica sobre datos reales).
+    conn = op.get_bind()
+    tiene_instructor_nombre = conn.execute(text(
+        "SELECT 1 FROM information_schema.columns "
+        "WHERE table_name = 'talleres' AND column_name = 'instructor_nombre'"
+    )).fetchone() is not None
+
+    if tiene_instructor_nombre:
+        op.execute(text("""
+            INSERT INTO instructores (nombre, descripcion, foto_media_id, foto_url)
+            SELECT DISTINCT ON (t.instructor_nombre)
+                   t.instructor_nombre, t.instructor_bio,
+                   t.instructor_media_id, t.instructor_foto_url
+            FROM talleres t
+            WHERE t.instructor_nombre != ''
+              AND NOT EXISTS (
+                  SELECT 1 FROM instructores i WHERE i.nombre = t.instructor_nombre
+              )
+            ORDER BY t.instructor_nombre, t.id
+        """))
+        op.execute(text("""
+            INSERT INTO taller_instructores (taller_id, instructor_id, orden)
+            SELECT t.id, i.id, 0
+            FROM talleres t
+            JOIN instructores i ON i.nombre = t.instructor_nombre
+            WHERE t.instructor_nombre != ''
+              AND NOT EXISTS (
+                  SELECT 1 FROM taller_instructores ti
+                  WHERE ti.taller_id = t.id AND ti.instructor_id = i.id
+              )
+        """))
 
 
 def downgrade() -> None:

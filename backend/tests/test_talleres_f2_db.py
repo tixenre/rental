@@ -67,9 +67,8 @@ def taller_base(monkeypatch):
     try:
         _limpiar(conn)
         conn.execute(
-            "INSERT INTO talleres (id, slug, slug_base, nombre, instructor_nombre, "
-            "fecha_inicio, fecha_fin) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-            (TALLER_ID, SLUG, SLUG, "Taller F2", "Instructor F2", "2099-01-01", "2099-01-02"),
+            "INSERT INTO talleres (id, slug, slug_base, nombre) VALUES (%s, %s, %s, %s)",
+            (TALLER_ID, SLUG, SLUG, "Taller F2"),
         )
         conn.commit()
     finally:

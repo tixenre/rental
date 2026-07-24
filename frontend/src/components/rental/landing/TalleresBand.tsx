@@ -65,7 +65,9 @@ export function TalleresBand() {
           >
             <div className="rounded-2xl border border-border/60 bg-muted/30 px-6 py-4 text-sm text-muted-foreground hover:border-rosa/40 transition-colors">
               <p className="font-medium text-ink text-base">{taller.nombre}</p>
-              <p className="mt-0.5">x {taller.instructor_nombre}</p>
+              {taller.instructores.length > 0 && (
+                <p className="mt-0.5">x {taller.instructores.map((i) => i.nombre).join(" y ")}</p>
+              )}
               <p className="mt-2 text-xs">
                 {fechaInicioStr} y {fechaFinStr} · {taller.direccion}
               </p>

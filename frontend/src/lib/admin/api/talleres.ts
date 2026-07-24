@@ -30,15 +30,6 @@ export const talleresAdminApi = {
       body: JSON.stringify(body),
     }),
 
-  uploadFotoInstructor: (conceptoId: number, file: File) => {
-    const fd = new FormData();
-    fd.append("file", file);
-    return authedFetch(`/api/admin/talleres/${conceptoId}/upload-foto-instructor`, {
-      method: "POST",
-      body: fd,
-    }).then((r) => _ok<{ instructor_foto_url?: string }>(r));
-  },
-
   createEdicion: (conceptoId: number, body: object) =>
     authedPostJson<EdicionAdmin>(`/api/admin/talleres/${conceptoId}/ediciones`, body),
 
@@ -136,6 +127,7 @@ export const talleresAdminApi = {
     descripcion?: string;
     instagram?: string;
     web?: string;
+    proyectos?: string;
   }) => authedPostJson<Instructor>("/api/admin/instructores", body),
 
   updateInstructor: (instructorId: number, body: object) =>

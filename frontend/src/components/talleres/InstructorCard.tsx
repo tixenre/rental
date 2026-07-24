@@ -2,14 +2,12 @@ import type { Taller } from "@/lib/api";
 
 type InstructorEntity = Taller["instructores"][number];
 
-function proyectosDe(taller: Taller): string[] {
-  if (!taller.instructor_proyectos) return [];
-  return Array.isArray(taller.instructor_proyectos)
-    ? taller.instructor_proyectos
-    : String(taller.instructor_proyectos)
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+function proyectosDe(instructor: InstructorEntity): string[] {
+  if (!instructor.proyectos) return [];
+  return instructor.proyectos
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 function InstructorFoto({ instructor }: { instructor: InstructorEntity }) {
@@ -26,7 +24,7 @@ function InstructorFoto({ instructor }: { instructor: InstructorEntity }) {
 
 /**
  * "Sobre" — 1 instructor mantiene el layout actual (foto grande + nombre +
- * bio + chips "trabajó con", legacy `instructor_proyectos`); N instructores
+ * bio + chips "trabajó con", desde `instructor.proyectos`); N instructores
  * pasa a grid de cards. Data-driven, no una variante por `tipo_taller`.
  */
 export function InstructorCard({ taller }: { taller: Taller }) {
@@ -35,7 +33,7 @@ export function InstructorCard({ taller }: { taller: Taller }) {
 
   if (instructores.length === 1) {
     const ins = instructores[0];
-    const proyectos = proyectosDe(taller);
+    const proyectos = proyectosDe(ins);
     return (
       <section className="rounded-2xl border border-border/60 bg-muted/20 px-6 py-7">
         <p className="font-mono text-2xs tracking-[0.25em] uppercase text-muted-foreground mb-4">
