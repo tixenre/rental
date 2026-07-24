@@ -1577,17 +1577,9 @@ def estudio_disponibilidad(
                 "pack": [],
             }
 
-        slot_cliente = _slot_bloqueante(conn, fecha_desde, fecha_hasta)
-        if slot_cliente:
-            return {"libre": False, "motivo": f"Reservado: {slot_cliente}", "pack": []}
-
-        taller_nombre = _taller_bloqueante(conn, fecha_desde, fecha_hasta)
-        if taller_nombre:
-            return {"libre": False, "motivo": f"Taller: {taller_nombre}", "pack": []}
-
-        if not _centinela_libre(conn, estudio["equipo_id"], fecha_desde, fecha_hasta,
-                                estudio["buffer_horas"]):
-            return {"libre": False, "motivo": "Ocupado en esa franja", "pack": []}
+        libre, motivo = _estudio_disponible(conn, estudio, fecha_desde, fecha_hasta)
+        if not libre:
+            return {"libre": False, "motivo": motivo, "pack": []}
 
         # Pack: equipos disponibles en la franja (solo si el pack está activo).
         pack = (
@@ -1677,13 +1669,13 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
                     f"Necesitás reservar con al menos {estudio['anticipacion_min_horas']} h de anticipación",
                 )
 
-            slot_cliente = _slot_bloqueante(conn, fecha_desde, fecha_hasta)
-            if slot_cliente:
-                raise HTTPException(409, f"Esa franja está reservada de forma fija ({slot_cliente})")
-
-            taller_nombre = _taller_bloqueante(conn, fecha_desde, fecha_hasta)
-            if taller_nombre:
-                raise HTTPException(409, f"Esa franja está reservada para el taller «{taller_nombre}»")
+            # Chequeo temprano (fail-fast, sin lock): mismo motor unificado que
+            # GET /estudio/disponibilidad — evita insertar el pedido/pack para
+            # después descubrir el conflicto. El requisito DURO real es el
+            # re-chequeo de _centinela_libre bajo lock, más abajo.
+            libre, motivo = _estudio_disponible(conn, estudio, fecha_desde, fecha_hasta)
+            if not libre:
+                raise HTTPException(409, f"El estudio no está disponible en esa franja: {motivo}")
 
             con_pack = bool(body.con_pack) and bool(estudio["pack_activo"])
             monto_total = (estudio["precio_hora"] or 0) * body.horas
