@@ -10,6 +10,7 @@ import { formatARS } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { Button } from "@/design-system/ui/button";
+import { Grain } from "@/components/common/Grain";
 
 export const Route = createLazyFileRoute("/estudio")({
   component: EstudioPage,
@@ -17,18 +18,6 @@ export const Route = createLazyFileRoute("/estudio")({
 
 const MAPA_EMBED_DEFAULT =
   "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d5418.432520284455!2d-57.56597107511356!3d-37.98649647543215!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x9584db0050a8b0bf%3A0x3860608ed96f47f1!2sRambla%20Estudio%20y%20Rental!5e0!3m2!1ses-419!2sar!4v1782432663360!5m2!1ses-419!2sar";
-
-// ── Grain overlay (reutilizado en secciones ink/amber) ─────────────────────
-const Grain = ({ opacity = 12 }: { opacity?: number }) => (
-  <div
-    className="pointer-events-none absolute inset-0"
-    style={{
-      backgroundImage: "radial-gradient(circle, oklch(0.85 0 0 / 12%) 1px, transparent 1px)",
-      backgroundSize: "5px 5px",
-      opacity: opacity / 100,
-    }}
-  />
-);
 
 type Photo = { src: string; alt: string; hero?: boolean; ciclorama?: boolean };
 

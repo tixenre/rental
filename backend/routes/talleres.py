@@ -264,7 +264,7 @@ def _edicion_lite(row) -> dict:
     }
 
 
-def _edicion_to_public_dict(row, clases=None, instructores=None, modalidades=None) -> dict:
+def _edicion_to_public_dict(row, clases=None, instructores=None, modalidades=None, trabajos=None) -> dict:
     """Convierte edicion_row (JOIN talleres) al shape plano del API público."""
     return {
         "id": row["id"],
@@ -313,11 +313,14 @@ def _edicion_to_public_dict(row, clases=None, instructores=None, modalidades=Non
         # sintético — ver _modalidades_publicas).
         "video": _video_dict(row),
         "modalidades": _modalidades_publicas(modalidades, row["precio_total"]),
-        # F4c: FAQ del concepto + cierre de inscripciones de ESTA edición.
+        # F4c: FAQ del concepto + cierre de inscripciones de ESTA edición +
+        # trabajos pasados del concepto (solo YouTube, sin testimonios —
+        # antes solo se servían al admin; F5 los muestra públicamente).
         "faqs": _row_get(row, "faqs", []) or [],
         "fecha_cierre_inscripcion": (
             str(row["fecha_cierre_inscripcion"]) if _row_get(row, "fecha_cierre_inscripcion") else None
         ),
+        "trabajos": trabajos if trabajos is not None else [],
     }
 
 
@@ -592,7 +595,7 @@ def get_taller(slug: str, request: Request):
         row = _get_edicion_row(conn, slug, incluir_borrador=es_admin)
         d = _edicion_to_public_dict(
             row, _get_clases(conn, row["id"]), _get_instructores_taller(conn, row["taller_id"]),
-            _get_modalidades(conn, row["id"]),
+            _get_modalidades(conn, row["id"]), _get_trabajos_taller(conn, row["taller_id"]),
         )
 
         # Próxima edición: misma concepto (taller_id), numero_edicion mayor
@@ -619,13 +622,10 @@ def get_taller(slug: str, request: Request):
     return d
 
 
-@router.post("/talleres/{slug}/upload-comprobante")
-@limiter.limit("20/minute")
-async def upload_comprobante(slug: str, request: Request):
-    """Recibe el comprobante de pago (multipart, campo 'file') y lo sube a R2 privado."""
-    with get_db() as conn:
-        _get_edicion_row(conn, slug)
-
+async def _procesar_upload_comprobante(request: Request, ref: str) -> dict:
+    """Recibe el comprobante de pago (multipart, campo 'file') y lo sube a R2
+    privado. Compartido por el upload del form de inscripción (slug) y el de
+    la página de seña (token) — misma validación, distinto `ref` de storage."""
     form = await request.form()
     file = form.get("file")
     if file is None or not hasattr(file, "read"):
@@ -638,19 +638,27 @@ async def upload_comprobante(slug: str, request: Request):
         raise HTTPException(413, f"Archivo muy grande (máx {COMPROBANTE_MAX_MB} MB)")
 
     content_type = getattr(file, "content_type", None) or "application/octet-stream"
-    ts = int(time.time() * 1000)
-    uid = uuid.uuid4().hex[:8]
-    ref = f"{slug}-{ts}-{uid}"
 
     try:
         key, url = store_raw_document(raw, kind="comprobante-taller", ref=ref, content_type=content_type)
     except MediaError as e:
         raise HTTPException(e.status, e.detail)
     except Exception as e:
-        logger.error("upload_comprobante: error inesperado: %s", e, exc_info=True)
+        logger.error("_procesar_upload_comprobante: error inesperado: %s", e, exc_info=True)
         raise HTTPException(502, "No se pudo subir el archivo. Intentá de nuevo.")
 
     return {"url": url, "key": key}
+
+
+@router.post("/talleres/{slug}/upload-comprobante")
+@limiter.limit("20/minute")
+async def upload_comprobante(slug: str, request: Request):
+    """Recibe el comprobante de pago del form de inscripción normal."""
+    with get_db() as conn:
+        _get_edicion_row(conn, slug)
+    ts = int(time.time() * 1000)
+    uid = uuid.uuid4().hex[:8]
+    return await _procesar_upload_comprobante(request, ref=f"{slug}-{ts}-{uid}")
 
 
 class InscripcionBody(BaseModel):
@@ -895,6 +903,19 @@ def get_oferta_cupo(token: str, request: Request):
         "pago_cbu": row["pago_cbu"],
         "pago_banco": row["pago_banco"],
     }
+
+
+@router.post("/talleres/sena/{token}/upload-comprobante")
+@limiter.limit("20/minute")
+async def upload_comprobante_sena(token: str, request: Request):
+    """Comprobante de la página "completá tu seña" (F5) — mismo procesamiento
+    que el form normal, sin necesitar el slug (todo resuelve por token)."""
+    insid = _leer_token_cupo(token)
+    if insid is None:
+        raise HTTPException(404, "Este link no es válido o venció.")
+    ts = int(time.time() * 1000)
+    uid = uuid.uuid4().hex[:8]
+    return await _procesar_upload_comprobante(request, ref=f"sena-{insid}-{ts}-{uid}")
 
 
 class ClaimCupoBody(BaseModel):

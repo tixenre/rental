@@ -217,6 +217,47 @@ def test_claim_cupo_via_token_reclama_y_suma_cupo(taller_base):
     assert r_post2.status_code == 410, r_post2.text
 
 
+def test_upload_comprobante_sena_no_necesita_slug(taller_base, monkeypatch):
+    """F5: la página pública 'completá tu seña' solo tiene el token — el
+    upload de comprobante tiene que resolver todo por ahí, sin slug."""
+    from fastapi.testclient import TestClient
+    import main
+    t = taller_base
+
+    ed = _crear_edicion_activa(t, cupos_total=5, cupos_confirmados=3)
+    ins_id = _insertar_inscripcion(ed["id"], en_lista_espera=True, estado="en_espera")
+    t.admin_ofrecer_cupo(TALLER_ID, ins_id, None)
+    token = t._generar_token_cupo(ins_id)
+
+    monkeypatch.setattr(
+        t, "store_raw_document",
+        lambda raw, *, kind, ref, content_type: (f"key-{ref}", "https://cdn.example.com/comprobante.pdf"),
+    )
+
+    client = TestClient(main.app)
+    r = client.post(
+        f"/api/talleres/sena/{token}/upload-comprobante",
+        files={"file": ("comprobante.pdf", b"%PDF-fake", "application/pdf")},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["url"] == "https://cdn.example.com/comprobante.pdf"
+    assert body["key"].startswith(f"key-sena-{ins_id}-")
+
+
+def test_upload_comprobante_sena_token_invalido_404(taller_base):
+    from fastapi.testclient import TestClient
+    import main
+    t = taller_base
+
+    client = TestClient(main.app)
+    r = client.post(
+        "/api/talleres/sena/token-inventado/upload-comprobante",
+        files={"file": ("comprobante.pdf", b"%PDF-fake", "application/pdf")},
+    )
+    assert r.status_code == 404, r.text
+
+
 def test_claim_cupo_ya_tomado_409(taller_base):
     """1 solo cupo libre, 2 ofertas en carrera — la primera gana, la segunda
     409 en vez de sobrevender."""

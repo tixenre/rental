@@ -246,6 +246,27 @@ def test_trabajo_youtube_url_invalida_400(taller_base):
     assert exc.value.status_code == 400
 
 
+def test_get_taller_publico_incluye_trabajos(taller_base, monkeypatch):
+    """F5: el detalle público (GET /talleres/{slug}) tiene que traer los
+    trabajos del concepto — antes solo se servían al admin."""
+    from fastapi.testclient import TestClient
+    import main
+    t = taller_base
+    _fake_poster(t, monkeypatch)
+
+    ed = _crear_edicion_activa(t)
+    t.admin_crear_trabajo(
+        TALLER_ID, t.TrabajoBody(titulo="Cortometraje", youtube_url="https://youtu.be/dQw4w9WgXcQ"), None
+    )
+
+    client = TestClient(main.app)
+    r = client.get(f"/api/talleres/{ed['slug']}")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert len(body["trabajos"]) == 1
+    assert body["trabajos"][0]["titulo"] == "Cortometraje"
+
+
 def _insertar_inscripcion(edicion_id, *, en_lista_espera, estado, email=None):
     from database import get_db
 
