@@ -901,6 +901,15 @@ export type CalendarioPedido = {
   equipos: string | null;
 };
 
+/** Bloqueo del estudio que no es un pedido (slot fijo recurrente o clase de
+ * taller publicada) — overlay del calendario admin, GET /admin/estudio/ocupacion. */
+export type CalendarioBloqueo = {
+  tipo: "slot_fijo" | "taller";
+  label: string;
+  fecha_desde: string;
+  fecha_hasta: string;
+};
+
 /** Una fila agregada de búsquedas: un término normalizado con cuántas veces se
  *  buscó, un ejemplo del texto crudo, la última vez, y (en `top`) el máximo de
  *  resultados que llegó a dar. */
