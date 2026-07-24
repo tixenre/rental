@@ -22,7 +22,18 @@ pytestmark = pytest.mark.unit
 
 ROUTES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "routes")
 
-GATE_SYMBOLS = {"_check_stock", "_check_stock_hipotetico", "_centinela_libre"}
+GATE_SYMBOLS = {
+    "_check_stock", "_check_stock_hipotetico", "_centinela_libre",
+    # `estudio.py` no alias-ea `validar_stock_hipotetico` (lo importa tal cual
+    # de `reservas`, a diferencia de `cliente_portal` que lo envuelve como
+    # `_check_stock_hipotetico`) — misma pieza del motor sagrado, otro nombre.
+    "validar_stock_hipotetico",
+    # `_estudio_disponible` (estudio.py) es el gate CANÓNICO del espacio: slot
+    # fijo → taller → `_centinela_libre` (buffer propio). Una función que lo
+    # llama YA validó el espacio aunque no referencie `_centinela_libre`
+    # directo (queda un nivel más adentro) — #1283 Fase 6.
+    "_estudio_disponible",
+}
 
 # Helpers que insertan items PERO delegan la validación de stock en su caller.
 # Cada uno está documentado en el código fuente como "el caller valida".

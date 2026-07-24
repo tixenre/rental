@@ -10,15 +10,16 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from auth.guards import require_admin
-from database import MARCA_SUBQUERY, get_db, now_ar, to_datetime
+from database import MARCA_SUBQUERY, get_db, now_ar, row_to_dict, to_datetime
 from rate_limit import limiter, ADMIN_WRITE_LIMIT, ADMIN_UPLOAD_LIMIT, CLIENTE_WRITE_LIMIT
 from clientes.queries.identidad import nombre_completo_cliente
 from reservas import ESTADOS_RESERVADO, validar_stock as _check_stock, validar_stock_hipotetico
 from routes.alquileres import (
     _dispatch_pedido_creado_emails,
+    _enriquecer_pedidos_con_cliente,
     _get_alquiler_detail,
     _next_numero_pedido,
     get_disponibilidad,
@@ -1824,6 +1825,204 @@ def _agregar_items_pack(conn, pedido_id: int, fecha_desde, fecha_hasta, pack_ids
             )
 
 
+class SueltoItem(BaseModel):
+    """Equipo suelto agregado a mano a una reserva del Estudio — solo desde el
+    back-office (#1283 Fase 6): el flujo público no ofrece sueltos arbitrarios,
+    solo pack ⏰/promo. Mismo tratamiento de plata que el pack/promo: cargo FIJO
+    (no por jornada) — la reserva se mide en horas, no en días."""
+    equipo_id: int
+    cantidad: int = Field(default=1, ge=1, le=9999)
+
+
+def _crear_pedido_estudio(
+    conn, *, estudio, fecha_desde, fecha_hasta,
+    cliente_id, cliente_nombre, cliente_email, cliente_telefono,
+    con_pack: bool, con_promo: bool, sueltos: list | None,
+    espacio_monto: int | None, estado: str, numero_pedido: int,
+) -> int:
+    """Núcleo de creación de un pedido del Estudio (#1283 Fase 6 — extraído de
+    `crear_reserva_estudio`, que ahora es un wrapper: sesión+Didit+anticipación
+    +'solicitado'). Arma los ítems (pack ⏰ best-effort / promo+sueltos DUROS /
+    centinela DURO) y el pedido, todo en la transacción del `conn` del caller
+    (no commitea — eso es responsabilidad del caller). Devuelve `pedido_id`.
+
+    NO valida identidad ni anticipación — son gates del CALLER, distintos entre
+    el flujo público y el admin. SÍ valida slot/taller (conflicto estructural,
+    aplica a cualquier origen) y todo el stock/disponibilidad.
+
+    `espacio_monto`: si es `None`, se calcula `precio_hora × horas` como
+    siempre; si viene, es un override manual del admin (ej. tarifa
+    negociada) — el pedido lo persiste tal cual, sin recalcularlo.
+    """
+    slot_cliente = _slot_bloqueante(conn, fecha_desde, fecha_hasta)
+    if slot_cliente:
+        raise HTTPException(409, f"Esa franja está reservada de forma fija ({slot_cliente})")
+
+    taller_nombre = _taller_bloqueante(conn, fecha_desde, fecha_hasta)
+    if taller_nombre:
+        raise HTTPException(409, f"Esa franja está reservada para el taller «{taller_nombre}»")
+
+    con_pack = bool(con_pack) and bool(estudio["pack_activo"])
+    # La promo reemplaza al pack (#1283 Fase 5): en la práctica son
+    # mutuamente excluyentes (crear la promo apaga pack_activo), pero no
+    # se fuerza acá — cada flag depende solo de que SU mecanismo siga vigente.
+    con_promo = bool(con_promo) and bool(estudio["promo_combo_id"])
+    sueltos = sueltos or []
+
+    # `espacio_monto` es la plata REAL del espacio (va al ítem centinela,
+    # Fase 2 — ítems veraces); `monto_total` sigue siendo espacio + pack/promo/
+    # sueltos, como siempre. El precio de la promo/sueltos se resuelve UNA vez
+    # acá y queda congelado en el ítem (como cualquier otra plata de pedido) —
+    # si el combo/equipo cambia de precio después, este pedido ya cobrado no
+    # se mueve.
+    horas = int(round((fecha_hasta - fecha_desde).total_seconds() / 3600))
+    espacio_monto_final = (
+        espacio_monto if espacio_monto is not None else (estudio["precio_hora"] or 0) * horas
+    )
+    monto_total = espacio_monto_final
+    if con_pack:
+        monto_total += estudio["pack_precio"] or 0
+    promo_precio = precio_jornada_efectivo(conn, estudio["promo_combo_id"]) or 0 if con_promo else 0
+    if con_promo:
+        monto_total += promo_precio
+    precios_sueltos: dict[int, int] = {}
+    for s in sueltos:
+        precio = precio_jornada_efectivo(conn, s.equipo_id) or 0
+        precios_sueltos[s.equipo_id] = precio
+        monto_total += precio * s.cantidad
+
+    pedido_id = conn.insert_returning(
+        """
+        INSERT INTO alquileres (cliente_id, cliente_nombre, cliente_email, cliente_telefono,
+                                fecha_desde, fecha_hasta, monto_total, estado,
+                                fuente, tipo, estudio_con_pack, numero_pedido)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """,
+        (
+            cliente_id, cliente_nombre, cliente_email, cliente_telefono,
+            fecha_desde, fecha_hasta, monto_total, estado,
+            "estudio", "estudio", con_pack, numero_pedido,
+        ),
+    )
+
+    # ── Pack PRIMERO (antes del ítem centinela) ─────────────────────────────
+    # Así _check_stock solo ve los equipos reales del pack y nunca el
+    # centinela → no se mezcla el buffer global con el propio del espacio.
+    if con_pack:
+        pack_ids = _pack_equipo_ids(conn)
+        if pack_ids:
+            # Lock de las filas del pack: serializa contra otras reservas que
+            # toquen estos equipos (su _check_stock también las lockea).
+            conn.execute("SELECT id FROM equipos WHERE id = ANY(%s) FOR UPDATE", (pack_ids,))
+            _agregar_items_pack(conn, pedido_id, fecha_desde, fecha_hasta, pack_ids)
+            # Gate del motor (FOR UPDATE). Best-effort: si algo se lo llevó
+            # otro entre el snapshot y el lock, re-snapshoteamos bajo el lock
+            # (ya refleja a los competidores commiteados) en vez de fallar
+            # toda la reserva. El espacio sí es requisito duro (abajo).
+            fd_iso, fh_iso = fecha_desde.isoformat(), fecha_hasta.isoformat()
+            if _check_stock(conn, pedido_id, fd_iso, fh_iso):
+                conn.execute(
+                    "DELETE FROM alquiler_items WHERE pedido_id = %s AND equipo_id = ANY(%s)",
+                    (pedido_id, pack_ids),
+                )
+                _agregar_items_pack(conn, pedido_id, fecha_desde, fecha_hasta, pack_ids)
+
+        # Línea personalizada con el precio FIJO del pack (Fase 2, ítems
+        # veraces): antes el pack no tenía NINGÚN ítem con plata propia —
+        # el prorrateo de la liquidación (que reparte `monto_total` por
+        # `subtotal` de ítem) caía al fallback "partes iguales" entre el
+        # centinela y los equipos del pack (todos a $0), derramando valor
+        # del espacio hacia los DUEÑOS de esos equipos. `equipo_id=NULL`
+        # → dueño 'Rambla' por default en la liquidación (`COALESCE`) —
+        # coherente con que la promo es plata de Rambla, no de los
+        # dueños tradicionales. Se cobra el precio fijo del pack pase lo
+        # que pase con la disponibilidad de sus equipos (best-effort de
+        # arriba: lo que no entró, no entró — el precio no cambia).
+        pack_precio = estudio["pack_precio"] or 0
+        conn.execute(
+            """
+            INSERT INTO alquiler_items
+                (pedido_id, equipo_id, cantidad, precio_jornada, subtotal, nombre_libre, cobro_modo)
+            VALUES (%s,NULL,1,%s,%s,%s,'fijo')
+            """,
+            (pedido_id, pack_precio, pack_precio, estudio["pack_nombre"] or "Pack de equipos"),
+        )
+
+    # ── Promo (combo) + sueltos: requisito DURO, sin best-effort ────────────
+    # A diferencia del pack (equipos sueltos best-effort, valor fijo pase lo
+    # que pase), la promo y los sueltos son equipos/combos a precio fijo YA
+    # comprometido con el cliente: si algún componente/equipo no tiene stock,
+    # la reserva falla entera (409) en vez de servir una versión parcial
+    # silenciosa. Se valida ANTES de insertar (`validar_stock_hipotetico`,
+    # como en `revalidar_disponibilidad_estudio`) — NO insertar-y-recién-
+    # chequear: el gate toma sus propios `FOR UPDATE` (expande combos con la
+    # MISMA pieza que cualquier compuesto, `_expandir_mult`), y si el INSERT
+    # fuera antes, el lock implícito FOR KEY SHARE del propio insert quedaría
+    # en el camino del FOR UPDATE del gate — mismo deadlock que el centinela
+    # (ver comentario abajo), aplicado acá por las dudas.
+    _Item = namedtuple("_Item", ["equipo_id", "cantidad"])
+    items_a_validar = []
+    if con_promo:
+        items_a_validar.append(_Item(estudio["promo_combo_id"], 1))
+    items_a_validar.extend(_Item(s.equipo_id, s.cantidad) for s in sueltos)
+    if items_a_validar:
+        errores = validar_stock_hipotetico(
+            conn, pedido_id, fecha_desde.isoformat(), fecha_hasta.isoformat(), items_a_validar
+        )
+        if errores:
+            raise HTTPException(409, f"Sin stock suficiente: {'; '.join(errores)}")
+
+    if con_promo:
+        conn.execute(
+            """
+            INSERT INTO alquiler_items
+                (pedido_id, equipo_id, cantidad, precio_jornada, subtotal, cobro_modo)
+            VALUES (%s,%s,1,%s,%s,'fijo')
+            """,
+            (pedido_id, estudio["promo_combo_id"], promo_precio, promo_precio),
+        )
+    for s in sueltos:
+        precio = precios_sueltos[s.equipo_id]
+        conn.execute(
+            """
+            INSERT INTO alquiler_items
+                (pedido_id, equipo_id, cantidad, precio_jornada, subtotal, cobro_modo)
+            VALUES (%s,%s,%s,%s,%s,'fijo')
+            """,
+            (pedido_id, s.equipo_id, s.cantidad, precio, precio * s.cantidad),
+        )
+
+    # ── Espacio (centinela): requisito DURO ─────────────────────────────────
+    # Lock PRIMERO, INSERT después — a propósito, en ese orden. Un INSERT que
+    # referencia `equipo_id` (FK) toma un lock implícito FOR KEY SHARE sobre esa
+    # fila; si esto insertara ANTES de pedir el FOR UPDATE, dos altas
+    # concurrentes de la MISMA franja quedarían cada una con FOR KEY SHARE de
+    # su propio insert (compatibles entre sí) y las dos bloqueadas pidiendo
+    # FOR UPDATE sobre la fila del otro — deadlock simétrico (encontrado con
+    # `test_concurrencia_admin_dos_altas_misma_franja_solo_una_pasa`). Lockeando
+    # ANTES de insertar, la 2da transacción espera acá, nunca llega a insertar
+    # su propia fila en conflicto. Mismo criterio que el pack (arriba: lockea
+    # `pack_ids` antes de `_agregar_items_pack`).
+    conn.execute("SELECT id FROM equipos WHERE id = %s FOR UPDATE", (estudio["equipo_id"],))
+    if not _centinela_libre(conn, estudio["equipo_id"], fecha_desde, fecha_hasta,
+                            estudio["buffer_horas"], exclude_pedido_id=pedido_id):
+        raise HTTPException(409, "El estudio no está disponible en esa franja")
+    # `cobro_modo='fijo'` con el monto real (Fase 2, ítems veraces): antes
+    # este ítem iba a $0 (la plata vivía solo en el header) — sin esto,
+    # cualquier recálculo/desglose/reconciliación que sume por ítem daba
+    # $0 en vez del total real (bugs vivos arreglados en la Fase 1/2).
+    conn.execute(
+        """
+        INSERT INTO alquiler_items
+            (pedido_id, equipo_id, cantidad, precio_jornada, subtotal, cobro_modo)
+        VALUES (%s,%s,1,%s,%s,'fijo')
+        """,
+        (pedido_id, estudio["equipo_id"], espacio_monto_final, espacio_monto_final),
+    )
+
+    return pedido_id
+
+
 @router.post("/estudio/reservas", status_code=201)
 @limiter.limit(CLIENTE_WRITE_LIMIT)
 def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, background: BackgroundTasks):
@@ -1832,11 +2031,8 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
 
     Requiere CLIENTE LOGUEADO (igual que /api/cliente/pedidos): el cliente_id sale
     de la sesión y nombre/email/teléfono del registro de `clientes` — nunca del body.
-
-    El ESPACIO (centinela) es requisito duro: se valida con _centinela_libre +
-    FOR UPDATE (su buffer propio), no con el motor. Los EQUIPOS del pack son
-    equipos reales: se validan con el motor sagrado (_check_stock, buffer global).
-    Criterio ante race del pack: best-effort — todo lo disponible al confirmar."""
+    Wrapper del núcleo `_crear_pedido_estudio` (#1283 Fase 6): acá viven los gates
+    específicos del público (identidad, anticipación) que el admin no necesita."""
     # Import diferido (mismo motivo que `_require_cliente`): evita acoplar el
     # módulo a toda la cadena del portal en import-time y romper ciclos.
     from routes.cliente_portal import cliente_verificado, IDENTIDAD_NO_VERIFICADA_MSG
@@ -1877,131 +2073,14 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
                     f"Necesitás reservar con al menos {estudio['anticipacion_min_horas']} h de anticipación",
                 )
 
-            slot_cliente = _slot_bloqueante(conn, fecha_desde, fecha_hasta)
-            if slot_cliente:
-                raise HTTPException(409, f"Esa franja está reservada de forma fija ({slot_cliente})")
-
-            taller_nombre = _taller_bloqueante(conn, fecha_desde, fecha_hasta)
-            if taller_nombre:
-                raise HTTPException(409, f"Esa franja está reservada para el taller «{taller_nombre}»")
-
-            con_pack = bool(body.con_pack) and bool(estudio["pack_activo"])
-            # La promo reemplaza al pack (#1283 Fase 5): en la práctica son
-            # mutuamente excluyentes (crear la promo apaga pack_activo), pero no
-            # se fuerza acá — cada flag depende solo de que SU mecanismo siga vigente.
-            con_promo = bool(body.con_promo) and bool(estudio["promo_combo_id"])
-            # `espacio_monto` es la plata REAL del espacio (va al ítem centinela,
-            # Fase 2 — ítems veraces); `monto_total` sigue siendo espacio + pack/promo,
-            # como siempre. El precio de la promo se resuelve UNA vez acá y queda
-            # congelado en el ítem (como cualquier otra plata de pedido) — si el
-            # combo cambia de precio después, este pedido ya cobrado no se mueve.
-            espacio_monto = (estudio["precio_hora"] or 0) * body.horas
-            monto_total = espacio_monto
-            if con_pack:
-                monto_total += estudio["pack_precio"] or 0
-            promo_precio = precio_jornada_efectivo(conn, estudio["promo_combo_id"]) or 0 if con_promo else 0
-            if con_promo:
-                monto_total += promo_precio
-
-            next_num = _next_numero_pedido(conn)
-            pedido_id = conn.insert_returning(
-                """
-                INSERT INTO alquileres (cliente_id, cliente_nombre, cliente_email, cliente_telefono,
-                                        fecha_desde, fecha_hasta, monto_total, estado,
-                                        fuente, tipo, estudio_con_pack, numero_pedido)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                """,
-                (
-                    cliente_id, cliente_nombre, cliente_email, cliente_telefono,
-                    fecha_desde, fecha_hasta, monto_total, "solicitado",
-                    "estudio", "estudio", con_pack, next_num,
-                ),
+            pedido_id = _crear_pedido_estudio(
+                conn, estudio=estudio, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
+                cliente_id=cliente_id, cliente_nombre=cliente_nombre,
+                cliente_email=cliente_email, cliente_telefono=cliente_telefono,
+                con_pack=body.con_pack, con_promo=body.con_promo, sueltos=None,
+                espacio_monto=None, estado="solicitado",
+                numero_pedido=_next_numero_pedido(conn),
             )
-
-            # ── Pack PRIMERO (antes del ítem centinela) ─────────────────────────────
-            # Así _check_stock solo ve los equipos reales del pack y nunca el
-            # centinela → no se mezcla el buffer global con el propio del espacio.
-            if con_pack:
-                pack_ids = _pack_equipo_ids(conn)
-                if pack_ids:
-                    # Lock de las filas del pack: serializa contra otras reservas que
-                    # toquen estos equipos (su _check_stock también las lockea).
-                    conn.execute("SELECT id FROM equipos WHERE id = ANY(%s) FOR UPDATE", (pack_ids,))
-                    _agregar_items_pack(conn, pedido_id, fecha_desde, fecha_hasta, pack_ids)
-                    # Gate del motor (FOR UPDATE). Best-effort: si algo se lo llevó
-                    # otro entre el snapshot y el lock, re-snapshoteamos bajo el lock
-                    # (ya refleja a los competidores commiteados) en vez de fallar
-                    # toda la reserva. El espacio sí es requisito duro (abajo).
-                    fd_iso, fh_iso = fecha_desde.isoformat(), fecha_hasta.isoformat()
-                    if _check_stock(conn, pedido_id, fd_iso, fh_iso):
-                        conn.execute(
-                            "DELETE FROM alquiler_items WHERE pedido_id = %s AND equipo_id = ANY(%s)",
-                            (pedido_id, pack_ids),
-                        )
-                        _agregar_items_pack(conn, pedido_id, fecha_desde, fecha_hasta, pack_ids)
-
-                # Línea personalizada con el precio FIJO del pack (Fase 2, ítems
-                # veraces): antes el pack no tenía NINGÚN ítem con plata propia —
-                # el prorrateo de la liquidación (que reparte `monto_total` por
-                # `subtotal` de ítem) caía al fallback "partes iguales" entre el
-                # centinela y los equipos del pack (todos a $0), derramando valor
-                # del espacio hacia los DUEÑOS de esos equipos. `equipo_id=NULL`
-                # → dueño 'Rambla' por default en la liquidación (`COALESCE`) —
-                # coherente con que la promo es plata de Rambla, no de los
-                # dueños tradicionales. Se cobra el precio fijo del pack pase lo
-                # que pase con la disponibilidad de sus equipos (best-effort de
-                # arriba: lo que no entró, no entró — el precio no cambia).
-                pack_precio = estudio["pack_precio"] or 0
-                conn.execute(
-                    """
-                    INSERT INTO alquiler_items
-                        (pedido_id, equipo_id, cantidad, precio_jornada, subtotal, nombre_libre, cobro_modo)
-                    VALUES (%s,NULL,1,%s,%s,%s,'fijo')
-                    """,
-                    (pedido_id, pack_precio, pack_precio, estudio["pack_nombre"] or "Pack de equipos"),
-                )
-
-            # ── Promo (combo, #1283 Fase 5): requisito DURO, sin best-effort ────────
-            # A diferencia del pack (equipos sueltos, mejor-esfuerzo), la promo es
-            # UN equipo tipo='combo' a precio fijo: el cliente paga por el combo
-            # completo, así que si algún componente no tiene stock la reserva
-            # falla entera (409) en vez de servir una versión parcial silenciosa.
-            # `equipo_id` real (no NULL) → `_check_stock` expande sus componentes
-            # con la MISMA pieza que cualquier compuesto (`_expandir_mult`, sin
-            # lógica nueva) y toma sus locks — no hace falta lockear a mano acá.
-            if con_promo:
-                conn.execute(
-                    """
-                    INSERT INTO alquiler_items
-                        (pedido_id, equipo_id, cantidad, precio_jornada, subtotal, cobro_modo)
-                    VALUES (%s,%s,1,%s,%s,'fijo')
-                    """,
-                    (pedido_id, estudio["promo_combo_id"], promo_precio, promo_precio),
-                )
-                fd_iso, fh_iso = fecha_desde.isoformat(), fecha_hasta.isoformat()
-                errores = _check_stock(conn, pedido_id, fd_iso, fh_iso)
-                if errores:
-                    raise HTTPException(409, f"La promo no tiene stock suficiente: {'; '.join(errores)}")
-
-            # ── Espacio (centinela): requisito DURO ─────────────────────────────────
-            # `cobro_modo='fijo'` con el monto real (Fase 2, ítems veraces): antes
-            # este ítem iba a $0 (la plata vivía solo en el header) — sin esto,
-            # cualquier recálculo/desglose/reconciliación que sume por ítem daba
-            # $0 en vez del total real (bugs vivos arreglados en la Fase 1/2).
-            conn.execute(
-                """
-                INSERT INTO alquiler_items
-                    (pedido_id, equipo_id, cantidad, precio_jornada, subtotal, cobro_modo)
-                VALUES (%s,%s,1,%s,%s,'fijo')
-                """,
-                (pedido_id, estudio["equipo_id"], espacio_monto, espacio_monto),
-            )
-            # Lock del centinela (recurso único) + chequeo con SU buffer propio. Una
-            # 2da reserva concurrente espera el lock y ve la 1ra commiteada.
-            conn.execute("SELECT id FROM equipos WHERE id = %s FOR UPDATE", (estudio["equipo_id"],))
-            if not _centinela_libre(conn, estudio["equipo_id"], fecha_desde, fecha_hasta,
-                                    estudio["buffer_horas"], exclude_pedido_id=pedido_id):
-                raise HTTPException(409, "El estudio no está disponible en esa franja")
 
             conn.commit()
             pedido = _get_alquiler_detail(conn, pedido_id)
@@ -2011,6 +2090,419 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
 
     _dispatch_pedido_creado_emails(background, pedido)
     return pedido
+
+
+# ── Admin: alta/gestión de reservas + agenda (#1283 Fase 6) ─────────────────────
+#
+# El admin puede cargar/reprogramar un turno sin pasar por el flujo público
+# (sin login/Didit/anticipación — "el admin carga urgencias a mano", mismo
+# criterio que el lead-time de #1126). Reusa el núcleo `_crear_pedido_estudio`
+# — nunca reimplementa la validación de stock/disponibilidad.
+
+# Estados con los que se puede CREAR una reserva desde el back-office (mismo
+# universo que reserva stock — `reservas.ESTADOS_RESERVADO`, acá como tupla
+# Python para validar el body; 'cancelado' no aplica a una alta).
+_ESTADOS_ADMIN_CREACION = ("solicitado", "confirmado", "retirado")
+
+
+def _resolver_cliente_admin(conn, cliente_id: Optional[int], cliente_nombre: Optional[str]):
+    """Admin: cliente REAL (cliente_id, con contacto de la ficha) o texto libre
+    (cliente_nombre, sin cuenta — ej. alguien que llamó por teléfono). Exactamente
+    uno de los dos. Devuelve (cliente_id, cliente_nombre, cliente_email, cliente_telefono)."""
+    if cliente_id and cliente_nombre:
+        raise HTTPException(400, "Mandá cliente_id O cliente_nombre, no los dos")
+    if cliente_id:
+        cli = conn.execute(
+            "SELECT nombre, apellido, email, telefono FROM clientes WHERE id = %s", (cliente_id,)
+        ).fetchone()
+        if not cli:
+            raise HTTPException(404, "Cliente no encontrado")
+        return (
+            cliente_id, nombre_completo_cliente(cli["nombre"], cli["apellido"]),
+            cli["email"], cli["telefono"],
+        )
+    nombre = (cliente_nombre or "").strip()
+    if not nombre:
+        raise HTTPException(400, "Mandá cliente_id o cliente_nombre")
+    return None, nombre, None, None
+
+
+def _reserva_estudio_admin_dict(conn, pedido_id: int) -> dict:
+    """Detalle liviano de una reserva para el admin — reusa la puerta única de
+    detalle de pedido (contacto en vivo, ítems reales) en vez de reimplementar
+    un SELECT paralelo."""
+    return _get_alquiler_detail(conn, pedido_id)
+
+
+@router.get("/admin/estudio/reservas")
+def listar_reservas_estudio(
+    request: Request, desde: Optional[str] = None, hasta: Optional[str] = None,
+):
+    """Turnos del estudio (tipo='estudio'; NO incluye estudio_fijo — esos son
+    slots recurrentes, ver /admin/estudio/slots) — para la lista del back-office."""
+    require_admin(request)
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT a.id, a.numero_pedido, a.cliente_id, a.cliente_nombre,
+                   a.fecha_desde, a.fecha_hasta, a.monto_total, a.monto_pagado,
+                   a.estado, a.estudio_con_pack
+            FROM alquileres a
+            WHERE a.tipo = 'estudio'
+              AND (%s::date IS NULL OR a.fecha_hasta >= %s::date)
+              AND (%s::date IS NULL OR a.fecha_desde < %s::date + interval '1 day')
+            ORDER BY a.fecha_desde DESC
+            """,
+            (desde, desde, hasta, hasta),
+        ).fetchall()
+        pedidos = [row_to_dict(r) for r in rows]
+        _enriquecer_pedidos_con_cliente(conn, pedidos)
+        return {"reservas": pedidos}
+
+
+@router.get("/admin/estudio/agenda")
+def agenda_estudio(request: Request, desde: str = Query(...), hasta: str = Query(...)):
+    """Bloques de ocupación del estudio en [desde, hasta] (YYYY-MM-DD): turnos
+    reales + slots fijos recurrentes (expandidos a fechas concretas) + talleres.
+    Solo lectura — no toca disponibilidad de ningún equipo, es la vista de
+    "qué ocupa el ESPACIO" (mismas fuentes que _estudio_disponible)."""
+    require_admin(request)
+    try:
+        desde_d = datetime.strptime(desde, "%Y-%m-%d").date()
+        hasta_d = datetime.strptime(hasta, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(400, "desde/hasta deben tener formato YYYY-MM-DD")
+    if desde_d > hasta_d:
+        raise HTTPException(400, "desde no puede ser posterior a hasta")
+
+    with get_db() as conn:
+        bloques = []
+
+        rows = conn.execute(
+            f"""
+            SELECT id, numero_pedido, cliente_nombre, fecha_desde, fecha_hasta, estado
+            FROM alquileres
+            WHERE tipo = 'estudio' AND estado IN {ESTADOS_RESERVADO}
+              AND fecha_desde < %s AND fecha_hasta > %s
+            ORDER BY fecha_desde
+            """,
+            (hasta_d + timedelta(days=1), desde_d),
+        ).fetchall()
+        for r in rows:
+            bloques.append({
+                "tipo": "turno",
+                "id": r["id"],
+                "numero_pedido": r["numero_pedido"],
+                "titulo": r["cliente_nombre"] or "Reserva",
+                "fecha_desde": r["fecha_desde"].isoformat(),
+                "fecha_hasta": r["fecha_hasta"].isoformat(),
+                "estado": r["estado"],
+            })
+
+        slots = conn.execute("SELECT * FROM estudio_slots_fijos WHERE activo = TRUE").fetchall()
+        for slot_row in slots:
+            slot = _slot_to_dict(slot_row)
+            for s in _sesiones_de_slot(slot):
+                if not (desde_d <= s["fecha"] <= hasta_d):
+                    continue
+                base = datetime(s["fecha"].year, s["fecha"].month, s["fecha"].day)
+                bloques.append({
+                    "tipo": "slot",
+                    "id": slot["id"],
+                    "numero_pedido": None,
+                    "titulo": slot["cliente"],
+                    "fecha_desde": (base + timedelta(minutes=s["hora_inicio_min"])).isoformat(),
+                    "fecha_hasta": (base + timedelta(minutes=s["hora_fin_min"])).isoformat(),
+                    "estado": "confirmado",
+                })
+
+        rows = conn.execute(
+            """
+            SELECT t.id, t.nombre, c.fecha, c.hora_inicio_min, c.hora_fin_min
+            FROM clases_taller c
+            JOIN ediciones_taller e ON e.id = c.edicion_id
+            JOIN talleres t ON t.id = e.taller_id
+            WHERE t.activo = TRUE AND e.activo = TRUE
+              AND c.fecha BETWEEN %s AND %s
+            ORDER BY c.fecha
+            """,
+            (desde_d, hasta_d),
+        ).fetchall()
+        for r in rows:
+            base = datetime(r["fecha"].year, r["fecha"].month, r["fecha"].day)
+            bloques.append({
+                "tipo": "taller",
+                "id": r["id"],
+                "numero_pedido": None,
+                "titulo": r["nombre"],
+                "fecha_desde": (base + timedelta(minutes=r["hora_inicio_min"])).isoformat(),
+                "fecha_hasta": (base + timedelta(minutes=r["hora_fin_min"])).isoformat(),
+                "estado": "confirmado",
+            })
+
+        bloques.sort(key=lambda b: b["fecha_desde"])
+        return {"bloques": bloques}
+
+
+@router.get("/admin/estudio/reservas/cotizar")
+def cotizar_reserva_estudio(
+    request: Request,
+    fecha: str = Query(...), start: str = Query(...), horas: int = Query(...),
+    con_pack: bool = False, con_promo: bool = False,
+    sueltos_json: str = Query("[]"),
+):
+    """Desglose de plata de una reserva ANTES de crearla — no muta nada (el
+    front no calcula plata, MEMORIA 2026-06-29). `sueltos_json` es
+    `[{"equipo_id":N,"cantidad":N}]` codificado."""
+    require_admin(request)
+    try:
+        sueltos_raw = json.loads(sueltos_json)
+        sueltos = [SueltoItem(**s) for s in sueltos_raw]
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, f"sueltos_json inválido: {e}")
+
+    with get_db() as conn:
+        estudio = _get_estudio_row(conn)
+        if not estudio["equipo_id"]:
+            raise HTTPException(409, "El estudio todavía no tiene un recurso asociado")
+        fecha_desde, fecha_hasta = _franja_estudio(estudio, fecha, start, horas)
+
+        con_pack = bool(con_pack) and bool(estudio["pack_activo"])
+        con_promo = bool(con_promo) and bool(estudio["promo_combo_id"])
+        espacio_monto = (estudio["precio_hora"] or 0) * horas
+        desglose = {"espacio": espacio_monto, "pack": 0, "promo": 0, "sueltos": []}
+        total = espacio_monto
+        if con_pack:
+            desglose["pack"] = estudio["pack_precio"] or 0
+            total += desglose["pack"]
+        if con_promo:
+            promo_precio = precio_jornada_efectivo(conn, estudio["promo_combo_id"]) or 0
+            desglose["promo"] = promo_precio
+            total += promo_precio
+        for s in sueltos:
+            precio = precio_jornada_efectivo(conn, s.equipo_id) or 0
+            subtotal = precio * s.cantidad
+            desglose["sueltos"].append(
+                {"equipo_id": s.equipo_id, "cantidad": s.cantidad, "precio_jornada": precio,
+                 "subtotal": subtotal}
+            )
+            total += subtotal
+        desglose["monto_total"] = total
+
+        libre, motivo = _estudio_disponible(conn, estudio, fecha_desde, fecha_hasta)
+        desglose["espacio_disponible"] = libre
+        desglose["espacio_motivo"] = motivo
+        return desglose
+
+
+class EstudioReservaAdminCreate(BaseModel):
+    fecha: str
+    start: str
+    horas: int
+    cliente_id: Optional[int] = None
+    cliente_nombre: Optional[str] = None
+    con_pack: bool = False
+    con_promo: bool = False
+    sueltos: list[SueltoItem] = []
+    espacio_monto: Optional[int] = None
+    estado: str = "confirmado"
+
+
+@router.post("/admin/estudio/reservas", status_code=201)
+@limiter.limit(ADMIN_WRITE_LIMIT)
+def crear_reserva_estudio_admin(body: EstudioReservaAdminCreate, request: Request):
+    """Alta de una reserva del estudio desde el back-office: sin sesión de
+    cliente ni Didit ni anticipación mínima (el admin la carga a mano),
+    con equipos sueltos + override del precio del espacio si hace falta.
+    Reusa el mismo núcleo (`_crear_pedido_estudio`) que el flujo público —
+    la validación de stock/disponibilidad no se reimplementa."""
+    require_admin(request)
+    if body.estado not in _ESTADOS_ADMIN_CREACION:
+        raise HTTPException(
+            400, f"estado debe ser uno de {', '.join(_ESTADOS_ADMIN_CREACION)}"
+        )
+
+    with get_db() as conn:
+        try:
+            estudio = _get_estudio_row(conn)
+            if not estudio["equipo_id"]:
+                raise HTTPException(409, "El estudio todavía no tiene un recurso asociado")
+
+            cliente_id, cliente_nombre, cliente_email, cliente_telefono = _resolver_cliente_admin(
+                conn, body.cliente_id, body.cliente_nombre
+            )
+            fecha_desde, fecha_hasta = _franja_estudio(estudio, body.fecha, body.start, body.horas)
+
+            pedido_id = _crear_pedido_estudio(
+                conn, estudio=estudio, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
+                cliente_id=cliente_id, cliente_nombre=cliente_nombre,
+                cliente_email=cliente_email, cliente_telefono=cliente_telefono,
+                con_pack=body.con_pack, con_promo=body.con_promo, sueltos=body.sueltos,
+                espacio_monto=body.espacio_monto, estado=body.estado,
+                numero_pedido=_next_numero_pedido(conn),
+            )
+            conn.commit()
+            return _reserva_estudio_admin_dict(conn, pedido_id)
+        except Exception:
+            conn.rollback()
+            raise
+
+
+class EstudioReservaAdminUpdate(BaseModel):
+    fecha: Optional[str] = None
+    start: Optional[str] = None
+    horas: Optional[int] = None
+    con_pack: Optional[bool] = None
+    con_promo: Optional[bool] = None
+    sueltos: Optional[list[SueltoItem]] = None
+    espacio_monto: Optional[int] = None
+
+
+@router.patch("/admin/estudio/reservas/{pedido_id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+def editar_reserva_estudio_admin(pedido_id: int, body: EstudioReservaAdminUpdate, request: Request):
+    """Reprograma/edita una reserva del estudio YA EXISTENTE. Reemplaza TODOS
+    los ítems no-centinela (pack/promo/sueltos) según el payload — mismo
+    criterio "reemplazo completo" que el PUT de ítems del editor genérico,
+    adaptado al Estudio (que el editor genérico bloquea, Fase 1: #1283).
+    Un `estudio_fijo` no se edita acá — lo gobierna su slot (editar el slot
+    regenera sus pedidos)."""
+    require_admin(request)
+    with get_db() as conn:
+        try:
+            pedido = conn.execute(
+                "SELECT * FROM alquileres WHERE id = %s FOR UPDATE", (pedido_id,)
+            ).fetchone()
+            if not pedido:
+                raise HTTPException(404, "Pedido no encontrado")
+            if pedido["tipo"] == "estudio_fijo":
+                raise HTTPException(
+                    409, "Los turnos de un slot fijo se editan desde el slot, no acá"
+                )
+            if pedido["tipo"] != "estudio":
+                raise HTTPException(400, "Este pedido no es del Estudio")
+
+            estudio = _get_estudio_row(conn)
+
+            fecha_desde = to_datetime(pedido["fecha_desde"])
+            fecha_hasta = to_datetime(pedido["fecha_hasta"])
+            reprograma = body.fecha is not None or body.start is not None or body.horas is not None
+            if reprograma:
+                horas_actuales = int(round((fecha_hasta - fecha_desde).total_seconds() / 3600))
+                fecha_desde, fecha_hasta = _franja_estudio(
+                    estudio,
+                    body.fecha or fecha_desde.strftime("%Y-%m-%d"),
+                    body.start or fecha_desde.strftime("%H:%M"),
+                    body.horas if body.horas is not None else horas_actuales,
+                )
+
+            libre, motivo = _estudio_disponible(
+                conn, estudio, fecha_desde, fecha_hasta, exclude_pedido_id=pedido_id,
+            )
+            if not libre:
+                raise HTTPException(409, f"El espacio no está disponible: {motivo}")
+
+            items_actuales = conn.execute(
+                "SELECT equipo_id, cantidad, precio_jornada, subtotal, nombre_libre, cobro_modo "
+                "FROM alquiler_items WHERE pedido_id = %s AND equipo_id != %s",
+                (pedido_id, estudio["equipo_id"]),
+            ).fetchall()
+            pack_actual = any(it["equipo_id"] is None for it in items_actuales)
+            promo_actual = any(it["equipo_id"] == estudio["promo_combo_id"] for it in items_actuales)
+
+            con_pack = body.con_pack if body.con_pack is not None else pack_actual
+            con_promo = body.con_promo if body.con_promo is not None else promo_actual
+            if body.sueltos is not None:
+                sueltos = body.sueltos
+            else:
+                ids_conocidos = {estudio["promo_combo_id"]}
+                sueltos = [
+                    SueltoItem(equipo_id=it["equipo_id"], cantidad=it["cantidad"])
+                    for it in items_actuales
+                    if it["equipo_id"] is not None and it["equipo_id"] not in ids_conocidos
+                ]
+            espacio_monto = (
+                body.espacio_monto if body.espacio_monto is not None
+                else (estudio["precio_hora"] or 0)
+                * int(round((fecha_hasta - fecha_desde).total_seconds() / 3600))
+            )
+
+            # Reemplazo completo de los ítems no-centinela: se recalcula todo
+            # desde cero contra la franja (nueva o la misma) en vez de parchear
+            # fila por fila — más simple y sin estado intermedio inconsistente.
+            conn.execute(
+                "DELETE FROM alquiler_items WHERE pedido_id = %s AND equipo_id != %s",
+                (pedido_id, estudio["equipo_id"]),
+            )
+
+            con_pack = bool(con_pack) and bool(estudio["pack_activo"])
+            con_promo = bool(con_promo) and bool(estudio["promo_combo_id"])
+            monto_total = espacio_monto
+            if con_pack:
+                pack_ids = _pack_equipo_ids(conn)
+                if pack_ids:
+                    conn.execute("SELECT id FROM equipos WHERE id = ANY(%s) FOR UPDATE", (pack_ids,))
+                    _agregar_items_pack(conn, pedido_id, fecha_desde, fecha_hasta, pack_ids)
+                monto_total += estudio["pack_precio"] or 0
+                conn.execute(
+                    """INSERT INTO alquiler_items
+                           (pedido_id, equipo_id, cantidad, precio_jornada, subtotal, nombre_libre, cobro_modo)
+                       VALUES (%s,NULL,1,%s,%s,%s,'fijo')""",
+                    (pedido_id, estudio["pack_precio"] or 0, estudio["pack_precio"] or 0,
+                     estudio["pack_nombre"] or "Pack de equipos"),
+                )
+            # Validar ANTES de insertar (mismo motivo que `_crear_pedido_estudio`:
+            # insertar primero dejaría el lock implícito FOR KEY SHARE del
+            # propio insert en el camino del FOR UPDATE que toma el gate).
+            _Item = namedtuple("_Item", ["equipo_id", "cantidad"])
+            items_a_validar = []
+            if con_promo:
+                items_a_validar.append(_Item(estudio["promo_combo_id"], 1))
+            items_a_validar.extend(_Item(s.equipo_id, s.cantidad) for s in sueltos)
+            if items_a_validar:
+                errores = validar_stock_hipotetico(
+                    conn, pedido_id, fecha_desde.isoformat(), fecha_hasta.isoformat(),
+                    items_a_validar,
+                )
+                if errores:
+                    raise HTTPException(409, f"Sin stock suficiente: {'; '.join(errores)}")
+
+            if con_promo:
+                promo_precio = precio_jornada_efectivo(conn, estudio["promo_combo_id"]) or 0
+                monto_total += promo_precio
+                conn.execute(
+                    """INSERT INTO alquiler_items
+                           (pedido_id, equipo_id, cantidad, precio_jornada, subtotal, cobro_modo)
+                       VALUES (%s,%s,1,%s,%s,'fijo')""",
+                    (pedido_id, estudio["promo_combo_id"], promo_precio, promo_precio),
+                )
+            for s in sueltos:
+                precio = precio_jornada_efectivo(conn, s.equipo_id) or 0
+                subtotal = precio * s.cantidad
+                monto_total += subtotal
+                conn.execute(
+                    """INSERT INTO alquiler_items
+                           (pedido_id, equipo_id, cantidad, precio_jornada, subtotal, cobro_modo)
+                       VALUES (%s,%s,%s,%s,%s,'fijo')""",
+                    (pedido_id, s.equipo_id, s.cantidad, precio, subtotal),
+                )
+
+            conn.execute(
+                "UPDATE alquiler_items SET precio_jornada = %s, subtotal = %s "
+                "WHERE pedido_id = %s AND equipo_id = %s",
+                (espacio_monto, espacio_monto, pedido_id, estudio["equipo_id"]),
+            )
+            conn.execute(
+                "UPDATE alquileres SET fecha_desde = %s, fecha_hasta = %s, monto_total = %s, "
+                "estudio_con_pack = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                (fecha_desde, fecha_hasta, monto_total, con_pack, pedido_id),
+            )
+
+            conn.commit()
+            return _reserva_estudio_admin_dict(conn, pedido_id)
+        except Exception:
+            conn.rollback()
+            raise
 
 
 # ── Admin: CRUD de slots fijos (E4) ────────────────────────────────────────────
