@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
 import { Checkbox } from "@/design-system/ui/checkbox";
+import { IconButton } from "@/design-system/ui/icon-button";
 import { Input } from "@/design-system/ui/input";
 import { Label } from "@/design-system/ui/label";
 import { Textarea } from "@/design-system/ui/textarea";
@@ -362,13 +363,15 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
                 <CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={1.5} />
                 <span className="truncate">{upload.fileName}</span>
               </div>
-              <button
+              <IconButton
                 type="button"
+                aria-label="Quitar archivo"
+                size="lg"
                 onClick={removeFile}
-                className="shrink-0 p-1 rounded hover:bg-muted transition text-muted-foreground hover:text-ink"
+                className="shrink-0 rounded-full text-muted-foreground hover:text-ink hover:bg-muted"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </IconButton>
             </div>
           )}
         </div>

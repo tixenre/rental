@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { Button } from "@/design-system/ui/button";
+import { IconButton } from "@/design-system/ui/icon-button";
 import { Spinner } from "@/design-system/ui/spinner";
 import { EmptyState } from "@/design-system/composites/EmptyState";
 import {
@@ -153,16 +154,18 @@ function ComprobanteForm({ token, oferta }: { token: string; oferta: OfertaCupo 
               <CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={1.5} />
               <span className="truncate">{upload.fileName}</span>
             </div>
-            <button
+            <IconButton
               type="button"
+              aria-label="Quitar archivo"
+              size="lg"
               onClick={() => {
                 setUpload({ status: "idle" });
                 if (fileRef.current) fileRef.current.value = "";
               }}
-              className="shrink-0 p-1 rounded hover:bg-muted transition text-muted-foreground hover:text-ink"
+              className="shrink-0 rounded-full text-muted-foreground hover:text-ink hover:bg-muted"
             >
               <X className="h-4 w-4" />
-            </button>
+            </IconButton>
           </div>
         )}
       </div>
