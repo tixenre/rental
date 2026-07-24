@@ -7,7 +7,6 @@ import { PublicLayout } from "@/components/rental/shell/PublicLayout";
 import { Button } from "@/design-system/ui/button";
 import { IconButton } from "@/design-system/ui/icon-button";
 import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
-import { Logo } from "@/components/rental/shell/Logo";
 import { WorkshopInscripcionForm } from "@/components/talleres/WorkshopInscripcionForm";
 import { TallerHero } from "@/components/talleres/TallerHero";
 import { TallerCalendario } from "@/components/talleres/TallerCalendario";
@@ -350,17 +349,6 @@ function TallerLandingPage() {
               <TallerFAQ faqs={taller.faqs} />
             </div>
           </div>
-
-          {/* ── Footer mínimo ──────────────────────────────────────────────── */}
-          <footer className="border-t border-border/60 py-8 mt-8">
-            <div className="max-w-[1100px] mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
-              <Logo className="h-5 w-auto opacity-50" />
-              <span>{taller.direccion}</span>
-              <Link to="/rental" className="hover:text-ink transition">
-                Volver al catálogo
-              </Link>
-            </div>
-          </footer>
         </div>
       </PublicLayout>
       {!isFrozen && (
