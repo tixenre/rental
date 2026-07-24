@@ -134,6 +134,9 @@ export function TallerCalendario({ sesiones, horario }: TallerCalendarioProps) {
           month={month}
           onMonthChange={setMonth}
           numberOfMonths={numberOfMonths}
+          startMonth={sesionDates[0]}
+          endMonth={lastDate}
+          showOutsideDays={false}
           modifiers={{ sesion: sesionDates }}
           modifiersClassNames={{
             sesion: "bg-rosa text-ink font-bold !opacity-100 rounded-full",

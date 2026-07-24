@@ -18,10 +18,12 @@ export function ClasesSection({ edicion }: { edicion: EdicionAdmin }) {
   const [editing, setEditing] = useState(false);
   const [tipo, setTipo] = useState(edicion.tipo_taller || "intensivo");
   const [clases, setClases] = useState<ClaseBody[]>(edicion.clases ?? []);
+  const [numeroEdicion, setNumeroEdicion] = useState(String(edicion.numero_edicion));
 
   useEffect(() => {
     setTipo(edicion.tipo_taller || "intensivo");
     setClases(edicion.clases ?? []);
+    setNumeroEdicion(String(edicion.numero_edicion));
   }, [edicion.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mut = useMutation({
@@ -30,6 +32,18 @@ export function ClasesSection({ edicion }: { edicion: EdicionAdmin }) {
     onSuccess: (updated) => {
       toast.success("Clases guardadas");
       setEditing(false);
+      updateEdicionInCache(qc, updated);
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  // Corrige el número de edición (ej. taller con historia previa fuera de
+  // Rambla — nace #1 y hay que pasarlo al número real). No re-deriva el slug.
+  const numeroMut = useMutation({
+    mutationFn: (numero_edicion: number) =>
+      talleresAdminApi.updateEdicion(edicion.id, { numero_edicion }),
+    onSuccess: (updated) => {
+      toast.success("Número de edición actualizado");
       updateEdicionInCache(qc, updated);
     },
     onError: (e) => toast.error((e as Error).message),
@@ -49,8 +63,40 @@ export function ClasesSection({ edicion }: { edicion: EdicionAdmin }) {
     setEditing(false);
   }
 
+  function handleSaveNumero() {
+    const n = parseInt(numeroEdicion, 10);
+    if (isNaN(n) || n < 1) {
+      toast.error("El número de edición debe ser un entero positivo");
+      return;
+    }
+    if (n !== edicion.numero_edicion) numeroMut.mutate(n);
+  }
+
   return !editing ? (
     <div className="flex flex-col gap-4">
+      <div className="flex items-end gap-2">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+            Número de edición
+          </label>
+          <Input
+            type="number"
+            min={1}
+            value={numeroEdicion}
+            onChange={(e) => setNumeroEdicion(e.target.value)}
+            className="w-24"
+          />
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleSaveNumero}
+          disabled={numeroMut.isPending || numeroEdicion === String(edicion.numero_edicion)}
+          className="gap-2"
+        >
+          {numeroMut.isPending ? <Spinner size="xs" /> : "Guardar"}
+        </Button>
+      </div>
       {edicion.clases && edicion.clases.length > 0 ? (
         <TallerCalendario sesiones={edicion.clases} horario={edicion.horario} />
       ) : (

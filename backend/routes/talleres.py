@@ -1124,6 +1124,10 @@ class EdicionUpdateBody(BaseModel):
     modalidades: list[ModalidadPagoBody] | None = None
     # F4c: cierre de inscripciones. '' → borra el cierre (siempre abierto).
     fecha_cierre_inscripcion: str | None = None
+    # Corrige el número de edición (ej. al cargar un taller con historia previa
+    # fuera de Rambla — nace #1 y hay que pasarlo a la #5 real). NO toca el
+    # slug (queda fijo desde la creación, no se re-deriva del número nuevo).
+    numero_edicion: int | None = None
 
 
 @router.get("/admin/talleres")
@@ -1494,6 +1498,10 @@ def admin_update_edicion(edicion_id: int, body: EdicionUpdateBody, request: Requ
         sets.append("direccion = %s"); params.append(body.direccion.strip())
     if body.activo is not None:
         sets.append("activo = %s"); params.append(body.activo)
+    if body.numero_edicion is not None:
+        if body.numero_edicion < 1:
+            raise HTTPException(400, "numero_edicion debe ser un entero positivo")
+        sets.append("numero_edicion = %s"); params.append(body.numero_edicion)
     if body.fecha_cierre_inscripcion is not None:
         if body.fecha_cierre_inscripcion == "":
             sets.append("fecha_cierre_inscripcion = NULL")
@@ -1526,6 +1534,17 @@ def admin_update_edicion(edicion_id: int, body: EdicionUpdateBody, request: Requ
             ).fetchone()
             if existing is None:
                 raise HTTPException(404, "Edición no encontrada")
+
+            if body.numero_edicion is not None:
+                conflicto = conn.execute(
+                    "SELECT id FROM ediciones_taller WHERE taller_id = %s AND numero_edicion = %s "
+                    "AND id != %s",
+                    (existing["taller_id"], body.numero_edicion, edicion_id),
+                ).fetchone()
+                if conflicto:
+                    raise HTTPException(
+                        409, f"Ya existe la edición #{body.numero_edicion} de este taller"
+                    )
 
             new_cupos = body.cupos_total if body.cupos_total is not None else existing["cupos_total"]
             if new_cupos < existing["cupos_confirmados"]:
