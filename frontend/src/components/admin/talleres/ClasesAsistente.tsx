@@ -3,8 +3,10 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import type { ClaseBody } from "@/lib/admin/api/types";
+import { talleresAdminApi } from "@/lib/admin/api/talleres";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
+import { Textarea } from "@/design-system/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -13,15 +15,17 @@ import {
   SelectValue,
 } from "@/design-system/ui/select";
 import { HoraSelect } from "./HoraSelect";
+import { fmtHhmm } from "@/lib/talleres/formato";
 
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
+// Horarios en MINUTOS desde medianoche (Escuela v2 F1): 510 = 8:30.
 function generarClasesSemanales(
   diaSemana: number,
   mesDesde: string,
   mesHasta: string,
-  horaInicio: number,
-  horaFin: number,
+  horaInicioMin: number,
+  horaFinMin: number,
 ): ClaseBody[] {
   const [yD, mD] = mesDesde.split("-").map(Number);
   const [yH, mH] = mesHasta.split("-").map(Number);
@@ -33,8 +37,8 @@ function generarClasesSemanales(
   while (cur <= end) {
     result.push({
       fecha: cur.toISOString().slice(0, 10),
-      hora_inicio: horaInicio,
-      hora_fin: horaFin,
+      hora_inicio_min: horaInicioMin,
+      hora_fin_min: horaFinMin,
     });
     cur.setDate(cur.getDate() + 7);
   }
@@ -52,14 +56,15 @@ export function ClasesAsistente({
   clases: ClaseBody[];
   onChange: (s: ClaseBody[]) => void;
 }) {
+  // Estado en minutos: 540 = 9:00, 780 = 13:00.
   const [newFecha, setNewFecha] = useState("");
-  const [newIni, setNewIni] = useState(9);
-  const [newFin, setNewFin] = useState(13);
+  const [newIni, setNewIni] = useState(540);
+  const [newFin, setNewFin] = useState(780);
   const [diaSemana, setDiaSemana] = useState(0);
   const [mesDesde, setMesDesde] = useState("");
   const [mesHasta, setMesHasta] = useState("");
-  const [semIni, setSemIni] = useState(9);
-  const [semFin, setSemFin] = useState(13);
+  const [semIni, setSemIni] = useState(540);
+  const [semFin, setSemFin] = useState(780);
 
   function addIntensivo() {
     if (!newFecha) {
@@ -70,12 +75,10 @@ export function ClasesAsistente({
       toast.error("Hora inicio debe ser menor a hora fin");
       return;
     }
-    if (clases.find((s) => s.fecha === newFecha)) {
-      toast.error("Esa fecha ya está en la lista");
-      return;
-    }
+    // Se permite repetir fecha (e incluso franja): "Clase 11 y 12 se dictan
+    // juntas". El backend rechaza el duplicado EXACTO (fecha+franja+título).
     onChange(
-      [...clases, { fecha: newFecha, hora_inicio: newIni, hora_fin: newFin }].sort((a, b) =>
+      [...clases, { fecha: newFecha, hora_inicio_min: newIni, hora_fin_min: newFin }].sort((a, b) =>
         a.fecha.localeCompare(b.fecha),
       ),
     );
@@ -102,8 +105,36 @@ export function ClasesAsistente({
     toast.success(`${generated.length} clases generadas`);
   }
 
-  function remove(fecha: string) {
-    onChange(clases.filter((s) => s.fecha !== fecha));
+  function removeAt(idx: number) {
+    onChange(clases.filter((_, i) => i !== idx));
+  }
+
+  function patchAt(idx: number, patch: Partial<ClaseBody>) {
+    onChange(clases.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
+  }
+
+  async function subirPortada(idx: number, file: File) {
+    const clase = clases[idx];
+    if (!clase.id) return; // el botón está deshabilitado sin id, doble red
+    try {
+      const r = await talleresAdminApi.uploadPortadaClase(clase.id, file);
+      patchAt(idx, { portada_url: r.url, portada_media_id: r.media_id });
+      toast.success("Portada subida");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+
+  async function quitarPortada(idx: number) {
+    const clase = clases[idx];
+    if (!clase.id) return;
+    try {
+      await talleresAdminApi.deletePortadaClase(clase.id);
+      patchAt(idx, { portada_url: "", portada_media_id: null });
+      toast.success("Portada quitada");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
   }
 
   return (
@@ -135,12 +166,12 @@ export function ClasesAsistente({
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted-foreground">Desde (h)</label>
-            <HoraSelect value={newIni} onChange={setNewIni} min={0} max={23} />
+            <label className="text-xs text-muted-foreground">Desde</label>
+            <HoraSelect value={newIni} onChange={setNewIni} min={0} max={1410} />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted-foreground">Hasta (h)</label>
-            <HoraSelect value={newFin} onChange={setNewFin} min={1} max={24} />
+            <label className="text-xs text-muted-foreground">Hasta</label>
+            <HoraSelect value={newFin} onChange={setNewFin} min={30} max={1440} />
           </div>
           <Button variant="outline" size="sm" onClick={addIntensivo} className="gap-1.5">
             <Plus className="h-3.5 w-3.5" />
@@ -185,12 +216,12 @@ export function ClasesAsistente({
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted-foreground">Desde (h)</label>
-            <HoraSelect value={semIni} onChange={setSemIni} min={0} max={23} />
+            <label className="text-xs text-muted-foreground">Desde</label>
+            <HoraSelect value={semIni} onChange={setSemIni} min={0} max={1410} />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted-foreground">Hasta (h)</label>
-            <HoraSelect value={semFin} onChange={setSemFin} min={1} max={24} />
+            <label className="text-xs text-muted-foreground">Hasta</label>
+            <HoraSelect value={semFin} onChange={setSemFin} min={30} max={1440} />
           </div>
           <Button variant="outline" size="sm" onClick={generateSemanal} className="gap-1.5">
             <Plus className="h-3.5 w-3.5" />
@@ -202,37 +233,105 @@ export function ClasesAsistente({
       {clases.length > 0 ? (
         <div className="flex flex-col gap-2">
           <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-            {clases.length} clase{clases.length !== 1 ? "s" : ""} · bloquean el estudio en esas
-            franjas
+            {clases.length} clase{clases.length !== 1 ? "s" : ""} · publicadas bloquean el estudio
+            en esas franjas
           </p>
-          <div className="flex flex-wrap gap-1.5">
-            {clases.map((s) => (
-              <span
-                key={s.fecha}
-                className="inline-flex items-center gap-1.5 rounded-full bg-muted/40 border border-border/50 px-3 py-1 text-xs"
+          {/* F2: cada clase es una card editable — título, descripción (temario,
+              1 ítem por línea), nota y portada. La portada requiere clase
+              GUARDADA (id); el resto viaja junto con "Guardar clases". */}
+          <div className="flex flex-col gap-2.5">
+            {clases.map((s, idx) => (
+              <div
+                key={s.id ?? `nueva-${idx}`}
+                className="rounded-xl border border-border/50 bg-muted/20 p-3 flex flex-col gap-2"
               >
-                {new Date(s.fecha + "T12:00:00").toLocaleDateString("es-AR", {
-                  weekday: "short",
-                  day: "numeric",
-                  month: "short",
-                })}
-                <span className="text-muted-foreground">
-                  {s.hora_inicio}–{s.hora_fin}h
-                </span>
-                <button
-                  onClick={() => remove(s.fecha)}
-                  className="ml-0.5 h-6 w-6 flex items-center justify-center text-muted-foreground/60 hover:text-destructive transition rounded"
-                  aria-label="Quitar"
-                >
-                  ×
-                </button>
-              </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-ink shrink-0">
+                    {new Date(s.fecha + "T12:00:00").toLocaleDateString("es-AR", {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                    })}
+                  </span>
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {fmtHhmm(s.hora_inicio_min)}–{fmtHhmm(s.hora_fin_min)}
+                  </span>
+                  <Input
+                    value={s.titulo ?? ""}
+                    onChange={(e) => patchAt(idx, { titulo: e.target.value })}
+                    placeholder={`Clase ${idx + 1}: título`}
+                    className="h-8 text-sm flex-1 min-w-0"
+                  />
+                  <button
+                    onClick={() => removeAt(idx)}
+                    className="h-8 w-8 shrink-0 flex items-center justify-center text-muted-foreground/60 hover:text-destructive transition rounded"
+                    aria-label="Quitar clase"
+                  >
+                    ×
+                  </button>
+                </div>
+                <Textarea
+                  value={s.descripcion ?? ""}
+                  onChange={(e) => patchAt(idx, { descripcion: e.target.value })}
+                  placeholder="Temario / descripción (1 ítem por línea)"
+                  rows={2}
+                  className="resize-y text-sm"
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    value={s.nota ?? ""}
+                    onChange={(e) => patchAt(idx, { nota: e.target.value })}
+                    placeholder="Nota (opcional, ej: se dicta junto a la clase 12)"
+                    className="h-8 text-sm flex-1 min-w-[180px]"
+                  />
+                  {s.portada_url ? (
+                    <span className="flex items-center gap-1.5 shrink-0">
+                      <img
+                        src={s.portada_url}
+                        alt="Portada"
+                        className="h-8 w-12 rounded object-cover border border-border/50"
+                      />
+                      <button
+                        onClick={() => quitarPortada(idx)}
+                        className="text-xs text-muted-foreground hover:text-destructive transition"
+                      >
+                        Quitar portada
+                      </button>
+                    </span>
+                  ) : (
+                    <label
+                      className={
+                        s.id
+                          ? "text-xs font-medium text-ink underline underline-offset-2 cursor-pointer shrink-0"
+                          : "text-xs text-muted-foreground/50 shrink-0 cursor-not-allowed"
+                      }
+                      title={
+                        s.id ? "Subir portada" : "Guardá las clases primero para subir portada"
+                      }
+                    >
+                      + Portada
+                      {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        disabled={!s.id}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void subirPortada(idx, f);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
             ))}
           </div>
         </div>
       ) : (
         <p className="text-xs text-muted-foreground/60 italic">
-          Sin clases. Agregá al menos una para bloquear el estudio.
+          Sin clases. Agregá al menos una (publicada, bloquea el estudio).
         </p>
       )}
     </div>

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Save } from "lucide-react";
+import { Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { talleresAdminApi } from "@/lib/admin/api/talleres";
-import type { ClaseBody, EdicionAdmin } from "@/lib/admin/api/types";
+import type { ClaseBody, EdicionAdmin, ModalidadPagoBody } from "@/lib/admin/api/types";
 import { Button } from "@/design-system/ui/button";
+import { IconButton } from "@/design-system/ui/icon-button";
 import { Input } from "@/design-system/ui/input";
 import { Spinner } from "@/design-system/ui/spinner";
 import { TallerCalendario } from "@/components/talleres/TallerCalendario";
@@ -17,10 +18,12 @@ export function ClasesSection({ edicion }: { edicion: EdicionAdmin }) {
   const [editing, setEditing] = useState(false);
   const [tipo, setTipo] = useState(edicion.tipo_taller || "intensivo");
   const [clases, setClases] = useState<ClaseBody[]>(edicion.clases ?? []);
+  const [numeroEdicion, setNumeroEdicion] = useState(String(edicion.numero_edicion));
 
   useEffect(() => {
     setTipo(edicion.tipo_taller || "intensivo");
     setClases(edicion.clases ?? []);
+    setNumeroEdicion(String(edicion.numero_edicion));
   }, [edicion.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mut = useMutation({
@@ -29,6 +32,18 @@ export function ClasesSection({ edicion }: { edicion: EdicionAdmin }) {
     onSuccess: (updated) => {
       toast.success("Clases guardadas");
       setEditing(false);
+      updateEdicionInCache(qc, updated);
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  // Corrige el número de edición (ej. taller con historia previa fuera de
+  // Rambla — nace #1 y hay que pasarlo al número real). No re-deriva el slug.
+  const numeroMut = useMutation({
+    mutationFn: (numero_edicion: number) =>
+      talleresAdminApi.updateEdicion(edicion.id, { numero_edicion }),
+    onSuccess: (updated) => {
+      toast.success("Número de edición actualizado");
       updateEdicionInCache(qc, updated);
     },
     onError: (e) => toast.error((e as Error).message),
@@ -48,8 +63,40 @@ export function ClasesSection({ edicion }: { edicion: EdicionAdmin }) {
     setEditing(false);
   }
 
+  function handleSaveNumero() {
+    const n = parseInt(numeroEdicion, 10);
+    if (isNaN(n) || n < 1) {
+      toast.error("El número de edición debe ser un entero positivo");
+      return;
+    }
+    if (n !== edicion.numero_edicion) numeroMut.mutate(n);
+  }
+
   return !editing ? (
     <div className="flex flex-col gap-4">
+      <div className="flex items-end gap-2">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+            Número de edición
+          </label>
+          <Input
+            type="number"
+            min={1}
+            value={numeroEdicion}
+            onChange={(e) => setNumeroEdicion(e.target.value)}
+            className="w-24"
+          />
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleSaveNumero}
+          disabled={numeroMut.isPending || numeroEdicion === String(edicion.numero_edicion)}
+          className="gap-2"
+        >
+          {numeroMut.isPending ? <Spinner size="xs" /> : "Guardar"}
+        </Button>
+      </div>
       {edicion.clases && edicion.clases.length > 0 ? (
         <TallerCalendario sesiones={edicion.clases} horario={edicion.horario} />
       ) : (
@@ -181,6 +228,7 @@ export function PagosSection({ edicion }: { edicion: EdicionAdmin }) {
     pago_cbu: edicion.pago_cbu ?? "",
     pago_banco: edicion.pago_banco ?? "",
     direccion: edicion.direccion ?? "",
+    fecha_cierre_inscripcion: edicion.fecha_cierre_inscripcion ?? "",
   });
 
   useEffect(() => {
@@ -189,6 +237,7 @@ export function PagosSection({ edicion }: { edicion: EdicionAdmin }) {
       pago_cbu: edicion.pago_cbu ?? "",
       pago_banco: edicion.pago_banco ?? "",
       direccion: edicion.direccion ?? "",
+      fecha_cierre_inscripcion: edicion.fecha_cierre_inscripcion ?? "",
     });
   }, [edicion.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -221,10 +270,186 @@ export function PagosSection({ edicion }: { edicion: EdicionAdmin }) {
         {tf("CBU", "pago_cbu")}
         {tf("Banco", "pago_banco")}
       </div>
+      <div className="border-t border-border/40 pt-4">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+              Cierre de inscripciones
+            </label>
+            <Input
+              type="date"
+              value={form.fecha_cierre_inscripcion}
+              onChange={(e) => setForm((f) => ({ ...f, fecha_cierre_inscripcion: e.target.value }))}
+            />
+            <p className="text-2xs text-muted-foreground">
+              Vacío = sin cierre, siempre abierto. Pasada esta fecha, la inscripción se rechaza.
+            </p>
+          </div>
+        </div>
+      </div>
       <div className="flex justify-end">
         <Button onClick={() => mut.mutate(form)} disabled={mut.isPending} className="gap-2">
           {mut.isPending ? <Spinner size="sm" /> : <Save className="h-4 w-4" />}
           Guardar
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// F4a: modalidades de pago — sin motor de descuentos, el admin carga el
+// monto final de cada opción a mano ("3 cuotas", "un pago con descuento",
+// "ex alumnos"); los "%" de ahorro son texto libre en `nota`. Sin ninguna
+// configurada, el público ve 1 sola opción sintética ("Pago total").
+type ModalidadForm = {
+  id?: number | null;
+  codigo: string;
+  label: string;
+  nota: string;
+  monto_total: string;
+};
+
+function toModalidadForm(m: ModalidadPagoBody): ModalidadForm {
+  return {
+    id: m.id,
+    codigo: m.codigo,
+    label: m.label,
+    nota: m.nota ?? "",
+    monto_total: String(m.monto_total),
+  };
+}
+
+export function ModalidadesSection({ edicion }: { edicion: EdicionAdmin }) {
+  const qc = useQueryClient();
+  const [rows, setRows] = useState<ModalidadForm[]>(
+    (edicion.modalidades ?? []).map(toModalidadForm),
+  );
+
+  useEffect(() => {
+    setRows((edicion.modalidades ?? []).map(toModalidadForm));
+  }, [edicion.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const mut = useMutation({
+    mutationFn: (modalidades: ModalidadPagoBody[]) =>
+      talleresAdminApi.updateEdicion(edicion.id, { modalidades }),
+    onSuccess: (updated) => {
+      toast.success("Modalidades guardadas");
+      updateEdicionInCache(qc, updated);
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  function agregar() {
+    setRows((r) => [
+      ...r,
+      { codigo: "", label: "", nota: "", monto_total: String(edicion.precio_total || "") },
+    ]);
+  }
+
+  function quitar(idx: number) {
+    setRows((r) => r.filter((_, i) => i !== idx));
+  }
+
+  function actualizar(idx: number, patch: Partial<ModalidadForm>) {
+    setRows((r) => r.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
+  }
+
+  function handleSave() {
+    const parsed: ModalidadPagoBody[] = [];
+    for (const row of rows) {
+      const codigo = row.codigo.trim();
+      const label = row.label.trim();
+      const monto = parseInt(row.monto_total, 10);
+      if (!codigo || !label) {
+        toast.error("Cada modalidad necesita código y label");
+        return;
+      }
+      if (isNaN(monto) || monto <= 0) {
+        toast.error(`La modalidad "${label}" necesita un monto válido`);
+        return;
+      }
+      parsed.push({ id: row.id, codigo, label, nota: row.nota.trim(), monto_total: monto });
+    }
+    const codigos = parsed.map((m) => m.codigo);
+    if (new Set(codigos).size !== codigos.length) {
+      toast.error("Hay códigos de modalidad repetidos");
+      return;
+    }
+    mut.mutate(parsed);
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {rows.length === 0 && (
+        <p className="text-sm text-muted-foreground italic">
+          Sin modalidades configuradas — el público ve 1 sola opción ("Pago total", el precio de
+          arriba). Agregá modalidades si querés ofrecer cuotas o descuentos por forma de pago.
+        </p>
+      )}
+      {rows.map((row, idx) => (
+        <div
+          key={row.id ?? `nueva-${idx}`}
+          className="grid sm:grid-cols-[1fr_1fr_1fr_140px_auto] gap-2 items-end"
+        >
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+              Código
+            </label>
+            <Input
+              value={row.codigo}
+              onChange={(e) => actualizar(idx, { codigo: e.target.value })}
+              placeholder="3-cuotas"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+              Label
+            </label>
+            <Input
+              value={row.label}
+              onChange={(e) => actualizar(idx, { label: e.target.value })}
+              placeholder="3 cuotas"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+              Nota
+            </label>
+            <Input
+              value={row.nota}
+              onChange={(e) => actualizar(idx, { nota: e.target.value })}
+              placeholder="10% off"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+              Monto (ARS)
+            </label>
+            <Input
+              type="number"
+              min={1}
+              value={row.monto_total}
+              onChange={(e) => actualizar(idx, { monto_total: e.target.value })}
+            />
+          </div>
+          <IconButton
+            aria-label="Quitar modalidad"
+            size="sm"
+            onClick={() => quitar(idx)}
+            className="text-muted-foreground hover:text-destructive mb-0.5"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </IconButton>
+        </div>
+      ))}
+      <div className="flex justify-between pt-1">
+        <Button variant="outline" size="sm" onClick={agregar} className="gap-1.5">
+          <Plus className="h-3.5 w-3.5" />
+          Agregar modalidad
+        </Button>
+        <Button onClick={handleSave} disabled={mut.isPending} className="gap-2">
+          {mut.isPending ? <Spinner size="sm" /> : <Save className="h-4 w-4" />}
+          Guardar modalidades
         </Button>
       </div>
     </div>

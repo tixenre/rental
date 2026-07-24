@@ -53,6 +53,7 @@ import {
 import { FacturaBadge } from "@/design-system/ui/FacturaBadge";
 import { Spinner } from "@/design-system/ui/spinner";
 import { cn } from "@/lib/utils";
+import { ESTADO_DOT } from "@/design-system/ui/estado-color";
 import { adminApi, ESTADO_LABEL, type PedidoEstado } from "@/lib/admin/api";
 import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
 import {
@@ -413,6 +414,7 @@ export function EstadoSplitButton({
         >
           {otrosDestinos.map((estado) => (
             <DropdownMenuItem key={estado} onClick={() => onSelect(estado)}>
+              <span className={cn("mr-2 h-2 w-2 shrink-0 rounded-full", ESTADO_DOT[estado])} />
               {ESTADO_LABEL[estado]}
             </DropdownMenuItem>
           ))}
@@ -454,6 +456,7 @@ export function EstadoSplitButton({
         <DropdownMenuContent align="end">
           {otrosDestinos.map((estado) => (
             <DropdownMenuItem key={estado} onClick={() => onSelect(estado)}>
+              <span className={cn("mr-2 h-2 w-2 shrink-0 rounded-full", ESTADO_DOT[estado])} />
               {ESTADO_LABEL[estado]}
             </DropdownMenuItem>
           ))}

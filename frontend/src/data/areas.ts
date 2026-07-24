@@ -27,10 +27,15 @@ export const AREAS = {
     fg: "text-ink",
     accent: "text-estudio",
   },
-  workshops: {
-    label: "workshops.",
+  // La vertical de formación: key `escuela`, ruta `/escuela`, label "escuela.",
+  // theming `[data-area="escuela"]`. Las clases que ofrece se siguen llamando
+  // "talleres" — la API `/api/talleres` y la tabla `talleres` NO se renombran (un
+  // taller es un taller; la escuela los ofrece). `/workshops` redirige a `/escuela`
+  // (única redirección; `/talleres` ya no se soporta).
+  escuela: {
+    label: "escuela.",
     desc: "Talleres y formación",
-    href: "/workshops",
+    href: "/escuela",
     bg: "bg-rosa",
     fg: "text-ink",
     accent: "text-rosa",
