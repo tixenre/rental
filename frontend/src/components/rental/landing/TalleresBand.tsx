@@ -1,7 +1,38 @@
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 
+import { apiGetTalleres, type Taller } from "@/lib/api";
+
+function proximoTaller(talleres: Taller[]): Taller | null {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const activos = talleres
+    .filter((t) => new Date(t.fecha_fin + "T00:00:00") >= hoy)
+    .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime());
+  return activos[0] ?? null;
+}
+
+/** Data-driven — antes mostraba a Jime hardcodeada ("11 y 18 de julio", quedaba
+ * stale apenas pasaba esa fecha). Ahora trae el próximo taller activo (en
+ * curso o por venir) de la API; sin ninguno, la card de la derecha se omite
+ * (el copy de la izquierda es marketing genérico, no depende de un taller). */
 export function TalleresBand() {
+  const { data: talleres = [] } = useQuery({
+    queryKey: ["talleres"],
+    queryFn: apiGetTalleres,
+    staleTime: 1000 * 60 * 5,
+  });
+  const taller = proximoTaller(talleres);
+
+  const optsLargo: Intl.DateTimeFormatOptions = { day: "numeric", month: "long" };
+  const fechaInicioStr = taller
+    ? new Date(taller.fecha_inicio + "T12:00:00").toLocaleDateString("es-AR", optsLargo)
+    : "";
+  const fechaFinStr = taller
+    ? new Date(taller.fecha_fin + "T12:00:00").toLocaleDateString("es-AR", optsLargo)
+    : "";
+
   return (
     <section className="bg-background border-y border-border/60">
       <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-12 sm:py-16 flex flex-col sm:flex-row items-center justify-between gap-8">
@@ -26,13 +57,23 @@ export function TalleresBand() {
             Ver talleres <ArrowRight size={15} strokeWidth={2.4} />
           </Link>
         </div>
-        <div className="hidden sm:flex flex-col items-end gap-2 text-right shrink-0">
-          <div className="rounded-2xl border border-border/60 bg-muted/30 px-6 py-4 text-sm text-muted-foreground">
-            <p className="font-medium text-ink text-base">Taller de Dirección de Arte</p>
-            <p className="mt-0.5">x Jime Troncoso</p>
-            <p className="mt-2 text-xs">11 y 18 de julio · Rambla Estudio</p>
-          </div>
-        </div>
+        {taller && (
+          <Link
+            to="/escuela/$slug"
+            params={{ slug: taller.slug }}
+            className="hidden sm:flex flex-col items-end gap-2 text-right shrink-0"
+          >
+            <div className="rounded-2xl border border-border/60 bg-muted/30 px-6 py-4 text-sm text-muted-foreground hover:border-rosa/40 transition-colors">
+              <p className="font-medium text-ink text-base">{taller.nombre}</p>
+              {taller.instructores.length > 0 && (
+                <p className="mt-0.5">x {taller.instructores.map((i) => i.nombre).join(" y ")}</p>
+              )}
+              <p className="mt-2 text-xs">
+                {fechaInicioStr} y {fechaFinStr} · {taller.direccion}
+              </p>
+            </div>
+          </Link>
+        )}
       </div>
     </section>
   );

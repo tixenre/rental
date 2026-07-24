@@ -1773,17 +1773,9 @@ def estudio_disponibilidad(
                 "promo": None,
             }
 
-        slot_cliente = _slot_bloqueante(conn, fecha_desde, fecha_hasta)
-        if slot_cliente:
-            return {"libre": False, "motivo": f"Reservado: {slot_cliente}", "pack": [], "promo": None}
-
-        taller_nombre = _taller_bloqueante(conn, fecha_desde, fecha_hasta)
-        if taller_nombre:
-            return {"libre": False, "motivo": f"Taller: {taller_nombre}", "pack": [], "promo": None}
-
-        if not _centinela_libre(conn, estudio["equipo_id"], fecha_desde, fecha_hasta,
-                                estudio["buffer_horas"]):
-            return {"libre": False, "motivo": "Ocupado en esa franja", "pack": [], "promo": None}
+        libre, motivo = _estudio_disponible(conn, estudio, fecha_desde, fecha_hasta)
+        if not libre:
+            return {"libre": False, "motivo": motivo, "pack": [], "promo": None}
 
         # Pack: equipos disponibles en la franja (solo si el pack está activo).
         # ⏰ LEGACY — el pack sigue funcionando hasta que la Fase 8 lo retire.

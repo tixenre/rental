@@ -10,13 +10,15 @@ import { Spinner } from "@/design-system/ui/spinner";
 import { Switch } from "@/design-system/ui/switch";
 import { useConfirm } from "@/components/admin/useConfirm";
 import { CuposPill } from "./CuposPill";
-import { ClasesSection, PagosSection, PreciosSection } from "./EdicionTabs";
+import { ClasesSection, ModalidadesSection, PagosSection, PreciosSection } from "./EdicionTabs";
 import { InscripcionesSection } from "./InscripcionesSection";
 import { updateEdicionInCache } from "./cache";
 
 function badgeEstadoEdicion(edicion: EdicionAdmin): { label: string; tone: PillTone } {
   const today = new Date().toISOString().slice(0, 10);
-  if (!edicion.activo) return { label: "INACTIVA", tone: "neutral" };
+  // F2: una edición despublicada es un BORRADOR — se arma sin estar en la web
+  // (preview vía "ver en web" con sesión admin) y no bloquea el estudio.
+  if (!edicion.activo) return { label: "BORRADOR", tone: "warning" };
   if (edicion.frozen_at) return { label: "CONGELADA", tone: "neutral" };
   if (edicion.fecha_inicio > today) return { label: "PRÓXIMAMENTE", tone: "warning" };
   if (edicion.fecha_fin >= today) return { label: "EN CURSO", tone: "success" };
@@ -55,10 +57,12 @@ export function EdicionSubRow({
   const toggleActivoMut = useMutation({
     mutationFn: (activo: boolean) => talleresAdminApi.updateEdicion(edicion.id, { activo }),
     onSuccess: (updated) => {
-      toast.success(updated.activo ? "Edición activada" : "Edición desactivada");
+      toast.success(updated.activo ? "Edición publicada" : "Edición pasada a borrador");
       updateEdicionInCache(qc, updated);
     },
-    onError: (e) => toast.error((e as Error).message),
+    // Publicar re-verifica la disponibilidad del estudio: si un borrador quedó
+    // pisado por una reserva nueva, el backend responde 409 con el detalle.
+    onError: (e) => toast.error((e as Error).message, { duration: 8000 }),
   });
 
   const deleteMut = useMutation({
@@ -140,7 +144,7 @@ export function EdicionSubRow({
             checked={edicion.activo}
             onCheckedChange={handleToggleActivo}
             disabled={toggleActivoMut.isPending}
-            aria-label={edicion.activo ? "Desactivar edición" : "Activar edición"}
+            aria-label={edicion.activo ? "Pasar a borrador" : "Publicar edición"}
           />
           <a
             href={`/escuela/${edicion.slug}`}
@@ -212,6 +216,12 @@ export function EdicionSubRow({
                 <PreciosSection edicion={edicion} />
                 <div className="border-t border-border/40 mt-6 pt-6">
                   <PagosSection edicion={edicion} />
+                </div>
+                <div className="border-t border-border/40 mt-6 pt-6">
+                  <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-3">
+                    Modalidades de pago
+                  </p>
+                  <ModalidadesSection edicion={edicion} />
                 </div>
               </div>
             )}

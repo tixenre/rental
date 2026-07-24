@@ -282,4 +282,59 @@ Datos de pago (seña):
 
 — El equipo de Rambla""",
     },
+    # F4b: verificar seña (pendiente_sena → confirmada).
+    "taller_sena_confirmada": {
+        "subject": "¡Tu lugar está confirmado! — {{ taller_nombre }}",
+        "body_html": f"""<p {b.H}>¡Tu lugar está confirmado!</p>
+<p style="margin:0 0 8px;">Hola <strong>{{{{ nombre_pila }}}}</strong>, verificamos tu seña — tu lugar en <strong>{{{{ taller_nombre }}}}</strong> queda reservado.</p>
+<p {b.LBL}>Fechas</p>
+<p style="margin:0 0 4px;"><strong>Desde:</strong> {{{{ fecha_inicio_str }}}}<br><strong>Hasta:</strong> {{{{ fecha_fin_str }}}}<br><strong>Horario:</strong> {{{{ horario }}}}<br><strong>Lugar:</strong> {{{{ direccion }}}}</p>
+<p {b.MUTED_P}>¿Preguntas? Respondé este mail o escribínos por WhatsApp.</p>
+<p style="margin:18px 0 0;">— El equipo de Rambla</p>""",
+        "body_text": """Hola {{ nombre_pila }}, verificamos tu seña — tu lugar en {{ taller_nombre }} queda reservado.
+
+Desde: {{ fecha_inicio_str }}
+Hasta: {{ fecha_fin_str }}
+Horario: {{ horario }}
+Lugar: {{ direccion }}
+
+¿Preguntas? Respondé este mail.
+
+— El equipo de Rambla""",
+    },
+    # F4b: se liberó un cupo — se le ofrece a el/la primero/a de la lista de
+    # espera, con link tokenizado para completar la seña.
+    "taller_cupo_ofrecido": {
+        "subject": "¡Se liberó un cupo! — {{ taller_nombre }}",
+        "body_html": f"""<p {b.H}>¡Se liberó un cupo!</p>
+<p style="margin:0 0 8px;">Hola <strong>{{{{ nombre_pila }}}}</strong>, se liberó un cupo en <strong>{{{{ taller_nombre }}}}</strong> y sos la/el primera/o en la lista de espera.</p>
+<p style="margin:0 0 8px;">Completá tu seña ({{{{ precio_sena_str }}}}) para confirmar tu lugar — es por orden de llegada, así que te recomendamos hacerlo pronto.</p>
+{b.btn("link_sena", "Completar mi seña")}
+<p {b.MUTED_P}>¿Preguntas? Respondé este mail o escribínos por WhatsApp.</p>
+<p style="margin:18px 0 0;">— El equipo de Rambla</p>""",
+        "body_text": """Hola {{ nombre_pila }}, se liberó un cupo en {{ taller_nombre }} y sos la/el primera/o en la lista de espera.
+
+Completá tu seña ({{ precio_sena_str }}) para confirmar tu lugar (por orden de llegada): {{ link_sena }}
+
+¿Preguntas? Respondé este mail.
+
+— El equipo de Rambla""",
+    },
+    # F4b: aviso a un interesado (lead sin cupo disponible en su momento) de
+    # que hay una nueva edición abierta.
+    "taller_interesado_nueva_edicion": {
+        "subject": "Nueva edición abierta — {{ taller_nombre }}",
+        "body_html": f"""<p {b.H}>Nueva edición abierta</p>
+<p style="margin:0 0 8px;">Hola <strong>{{{{ nombre_pila }}}}</strong>, te contactamos porque te habías anotado como interesado/a en <strong>{{{{ taller_nombre }}}}</strong> — ¡ya está abierta una nueva edición!</p>
+{b.btn("taller_url", "Ver el taller")}
+<p {b.MUTED_P}>¿Preguntas? Respondé este mail o escribínos por WhatsApp.</p>
+<p style="margin:18px 0 0;">— El equipo de Rambla</p>""",
+        "body_text": """Hola {{ nombre_pila }}, te contactamos porque te habías anotado como interesado/a en {{ taller_nombre }} — ¡ya está abierta una nueva edición!
+
+{{ taller_url }}
+
+¿Preguntas? Respondé este mail.
+
+— El equipo de Rambla""",
+    },
 }

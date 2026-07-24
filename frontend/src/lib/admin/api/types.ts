@@ -1358,13 +1358,34 @@ export type DescuentoJornada = { id: number; jornadas: number; pct: number };
 // ── Talleres ──────────────────────────────────────────────────────────────────
 
 // Horas en MINUTOS desde medianoche (510 = 8:30). Los `_str` vienen resueltos
-// del backend en las lecturas; al ESCRIBIR solo viajan los `_min`.
+// del backend en las lecturas; al ESCRIBIR solo viajan los `_min` + contenido.
+// F2 (clase rica): `id` presente al escribir = actualizar esa clase (preserva
+// su portada); ausente = clase nueva. La portada solo cambia por sus endpoints.
 export type ClaseBody = {
+  id?: number | null;
   fecha: string;
   hora_inicio_min: number;
   hora_fin_min: number;
   hora_inicio_str?: string;
   hora_fin_str?: string;
+  titulo?: string;
+  descripcion?: string;
+  nota?: string;
+  portada_media_id?: number | null;
+  portada_url?: string;
+};
+
+// F4a: modalidad de pago de una edición. `id` presente al escribir = editar
+// esa fila (preserva su posición salvo reorden); ausente = nueva. Sin motor
+// de descuentos: `monto_total` lo carga el admin a mano, los "%" son texto
+// libre en `nota`. `monto_total_str` viene resuelto del backend en lecturas.
+export type ModalidadPagoBody = {
+  id?: number | null;
+  codigo: string;
+  label: string;
+  nota?: string;
+  monto_total: number;
+  monto_total_str?: string;
 };
 
 export type EdicionAdmin = {
@@ -1388,6 +1409,33 @@ export type EdicionAdmin = {
   activo: boolean;
   frozen_at: string | null;
   clases: ClaseBody[];
+  // F4a: RAW (sin fallback sintético — [] = "no configuradas todavía").
+  modalidades: ModalidadPagoBody[];
+  // F4c: NULL = sin cierre (siempre abierto).
+  fecha_cierre_inscripcion: string | null;
+};
+
+// F4c: mini-KPIs de una edición — plata ya resuelta por el backend (el front
+// solo la muestra, nunca la calcula).
+export type EdicionKpis = {
+  senas_verificadas: number;
+  senas_pendientes: number;
+  en_espera: number;
+  cupo_ofrecido: number;
+  plata_recibida_str: string;
+  plata_esperada_str: string;
+};
+
+// F4c: FAQ del concepto — ninguna pregunta es obligatoria.
+export type FaqItem = { pregunta: string; respuesta: string };
+
+// F4c: trabajo pasado del taller (link de YouTube, sin testimonios/reseñas).
+export type Trabajo = {
+  id: number;
+  titulo: string;
+  youtube_url: string;
+  poster_url: string;
+  poster_media_id: number | null;
 };
 
 export type TallerConcepto = {
@@ -1395,17 +1443,39 @@ export type TallerConcepto = {
   slug_base: string;
   nombre: string;
   subtitulo: string;
-  instructor_nombre: string;
-  instructor_bio: string;
-  instructor_proyectos: string;
   descripcion: string;
   publico_objetivo: string;
-  programa_teorica: string[];
-  programa_practica: string[];
-  instructor_foto_url: string;
-  instructor_media_id: number | null;
   notif_email: string;
+  // F2: T&C propios ('' → /terminos general), beneficios, pregunta del form
+  // configurable y mensaje post-inscripción.
+  terminos: string;
+  beneficios: string;
+  pregunta_experiencia: string;
+  mensaje_confirmacion: string;
+  // F4a: video hero (YouTube). '' → sin video.
+  video_url: string;
+  video_poster_url: string;
+  // F3: instructores como entidad (además de instructor_* legacy arriba).
+  instructores: Instructor[];
   ediciones: EdicionAdmin[];
+  // F4c: FAQ del concepto + trabajos pasados (solo YouTube).
+  faqs: FaqItem[];
+  trabajos: Trabajo[];
+};
+
+// F3: instructor como entidad propia (N↔N con talleres — fuente única desde
+// F6, reemplazó a los campos instructor_* legacy del concepto).
+export type Instructor = {
+  id: number;
+  nombre: string;
+  rol: string;
+  descripcion: string;
+  instagram: string;
+  web: string;
+  foto_url: string;
+  foto_media_id: number | null;
+  // F6: "Trabajó con" — reemplaza el legacy `instructor_proyectos` (1 por taller).
+  proyectos: string;
 };
 
 export type Inscripcion = {
@@ -1421,6 +1491,22 @@ export type Inscripcion = {
   numero_edicion: number | null;
   edicion_slug: string | null;
   created_at: string | null;
+  tyc_aceptado_at: string | null;
+  // F4a: snapshot de la modalidad de pago elegida (null = inscripción previa a F4a).
+  modalidad_codigo: string | null;
+  modalidad_label: string | null;
+  modalidad_monto: number | null;
+};
+
+// F4b: interesado (lead sin cupo en su momento). notificado_at = ya se le avisó
+// de una nueva edición (el admin puede re-avisar, no queda bloqueado).
+export type Interesado = {
+  id: number;
+  nombre: string;
+  email: string;
+  telefono: string;
+  created_at: string | null;
+  notificado_at: string | null;
 };
 
 // ── Solicitudes ───────────────────────────────────────────────────────────────
