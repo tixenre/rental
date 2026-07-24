@@ -412,13 +412,8 @@ export type Taller = {
   slug: string;
   nombre: string;
   subtitulo: string;
-  instructor_nombre: string;
-  instructor_bio: string;
-  instructor_proyectos: string;
   descripcion: string;
   publico_objetivo: string;
-  programa_teorica: string[];
-  programa_practica: string[];
   fecha_inicio: string;
   fecha_fin: string;
   horario: string;
@@ -431,10 +426,7 @@ export type Taller = {
   pago_cbu: string;
   pago_banco: string;
   direccion: string;
-  instructor_foto_url?: string;
-  instructor_media_id?: number | null;
   numero_edicion: number;
-  proxima_edicion_slug: string;
   proxima_edicion?: EdicionLite | null;
   edicion_anterior?: EdicionLite | null;
   activo: boolean;
@@ -448,7 +440,7 @@ export type Taller = {
   mensaje_confirmacion: string;
   /** True solo cuando una sesión admin previsualiza una edición despublicada. */
   borrador: boolean;
-  // F3: instructores como entidad (además de instructor_* legacy arriba).
+  // F3: instructores como entidad.
   instructores: {
     id: number;
     nombre: string;
@@ -458,6 +450,8 @@ export type Taller = {
     web: string;
     foto_url: string;
     foto_media_id: number | null;
+    // F6: "Trabajó con" — reemplaza el legacy `instructor_proyectos` (1 por taller).
+    proyectos: string;
   }[];
   sesiones: Sesion[];
   // F4a: video hero (YouTube) — null si no hay video configurado o la URL no

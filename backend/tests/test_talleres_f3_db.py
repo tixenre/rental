@@ -57,9 +57,8 @@ def taller_base(monkeypatch):
     try:
         _limpiar(conn)
         conn.execute(
-            "INSERT INTO talleres (id, slug, slug_base, nombre, instructor_nombre, "
-            "fecha_inicio, fecha_fin) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-            (TALLER_ID, SLUG, SLUG, "Taller F3", "", "2099-01-01", "2099-01-02"),
+            "INSERT INTO talleres (id, slug, slug_base, nombre) VALUES (%s, %s, %s, %s)",
+            (TALLER_ID, SLUG, SLUG, "Taller F3"),
         )
         conn.commit()
     finally:
@@ -119,10 +118,8 @@ def test_mismo_instructor_en_dos_talleres(taller_base):
     from database import get_db
     with get_db() as conn:
         conn.execute(
-            "INSERT INTO talleres (id, slug, slug_base, nombre, instructor_nombre, "
-            "fecha_inicio, fecha_fin) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-            (otro_taller_id, SLUG + "-b", SLUG + "-b", "Taller F3 B", "",
-             "2099-01-01", "2099-01-02"),
+            "INSERT INTO talleres (id, slug, slug_base, nombre) VALUES (%s, %s, %s, %s)",
+            (otro_taller_id, SLUG + "-b", SLUG + "-b", "Taller F3 B"),
         )
         conn.commit()
     try:

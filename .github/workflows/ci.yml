@@ -352,17 +352,21 @@ jobs:
           export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
           export RESERVAS_DB_TEST=1
           python -m pytest tests/test_talleres_f3_db.py -v --tb=short -m integration
-      - name: Backfills de datos legacy contra una base descartable (dedup por nombre, % histórico)
+      - name: Backfill de datos legacy contra una base descartable (% histórico)
         run: |
           cd backend
-          # Ambos hacen DROP/CREATE SCHEMA + init_db() + alembic upgrade head — corren
-          # sobre una BD que el resto del job no vuelve a tocar después. test_backfill_
-          # descuento_cliente_pct_migration_db.py (#1219) no tenía step propio hasta ahora.
+          # Hace DROP/CREATE SCHEMA + init_db() + alembic upgrade head — corre sobre una
+          # BD que el resto del job no vuelve a tocar después. test_backfill_descuento_
+          # cliente_pct_migration_db.py (#1219) no tenía step propio hasta ahora.
+          # test_instructores_backfill_migration_db.py (el otro test que corría acá) se
+          # retiró en Escuela v2 F6: su premisa (simular una DB pre-F3 vía init_db() +
+          # una fila legacy a mano) dejó de ser reproducible una vez que init_db() nace
+          # directo en la forma final (sin instructor_nombre) — ver esc7l8i9m0p1.
           export SECRET_KEY=ci-test-secret-not-for-production
           export ADMIN_EMAILS=admin@test.com
           export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
           export ALEMBIC_DB_TEST=1
-          python -m pytest tests/test_instructores_backfill_migration_db.py tests/test_backfill_descuento_cliente_pct_migration_db.py -v --tb=short -m integration
+          python -m pytest tests/test_backfill_descuento_cliente_pct_migration_db.py -v --tb=short -m integration
       - name: Escuela v2 — video hero + modalidades de pago contra Postgres real (F4a, #1278)
         run: |
           cd backend

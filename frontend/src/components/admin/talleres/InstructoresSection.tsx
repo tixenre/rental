@@ -192,6 +192,7 @@ function InstructorDialog({
     descripcion: instructor?.descripcion ?? "",
     instagram: instructor?.instagram ?? "",
     web: instructor?.web ?? "",
+    proyectos: instructor?.proyectos ?? "",
   });
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
@@ -280,6 +281,7 @@ function InstructorDialog({
             {field("Instagram", "instagram")}
             {field("Web", "web")}
           </div>
+          {field("Proyectos (separados por coma)", "proyectos", { rows: 2 })}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
               Foto

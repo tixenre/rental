@@ -87,10 +87,8 @@ def _fmt_pesos(n: int) -> str:
 # ── Helpers de lectura ────────────────────────────────────────────────────────
 
 _EDICION_JOIN_SELECT = """
-    SELECT e.*, t.nombre, t.subtitulo, t.instructor_nombre,
-           t.instructor_bio, t.instructor_proyectos, t.descripcion,
-           t.publico_objetivo, t.programa_teorica, t.programa_practica,
-           t.instructor_foto_url, t.instructor_media_id, t.notif_email,
+    SELECT e.*, t.nombre, t.subtitulo, t.descripcion,
+           t.publico_objetivo, t.notif_email,
            t.slug_base, t.terminos, t.beneficios, t.pregunta_experiencia,
            t.mensaje_confirmacion, t.video_url, t.video_poster_url, t.faqs
     FROM ediciones_taller e
@@ -150,12 +148,15 @@ def _instructor_dict(row) -> dict:
         "web": row["web"],
         "foto_url": row["foto_url"] or "",
         "foto_media_id": row["foto_media_id"],
+        # F6: "Trabajó con" — reemplaza el legacy `talleres.instructor_proyectos`
+        # (1 por taller); ahora es propio de cada instructor.
+        "proyectos": _row_get(row, "proyectos", ""),
     }
 
 
 def _get_instructores_taller(conn, taller_id: int) -> list[dict]:
-    """Instructores de un taller (F3), ordenados. Reemplaza de a poco a los
-    campos legacy `talleres.instructor_*` (servidos en paralelo hasta F6)."""
+    """Instructores de un taller (F3), ordenados. Fuente única desde F6 (los
+    campos legacy `talleres.instructor_*` que precedían a esto ya no existen)."""
     rows = conn.execute(
         "SELECT i.* FROM instructores i "
         "JOIN taller_instructores ti ON ti.instructor_id = i.id "
@@ -272,15 +273,8 @@ def _edicion_to_public_dict(row, clases=None, instructores=None, modalidades=Non
         "slug": row["slug"],
         "nombre": row["nombre"],
         "subtitulo": row["subtitulo"],
-        "instructor_nombre": row["instructor_nombre"],
-        "instructor_bio": row["instructor_bio"],
-        "instructor_proyectos": row["instructor_proyectos"],
         "descripcion": row["descripcion"],
         "publico_objetivo": row["publico_objetivo"],
-        "programa_teorica": row["programa_teorica"] or [],
-        "programa_practica": row["programa_practica"] or [],
-        "instructor_foto_url": row["instructor_foto_url"] or "",
-        "instructor_media_id": row["instructor_media_id"],
         "fecha_inicio": str(row["fecha_inicio"]),
         "fecha_fin": str(row["fecha_fin"]),
         "horario": row["horario"],
@@ -365,15 +359,8 @@ def _concepto_to_admin_dict(taller_row, ediciones=None, instructores=None, traba
         "slug_base": taller_row["slug_base"] or taller_row["slug"],
         "nombre": taller_row["nombre"],
         "subtitulo": taller_row["subtitulo"],
-        "instructor_nombre": taller_row["instructor_nombre"],
-        "instructor_bio": taller_row["instructor_bio"],
-        "instructor_proyectos": taller_row["instructor_proyectos"],
         "descripcion": taller_row["descripcion"],
         "publico_objetivo": taller_row["publico_objetivo"],
-        "programa_teorica": taller_row["programa_teorica"] or [],
-        "programa_practica": taller_row["programa_practica"] or [],
-        "instructor_foto_url": taller_row["instructor_foto_url"] or "",
-        "instructor_media_id": taller_row["instructor_media_id"],
         "notif_email": taller_row["notif_email"],
         "terminos": _row_get(taller_row, "terminos", ""),
         "beneficios": _row_get(taller_row, "beneficios", ""),
@@ -1059,12 +1046,14 @@ class EdicionCreateBody(BaseModel):
 
 class TallerConceptoCreateBody(BaseModel):
     nombre: str
+    # F6: ya no se persiste en `talleres` — resuelve por find-or-create contra
+    # la entidad `instructores` (mismo dedup exacto-por-nombre del backfill de
+    # F3) + link vía `taller_instructores`. Mantiene la UX de 1 solo campo al
+    # crear; el admin ajusta rol/bio/foto después en la pestaña "Instructores".
     instructor_nombre: str
     subtitulo: str = ""
     descripcion: str = ""
     publico_objetivo: str = ""
-    instructor_bio: str = ""
-    instructor_proyectos: str = ""
     notif_email: str = ""
     terminos: str = ""
     beneficios: str = ""
@@ -1080,6 +1069,9 @@ class InstructorBody(BaseModel):
     descripcion: str = ""
     instagram: str = ""
     web: str = ""
+    # F6: "Trabajó con" — reemplaza `talleres.instructor_proyectos` (legacy,
+    # 1 por taller); ahora es propio de cada instructor. Texto separado por coma.
+    proyectos: str = ""
 
 
 class InstructorUpdateBody(BaseModel):
@@ -1088,6 +1080,7 @@ class InstructorUpdateBody(BaseModel):
     descripcion: str | None = None
     instagram: str | None = None
     web: str | None = None
+    proyectos: str | None = None
     activo: bool | None = None
 
 
@@ -1105,11 +1098,6 @@ class TallerConceptoUpdateBody(BaseModel):
     subtitulo: str | None = None
     descripcion: str | None = None
     publico_objetivo: str | None = None
-    instructor_nombre: str | None = None
-    instructor_bio: str | None = None
-    instructor_proyectos: str | None = None
-    programa_teorica: list[str] | None = None
-    programa_practica: list[str] | None = None
     notif_email: str | None = None
     terminos: str | None = None
     beneficios: str | None = None
@@ -1172,6 +1160,17 @@ def admin_list_talleres(request: Request):
     return result
 
 
+def _find_or_create_instructor(conn, nombre: str) -> int:
+    """Dedup EXACTO por nombre — mismo criterio que el backfill de F3
+    (esc3n4t5r6u7): dos talleres con el mismo nombre de instructor comparten
+    la misma fila de `instructores`."""
+    row = conn.execute("SELECT id FROM instructores WHERE nombre = %s", (nombre,)).fetchone()
+    if row:
+        return row["id"]
+    cur = conn.execute("INSERT INTO instructores (nombre) VALUES (%s) RETURNING id", (nombre,))
+    return cur.fetchone()["id"]
+
+
 @router.post("/admin/talleres", status_code=201)
 def admin_create_taller(body: TallerConceptoCreateBody, request: Request):
     """Crea un nuevo concepto de taller con su primera edición."""
@@ -1221,40 +1220,35 @@ def admin_create_taller(body: TallerConceptoCreateBody, request: Request):
             cur = conn.execute(
                 """
                 INSERT INTO talleres (
-                    slug, nombre, subtitulo,
-                    instructor_nombre, instructor_bio, instructor_proyectos,
-                    descripcion, publico_objetivo,
-                    programa_teorica, programa_practica,
-                    fecha_inicio, fecha_fin, horario,
-                    cupos_total, precio_total, precio_sena,
-                    pago_alias, pago_cbu, pago_banco,
-                    direccion, notif_email, activo,
-                    tipo_taller, numero_edicion, slug_base,
+                    slug, nombre, subtitulo, descripcion, publico_objetivo,
+                    notif_email, activo, slug_base,
                     terminos, beneficios, pregunta_experiencia, mensaje_confirmacion
                 ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s::jsonb, %s::jsonb,
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, TRUE, %s, %s, %s,
-                    %s, %s, %s, %s
+                    %s, %s, %s, %s, %s, %s, TRUE, %s, %s, %s, %s, %s
                 ) RETURNING id
                 """,
                 (
                     slug_base, nombre_base, body.subtitulo.strip(),
-                    body.instructor_nombre.strip(), body.instructor_bio.strip(),
-                    body.instructor_proyectos.strip(),
                     body.descripcion.strip(), body.publico_objetivo.strip(),
-                    _json.dumps([], ensure_ascii=False), _json.dumps([], ensure_ascii=False),
-                    fecha_inicio, fecha_fin, ed.horario.strip(),
-                    ed.cupos_total, ed.precio_total, ed.precio_sena,
-                    ed.pago_alias.strip(), ed.pago_cbu.strip(), ed.pago_banco.strip(),
-                    ed.direccion.strip(), body.notif_email.strip(),
-                    ed.tipo_taller, ed_numero, slug_base,
+                    body.notif_email.strip(), slug_base,
                     body.terminos.strip(), body.beneficios.strip(),
                     body.pregunta_experiencia.strip(), body.mensaje_confirmacion.strip(),
                 ),
             )
             taller_id = cur.fetchone()["id"]
+
+            # F6: instructor por find-or-create (entidad `instructores`) + link
+            # — reemplaza el UPDATE directo a columnas legacy de `talleres`.
+            # Vacío → el concepto nace sin instructor (se agrega después desde
+            # la pestaña "Instructores"), en vez de crear una fila basura "".
+            instructor_nombre = body.instructor_nombre.strip()
+            if instructor_nombre:
+                instructor_id = _find_or_create_instructor(conn, instructor_nombre)
+                conn.execute(
+                    "INSERT INTO taller_instructores (taller_id, instructor_id, orden) "
+                    "VALUES (%s, %s, 0)",
+                    (taller_id, instructor_id),
+                )
 
             # Crear primera edición en ediciones_taller
             cur2 = conn.execute(
@@ -1289,11 +1283,14 @@ def admin_create_taller(body: TallerConceptoCreateBody, request: Request):
             # bloquea el próximo `ALTER TABLE`/lock de otra sesión (candado:
             # test_talleres_f2_db.py, se colgaba justo por esto).
             clases_out = _get_clases(conn, e_row["id"])
+            instructores_out = _get_instructores_taller(conn, taller_id)
         except Exception:
             conn.rollback()
             raise
 
-    return _concepto_to_admin_dict(t_row, [_edicion_to_admin_dict(e_row, clases_out)])
+    return _concepto_to_admin_dict(
+        t_row, [_edicion_to_admin_dict(e_row, clases_out)], instructores_out
+    )
 
 
 @router.post("/admin/talleres/{taller_id}/ediciones", status_code=201)
@@ -1384,7 +1381,7 @@ def admin_create_edicion(taller_id: int, body: EdicionCreateBody, request: Reque
 
 @router.patch("/admin/talleres/{taller_id}")
 def admin_update_concepto(taller_id: int, body: TallerConceptoUpdateBody, request: Request):
-    """Actualiza los campos estables del concepto (nombre, bio, programa, etc.)."""
+    """Actualiza los campos estables del concepto (nombre, descripción, T&C, etc.)."""
     require_admin(request)
     sets = []
     params: list = []
@@ -1396,18 +1393,6 @@ def admin_update_concepto(taller_id: int, body: TallerConceptoUpdateBody, reques
         sets.append("descripcion = %s"); params.append(body.descripcion.strip())
     if body.publico_objetivo is not None:
         sets.append("publico_objetivo = %s"); params.append(body.publico_objetivo.strip())
-    if body.instructor_nombre is not None:
-        sets.append("instructor_nombre = %s"); params.append(body.instructor_nombre.strip())
-    if body.instructor_bio is not None:
-        sets.append("instructor_bio = %s"); params.append(body.instructor_bio.strip())
-    if body.instructor_proyectos is not None:
-        sets.append("instructor_proyectos = %s"); params.append(body.instructor_proyectos.strip())
-    if body.programa_teorica is not None:
-        sets.append("programa_teorica = %s::jsonb")
-        params.append(_json.dumps(body.programa_teorica, ensure_ascii=False))
-    if body.programa_practica is not None:
-        sets.append("programa_practica = %s::jsonb")
-        params.append(_json.dumps(body.programa_practica, ensure_ascii=False))
     if body.notif_email is not None:
         sets.append("notif_email = %s"); params.append(body.notif_email.strip())
     if body.terminos is not None:
@@ -1667,59 +1652,12 @@ def admin_delete_edicion(edicion_id: int, request: Request):
     return {"ok": True}
 
 
-_INSTRUCTOR_SPECS = [
-    DeriveSpec(name="display", square=False, max_width=400),
-    DeriveSpec(name="display-sm", square=False, max_width=200),
-]
-
-
-@router.post("/admin/talleres/{taller_id}/upload-foto-instructor")
-async def admin_upload_foto_instructor(taller_id: int, request: Request):
-    """Sube la foto del instructor a R2 vía el motor de media y actualiza talleres."""
-    require_admin(request)
-    with get_db() as conn:
-        row = conn.execute("SELECT id FROM talleres WHERE id = %s", (taller_id,)).fetchone()
-        if row is None:
-            raise HTTPException(404, "Taller no encontrado")
-
-    form = await request.form()
-    file = form.get("file")
-    if file is None or not hasattr(file, "read"):
-        raise HTTPException(400, "Falta el campo 'file' en el form-data")
-
-    raw = await file.read()
-    if not raw:
-        raise HTTPException(400, "Archivo vacío")
-    if len(raw) > FOTO_MAX_MB * 1024 * 1024:
-        raise HTTPException(413, f"Archivo muy grande (máx {FOTO_MAX_MB} MB)")
-
-    try:
-        with get_db() as conn:
-            asset = store_upload(raw, kind="instructor", derive_specs=_INSTRUCTOR_SPECS, conn=conn)
-            display = asset.variant("display") or (asset.variants[0] if asset.variants else None)
-            url = display.url if display else ""
-            conn.execute(
-                "UPDATE talleres SET instructor_media_id = %s, instructor_foto_url = %s, "
-                "updated_at = CURRENT_TIMESTAMP WHERE id = %s",
-                (asset.id, url, taller_id),
-            )
-            conn.commit()
-    except MediaError as e:
-        raise HTTPException(e.status, e.detail)
-    except Exception as e:
-        logger.error("upload_foto_instructor: error inesperado: %s", e, exc_info=True)
-        raise HTTPException(502, "No se pudo subir la foto. Intentá de nuevo.")
-
-    return {"ok": True, "url": url, "media_id": asset.id}
-
-
 # ── Instructores: entidad propia + mini-CRUD (F3) ────────────────────────────
 # Un taller puede tener varios instructores; un instructor puede dar varios
-# talleres (Filmar: mismo instructor en Principiante y Avanzado). Reemplaza de
-# a poco a los campos legacy `talleres.instructor_*` (servidos en paralelo
-# hasta F6). Kind de media PROPIO ("instructor-perfil", entity_id=instructor.id)
-# — no reusa el kind legacy "instructor" (entity_id=taller_id) para no arriesgar
-# el flujo ya en producción.
+# talleres (Filmar: mismo instructor en Principiante y Avanzado). Fuente única
+# desde F6 (reemplazó a los campos legacy `talleres.instructor_*`, retirados).
+# Kind de media PROPIO ("instructor-perfil", entity_id=instructor.id) — el kind
+# legacy "instructor" (entity_id=taller_id) se retiró junto con el resto en F6.
 
 _INSTRUCTOR_PERFIL_SPECS = [
     DeriveSpec(name="display", square=False, max_width=400),
@@ -1743,10 +1681,10 @@ def admin_create_instructor(body: InstructorBody, request: Request):
         raise HTTPException(400, "El nombre es obligatorio")
     with get_db() as conn:
         cur = conn.execute(
-            "INSERT INTO instructores (nombre, rol, descripcion, instagram, web) "
-            "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            "INSERT INTO instructores (nombre, rol, descripcion, instagram, web, proyectos) "
+            "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
             (body.nombre.strip(), body.rol.strip(), body.descripcion.strip(),
-             body.instagram.strip(), body.web.strip()),
+             body.instagram.strip(), body.web.strip(), body.proyectos.strip()),
         )
         instructor_id = cur.fetchone()["id"]
         conn.commit()
@@ -1771,6 +1709,8 @@ def admin_update_instructor(instructor_id: int, body: InstructorUpdateBody, requ
         sets.append("instagram = %s"); params.append(body.instagram.strip())
     if body.web is not None:
         sets.append("web = %s"); params.append(body.web.strip())
+    if body.proyectos is not None:
+        sets.append("proyectos = %s"); params.append(body.proyectos.strip())
     if body.activo is not None:
         sets.append("activo = %s"); params.append(body.activo)
     if not sets:

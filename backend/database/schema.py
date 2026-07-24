@@ -1840,30 +1840,19 @@ def _init_db_schema(conn):
     conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL")
 
     # ── Talleres (workshops públicos con formulario de inscripción) ──────────
+    # Concepto (F1-F3 lo redujeron a datos estables): fechas/precio/cupos/pago/
+    # dirección/tipo viven en `ediciones_taller`; instructor(es) en `instructores`
+    # + `taller_instructores`; el contenido de clase en `clases_taller`. Escuela
+    # v2 F6 retiró las columnas legacy que las duplicaban acá (ver migración
+    # esc7l8i9m0p1 + docs/MEMORIA.md 2026-07-23 — Escuela v2 F6).
     conn.execute("""
         CREATE TABLE IF NOT EXISTS talleres (
             id                   SERIAL PRIMARY KEY,
             slug                 VARCHAR(120) NOT NULL UNIQUE,
             nombre               TEXT NOT NULL,
             subtitulo            TEXT NOT NULL DEFAULT '',
-            instructor_nombre    TEXT NOT NULL,
-            instructor_bio       TEXT NOT NULL DEFAULT '',
-            instructor_proyectos TEXT NOT NULL DEFAULT '',
             descripcion          TEXT NOT NULL DEFAULT '',
             publico_objetivo     TEXT NOT NULL DEFAULT '',
-            programa_teorica     JSONB NOT NULL DEFAULT '[]',
-            programa_practica    JSONB NOT NULL DEFAULT '[]',
-            fecha_inicio         DATE NOT NULL,
-            fecha_fin            DATE NOT NULL,
-            horario              TEXT NOT NULL DEFAULT '',
-            cupos_total          INTEGER NOT NULL DEFAULT 12,
-            cupos_confirmados    INTEGER NOT NULL DEFAULT 0,
-            precio_total         INTEGER NOT NULL DEFAULT 0,
-            precio_sena          INTEGER NOT NULL DEFAULT 0,
-            pago_alias           TEXT NOT NULL DEFAULT '',
-            pago_cbu             TEXT NOT NULL DEFAULT '',
-            pago_banco           TEXT NOT NULL DEFAULT '',
-            direccion            TEXT NOT NULL DEFAULT '',
             notif_email          TEXT NOT NULL DEFAULT '',
             activo               BOOLEAN NOT NULL DEFAULT TRUE,
             created_at           TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1887,31 +1876,7 @@ def _init_db_schema(conn):
         "CREATE INDEX IF NOT EXISTS idx_taller_inscripciones_taller "
         "ON taller_inscripciones(taller_id)"
     )
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS taller_sesiones (
-            id          SERIAL PRIMARY KEY,
-            taller_id   INTEGER NOT NULL REFERENCES talleres(id) ON DELETE CASCADE,
-            fecha       DATE    NOT NULL,
-            hora_inicio INTEGER NOT NULL,
-            hora_fin    INTEGER NOT NULL,
-            created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_taller_sesiones_taller "
-        "ON taller_sesiones(taller_id)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_taller_sesiones_fecha "
-        "ON taller_sesiones(fecha)"
-    )
-    # Seed idempotente del workshop de Jime Troncoso (julio 2026)
-    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS instructor_foto_url TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS numero_edicion INTEGER NOT NULL DEFAULT 1")
-    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS proxima_edicion_slug TEXT NOT NULL DEFAULT ''")
     conn.execute("ALTER TABLE taller_inscripciones ADD COLUMN IF NOT EXISTS comprobante_key TEXT")
-    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS instructor_media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL")
-    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS tipo_taller TEXT NOT NULL DEFAULT 'intensivo'")
     # Escuela v2 F2: T&C propios del taller ('' → linkea /terminos general),
     # beneficios ("15% off en rental..."), pregunta del form configurable
     # ('' → default actual) y mensaje de confirmación post-inscripción.
@@ -1924,155 +1889,6 @@ def _init_db_schema(conn):
     # admin arma la lista de a una (hay preguntas sugeridas precargables en
     # el front); ninguna es obligatoria.
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS faqs JSONB NOT NULL DEFAULT '[]'")
-    import json as _json_t
-    _programa_teorica = _json_t.dumps([
-        "Qué es la dirección de arte y cuál es su función dentro de un proyecto",
-        "Cómo se compone y se coordina un equipo",
-        "Análisis de proyectos reales: videoclip, publicidad, ambientación en evento y foto producto",
-        "Armado de presupuesto (sí, vamos a hablar de números)",
-        "Cómo mostrar tus proyectos y crecer dentro de la industria",
-    ])
-    _programa_practica = _json_t.dumps([
-        "Llegamos a la mejor parte (o la que a mí más me divierte): crear el set.",
-        "En esta instancia se suman el director de fotografía (Pablo Isa) y el gaffer (Tincho Santini), "
-        "que se encargarán del equipo técnico, junto con Rambla Rental, para que la práctica sea aún "
-        "más real y podamos ver el resultado final.",
-    ])
-    _instructor_proyectos = (
-        "Universal LATAM, CheNetflix, Shorta, Spotify, Gancia, Skyy, Dr Lemon, Luigi Bosca, "
-        "Las Pastillas del Abuelo, Kevin Johansen, Los Pericos & El Plan de la Mariposa, "
-        "Agapornis, Guolis, Lucciano's, La Fonte D'Oro, Billabong, Atomik, Kappa x Huracán, "
-        "Bruto, Turboblender, Shell, Hops"
-    )
-    conn.execute(
-        """
-        INSERT INTO talleres (
-            slug, nombre, subtitulo,
-            instructor_nombre, instructor_bio, instructor_proyectos,
-            descripcion, publico_objetivo,
-            programa_teorica, programa_practica,
-            fecha_inicio, fecha_fin, horario,
-            cupos_total, precio_total, precio_sena,
-            pago_alias, pago_cbu, pago_banco,
-            direccion, notif_email, activo
-        )
-        VALUES (
-            'direccion-de-arte-jime-troncoso',
-            'Workshop Dirección de Arte', 'x Jime Troncoso',
-            'Jime Troncoso',
-            '26 años, marplatense viviendo en CABA. Desde 2020 colabora con marcas, agencias y equipos '
-            'creativos en proyectos artísticos, audiovisuales y fotográficos, pensados para entornos '
-            'digitales y físicos.',
-            %s,
-            'Si llegaste hasta acá: gracias, estoy muy emocionada por hacer realidad este proyecto. '
-            'El workshop incluye 2 clases en Rambla Estudio y son 12 cupos, porque quiero que sea '
-            'un espacio donde podamos tener un intercambio de aprendizajes y conocimientos.',
-            'Directores/as, asistentes y ayudantes de arte · Creadores de contenido, fotógrafos/as, filmmakers · '
-            'Estudiantes de comunicación audiovisual, cine o fotografía · '
-            'Personas que les interese trabajar sobre lo artístico y estético a la hora de crear proyectos',
-            %s::jsonb, %s::jsonb,
-            '2026-07-11', '2026-07-18', '9 a 13 hs',
-            12, 200000, 100000,
-            'rambla.estudio', '0170239440000032889112', 'BBVA',
-            'Chaco 1392 — Rambla Estudio',
-            'jimetroncoso44@gmail.com',
-            TRUE
-        )
-        ON CONFLICT (slug) DO NOTHING
-        """,
-        (_instructor_proyectos, _programa_teorica, _programa_practica),
-    )
-    # Actualizaciones idempotentes para filas ya existentes (ON CONFLICT DO NOTHING no las toca).
-    conn.execute(
-        "UPDATE talleres SET notif_email = %s WHERE slug = %s AND notif_email = ''",
-        ("jimetroncoso44@gmail.com", "direccion-de-arte-jime-troncoso"),
-    )
-    conn.execute(
-        "UPDATE talleres SET instructor_proyectos = %s WHERE slug = %s",
-        (_instructor_proyectos, "direccion-de-arte-jime-troncoso"),
-    )
-    conn.execute(
-        "UPDATE talleres SET programa_teorica = %s::jsonb, programa_practica = %s::jsonb WHERE slug = %s",
-        (_programa_teorica, _programa_practica, "direccion-de-arte-jime-troncoso"),
-    )
-    conn.execute(
-        "UPDATE talleres SET instructor_bio = %s WHERE slug = %s",
-        (
-            "26 años, marplatense viviendo en CABA. Desde 2020 colabora con marcas, agencias y equipos "
-            "creativos en proyectos artísticos, audiovisuales y fotográficos, pensados para entornos "
-            "digitales y físicos.",
-            "direccion-de-arte-jime-troncoso",
-        ),
-    )
-    conn.execute(
-        "UPDATE talleres SET publico_objetivo = %s WHERE slug = %s",
-        (
-            "Directores/as, asistentes y ayudantes de arte · Creadores de contenido, fotógrafos/as, filmmakers · "
-            "Estudiantes de comunicación audiovisual, cine o fotografía · "
-            "Personas que les interese trabajar sobre lo artístico y estético a la hora de crear proyectos",
-            "direccion-de-arte-jime-troncoso",
-        ),
-    )
-    # Seed 2da edición (agosto 2026) — mismos contenidos, fechas distintas.
-    _descripcion_taller = (
-        "Si llegaste hasta acá: gracias, estoy muy emocionada por hacer realidad este proyecto. "
-        "El workshop incluye 2 clases en Rambla Estudio y son 12 cupos, porque quiero que sea "
-        "un espacio donde podamos tener un intercambio de aprendizajes y conocimientos."
-    )
-    _publico_objetivo_taller = (
-        "Directores/as, asistentes y ayudantes de arte · Creadores de contenido, fotógrafos/as, filmmakers · "
-        "Estudiantes de comunicación audiovisual, cine o fotografía · "
-        "Personas que les interese trabajar sobre lo artístico y estético a la hora de crear proyectos"
-    )
-    _instructor_bio_taller = (
-        "26 años, marplatense viviendo en CABA. Desde 2020 colabora con marcas, agencias y equipos "
-        "creativos en proyectos artísticos, audiovisuales y fotográficos, pensados para entornos "
-        "digitales y físicos."
-    )
-    conn.execute(
-        """
-        INSERT INTO talleres (
-            slug, nombre, subtitulo,
-            instructor_nombre, instructor_bio, instructor_proyectos,
-            descripcion, publico_objetivo,
-            programa_teorica, programa_practica,
-            fecha_inicio, fecha_fin, horario,
-            cupos_total, precio_total, precio_sena,
-            pago_alias, pago_cbu, pago_banco,
-            direccion, notif_email, activo,
-            numero_edicion
-        )
-        VALUES (
-            'direccion-de-arte-jime-troncoso-2',
-            'Workshop Dirección de Arte', 'x Jime Troncoso',
-            'Jime Troncoso',
-            %s, %s, %s, %s,
-            %s::jsonb, %s::jsonb,
-            '2026-08-15', '2026-08-22', '9 a 13 hs',
-            12, 200000, 100000,
-            'rambla.estudio', '0170239440000032889112', 'BBVA',
-            'Chaco 1392 — Rambla Estudio',
-            'jimetroncoso44@gmail.com',
-            TRUE, 2
-        )
-        ON CONFLICT (slug) DO NOTHING
-        """,
-        (
-            _instructor_bio_taller, _instructor_proyectos,
-            _descripcion_taller, _publico_objetivo_taller,
-            _programa_teorica, _programa_practica,
-        ),
-    )
-    # Linkear ediciones y asegurar numero_edicion correcto.
-    conn.execute(
-        "UPDATE talleres SET numero_edicion = 1, proxima_edicion_slug = 'direccion-de-arte-jime-troncoso-2' WHERE slug = 'direccion-de-arte-jime-troncoso'",
-    )
-    conn.execute(
-        "UPDATE talleres SET numero_edicion = 2, proxima_edicion_slug = '' WHERE slug = 'direccion-de-arte-jime-troncoso-2'",
-    )
-    # Las sesiones de talleres existentes no se seedean con fechas hardcodeadas:
-    # el admin las carga desde el back-office post-deploy con los datos reales.
-    # Mientras no haya sesiones, la página pública muestra el campo `horario` de texto.
 
     # ── Modelo de ediciones (F1): talleres → concepto + ediciones_taller + clases_taller ──
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS slug_base VARCHAR(120)")
@@ -2145,8 +1961,8 @@ def _init_db_schema(conn):
     # Escuela v2 F3: instructores como ENTIDAD propia (antes solo texto suelto en
     # `talleres.instructor_*`) — un taller puede tener varios, un instructor puede
     # dar varios talleres (caso Filmar: mismo instructor en Principiante y
-    # Avanzado). Las columnas `talleres.instructor_*` quedan servidas como
-    # legacy hasta F6 (backfill las migra a filas de `instructores` + link).
+    # Avanzado). Fuente única desde F6 (las columnas legacy de `talleres` que
+    # las precedían ya no existen).
     conn.execute("""
         CREATE TABLE IF NOT EXISTS instructores (
             id            SERIAL PRIMARY KEY,
@@ -2178,6 +1994,9 @@ def _init_db_schema(conn):
         "CREATE INDEX IF NOT EXISTS idx_taller_instructores_instructor "
         "ON taller_instructores(instructor_id)"
     )
+    # Escuela v2 F6: proyectos por-instructor (reemplaza `talleres.instructor_proyectos`,
+    # dropeada en la misma fase) — "Trabajó con" ahora lee de acá.
+    conn.execute("ALTER TABLE instructores ADD COLUMN IF NOT EXISTS proyectos TEXT NOT NULL DEFAULT ''")
 
     # Escuela v2 F4a: video hero (YouTube) del concepto. Mismo extractor que
     # estudio_trabajos (services.media.youtube.extract_video_id), pero acá SÍ

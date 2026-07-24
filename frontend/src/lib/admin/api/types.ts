@@ -1443,15 +1443,8 @@ export type TallerConcepto = {
   slug_base: string;
   nombre: string;
   subtitulo: string;
-  instructor_nombre: string;
-  instructor_bio: string;
-  instructor_proyectos: string;
   descripcion: string;
   publico_objetivo: string;
-  programa_teorica: string[];
-  programa_practica: string[];
-  instructor_foto_url: string;
-  instructor_media_id: number | null;
   notif_email: string;
   // F2: T&C propios ('' → /terminos general), beneficios, pregunta del form
   // configurable y mensaje post-inscripción.
@@ -1470,8 +1463,8 @@ export type TallerConcepto = {
   trabajos: Trabajo[];
 };
 
-// F3: instructor como entidad propia (N↔N con talleres — reemplaza de a poco
-// a los campos instructor_* legacy del concepto, servidos en paralelo hasta F6).
+// F3: instructor como entidad propia (N↔N con talleres — fuente única desde
+// F6, reemplazó a los campos instructor_* legacy del concepto).
 export type Instructor = {
   id: number;
   nombre: string;
@@ -1481,6 +1474,8 @@ export type Instructor = {
   web: string;
   foto_url: string;
   foto_media_id: number | null;
+  // F6: "Trabajó con" — reemplaza el legacy `instructor_proyectos` (1 por taller).
+  proyectos: string;
 };
 
 export type Inscripcion = {

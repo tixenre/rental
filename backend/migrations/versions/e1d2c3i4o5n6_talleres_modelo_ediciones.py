@@ -132,43 +132,54 @@ def upgrade() -> None:
     )
 
     # ── F2: backfill de datos ─────────────────────────────────────────────────
+    # Guard post-Escuela-v2-F6 (esc7l8i9m0p1): en una DB fresca, init_db() ya
+    # crea `talleres` en su forma FINAL — sin fecha_inicio/proxima_edicion_slug/
+    # el resto de columnas de edición "plana" que este backfill lee (retiradas
+    # en F6) — así que no hay ninguna fila legacy de la que migrar. Mismo
+    # criterio que el guard de clases_taller un poco más abajo.
+    conn = op.get_bind()
+    tiene_fecha_inicio = conn.execute(text(
+        "SELECT 1 FROM information_schema.columns "
+        "WHERE table_name = 'talleres' AND column_name = 'fecha_inicio'"
+    )).fetchone() is not None
 
-    # Marcar raíces de cadena (slug no referenciado como proxima_edicion_slug)
-    op.execute("""
-        UPDATE talleres
-        SET slug_base = slug
-        WHERE slug NOT IN (
-            SELECT proxima_edicion_slug FROM talleres WHERE proxima_edicion_slug != ''
-        )
-        AND slug_base IS NULL
-    """)
+    if tiene_fecha_inicio:
+        # Marcar raíces de cadena (slug no referenciado como proxima_edicion_slug)
+        op.execute("""
+            UPDATE talleres
+            SET slug_base = slug
+            WHERE slug NOT IN (
+                SELECT proxima_edicion_slug FROM talleres WHERE proxima_edicion_slug != ''
+            )
+            AND slug_base IS NULL
+        """)
 
-    # Crear ediciones_taller a partir de cada fila de talleres.
-    # Para cadenas de profundidad 2 (root → hijo): el taller_id de la edición
-    # es la raíz del concepto (el que tiene slug_base seteado).
-    op.execute("""
-        INSERT INTO ediciones_taller (
-            taller_id, numero_edicion, slug, tipo_taller,
-            fecha_inicio, fecha_fin, horario,
-            cupos_total, cupos_confirmados, precio_total, precio_sena,
-            pago_alias, pago_cbu, pago_banco, direccion, activo
-        )
-        SELECT
-            (
-                SELECT r.id FROM talleres r
-                WHERE r.slug_base IS NOT NULL
-                  AND (r.slug = t.slug OR r.proxima_edicion_slug = t.slug)
-                LIMIT 1
-            ) AS taller_id,
-            t.numero_edicion, t.slug, t.tipo_taller,
-            t.fecha_inicio, t.fecha_fin, t.horario,
-            t.cupos_total, t.cupos_confirmados, t.precio_total, t.precio_sena,
-            t.pago_alias, t.pago_cbu, t.pago_banco, t.direccion, t.activo
-        FROM talleres t
-        WHERE NOT EXISTS (
-            SELECT 1 FROM ediciones_taller e WHERE e.slug = t.slug
-        )
-    """)
+        # Crear ediciones_taller a partir de cada fila de talleres.
+        # Para cadenas de profundidad 2 (root → hijo): el taller_id de la edición
+        # es la raíz del concepto (el que tiene slug_base seteado).
+        op.execute("""
+            INSERT INTO ediciones_taller (
+                taller_id, numero_edicion, slug, tipo_taller,
+                fecha_inicio, fecha_fin, horario,
+                cupos_total, cupos_confirmados, precio_total, precio_sena,
+                pago_alias, pago_cbu, pago_banco, direccion, activo
+            )
+            SELECT
+                (
+                    SELECT r.id FROM talleres r
+                    WHERE r.slug_base IS NOT NULL
+                      AND (r.slug = t.slug OR r.proxima_edicion_slug = t.slug)
+                    LIMIT 1
+                ) AS taller_id,
+                t.numero_edicion, t.slug, t.tipo_taller,
+                t.fecha_inicio, t.fecha_fin, t.horario,
+                t.cupos_total, t.cupos_confirmados, t.precio_total, t.precio_sena,
+                t.pago_alias, t.pago_cbu, t.pago_banco, t.direccion, t.activo
+            FROM talleres t
+            WHERE NOT EXISTS (
+                SELECT 1 FROM ediciones_taller e WHERE e.slug = t.slug
+            )
+        """)
 
     # Migrar clases desde taller_sesiones (si existen).
     # Guard post-Escuela-v2-F1 (esc1m2i3n4t5): en una DB fresca, init_db() ya
