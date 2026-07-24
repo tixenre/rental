@@ -18,7 +18,7 @@ import { TallerFAQ } from "@/components/talleres/TallerFAQ";
 import { TallerCTABar } from "@/components/talleres/TallerCTABar";
 import { Input } from "@/design-system/ui/input";
 import { apiGetTaller, type EdicionLite, type Taller } from "@/lib/api";
-import { ordinalEdicion } from "@/lib/talleres/formato";
+import { ordinalEdicion, resumenFechas, resumenHorario } from "@/lib/talleres/formato";
 import { descargarIcsTaller } from "@/lib/talleres/ical";
 
 export const Route = createLazyFileRoute("/escuela/$slug")({
@@ -206,6 +206,8 @@ function TallerLandingPage() {
   const fechaFinStr = fechaFin.toLocaleDateString("es-AR", optsLong);
 
   const clases = formTaller.sesiones;
+  const fechasResumen = resumenFechas(clases, fechaInicioStr, fechaFinStr);
+  const horarioResumen = resumenHorario(clases, formTaller.horario);
 
   return (
     <>
@@ -231,8 +233,8 @@ function TallerLandingPage() {
           <TallerHero
             taller={taller}
             formTaller={formTaller}
-            fechaInicioStr={fechaInicioStr}
-            fechaFinStr={fechaFinStr}
+            fechasResumen={fechasResumen}
+            horarioResumen={horarioResumen}
           />
 
           {/* ── Cuerpo ─────────────────────────────────────────────────────── */}

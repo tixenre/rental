@@ -71,15 +71,13 @@ function EdicionesContexto({
 }
 
 function MetaRow({
-  fechaInicioStr,
-  fechaFinStr,
-  horario,
+  fechasResumen,
+  horarioResumen,
   direccion,
   cuposTotal,
 }: {
-  fechaInicioStr: string;
-  fechaFinStr: string;
-  horario: string;
+  fechasResumen: string;
+  horarioResumen: string;
   direccion: string;
   cuposTotal: number;
 }) {
@@ -87,11 +85,11 @@ function MetaRow({
     <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm text-background/60">
       <span className="flex items-center gap-2">
         <Calendar className="h-4 w-4 shrink-0" />
-        {fechaInicioStr} y {fechaFinStr}
+        {fechasResumen}
       </span>
       <span className="flex items-center gap-2">
         <Clock className="h-4 w-4 shrink-0" />
-        {horario}
+        {horarioResumen}
       </span>
       <span className="flex items-center gap-2">
         <MapPin className="h-4 w-4 shrink-0" />
@@ -107,9 +105,9 @@ function MetaRow({
 
 type Props = {
   taller: Taller;
-  formTaller: { horario: string; direccion: string; cupos_total: number };
-  fechaInicioStr: string;
-  fechaFinStr: string;
+  formTaller: { direccion: string; cupos_total: number };
+  fechasResumen: string;
+  horarioResumen: string;
 };
 
 /**
@@ -120,7 +118,7 @@ type Props = {
  * campo de foto de portada separado; si se pide, es un campo nuevo a sumar
  * junto a video_url, no algo a inventar acá.
  */
-export function TallerHero({ taller, formTaller, fechaInicioStr, fechaFinStr }: Props) {
+export function TallerHero({ taller, formTaller, fechasResumen, horarioResumen }: Props) {
   const cta = (
     <a
       href="#inscripcion"
@@ -139,9 +137,8 @@ export function TallerHero({ taller, formTaller, fechaInicioStr, fechaFinStr }: 
             <Titulo taller={taller} />
             <EdicionesContexto taller={taller} />
             <MetaRow
-              fechaInicioStr={fechaInicioStr}
-              fechaFinStr={fechaFinStr}
-              horario={formTaller.horario}
+              fechasResumen={fechasResumen}
+              horarioResumen={horarioResumen}
               direccion={formTaller.direccion}
               cuposTotal={formTaller.cupos_total}
             />
@@ -165,9 +162,8 @@ export function TallerHero({ taller, formTaller, fechaInicioStr, fechaFinStr }: 
         <Titulo taller={taller} />
         <EdicionesContexto taller={taller} />
         <MetaRow
-          fechaInicioStr={fechaInicioStr}
-          fechaFinStr={fechaFinStr}
-          horario={formTaller.horario}
+          fechasResumen={fechasResumen}
+          horarioResumen={horarioResumen}
           direccion={formTaller.direccion}
           cuposTotal={formTaller.cupos_total}
         />
